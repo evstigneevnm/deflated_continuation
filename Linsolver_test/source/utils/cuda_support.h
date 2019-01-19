@@ -23,14 +23,71 @@
 #include <iostream>
 #include <cstdlib>
 #include <stdarg.h>
+#include <utils/cuda_safe_call.h>
 #include <cuda_runtime.h>
 
-#include "cuda_safe_call.h"
-//TODO: put throw everywhere!!!
 
+int init_cuda(int PCI_ID)
+{
 
-int InitCUDA(int GPU_number=-1);
+    
+    int count = 0;
+    int i = 0;
 
+    cudaGetDeviceCount(&count);
+    if(count == 0)
+    {
+        fprintf(stderr, "There is no compartable device found.\n");
+        return -1;
+    }
+    
+    int deviceNumber=0;
+    int deviceNumberTemp=0;
+    
+    if(count>1)
+    {
+
+        if(PCI_ID==-1)
+        {
+            for(i = 0; i < count; i++) 
+            {
+                cudaDeviceProp deviceProp;
+                cudaGetDeviceProperties(&deviceProp, i);
+                printf( "#%i:   %s, pci-bus id:%i %i %i \n", i, (char*)&deviceProp,deviceProp.pciBusID,deviceProp.pciDeviceID,deviceProp.pciDomainID);
+            }            
+            printf("Device number for it to use>>>\n");
+            scanf("%i", &deviceNumberTemp);
+        }
+        else
+        {
+            cudaDeviceProp deviceProp;
+            for(int j=0;j<count;j++)
+            {
+                cudaGetDeviceProperties(&deviceProp, j);
+                if(deviceProp.pciBusID==PCI_ID)
+                {
+                    deviceNumberTemp = j;
+                    break;
+                }
+            }
+
+            printf("Using %s@[%i:%i:%i]\n",(char*)&deviceProp,deviceProp.pciBusID,deviceProp.pciDeviceID,deviceProp.pciDomainID);
+        }
+        deviceNumber=deviceNumberTemp;
+    
+    }
+    else
+    {
+        cudaDeviceProp deviceProp;
+        cudaGetDeviceProperties(&deviceProp, deviceNumber);
+        printf( "#%i:   %s, pci-bus id:%i %i %i \n", deviceNumber, (char*)&deviceProp,deviceProp.pciBusID,deviceProp.pciDeviceID,deviceProp.pciDomainID);
+        printf( "       using it...\n");    
+    }
+
+    cudaSetDevice(deviceNumber);
+    
+    return deviceNumber;
+}
 
 
 template <class T>
