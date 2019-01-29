@@ -1,14 +1,15 @@
 #include <cmath>
 #include <iostream>
+#include <cstdio>
 #include <utils/cuda_support.h>
 #include <external_libraries/cufft_wrap.h>
-#include <cufft_test_kernels.h>
+#include "cufft_test_kernels.h"
 
 
 int main(int argc, char const *argv[])
 {
     typedef SCALAR_TYPE real;
-    int Nx=1000;
+    int Nx=10000;
     typedef cufft_wrap_C2C<real>::complex_type complex_type;
 
     init_cuda(-1);
@@ -48,13 +49,15 @@ int main(int argc, char const *argv[])
         res_norm_I+=sqrt(uI[j]*uI[j]);
     }
 
-    std::cout << "C2C:" << res_norm_R << " " << res_norm_I << " " << std::endl;
-    
+    //std::cout << "C2C:" << res_norm_R << " " << res_norm_I << " " << std::endl;
+    printf("C2C: Re=%le Im=%le\n", (double)res_norm_R,(double)res_norm_I);
 
     set_values<real,complex_type>(Nx, u_d);
     convert_2R_values<real,complex_type>(Nx, u_d, uR_d, uI_d);
+    
     CUFFT_R->fft(uR_d, u_hat_reduced_d);
     CUFFT_R->ifft(u_hat_reduced_d, uI_d);
+    
     device_2_host_cpy<real>(uR, uR_d, Nx);
     device_2_host_cpy<real>(uI, uI_d, Nx);
     res_norm_R=0.0;
@@ -63,7 +66,8 @@ int main(int argc, char const *argv[])
         real diff=uI[j]/Nx-uR[j];
         res_norm_R+=sqrt(diff*diff);
     }
-    std::cout << "R2C2R:" << res_norm_R << " " << std::endl;
+    //std::cout << "R2C: " << res_norm_R << " " << std::endl;
+    printf("R2C: %le \n", (double)res_norm_R);
 
     free(uR);
     free(uI);

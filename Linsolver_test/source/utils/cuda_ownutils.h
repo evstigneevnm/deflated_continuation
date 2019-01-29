@@ -18,6 +18,6 @@
 #define __CUDA_OWNUTILS_H__
 
 #include "cuda_safe_call.h"
-#include "InitCUDA.h"
+#include "cuda_support.h"
 
 #endif

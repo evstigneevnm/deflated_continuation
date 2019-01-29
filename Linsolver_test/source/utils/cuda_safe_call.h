@@ -23,6 +23,9 @@
 #define __STR_HELPER(x) #x
 #define __STR(x) __STR_HELPER(x)
 
+
+
+
 #define CUDA_SAFE_CALL(X)                                                                                                                                                                       \
     do {                                                                                                                                                                                        \
         cudaError_t cuda_res = (X);                                                                                                                                                             \

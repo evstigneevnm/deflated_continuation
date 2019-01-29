@@ -2,6 +2,7 @@
 #define __CUFFT_SAFE_CALL_H__
 
 #include <cuda_runtime.h>
+#include <cufft.h>
 #include <stdexcept>
 #include <string>
 #include <sstream>
@@ -9,7 +10,7 @@
 #define __STR_HELPER(x) #x
 #define __STR(x) __STR_HELPER(x)
 
-static const char *_cudaGetErrorEnum(cufftResult error)
+static const char *_cufftGetErrorEnum(cufftResult error)
 {
     switch (error)
     {
@@ -66,7 +67,7 @@ static const char *_cudaGetErrorEnum(cufftResult error)
                 cudaError_t cuda_res = cudaDeviceSynchronize(); \
                 if (status != CUFFT_SUCCESS) { \
                         std::stringstream ss;  \
-                        ss << std::string("CUFFT_SAFE_CALL " __FILE__ " " __STR(__LINE__) " : " #X " failed: ") << std::string(_cudaGetErrorEnum(status)); \
+                        ss << std::string("CUFFT_SAFE_CALL " __FILE__ " " __STR(__LINE__) " : " #X " failed: ") << std::string(_cufftGetErrorEnum(status)); \
                         std::string str = ss.str();  \
                         throw std::runtime_error(str); \
                 }      \

@@ -8,7 +8,7 @@ __global__ void kernel_set_values(size_t N, T_C *array)
 {
     unsigned int j = blockIdx.x * blockDim.x + threadIdx.x;
     if(j<N){
-        array[j].x=sin(T_R(j)/N);
+        array[j].x=sin(3.14159265358979*T_R(j)/N);
         array[j].y=T_R(0.0);
     }
 
