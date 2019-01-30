@@ -5,28 +5,32 @@
 #include <thrust/complex.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D_ker.h>
 //for debug!
+#include <iostream>
 #include "file_operations.h"
 #include <limits>
 
-template<typename VectorOperations, unsigned int BLOCK_SIZE_x, unsigned int BLOCK_SIZE_y>
+template<typename VectorOperations_R, typename VectorOperations_C, unsigned int BLOCK_SIZE_x, unsigned int BLOCK_SIZE_y>
 class Kuramoto_Sivashinskiy_2D
 {
 public:
     
-    typedef VectorOperations vector_operations_type;
-    typedef typename VectorOperations::scalar_type  T;
-    typedef typename VectorOperations::vector_type  T_vec;
-    typedef thrust::complex<T> thrust_complex_type;    
+    typedef VectorOperations_R vector_operations_real;
+    typedef VectorOperations_C vector_operations_complex;
+    typedef typename VectorOperations_R::scalar_type  T;
+    typedef typename VectorOperations_R::vector_type  T_vec;
+    typedef typename VectorOperations_C::scalar_type  TC;
+    typedef typename VectorOperations_C::vector_type  TC_vec;
+    typedef thrust::complex<T> thrust_complex_type;   
 
 
-    Kuramoto_Sivashinskiy_2D(size_t Nx_, size_t Ny_, vector_operations_type *vec_ops_, cufft_wrap_R2C<T> *CUFFT_): Nx(Nx_), Ny(Ny_), vec_ops(vec_ops_), CUFFT(CUFFT_)
+    Kuramoto_Sivashinskiy_2D(size_t Nx_, size_t Ny_, vector_operations_real *vec_ops_R_, vector_operations_complex *vec_ops_C_, cufft_wrap_R2C<T> *CUFFT_): Nx(Nx_), Ny(Ny_), vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), CUFFT(CUFFT_)
     {
         common_constructor_operation();
         calculate_cuda_grid();
         init_all_derivatives();
     }
 
-    Kuramoto_Sivashinskiy_2D(size_t Nx_, size_t Ny_, dim3 dimGrid_, dim3 dimGrid_F_, dim3 dimBlock_, vector_operations_type *vec_ops_, cufft_wrap_R2C<T> &CUFFT_): Nx(Nx_), Ny(Ny_), dimGrid(dimGrid_), dimGrid_F(dimGrid_F_), dimBlock(dimBlock_), vec_ops(vec_ops_), CUFFT(CUFFT_)
+    Kuramoto_Sivashinskiy_2D(size_t Nx_, size_t Ny_, dim3 dimGrid_, dim3 dimGrid_F_, dim3 dimBlock_, vector_operations_real *vec_ops_R_, vector_operations_complex *vec_ops_C_, cufft_wrap_R2C<T> &CUFFT_): Nx(Nx_), Ny(Ny_), dimGrid(dimGrid_), dimGrid_F(dimGrid_F_), dimBlock(dimBlock_), vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), CUFFT(CUFFT_)
     {
 
         common_constructor_operation();
@@ -54,7 +58,9 @@ public:
     void tests()
     {
         
-        thrust_complex_type *U_hat_d = device_allocate<thrust_complex_type>(Nx*My);
+        TC_vec U_hat_d = device_allocate<TC>(Nx*My);
+        TC_vec U_hat1_d = device_allocate<TC>(Nx*My);
+        TC_vec U_hat2_d = device_allocate<TC>(Nx*My);
         T_vec U = (T_vec) malloc(sizeof(T)*Nx*Ny);
         T_vec U1 = (T_vec) malloc(sizeof(T)*Nx*Ny);
         for (int i = 0; i < Nx*Ny; ++i)
@@ -67,7 +73,8 @@ public:
 
         CUFFT->fft(U_d, U_hat_d);
         CUFFT->ifft(U_hat_d, U1_d);
-        
+
+
         device_2_host_cpy<T>(U1, U1_d, Nx*Ny);
         T residual = 0.0;
         for (int i = 0; i < Nx*Ny; ++i)
@@ -75,9 +82,28 @@ public:
             T diff = U1[i]/Nx/Ny-U[i];
             residual+=sqrt(diff*diff);
         }
+        
+
+        printf("||U||_2=%le\n",(double)vec_ops_R->normalize(U_d));
+        printf("||U||_2=%le\n",(double)vec_ops_R->norm(U_d));
+        printf("(U,U1)=%le\n",(double)vec_ops_R->scalar_prod(U1_d,U_d));
+
+        
+        CUFFT->fft(U_d, U_hat1_d);
+        CUFFT->fft(U_d, U_hat2_d);
+
+        vec_ops_C->assign_mul( (TC)1.0, U_hat_d, (TC)-5.0, U_hat1_d, U_hat2_d);
+
+        std::cout << "||U_hat||_2=" << sqrt(vec_ops_C->scalar_prod(U_hat2_d,U_hat2_d).real()) << std::endl;
+        printf("||U_hat||_2=%le\n",(double)vec_ops_C->normalize(U_hat2_d));
+        printf("||U_hat||_2=%le\n",(double)vec_ops_C->norm(U_hat2_d));
+        std::cout << "||U_hat||_2=" << sqrt(vec_ops_C->scalar_prod(U_hat2_d,U_hat2_d)) << std::endl;
+
         cudaFree(U_d);
         cudaFree(U1_d);
         cudaFree(U_hat_d);
+        cudaFree(U_hat1_d);
+        cudaFree(U_hat2_d);
         free(U);
         free(U1);
         printf("resid = %le\n",(double)residual);
@@ -88,14 +114,14 @@ public:
         device_2_host_cpy<T>(Laplace_h, Laplace, Nx*My);
         device_2_host_cpy<T>(biharmonic_h, biharmonic, Nx*My);
         
-        printf("is valid? %i. ture=%i, false=%i.\n",vec_ops->check_is_valid_number(Laplace), true, false);
+        printf("is valid? %i. ture=%i, false=%i.\n",vec_ops_R->check_is_valid_number(Laplace), true, false);
         file_operations::write_matrix<T>("laplace.dat",  Nx, My, Laplace_h);
         file_operations::write_matrix<T>("biharm.dat",  Nx, My, biharmonic_h);
         
         //Laplace_h[Nx*My/2]=std::numeric_limits<T>::quiet_NaN();
         Laplace_h[Nx*My-1]=std::numeric_limits<T>::infinity();
         host_2_device_cpy<T>(Laplace, Laplace_h, Nx*My);   
-        printf("is valid? %i. ture=%i, false=%i.\n",vec_ops->check_is_valid_number(Laplace), true, false);
+        printf("is valid? %i. ture=%i, false=%i.\n",vec_ops_R->check_is_valid_number(Laplace), true, false);
 
         free(Laplace_h);
         free(biharmonic_h);
@@ -125,7 +151,8 @@ private:
     dim3 dimGrid;
     dim3 dimBlock;
     dim3 dimGrid_F;
-    vector_operations_type *vec_ops;
+    vector_operations_real *vec_ops_R;
+    vector_operations_complex *vec_ops_C;
 
 
     size_t Nx, Ny, My;

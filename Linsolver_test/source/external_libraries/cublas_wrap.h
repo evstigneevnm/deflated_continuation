@@ -57,6 +57,7 @@ public:
     {
         cublas_create();
         handle_created=true;
+        set_pointer_location_device(false);
     }
 
     cublas_wrap(bool plot_info): handle_created(false)
@@ -71,6 +72,7 @@ public:
             cublas_create();
             handle_created=true;
         }
+        set_pointer_location_device(false);
     }
 
 
@@ -114,10 +116,14 @@ public:
     //this scalar pointer must be allocated on the device via cudaMalloc!
     void set_pointer_location_device(bool store_on_device)
     {
-        if(store_on_device)
+        if(store_on_device){
             CUBLAS_SAFE_CALL(cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_DEVICE)); 
-        else
+            scalar_pointer_on_device=true;
+        }
+        else{
             CUBLAS_SAFE_CALL(cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_HOST)); 
+            scalar_pointer_on_device=false;
+        }
     }
 
     template<typename T>
@@ -161,7 +167,7 @@ public:
         CUBLAS_SAFE_CALL(cublasGetMatrixAsync(rows, cols, sizeof(T), mat_device, lda, mat_host, ldb, stream));
     }
     
-    //TODO Can't be used in cuda8?!? WTF? see: https://docs.nvidia.com/cuda/cublas/index.html#cublasmath_t
+    //TODO Can't be used in cuda 8?!? WTF? see: https://docs.nvidia.com/cuda/cublas/index.html#cublasmath_t
     // void use_tensor_core_operations(bool useTCO)
     // {
     //     cublasMath_t mode = CUBLAS_DEFAULT_MATH;
@@ -188,7 +194,10 @@ public:
     // y [ j ] = x [ k ] 
     template<typename T>
     void copy(size_t vector_sizes, const T *x, T *y, int incx=1, int incy=1);
-    //dot product (we use automatic conjugation for complex)
+    // y [ j ] <-> x [ k ] 
+    template<typename T>
+    void swap(size_t vector_sizes, T *x, T *y, int incx=1, int incy=1);
+    //dot product (we use automatic conjugation for complex number, i.e. dot(u,v)=u^C*v)
     template<typename T>
     void dot(size_t vector_size, const T *x, const T *y, T *result, int incx=1, int incy=1);
     //vector l2 norm.
@@ -205,14 +214,14 @@ public:
     void scale(size_t vector_size, const T alpha, typename cublas_cuComplex_type_hlp<T>::type *x, int incx=1);
     template<typename T>
     void scale(size_t vector_size, const T alpha, thrust::complex<T> *x, int incx=1);
-    //normalizes vector. Overwrites a vector with normilized one and returns it's norm. Usually used in Krylov-type methods
+    //normalizes vector. Overwrites a vector with normalized one and returns it's norm. Usually used in Krylov-type methods
     template<typename T>
     void normalize(size_t vector_size, T *x, T *norm, int incx=1);
     template<typename T>
     void normalize(size_t vector_size, typename cublas_cuComplex_type_hlp<T>::type *x, T *norm, int incx=1);
     template<typename T> 
     void normalize(size_t vector_size, thrust::complex<T> *x, T *norm, int incx=1);
-
+    //TODO: add Givens rotations construction for Arnoldi process
 
     //===cuBLAS Level-2 Functions=== see: https://docs.nvidia.com/cuda/cublas/index.html#cublas-level-2-function-reference
     //TODO: to be inplemented on demand.
@@ -226,7 +235,7 @@ public:
 private:
     cublasHandle_t handle;
     bool handle_created;
-
+    bool scalar_pointer_on_device;
 
 
 
@@ -296,7 +305,9 @@ private:
         CUBLAS_SAFE_CALL(cublasDzasum(handle, vector_size, (cuDoubleComplex*) vector, incx, result));
 
     }   
-    //
+    //This function multiplies the vector x by the scalar alpha 
+    //and adds it to the vector y overwriting the latest vector with the result.
+    //y=alpha*x+y;
     template<>
     void cublas_wrap::axpy(size_t vector_sizes, const float alpha, const float *x, float *y, int incx, int incy)
     {
@@ -360,6 +371,37 @@ private:
     }
     //
     template<>
+    void cublas_wrap::swap(size_t vector_size, float *x, float *y, int incx, int incy)
+    {
+        CUBLAS_SAFE_CALL(cublasSswap(handle, vector_size, x, incx, y, incy));
+    }
+    template<>
+    void cublas_wrap::swap(size_t vector_size, double *x, double *y, int incx, int incy)
+    {
+        CUBLAS_SAFE_CALL(cublasDswap(handle, vector_size, x, incx, y, incy));
+    }
+    template<>
+    void cublas_wrap::swap(size_t vector_size, cuComplex *x, cuComplex *y, int incx, int incy)
+    {
+        CUBLAS_SAFE_CALL(cublasCswap(handle, vector_size, x, incx, y, incy));
+    }    
+    template<>
+    void cublas_wrap::swap(size_t vector_size, cuDoubleComplex *x, cuDoubleComplex *y, int incx, int incy)
+    {
+        CUBLAS_SAFE_CALL(cublasZswap(handle, vector_size, x, incx, y, incy));
+    }   
+    template<>
+    void cublas_wrap::swap(size_t vector_size, thrust::complex<float> *x, thrust::complex<float> *y, int incx, int incy)
+    {
+        CUBLAS_SAFE_CALL(cublasCswap(handle, vector_size, (cuComplex*)x, incx, (cuComplex*)y, incy));
+    }    
+    template<>
+    void cublas_wrap::swap(size_t vector_size, thrust::complex<double> *x, thrust::complex<double> *y, int incx, int incy)
+    {
+        CUBLAS_SAFE_CALL(cublasZswap(handle, vector_size, (cuDoubleComplex*)x, incx, (cuDoubleComplex*)y, incy));
+    }       
+    //
+    template<>
     void cublas_wrap::dot(size_t vector_size, const float *x, const float *y, float *result, int incx, int incy)
     {
         CUBLAS_SAFE_CALL(cublasSdot (handle, vector_size, x, incx, y, incy, result));
@@ -372,22 +414,22 @@ private:
     template<>
     void cublas_wrap::dot(size_t vector_size, const cuComplex *x, const cuComplex *y, cuComplex *result, int incx, int incy)
     {
-        CUBLAS_SAFE_CALL(cublasCdotu (handle, vector_size, x, incx, y, incy, result));
+        CUBLAS_SAFE_CALL(cublasCdotc (handle, vector_size, x, incx, y, incy, result));
     }
     template<>
     void cublas_wrap::dot(size_t vector_size, const cuDoubleComplex *x, const cuDoubleComplex *y, cuDoubleComplex *result, int incx, int incy)
     {
-        CUBLAS_SAFE_CALL(cublasZdotu (handle, vector_size, x, incx, y, incy, result));
+        CUBLAS_SAFE_CALL(cublasZdotc (handle, vector_size, x, incx, y, incy, result));
     }    
     template<>
     void cublas_wrap::dot(size_t vector_size, const thrust::complex<float> *x, const thrust::complex<float> *y,  thrust::complex<float> *result, int incx, int incy)
     {
-        CUBLAS_SAFE_CALL(cublasCdotu (handle, vector_size, (cuComplex*)x, incx, (cuComplex*)y, incy, (cuComplex*)result));
+        CUBLAS_SAFE_CALL(cublasCdotc (handle, vector_size, (cuComplex*)x, incx, (cuComplex*)y, incy, (cuComplex*)result));
     }
     template<>
     void cublas_wrap::dot(size_t vector_size, const thrust::complex<double> *x, const thrust::complex<double> *y, thrust::complex<double> *result, int incx, int incy)
     {
-        CUBLAS_SAFE_CALL(cublasZdotu (handle, vector_size, (cuDoubleComplex*)x, incx, (cuDoubleComplex*)y, incy, (cuDoubleComplex*)result));
+        CUBLAS_SAFE_CALL(cublasZdotc (handle, vector_size, (cuDoubleComplex*)x, incx, (cuDoubleComplex*)y, incy, (cuDoubleComplex*)result));
     }  
     //
     template<>
@@ -471,42 +513,92 @@ private:
     {
         CUBLAS_SAFE_CALL(cublasZdscal(handle, vector_size, &alpha, (cuDoubleComplex*)x, incx));
     }
-    // adtional functions that are common
+    // aditional functions that are common
     template<>
     void cublas_wrap::normalize(size_t vector_size, float *x, float *norm, int incx)
     {
         norm2<float>(vector_size, (const float*)x, norm, incx);
-        scale<float>(vector_size, (const float) *norm, x, incx);
+        if(scalar_pointer_on_device)
+        {
+
+        }
+        else
+        {
+            float inorm=float(1.0)/norm[0];
+            scale<float>(vector_size, (const float) inorm, x, incx);    
+        }
+        
     }
     template<>
     void cublas_wrap::normalize(size_t vector_size, double *x, double *norm, int incx)
     {
         norm2<double>(vector_size, (const double*)x, norm, incx);
-        scale<double>(vector_size, (const double) *norm, x, incx);
+        if(scalar_pointer_on_device)
+        {
+
+        }
+        else
+        {
+            double inorm=float(1.0)/norm[0];
+            scale<double>(vector_size, (const double) inorm, x, incx);    
+        }        
     }
     template<>
     void cublas_wrap::normalize(size_t vector_size, cuComplex *x, float *norm, int incx)
     {
         norm2<float>(vector_size, (const cuComplex*)x, norm, incx);
-        scale<float>(vector_size, (const float) *norm, x, incx);
+        if(scalar_pointer_on_device)
+        {
+
+        }
+        else
+        {
+            float inorm=float(1.0)/norm[0];
+            scale<float>(vector_size, (const float) inorm, x, incx);    
+        }
     }
     template<>
     void cublas_wrap::normalize(size_t vector_size, cuDoubleComplex *x, double *norm, int incx)
     {
         norm2<double>(vector_size, (const cuDoubleComplex*)x, norm, incx);
-        scale<double>(vector_size, (const double) *norm, x, incx);
+        if(scalar_pointer_on_device)
+        {
+
+        }
+        else
+        {
+            double inorm=double(1.0)/norm[0];
+            scale<double>(vector_size, (const double) inorm, x, incx);    
+        }        
     }
     template<>
     void cublas_wrap::normalize(size_t vector_size, thrust::complex<float> *x, float *norm, int incx)
     {
         norm2<float>(vector_size, (const cuComplex*)x, norm, incx);
-        scale<float>(vector_size, (const float) *norm, (cuComplex*)x, incx);
+        if(scalar_pointer_on_device)
+        {
+
+        }
+        else
+        {
+            float inorm=float(1.0)/norm[0];
+            scale<float>(vector_size, (const float) inorm, (cuComplex*)x, incx);
+        }         
+
     }
     template<>
     void cublas_wrap::normalize(size_t vector_size, thrust::complex<double> *x, double *norm, int incx)
     {
         norm2<double>(vector_size, (const cuDoubleComplex*)x, norm, incx);
-        scale<double>(vector_size, (const double) *norm, (cuDoubleComplex*)x, incx);
+        if(scalar_pointer_on_device)
+        {
+
+        }
+        else
+        {
+            double inorm=double(1.0)/norm[0];
+            scale<double>(vector_size, (const double) inorm, (cuDoubleComplex*)x, incx);
+        }
     }
 
 
@@ -517,5 +609,5 @@ private:
 
 
 
-    
+
 #endif
