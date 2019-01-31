@@ -129,7 +129,22 @@ void add_mul_wrap(dim3 dimGrid, dim3 dimBlock, size_t N, const T  mul_x, const T
 {
     add_mul_kernel<T><<<dimGrid, dimBlock>>>(N, mul_x, x, mul_y, y, mul_z, z);
 }
+//===
 
+template<typename T>
+__global__ void mul_pointwise_kernel(size_t N, const T mul_x, const T* x, const T mul_y, const T* y, T* z)
+{
+    unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
+    if(j>=N) return;
+
+    z[j] = (mul_x*x[j])*(mul_y*y[j]);
+}
+
+template<typename T>
+void mul_pointwise_wrap(dim3 dimGrid, dim3 dimBlock, size_t N, const T mul_x, const T* x, const T mul_y, const T* y, T* z)
+{
+    mul_pointwise_kernel<T><<<dimGrid, dimBlock>>>(N, mul_x, x, mul_y, y, z);
+}
 
 
 //explicit instantiation
@@ -165,3 +180,8 @@ template void add_mul_wrap<float>(dim3 dimGrid, dim3 dimBlock, size_t sz, const 
 template void add_mul_wrap<double>(dim3 dimGrid, dim3 dimBlock, size_t sz, const double  mul_x, const double*&  x, const double mul_y, const double*& y, const double mul_z, double*& z);
 template void add_mul_wrap< thrust::complex<float> >(dim3 dimGrid, dim3 dimBlock, size_t sz, const thrust::complex<float>  mul_x, const thrust::complex<float>*&  x, const thrust::complex<float> mul_y, const thrust::complex<float>*& y, const thrust::complex<float> mul_z, thrust::complex<float>*& z);
 template void add_mul_wrap< thrust::complex<double> >(dim3 dimGrid, dim3 dimBlock, size_t sz, const thrust::complex<double>  mul_x, const thrust::complex<double>*&  x, const thrust::complex<double> mul_y, const thrust::complex<double>*& y, const thrust::complex<double> mul_z, thrust::complex<double>*& z);
+
+template void mul_pointwise_wrap<float>(dim3 dimGrid, dim3 dimBlock, size_t N, const float mul_x, const float* x, const float mul_y, const float* y, float* z);
+template void mul_pointwise_wrap<double>(dim3 dimGrid, dim3 dimBlock, size_t N, const double mul_x, const double* x, const double mul_y, const double* y, double* z);
+template void mul_pointwise_wrap< thrust::complex<float> >(dim3 dimGrid, dim3 dimBlock, size_t N, const thrust::complex<float> mul_x, const thrust::complex<float>* x, const thrust::complex<float> mul_y, const thrust::complex<float>* y, thrust::complex<float>* z);
+template void mul_pointwise_wrap< thrust::complex<double> >(dim3 dimGrid, dim3 dimBlock, size_t N, const thrust::complex<double> mul_x, const thrust::complex<double>* x, const thrust::complex<double> mul_y, const thrust::complex<double>* y, thrust::complex<double>* z);

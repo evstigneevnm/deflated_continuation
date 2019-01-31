@@ -17,8 +17,8 @@ int main(int argc, char const *argv[])
 {
     typedef SCALAR_TYPE real;
     typedef thrust::complex<real> thrust_complex;
-    typedef gpu_vector_operations<real,real> gpu_vector_operations_real;
-    typedef gpu_vector_operations<thrust_complex,real> gpu_vector_operations_complex;
+    typedef gpu_vector_operations<real> gpu_vector_operations_real;
+    typedef gpu_vector_operations<thrust_complex> gpu_vector_operations_complex;
     typedef cufft_wrap_R2C<real> cufft_type;
     typedef Kuramoto_Sivashinskiy_2D<gpu_vector_operations_real, gpu_vector_operations_complex, Blocks_x_, Blocks_y_> KS_2D;
 
@@ -46,6 +46,12 @@ int main(int argc, char const *argv[])
     printf("Grids = (%i,%i,%i)\n", Grids.x, Grids.y, Grids.z);
     printf("GridsFourier = (%i,%i,%i)\n", Grids_F.x, Grids_F.y, Grids_F.z);
 
+    thrust_complex *u_in_hat = device_allocate<thrust_complex>(Nx*My);
+    thrust_complex *u_out_hat = device_allocate<thrust_complex>(Nx*My);
+    KS2D->F((const thrust_complex*&)u_in_hat, 1.0, u_out_hat);
+
+    cudaFree(u_in_hat);
+    cudaFree(u_out_hat);
 
     delete KS2D;
     delete vec_ops_R;

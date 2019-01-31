@@ -30,24 +30,25 @@ index of a matrix element in row ''i'' and column 'j'' can be computed via the f
 #include <thrust/complex.h>
 #include <utils/cublas_safe_call.h>
 
-template<typename T>
-struct cublas_cuComplex_type_hlp
-{
-};
+namespace cublas_complex_types{
+    template<typename T>
+    struct cublas_cuComplex_type_hlp
+    {
+    };
 
 
-template<>
-struct cublas_cuComplex_type_hlp<float>
-{
-    typedef cuComplex type;
-};
+    template<>
+    struct cublas_cuComplex_type_hlp<float>
+    {
+        typedef cuComplex type;
+    };
 
-template<>
-struct cublas_cuComplex_type_hlp<double>
-{
-    typedef cuDoubleComplex type;
-};
-
+    template<>
+    struct cublas_cuComplex_type_hlp<double>
+    {
+        typedef cuDoubleComplex type;
+    };
+}
 
 class cublas_wrap
 {
@@ -183,7 +184,7 @@ public:
     void sum_abs_elements(size_t vector_size, const T *vector, T *result, int incx=1);
     
     template<typename T>
-    void sum_abs_elements(size_t vector_size, const typename cublas_cuComplex_type_hlp<T>::type *vector, T *result, int incx=1);
+    void sum_abs_elements(size_t vector_size, const typename cublas_complex_types::cublas_cuComplex_type_hlp<T>::type *vector, T *result, int incx=1);
 
     template<typename T>
     void sum_abs_elements(size_t vector_size, const thrust::complex<T> *vector, T *result, int incx=1);
@@ -204,21 +205,21 @@ public:
     template<typename T>
     void norm2(size_t vector_size, const T *x, T *result, int incx=1);
     template<typename T>
-    void norm2(size_t vector_size, const typename cublas_cuComplex_type_hlp<T>::type *x, T *result, int incx=1);
+    void norm2(size_t vector_size, const typename cublas_complex_types::cublas_cuComplex_type_hlp<T>::type *x, T *result, int incx=1);
     template<typename T>
     void norm2(size_t vector_size, const thrust::complex<T> *x, T *result, int incx=1);
     //scale vector as x=x/a. 'a' can be real or complex
     template<typename T>
     void scale(size_t vector_size, const T alpha, T *x, int incx=1);
     template<typename T>
-    void scale(size_t vector_size, const T alpha, typename cublas_cuComplex_type_hlp<T>::type *x, int incx=1);
+    void scale(size_t vector_size, const T alpha, typename cublas_complex_types::cublas_cuComplex_type_hlp<T>::type *x, int incx=1);
     template<typename T>
     void scale(size_t vector_size, const T alpha, thrust::complex<T> *x, int incx=1);
     //normalizes vector. Overwrites a vector with normalized one and returns it's norm. Usually used in Krylov-type methods
     template<typename T>
     void normalize(size_t vector_size, T *x, T *norm, int incx=1);
     template<typename T>
-    void normalize(size_t vector_size, typename cublas_cuComplex_type_hlp<T>::type *x, T *norm, int incx=1);
+    void normalize(size_t vector_size, typename cublas_complex_types::cublas_cuComplex_type_hlp<T>::type *x, T *norm, int incx=1);
     template<typename T> 
     void normalize(size_t vector_size, thrust::complex<T> *x, T *norm, int incx=1);
     //TODO: add Givens rotations construction for Arnoldi process
@@ -284,12 +285,12 @@ private:
         CUBLAS_SAFE_CALL(cublasDasum(handle, vector_size, vector, incx, result));
     }
     template<>
-    void cublas_wrap::sum_abs_elements(size_t vector_size, const typename cublas_cuComplex_type_hlp<float>::type *vector, float *result, int incx)
+    void cublas_wrap::sum_abs_elements(size_t vector_size, const typename cublas_complex_types::cublas_cuComplex_type_hlp<float>::type *vector, float *result, int incx)
     {
         CUBLAS_SAFE_CALL(cublasScasum(handle, vector_size, vector, incx, result));
     }    
     template<>
-    void cublas_wrap::sum_abs_elements(size_t vector_size, const typename cublas_cuComplex_type_hlp<double>::type *vector, double *result, int incx)
+    void cublas_wrap::sum_abs_elements(size_t vector_size, const typename cublas_complex_types::cublas_cuComplex_type_hlp<double>::type *vector, double *result, int incx)
     {
         CUBLAS_SAFE_CALL(cublasDzasum(handle, vector_size, vector, incx, result));
     }  

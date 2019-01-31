@@ -4,12 +4,13 @@
 #include <external_libraries/cufft_wrap.h>
 #include <thrust/complex.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D_ker.h>
-//for debug!
+//DEBUG
 #include <iostream>
 #include "file_operations.h"
 #include <limits>
+//ENDS
 
-template<typename VectorOperations_R, typename VectorOperations_C, unsigned int BLOCK_SIZE_x, unsigned int BLOCK_SIZE_y>
+template<typename VectorOperations_R, typename VectorOperations_C, unsigned int BLOCK_SIZE_x=64, unsigned int BLOCK_SIZE_y=16>
 class Kuramoto_Sivashinskiy_2D
 {
 public:
@@ -20,7 +21,7 @@ public:
     typedef typename VectorOperations_R::vector_type  T_vec;
     typedef typename VectorOperations_C::scalar_type  TC;
     typedef typename VectorOperations_C::vector_type  TC_vec;
-    typedef thrust::complex<T> thrust_complex_type;   
+    
 
 
     Kuramoto_Sivashinskiy_2D(size_t Nx_, size_t Ny_, vector_operations_real *vec_ops_R_, vector_operations_complex *vec_ops_C_, cufft_wrap_R2C<T> *CUFFT_): Nx(Nx_), Ny(Ny_), vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), CUFFT(CUFFT_)
@@ -47,14 +48,26 @@ public:
             cudaFree(Laplace);
         if(biharmonic!=NULL)
             cudaFree(biharmonic);
+        if(u_x_hat!=NULL)
+            cudaFree(u_x_hat);
+        if(u_y_hat!=NULL)
+            cudaFree(u_y_hat);
     }
 
-
-    void construct_derivatives()
+    //nonlinear Kuramoto Sivashinskiy 2D operator:
+    //   F(u,alpha)=v
+    void F(const TC*& u, const T alpha, TC*& v)
     {
+        
+        vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u, TC(1.0), (const TC_vec&)gradient_x, (TC*&)u_x_hat);
+        vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u, TC(1.0), (const TC_vec&)gradient_y, (TC*&)u_y_hat);
+        
 
     }
 
+
+
+//DEBUG
     void tests()
     {
         
@@ -93,8 +106,9 @@ public:
         CUFFT->fft(U_d, U_hat2_d);
 
         vec_ops_C->assign_mul( (TC)1.0, U_hat_d, (TC)-5.0, U_hat1_d, U_hat2_d);
-
-        std::cout << "||U_hat||_2=" << sqrt(vec_ops_C->scalar_prod(U_hat2_d,U_hat2_d).real()) << std::endl;
+        
+        std::cout << "(complex)-5=" << (TC)-5.0 << std::endl;
+        printf("sqrt((U_hat,U_hat))=%le\n",(double)sqrt(vec_ops_C->scalar_prod(U_hat2_d,U_hat2_d).real()) );
         printf("||U_hat||_2=%le\n",(double)vec_ops_C->normalize(U_hat2_d));
         printf("||U_hat||_2=%le\n",(double)vec_ops_C->norm(U_hat2_d));
         std::cout << "||U_hat||_2=" << sqrt(vec_ops_C->scalar_prod(U_hat2_d,U_hat2_d)) << std::endl;
@@ -129,7 +143,7 @@ public:
 
 
     }
-
+//ENDS
 
     void set_cuda_grid(dim3 dimGrid_, dim3 dimGrid_F_, dim3 dimBlock_)
     {
@@ -157,10 +171,12 @@ private:
 
     size_t Nx, Ny, My;
     cufft_wrap_R2C<T> *CUFFT;
-    thrust_complex_type *gradient_x=NULL;
-    thrust_complex_type *gradient_y=NULL;
-    T *Laplace=NULL;
-    T *biharmonic=NULL;
+    TC_vec gradient_x=NULL;
+    TC_vec gradient_y=NULL;
+    T_vec Laplace=NULL;
+    T_vec biharmonic=NULL;
+    TC_vec u_x_hat=NULL;
+    TC_vec u_y_hat=NULL;
 
 
 
@@ -168,10 +184,12 @@ private:
     void common_constructor_operation()
     {   
         My=CUFFT->get_reduced_size();
-        gradient_x = device_allocate<thrust_complex_type>(Nx*My);
-        gradient_y = device_allocate<thrust_complex_type>(Nx*My);
+        gradient_x = device_allocate<TC>(Nx*My);
+        gradient_y = device_allocate<TC>(Nx*My);
         Laplace = device_allocate<T>(Nx*My);
         biharmonic = device_allocate<T>(Nx*My);
+        u_x_hat = device_allocate<TC>(Nx*My);
+        u_y_hat = device_allocate<TC>(Nx*My);        
     }
 
     void init_all_derivatives()
@@ -198,17 +216,17 @@ private:
 
     void set_gradient_coefficients()
     {
-        gradient_Fourier<T, thrust_complex_type>(dimGrid_F, dimBlock, Nx, My, gradient_x, gradient_y);
+        gradient_Fourier<T, TC>(dimGrid_F, dimBlock, Nx, My, gradient_x, gradient_y);
     }
 
     void set_Laplace_coefficients()
     {
-        Laplace_Fourier<T, thrust_complex_type>(dimGrid_F, dimBlock, Nx, My, gradient_x, gradient_y, Laplace);
+        Laplace_Fourier<T, TC>(dimGrid_F, dimBlock, Nx, My, gradient_x, gradient_y, Laplace);
     }
    
     void set_biharmonic_coefficients()
     {
-        biharmonic_Fourier<T, thrust_complex_type>(dimGrid_F, dimBlock, Nx, My, gradient_x, gradient_y, biharmonic);
+        biharmonic_Fourier<T, TC>(dimGrid_F, dimBlock, Nx, My, gradient_x, gradient_y, biharmonic);
     }
 
 };

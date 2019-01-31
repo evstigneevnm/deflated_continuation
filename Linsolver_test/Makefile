@@ -19,3 +19,5 @@ KS_2D_ker:
 	nvcc -I source/ -g source/nonlinear_operators/Kuramoto_Sivashinskiy_2D_ker.cu -c -o O/Kuramoto_Sivashinskiy_2D_ker.o 2>results_make.txt
 KS_2D_double: source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp
 	nvcc -I source/ -DSCALAR_TYPE=double -g source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o -lcufft -lcublas -o test_Kuramoto_Sivashinskiy_2D_RHS.bin 2>results_make.txt
+KS_2D_float: source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp
+	nvcc -I source/ -DSCALAR_TYPE=float -g source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o -lcufft -lcublas -o test_Kuramoto_Sivashinskiy_2D_RHS.bin 2>results_make.txt

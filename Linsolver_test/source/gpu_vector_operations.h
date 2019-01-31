@@ -5,11 +5,55 @@
 #include <external_libraries/cublas_wrap.h>
 #include <gpu_vector_operations_kernels.h>
 
-template <typename T, typename Tsc, int BLOCK_SIZE = 256>
+namespace gpu_vector_operations_type{
+
+    template<typename T>
+    struct vec_ops_cuComplex_type_hlp
+    {
+    };
+
+
+    template<>
+    struct vec_ops_cuComplex_type_hlp<float>
+    {
+        typedef float norm_type;
+    };
+
+    template<>
+    struct vec_ops_cuComplex_type_hlp<double>
+    {
+        typedef double norm_type;
+    };
+
+    template<>
+    struct vec_ops_cuComplex_type_hlp<cuComplex>
+    {
+        typedef float norm_type;
+    };
+    template<>
+    struct vec_ops_cuComplex_type_hlp<cuDoubleComplex>
+    {
+        typedef double norm_type;
+    };    
+    template<>
+    struct vec_ops_cuComplex_type_hlp< thrust::complex<float> >
+    {
+        typedef float norm_type;
+    };
+    template<>
+    struct vec_ops_cuComplex_type_hlp< thrust::complex<double> >
+    {
+        typedef double norm_type;
+    };     
+}
+
+
+template <typename T, int BLOCK_SIZE = 256>
 struct gpu_vector_operations
 {
     typedef T  scalar_type;
     typedef T* vector_type;
+    typedef typename gpu_vector_operations_type::vec_ops_cuComplex_type_hlp<T>::norm_type Tsc;
 
 
     gpu_vector_operations(int sz_, cublas_wrap *cuBLAS_) : sz(sz_), cuBLAS(cuBLAS_)
@@ -113,7 +157,7 @@ struct gpu_vector_operations
     //calc: y := mul_x*x
     void assign_mul(const scalar_type mul_x, const vector_type& x, vector_type& y)const
     {
-        assign_mul_wrap(dimGrid, dimBlock, sz, mul_x, x, y);
+        assign_mul_wrap<scalar_type>(dimGrid, dimBlock, sz, mul_x, x, y);
     }
     //cublas axpy: y=y+mul_x*x;
     void add_mul(scalar_type mul_x, const vector_type& x, vector_type& y)const
@@ -124,18 +168,24 @@ struct gpu_vector_operations
     void assign_mul(scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                                vector_type& z)const
     {
-        assign_mul_wrap(dimGrid, dimBlock, sz, mul_x, x, mul_y, y, z);
+        assign_mul_wrap<scalar_type>(dimGrid, dimBlock, sz, mul_x, x, mul_y, y, z);
     }
     //calc: y := mul_x*x + mul_y*y
     void add_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, vector_type& y)const
     {
-        add_mul_wrap(dimGrid, dimBlock, sz, mul_x, x, mul_y, y);
+        add_mul_wrap<scalar_type>(dimGrid, dimBlock, sz, mul_x, x, mul_y, y);
     }
     //calc: z := mul_x*x + mul_y*y + mul_z*z
     void add_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                             const scalar_type mul_z, vector_type& z)const
     {
-        add_mul_wrap(dimGrid, dimBlock, sz, mul_x, x, mul_y, y, mul_z, z);
+        add_mul_wrap<scalar_type>(dimGrid, dimBlock, sz, mul_x, x, mul_y, y, mul_z, z);
+    }
+    //calc: z := (mul_x*x)*(mul_y*y)
+    void mul_pointwise(const scalar_type mul_x, const vector_type x, const scalar_type mul_y, const vector_type y, 
+                        vector_type z)
+    {
+        mul_pointwise_wrap<scalar_type>(dimGrid, dimBlock, sz, mul_x, x, mul_y, y, z);
     }
 
 //*/

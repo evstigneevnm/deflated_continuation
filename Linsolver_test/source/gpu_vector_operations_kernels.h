@@ -24,4 +24,8 @@ extern void add_mul_wrap(dim3 dimGrid, dim3 dimBlock, size_t sz,const T mul_x, c
 template<typename T>
 extern void add_mul_wrap(dim3 dimGrid, dim3 dimBlock, size_t sz, const T  mul_x, const T*&  x, const T mul_y, const T*& y, const T mul_z, T*& z);
 
+template<typename T>
+extern void mul_pointwise_wrap(dim3 dimGrid, dim3 dimBlock, size_t sz, const T mul_x, const T* x, const T mul_y, const T* y, T* z);
+
+
 #endif
