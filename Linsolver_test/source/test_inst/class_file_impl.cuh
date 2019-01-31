@@ -14,6 +14,8 @@ __global__ void add_vectors_kernel(int N, const T*& x, T*& y)
 
 }
 
+
+
 template<typename T, int BLOCK_SIZE>
 void class_file<T, BLOCK_SIZE>::add_vectors(const T*& x, T*& y)
 {
@@ -22,4 +24,14 @@ void class_file<T, BLOCK_SIZE>::add_vectors(const T*& x, T*& y)
     add_vectors_kernel<T><<<grid, block>>>(sz, x, y);
 }
 
+template<typename T, int BLOCK_SIZE>
+void class_file<T, BLOCK_SIZE>::start_use_vector(T*& x)
+{
+    cudaMalloc((void**)& x, sizeof(T)*sz);
+}
 
+template<typename T, int BLOCK_SIZE>
+void class_file<T, BLOCK_SIZE>::stop_use_vector(T*& x)
+{
+    cudaFree(x);
+}

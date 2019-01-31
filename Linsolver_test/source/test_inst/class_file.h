@@ -18,7 +18,8 @@ public:
     {
 
     }
-    
+    void start_use_vector(T*& x);
+    void stop_use_vector(T*& x);
     void add_vectors(const T*& x, T*& y);
 
 private:
