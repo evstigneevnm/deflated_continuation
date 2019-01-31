@@ -50,9 +50,53 @@ namespace cublas_complex_types{
     };
 }
 
+namespace cublas_real_types{
+    template<typename T>
+    struct cublas_real_type_hlp
+    {
+    };
+
+    template<>
+    struct cublas_real_type_hlp<float>
+    {
+        typedef float type;
+    };
+
+    template<>
+    struct cublas_real_type_hlp<double>
+    {
+        typedef double type;
+    };
+
+    template<>
+    struct cublas_real_type_hlp<cuComplex>
+    {
+        typedef float type;
+    };
+
+    template<>
+    struct cublas_real_type_hlp<cuDoubleComplex>
+    {
+        typedef double type;
+    };
+
+    template<>
+    struct cublas_real_type_hlp< thrust::complex<float> >
+    {
+        typedef float type;
+    };
+
+    template<>
+    struct cublas_real_type_hlp< thrust::complex<double> >
+    {
+        typedef double type;
+    };    
+}
+
 class cublas_wrap
 {
 public:
+
 
     cublas_wrap(): handle_created(false)
     {
@@ -181,13 +225,8 @@ public:
 
     //===cuBLAS Level-1 Functions=== see: https://docs.nvidia.com/cuda/cublas/index.html#cublas-level-1-function-reference
     template<typename T>
-    void sum_abs_elements(size_t vector_size, const T *vector, T *result, int incx=1);
-    
-    template<typename T>
-    void sum_abs_elements(size_t vector_size, const typename cublas_complex_types::cublas_cuComplex_type_hlp<T>::type *vector, T *result, int incx=1);
-
-    template<typename T>
-    void sum_abs_elements(size_t vector_size, const thrust::complex<T> *vector, T *result, int incx=1);
+    void sum_abs_elements(size_t vector_size, const T *vector, 
+                            typename cublas_real_types::cublas_real_type_hlp<T>::type *result, int incx=1);
 
     // y [ j ] = alpha x [ k ] + y [ j ]
     template<typename T>
@@ -203,25 +242,17 @@ public:
     void dot(size_t vector_size, const T *x, const T *y, T *result, int incx=1, int incy=1);
     //vector l2 norm.
     template<typename T>
-    void norm2(size_t vector_size, const T *x, T *result, int incx=1);
-    template<typename T>
-    void norm2(size_t vector_size, const typename cublas_complex_types::cublas_cuComplex_type_hlp<T>::type *x, T *result, int incx=1);
-    template<typename T>
-    void norm2(size_t vector_size, const thrust::complex<T> *x, T *result, int incx=1);
+    void norm2(size_t vector_size, const T *x, typename cublas_real_types::cublas_real_type_hlp<T>::type *result, int incx=1);
     //scale vector as x=x/a. 'a' can be real or complex
     template<typename T>
     void scale(size_t vector_size, const T alpha, T *x, int incx=1);
     template<typename T>
-    void scale(size_t vector_size, const T alpha, typename cublas_complex_types::cublas_cuComplex_type_hlp<T>::type *x, int incx=1);
-    template<typename T>
-    void scale(size_t vector_size, const T alpha, thrust::complex<T> *x, int incx=1);
+    void scale(size_t vector_size, const typename cublas_real_types::cublas_real_type_hlp<T>::type alpha, T *x, int incx=1);
     //normalizes vector. Overwrites a vector with normalized one and returns it's norm. Usually used in Krylov-type methods
     template<typename T>
     void normalize(size_t vector_size, T *x, T *norm, int incx=1);
     template<typename T>
-    void normalize(size_t vector_size, typename cublas_complex_types::cublas_cuComplex_type_hlp<T>::type *x, T *norm, int incx=1);
-    template<typename T> 
-    void normalize(size_t vector_size, thrust::complex<T> *x, T *norm, int incx=1);
+    void normalize(size_t vector_size, T *x, typename cublas_real_types::cublas_real_type_hlp<T>::type *norm, int incx=1);
     //TODO: add Givens rotations construction for Arnoldi process
 
     //===cuBLAS Level-2 Functions=== see: https://docs.nvidia.com/cuda/cublas/index.html#cublas-level-2-function-reference
@@ -285,27 +316,29 @@ private:
         CUBLAS_SAFE_CALL(cublasDasum(handle, vector_size, vector, incx, result));
     }
     template<>
-    void cublas_wrap::sum_abs_elements(size_t vector_size, const typename cublas_complex_types::cublas_cuComplex_type_hlp<float>::type *vector, float *result, int incx)
-    {
-        CUBLAS_SAFE_CALL(cublasScasum(handle, vector_size, vector, incx, result));
-    }    
-    template<>
-    void cublas_wrap::sum_abs_elements(size_t vector_size, const typename cublas_complex_types::cublas_cuComplex_type_hlp<double>::type *vector, double *result, int incx)
-    {
-        CUBLAS_SAFE_CALL(cublasDzasum(handle, vector_size, vector, incx, result));
-    }  
-    template<>
-    void cublas_wrap::sum_abs_elements(size_t vector_size, const thrust::complex<float> *vector, float *result, int incx)
+    void cublas_wrap::sum_abs_elements(size_t vector_size, const thrust::complex<float> *vector, typename cublas_real_types::cublas_real_type_hlp< thrust::complex<float> >::type *result, int incx)
     {
         CUBLAS_SAFE_CALL(cublasScasum(handle, vector_size, (cuComplex*) vector, incx, result));
     }    
     template<>
-    void cublas_wrap::sum_abs_elements(size_t vector_size, const thrust::complex<double> *vector, double *result, int incx)
+    void cublas_wrap::sum_abs_elements(size_t vector_size, const thrust::complex<double> *vector, typename cublas_real_types::cublas_real_type_hlp< thrust::complex<double> >::type *result, int incx)
     {
 
         CUBLAS_SAFE_CALL(cublasDzasum(handle, vector_size, (cuDoubleComplex*) vector, incx, result));
 
     }   
+    template<>
+    void cublas_wrap::sum_abs_elements(size_t vector_size, const cuComplex *vector, typename cublas_real_types::cublas_real_type_hlp< cuComplex >::type *result, int incx)
+    {
+        CUBLAS_SAFE_CALL(cublasScasum(handle, vector_size, vector, incx, result));
+    }    
+    template<>
+    void cublas_wrap::sum_abs_elements(size_t vector_size, const cuDoubleComplex *vector, typename cublas_real_types::cublas_real_type_hlp< cuDoubleComplex >::type *result, int incx)
+    {
+
+        CUBLAS_SAFE_CALL(cublasDzasum(handle, vector_size, vector, incx, result));
+
+    }       
     //This function multiplies the vector x by the scalar alpha 
     //and adds it to the vector y overwriting the latest vector with the result.
     //y=alpha*x+y;
@@ -444,22 +477,22 @@ private:
         CUBLAS_SAFE_CALL(cublasDnrm2(handle, vector_size, x, incx, result));
     }
     template<>
-    void cublas_wrap::norm2(size_t vector_size, const cuComplex *x, float *result, int incx)
+    void cublas_wrap::norm2(size_t vector_size, const cuComplex *x, typename cublas_real_types::cublas_real_type_hlp< cuComplex >::type *result, int incx)
     {
         CUBLAS_SAFE_CALL(cublasScnrm2(handle, vector_size, x, incx, result));
     }
     template<>
-    void cublas_wrap::norm2(size_t vector_size, const cuDoubleComplex *x, double *result, int incx)
+    void cublas_wrap::norm2(size_t vector_size, const cuDoubleComplex *x, typename cublas_real_types::cublas_real_type_hlp< cuDoubleComplex >::type *result, int incx)
     {
         CUBLAS_SAFE_CALL(cublasDznrm2(handle, vector_size, x, incx, result));
     }
     template<>
-    void cublas_wrap::norm2(size_t vector_size, const thrust::complex<float>  *x, float *result, int incx)
+    void cublas_wrap::norm2(size_t vector_size, const thrust::complex<float>  *x, typename cublas_real_types::cublas_real_type_hlp< thrust::complex<float> >::type *result, int incx)
     {
         CUBLAS_SAFE_CALL(cublasScnrm2(handle, vector_size, (cuComplex*)x, incx, result));
     }
     template<>
-    void cublas_wrap::norm2(size_t vector_size, const thrust::complex<double> *x, double *result, int incx)
+    void cublas_wrap::norm2(size_t vector_size, const thrust::complex<double> *x, typename cublas_real_types::cublas_real_type_hlp< thrust::complex<double> >::type *result, int incx)
     {
         CUBLAS_SAFE_CALL(cublasDznrm2(handle, vector_size, (cuDoubleComplex*)x, incx, result));
     }
@@ -545,9 +578,9 @@ private:
         }        
     }
     template<>
-    void cublas_wrap::normalize(size_t vector_size, cuComplex *x, float *norm, int incx)
+    void cublas_wrap::normalize(size_t vector_size, cuComplex *x, typename cublas_real_types::cublas_real_type_hlp< cuComplex >::type *norm, int incx)
     {
-        norm2<float>(vector_size, (const cuComplex*)x, norm, incx);
+        norm2<cuComplex>(vector_size, (const cuComplex*)x, norm, incx);
         if(scalar_pointer_on_device)
         {
 
@@ -555,13 +588,13 @@ private:
         else
         {
             float inorm=float(1.0)/norm[0];
-            scale<float>(vector_size, (const float) inorm, x, incx);    
+            scale<cuComplex>(vector_size, (const float) inorm, x, incx);    
         }
     }
     template<>
-    void cublas_wrap::normalize(size_t vector_size, cuDoubleComplex *x, double *norm, int incx)
+    void cublas_wrap::normalize(size_t vector_size, cuDoubleComplex *x, typename cublas_real_types::cublas_real_type_hlp< cuDoubleComplex >::type *norm, int incx)
     {
-        norm2<double>(vector_size, (const cuDoubleComplex*)x, norm, incx);
+        norm2<cuDoubleComplex>(vector_size, (const cuDoubleComplex*)x, norm, incx);
         if(scalar_pointer_on_device)
         {
 
@@ -569,13 +602,13 @@ private:
         else
         {
             double inorm=double(1.0)/norm[0];
-            scale<double>(vector_size, (const double) inorm, x, incx);    
+            scale<cuDoubleComplex>(vector_size, (const double) inorm, x, incx);    
         }        
     }
     template<>
-    void cublas_wrap::normalize(size_t vector_size, thrust::complex<float> *x, float *norm, int incx)
+    void cublas_wrap::normalize(size_t vector_size, thrust::complex<float> *x, typename cublas_real_types::cublas_real_type_hlp< thrust::complex<float> >::type *norm, int incx)
     {
-        norm2<float>(vector_size, (const cuComplex*)x, norm, incx);
+        norm2< thrust::complex<float> >(vector_size, x, norm, incx);
         if(scalar_pointer_on_device)
         {
 
@@ -583,14 +616,14 @@ private:
         else
         {
             float inorm=float(1.0)/norm[0];
-            scale<float>(vector_size, (const float) inorm, (cuComplex*)x, incx);
+            scale< thrust::complex<float> >(vector_size, (const float) inorm, x, incx);
         }         
 
     }
     template<>
-    void cublas_wrap::normalize(size_t vector_size, thrust::complex<double> *x, double *norm, int incx)
+    void cublas_wrap::normalize(size_t vector_size, thrust::complex<double> *x, typename cublas_real_types::cublas_real_type_hlp< thrust::complex<double> >::type *norm, int incx)
     {
-        norm2<double>(vector_size, (const cuDoubleComplex*)x, norm, incx);
+        norm2< thrust::complex<double> >(vector_size, x, norm, incx);
         if(scalar_pointer_on_device)
         {
 
@@ -598,7 +631,7 @@ private:
         else
         {
             double inorm=double(1.0)/norm[0];
-            scale<double>(vector_size, (const double) inorm, (cuDoubleComplex*)x, incx);
+            scale< thrust::complex<double> >(vector_size, (const double) inorm, x, incx);
         }
     }
 

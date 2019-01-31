@@ -44,7 +44,7 @@ namespace gpu_vector_operations_type{
     struct vec_ops_cuComplex_type_hlp< thrust::complex<double> >
     {
         typedef double norm_type;
-    };     
+    };    
 }
 
 
@@ -102,13 +102,13 @@ struct gpu_vector_operations
     Tsc norm(const vector_type &x)const
     {
         Tsc result;
-        cuBLAS->norm2<Tsc>(sz, x, &result);
+        cuBLAS->norm2<T>(sz, x, &result);
         return result;
     }
     //for GPU pointer storage with call from CPU
     void norm(const vector_type &x, Tsc *result)
     {
-        cuBLAS->norm2<Tsc>(sz, x, result);
+        cuBLAS->norm2<T>(sz, x, result);
     }    
     // dot product of two vectors
     scalar_type scalar_prod(const vector_type &x, const vector_type &y)const
@@ -130,12 +130,12 @@ struct gpu_vector_operations
     Tsc normalize(vector_type& x)
     {
         Tsc norm;
-        cuBLAS->normalize<Tsc>(sz, x, &norm);
+        cuBLAS->normalize<T>(sz, x, &norm);
         return norm;
     }
     void normalize(vector_type& x, Tsc *norm)
     {
-        cuBLAS->normalize<Tsc>(sz, x, norm);
+        cuBLAS->normalize<T>(sz, x, norm);
     }
 
     //calc: x := mul_x*x + <vector_type of all scalar value> 
