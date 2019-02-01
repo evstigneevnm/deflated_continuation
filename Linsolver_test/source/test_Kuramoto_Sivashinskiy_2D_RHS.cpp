@@ -30,11 +30,11 @@ int main(int argc, char const *argv[])
     size_t My=CUFFT_C2R->get_reduced_size();
     cublas_wrap *CUBLAS = new cublas_wrap(true);
     CUBLAS->set_pointer_location_device(false);
-    gpu_vector_operations_real *vec_ops_R = new gpu_vector_operations_real(Nx*My, CUBLAS);
+    gpu_vector_operations_real *vec_ops_R = new gpu_vector_operations_real(Nx*Ny, CUBLAS);
     gpu_vector_operations_complex *vec_ops_C = new gpu_vector_operations_complex(Nx*My, CUBLAS);
 
     
-    KS_2D *KS2D = new KS_2D(Nx, Ny, vec_ops_R, vec_ops_C, CUFFT_C2R);
+    KS_2D *KS2D = new KS_2D(2.0, 4.0, Nx, Ny, vec_ops_R, vec_ops_C, CUFFT_C2R);
     
     dim3 Blocks;
     dim3 Grids;

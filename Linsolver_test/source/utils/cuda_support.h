@@ -16,7 +16,9 @@
 * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#pragma once
+//#pragma once
+#ifndef __CUDA_SUPPORT_H__
+#define __CUDA_SUPPORT_H__
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,7 +29,7 @@
 #include <cuda_runtime.h>
 
 
-int init_cuda(int PCI_ID)
+inline int init_cuda(int PCI_ID)
 {
 
     
@@ -236,3 +238,5 @@ void host_deallocate_all(int count, ...)
 
 }
 
+
+#endif
