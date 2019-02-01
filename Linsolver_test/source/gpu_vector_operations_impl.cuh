@@ -47,7 +47,7 @@ __global__ void check_is_valid_number_kernel(int N, const thrust::complex<double
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
     if(j>=N) return;
 
-    if(!isfinite(x[j].real()*x[j].imag()))
+    if(!isfinite(x[j].real()+x[j].imag()))
     {
         result[0]=false;
         return;
@@ -62,7 +62,7 @@ __global__ void check_is_valid_number_kernel(int N, const thrust::complex<float>
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
     if(j>=N) return;
 
-    if(!isfinite(x[j].real()*x[j].imag()))
+    if(!isfinite(x[j].real()+x[j].imag()))
     {
         result[0]=false;
         return;
@@ -83,7 +83,7 @@ bool gpu_vector_operations<T, BLOCK_SIZE>::check_is_valid_number(const vector_ty
 }
 //===
 template<typename T> 
-__global__ void assign_scalar_kernel(size_t N, const T scalar, T*& x)
+__global__ void assign_scalar_kernel(size_t N, const T scalar, T* x)
 {
 
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
@@ -100,7 +100,7 @@ void gpu_vector_operations<T, BLOCK_SIZE>::assign_scalar(const scalar_type scala
 }
 //===
 template<typename T>
-__global__ void add_mul_scalar_kernel(size_t N, const T scalar, const T mul_x, T*& x)
+__global__ void add_mul_scalar_kernel(size_t N, const T scalar, const T mul_x, T* x)
 {
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
     if(j>=N) return;
