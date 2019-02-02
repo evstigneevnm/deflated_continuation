@@ -54,7 +54,6 @@ private:
     // let's use nested classes?!
 
     // modified Linear Operator
-    template<typename T>
     struct LinearOperator_SM
     {
         mutable const vector_operations_type *vector_operations;
@@ -123,11 +122,10 @@ private:
     };
     
     // modified Preconditioner
-    template<typename T>
     struct Preconditioner_SM
     {
         mutable const vector_operations_type *vector_operations;
-        mutable const LinearOperator_SM<T> *op;
+        mutable const LinearOperator_SM *op;
         mutable const preconditioner_type *inherited_preconditioner;
 
         mutable vector_type c, d;
@@ -150,7 +148,7 @@ private:
             vector_operations->free_vector(g);            
         }
 
-        void set_operator(const LinearOperator_SM<T> *op_) const
+        void set_operator(const LinearOperator_SM *op_) const
         {
             op=op_;
         }
@@ -182,8 +180,8 @@ private:
     };
 
 public:
-    typedef LinearOperator_SM<scalar_type> LinearOperator_SM_t;
-    typedef Preconditioner_SM<scalar_type> Preconditioner_SM_t;
+    typedef LinearOperator_SM LinearOperator_SM_t;
+    typedef Preconditioner_SM Preconditioner_SM_t;
 
     typedef LinearSolver<LinearOperator_SM_t, 
                         Preconditioner_SM_t,

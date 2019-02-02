@@ -20,7 +20,7 @@ int main(int argc, char const *argv[])
     typedef gpu_vector_operations<real> gpu_vector_operations_real;
     typedef gpu_vector_operations<thrust_complex> gpu_vector_operations_complex;
     typedef cufft_wrap_R2C<real> cufft_type;
-    typedef Kuramoto_Sivashinskiy_2D<gpu_vector_operations_real, gpu_vector_operations_complex, Blocks_x_, Blocks_y_> KS_2D;
+    typedef Kuramoto_Sivashinskiy_2D<cufft_type, gpu_vector_operations_real, gpu_vector_operations_complex, Blocks_x_, Blocks_y_> KS_2D;
 
 
     init_cuda(-1);

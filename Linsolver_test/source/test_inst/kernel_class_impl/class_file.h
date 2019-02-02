@@ -26,7 +26,6 @@ public:
 
     }
     
-
     void start_use_vector(T*& x)
     {
         x=device_allocate<T>(sz);

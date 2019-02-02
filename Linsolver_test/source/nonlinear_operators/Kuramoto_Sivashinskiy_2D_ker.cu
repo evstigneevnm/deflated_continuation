@@ -25,6 +25,8 @@ __global__ void gradient_Fourier_kernel(int Nx, int My, T_C *gradient_x, T_C *gr
 template<typename T_C>
 __global__ void Laplace_Fourier_kernel(int Nx, int My, T_C *gradient_x, T_C *gradient_y, T_C *Laplace)
 {
+    //result of grad_x^2 + grad_y^2 is pure real
+    //we use T_C(*.real,0.0) to get rid of rounding errors for float type
 
     unsigned int j=blockDim.x * blockIdx.x + threadIdx.x;
     unsigned int k=blockDim.y * blockIdx.y + threadIdx.y;
@@ -34,7 +36,7 @@ __global__ void Laplace_Fourier_kernel(int Nx, int My, T_C *gradient_x, T_C *gra
     T_C x2 = gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)];
     T_C y2 = gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)];
 
-    Laplace[I2(j,k,Nx)] = x2 + y2;
+    Laplace[I2(j,k,Nx)] = T_C(x2.real() + y2.real(),0.0);
 
 }
 
@@ -42,6 +44,8 @@ template<typename T_C>
 __global__ void biharmonic_Fourier_kernel(int Nx, int My, T_C *gradient_x, T_C *gradient_y, T_C *biharmonic)
 {
 
+    //result of grad_x^4 + grad_y^4 + 2*grad_x^2*grad_y^2 is pure real
+    //we use T_C(*.real,0.0) to get rid of rounding errors for float type
 
     unsigned int j=blockDim.x * blockIdx.x + threadIdx.x;
     unsigned int k=blockDim.y * blockIdx.y + threadIdx.y;
@@ -52,7 +56,7 @@ __global__ void biharmonic_Fourier_kernel(int Nx, int My, T_C *gradient_x, T_C *
     T_C y4 = gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)];
     T_C x2y2 = gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)];
     
-    biharmonic[I2(j,k,Nx)] = x4+T_C(2.0,0.0)*x2y2+y4;
+    biharmonic[I2(j,k,Nx)] = T_C(x4.real()+2.0*x2y2.real()+y4.real(),0.0);
 
 }
 

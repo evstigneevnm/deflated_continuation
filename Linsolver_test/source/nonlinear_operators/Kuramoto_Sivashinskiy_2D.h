@@ -1,16 +1,10 @@
 #ifndef __KURAMOTO_SIVASHINSKIY_2D__
 #define __KURAMOTO_SIVASHINSKIY_2D__
 
-#include <external_libraries/cufft_wrap.h>
-#include <thrust/complex.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D_ker.h>
-//DEBUG
-#include <iostream>
-#include "file_operations.h"
-#include <limits>
-//ENDS
 
-template<typename VectorOperations_R, typename VectorOperations_C, unsigned int BLOCK_SIZE_x=64, unsigned int BLOCK_SIZE_y=16>
+
+template<class FFT_type, class VectorOperations_R, class VectorOperations_C, unsigned int BLOCK_SIZE_x=64, unsigned int BLOCK_SIZE_y=16>
 class Kuramoto_Sivashinskiy_2D
 {
 public:
@@ -24,14 +18,14 @@ public:
     
 
 
-    Kuramoto_Sivashinskiy_2D(T a_val_, T b_val_, size_t Nx_, size_t Ny_, vector_operations_real *vec_ops_R_, vector_operations_complex *vec_ops_C_, cufft_wrap_R2C<T> *CUFFT_): Nx(Nx_), Ny(Ny_), vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), CUFFT(CUFFT_), a_val(a_val_), b_val(b_val_)
+    Kuramoto_Sivashinskiy_2D(T a_val_, T b_val_, size_t Nx_, size_t Ny_, vector_operations_real *vec_ops_R_, vector_operations_complex *vec_ops_C_, FFT_type *FFT_): Nx(Nx_), Ny(Ny_), vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), FFT(FFT_), a_val(a_val_), b_val(b_val_)
     {
         common_constructor_operation();
         calculate_cuda_grid();
         init_all_derivatives();
     }
 
-    Kuramoto_Sivashinskiy_2D(T a_val_, T b_val_, size_t Nx_, size_t Ny_, dim3 dimGrid_, dim3 dimGrid_F_, dim3 dimBlock_, vector_operations_real *vec_ops_R_, vector_operations_complex *vec_ops_C_, cufft_wrap_R2C<T> &CUFFT_): Nx(Nx_), Ny(Ny_), dimGrid(dimGrid_), dimGrid_F(dimGrid_F_), dimBlock(dimBlock_), vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), CUFFT(CUFFT_), a_val(a_val_), b_val(b_val_)
+    Kuramoto_Sivashinskiy_2D(T a_val_, T b_val_, size_t Nx_, size_t Ny_, dim3 dimGrid_, dim3 dimGrid_F_, dim3 dimBlock_, vector_operations_real *vec_ops_R_, vector_operations_complex *vec_ops_C_, FFT_type &FFT_): Nx(Nx_), Ny(Ny_), dimGrid(dimGrid_), dimGrid_F(dimGrid_F_), dimBlock(dimBlock_), vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), FFT(FFT_), a_val(a_val_), b_val(b_val_)
     {
 
         common_constructor_operation();
@@ -40,30 +34,20 @@ public:
 
     ~Kuramoto_Sivashinskiy_2D()
     {
-        if(gradient_x!=NULL)
-            cudaFree(gradient_x);
-        if(gradient_y!=NULL)
-            cudaFree(gradient_y);
-        if(Laplace!=NULL)
-            cudaFree(Laplace);
-        if(biharmonic!=NULL)
-            cudaFree(biharmonic);
-        if(u_x_hat!=NULL)
-            cudaFree(u_x_hat);
-        if(u_y_hat!=NULL)
-            cudaFree(u_y_hat);
-        if(w1_ext!=NULL)
-            cudaFree(w1_ext);
-        if(w2_ext!=NULL)
-            cudaFree(w2_ext);
-        if(u_ext!=NULL)
-            cudaFree(u_ext);
-        if(u_x_ext!=NULL)
-            cudaFree(u_x_ext);
-        if(u_y_ext!=NULL)
-            cudaFree(u_y_ext);
-        if(b_hat!=NULL)
-            cudaFree(b_hat);
+        vec_ops_C->stop_use_vector(gradient_x); vec_ops_C->free_vector(gradient_x);
+        vec_ops_C->stop_use_vector(gradient_y); vec_ops_C->free_vector(gradient_y);
+        vec_ops_C->stop_use_vector(Laplace); vec_ops_C->free_vector(Laplace);
+        vec_ops_C->stop_use_vector(biharmonic); vec_ops_C->free_vector(biharmonic);
+        vec_ops_C->stop_use_vector(u_x_hat); vec_ops_C->free_vector(u_x_hat);
+        vec_ops_C->stop_use_vector(u_y_hat); vec_ops_C->free_vector(u_y_hat);        
+        vec_ops_C->stop_use_vector(b_hat); vec_ops_C->free_vector(b_hat);                
+
+        vec_ops_R->stop_use_vector(w1_ext); vec_ops_R->free_vector(w1_ext);
+        vec_ops_R->stop_use_vector(w2_ext); vec_ops_R->free_vector(w2_ext);
+        vec_ops_R->stop_use_vector(u_ext); vec_ops_R->free_vector(u_ext);
+        vec_ops_R->stop_use_vector(u_x_ext); vec_ops_R->free_vector(u_x_ext);
+        vec_ops_R->stop_use_vector(u_y_ext); vec_ops_R->free_vector(u_y_ext);
+
     }
 
     //nonlinear Kuramoto Sivashinskiy 2D operator:
@@ -95,82 +79,6 @@ public:
 
 
 
-//DEBUG
-    void tests()
-    {
-        
-        TC_vec U_hat_d = device_allocate<TC>(Nx*My);
-        TC_vec U_hat1_d = device_allocate<TC>(Nx*My);
-        TC_vec U_hat2_d = device_allocate<TC>(Nx*My);
-        T_vec U = (T_vec) malloc(sizeof(T)*Nx*Ny);
-        T_vec U1 = (T_vec) malloc(sizeof(T)*Nx*Ny);
-        for (int i = 0; i < Nx*Ny; ++i)
-        {
-            U[i]=T(i)/sqrt(Nx*Ny);
-        }
-        T_vec U_d = device_allocate<T>(Nx*Ny);
-        T_vec U1_d = device_allocate<T>(Nx*Ny);
-        host_2_device_cpy<T>(U_d, U, Nx*Ny);        
-
-        fft(U_d, U_hat_d);
-        ifft(U_hat_d, U1_d);
-
-
-        device_2_host_cpy<T>(U1, U1_d, Nx*Ny);
-        T residual = 0.0;
-        for (int i = 0; i < Nx*Ny; ++i)
-        {
-            T diff = U1[i]-U[i];
-            residual+=sqrt(diff*diff);
-        }
-        
-
-        printf("||U||_2=%le\n",(double)vec_ops_R->normalize(U_d));
-        printf("||U||_2=%le\n",(double)vec_ops_R->norm(U_d));
-        printf("(U,U1)=%le\n",(double)vec_ops_R->scalar_prod(U1_d,U_d));
-
-        
-        fft(U_d, U_hat1_d);
-        fft(U_d, U_hat2_d);
-
-        vec_ops_C->assign_mul( (TC)1.0, U_hat_d, (TC)-5.0, U_hat1_d, U_hat2_d);
-        
-        std::cout << "(complex)-5=" << (TC)-5.0 << std::endl;
-        printf("sqrt((U_hat,U_hat))=%le\n",(double)sqrt(vec_ops_C->scalar_prod(U_hat2_d,U_hat2_d).real()) );
-        printf("||U_hat||_2=%le\n",(double)vec_ops_C->normalize(U_hat2_d));
-        printf("||U_hat||_2=%le\n",(double)vec_ops_C->norm(U_hat2_d));
-        std::cout << "||U_hat||_2=" << sqrt(vec_ops_C->scalar_prod(U_hat2_d,U_hat2_d)) << std::endl;
-
-        cudaFree(U_d);
-        cudaFree(U1_d);
-        cudaFree(U_hat_d);
-        cudaFree(U_hat1_d);
-        cudaFree(U_hat2_d);
-        free(U);
-        free(U1);
-        printf("resid = %le\n",(double)residual);
-
-
-        T_vec Laplace_h = (T_vec) malloc(sizeof(T)*Nx*My);
-        T_vec biharmonic_h = (T_vec) malloc(sizeof(T)*Nx*My);
-        device_2_host_cpy<T>(Laplace_h, Laplace, Nx*My);
-        device_2_host_cpy<T>(biharmonic_h, biharmonic, Nx*My);
-        
-        printf("is valid? %i. ture=%i, false=%i.\n",vec_ops_R->check_is_valid_number(Laplace), true, false);
-        file_operations::write_matrix<T>("laplace.dat",  Nx, My, Laplace_h);
-        file_operations::write_matrix<T>("biharm.dat",  Nx, My, biharmonic_h);
-        
-        //Laplace_h[Nx*My/2]=std::numeric_limits<T>::quiet_NaN();
-        Laplace_h[Nx*My-1]=std::numeric_limits<T>::infinity();
-        host_2_device_cpy<T>(Laplace, Laplace_h, Nx*My);   
-        printf("is valid? %i. ture=%i, false=%i.\n",vec_ops_R->check_is_valid_number(Laplace), true, false);
-
-        free(Laplace_h);
-        free(biharmonic_h);
-
-    }
-//ENDS
-
     void set_cuda_grid(dim3 dimGrid_, dim3 dimGrid_F_, dim3 dimBlock_)
     {
         dimGrid=dimGrid_;
@@ -197,7 +105,7 @@ private:
 
 
     size_t Nx, Ny, My;
-    cufft_wrap_R2C<T> *CUFFT;
+    FFT_type *FFT;
     TC_vec gradient_x=NULL;
     TC_vec gradient_y=NULL;
     TC_vec Laplace=NULL;
@@ -216,19 +124,21 @@ private:
 
     void common_constructor_operation()
     {   
-        My=CUFFT->get_reduced_size();
-        gradient_x = device_allocate<TC>(Nx*My);
-        gradient_y = device_allocate<TC>(Nx*My);
-        Laplace = device_allocate<TC>(Nx*My);
-        biharmonic = device_allocate<TC>(Nx*My);
-        u_x_hat = device_allocate<TC>(Nx*My);
-        u_y_hat = device_allocate<TC>(Nx*My);
-        w1_ext = device_allocate<T>(Nx*Ny);
-        w2_ext = device_allocate<T>(Nx*Ny);
-        u_ext = device_allocate<T>(Nx*Ny);
-        u_x_ext = device_allocate<T>(Nx*Ny);
-        u_y_ext = device_allocate<T>(Nx*Ny);
-        b_hat = device_allocate<TC>(Nx*My);
+        My=FFT->get_reduced_size();
+        vec_ops_C->init_vector(gradient_x); vec_ops_C->start_use_vector(gradient_x); 
+        vec_ops_C->init_vector(gradient_y); vec_ops_C->start_use_vector(gradient_y); 
+        vec_ops_C->init_vector(Laplace); vec_ops_C->start_use_vector(Laplace); 
+        vec_ops_C->init_vector(biharmonic); vec_ops_C->start_use_vector(biharmonic); 
+        vec_ops_C->init_vector(u_x_hat); vec_ops_C->start_use_vector(u_x_hat); 
+        vec_ops_C->init_vector(u_y_hat); vec_ops_C->start_use_vector(u_y_hat); 
+        vec_ops_C->init_vector(b_hat); vec_ops_C->start_use_vector(b_hat); 
+
+        vec_ops_R->init_vector(w1_ext); vec_ops_R->start_use_vector(w1_ext); 
+        vec_ops_R->init_vector(w2_ext); vec_ops_R->start_use_vector(w2_ext); 
+        vec_ops_R->init_vector(u_ext); vec_ops_R->start_use_vector(u_ext); 
+        vec_ops_R->init_vector(u_x_ext); vec_ops_R->start_use_vector(u_x_ext); 
+        vec_ops_R->init_vector(u_y_ext); vec_ops_R->start_use_vector(u_y_ext); 
+
     }
 
     void init_all_derivatives()
@@ -270,13 +180,13 @@ private:
 
     void ifft(TC_vec& u_hat_, T_vec& u_)
     {
-        CUFFT->ifft(u_hat_, u_);
+        FFT->ifft(u_hat_, u_);
         T scale = T(1.0)/(Nx*Ny);
         vec_ops_R->scale(scale, u_);
     }
     void fft(T_vec& u_, TC_vec& u_hat_)
     {
-        CUFFT->fft(u_, u_hat_);
+        FFT->fft(u_, u_hat_);
     }
 
 };

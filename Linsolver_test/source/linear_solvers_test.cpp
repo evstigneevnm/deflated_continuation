@@ -8,11 +8,10 @@
 //#include <numerical_algos/lin_solvers/bicgstab.h>
 #include <file_operations.h>
 #include <cpu_vector_operations.h>
-#include <sherman_morrison_linear_system_solve.h>
+
 
 
 using namespace numerical_algos::lin_solvers;
-using namespace numerical_algos::sherman_morrison_linear_system;
 
 typedef SCALAR_TYPE   real;
 typedef real*         vector_t;
@@ -87,7 +86,7 @@ private:
         for (int i=0; i<sz; i++)
         {
             real *mat_row = &mat[I2(i,0,sz)];
-            result[i] = scalar_prod(&mat[I2(i,0,sz)], vec);
+            result[i] = scalar_prod(mat_row, vec);
         }
     }
 
@@ -96,8 +95,7 @@ private:
 typedef utils::log_std                                                                  log_t;
 typedef default_monitor<cpu_vector_operations_real,log_t>                                    monitor_t;
 typedef bicgstabl<system_operator,prec_operator,cpu_vector_operations_real,monitor_t,log_t>  lin_solver_bicgstabl_t;
-// Sherman Morrison class
-typedef sherman_morrison_linear_system_solve<system_operator,prec_operator,cpu_vector_operations_real,monitor_t,log_t,bicgstabl> sherman_morrison_linear_system_solve_t;
+
 
 int main(int argc, char **args)
 {
@@ -113,27 +111,18 @@ int main(int argc, char **args)
     int basis_sz = atoi(args[5]);
 
     int sz = file_operations::read_matrix_size("./dat_files/A.dat");
-    vector_t A, iP, x, x0, b, c, d;
+    vector_t A, iP, x, x0, b;
 
     A=(vector_t) malloc(sz*sz*sizeof(real));
     iP=(vector_t) malloc(sz*sz*sizeof(real));
-
     x0=(vector_t) malloc(sz*sizeof(real));
     x=(vector_t) malloc(sz*sizeof(real));
-    c=(vector_t) malloc(sz*sizeof(real));
-    d=(vector_t) malloc(sz*sizeof(real));
-
     b=(vector_t) malloc(sz*sizeof(real));
-    real alpha=1.0/100.0;
-    real beta=1.0;
-    real v=0.0;
 
     file_operations::read_matrix<real>("./dat_files/A.dat",  sz, sz, A);
     file_operations::read_matrix<real>("./dat_files/iP.dat",  sz, sz, iP);
     file_operations::read_vector<real>("./dat_files/x0.dat",  sz, x0);
     file_operations::read_vector<real>("./dat_files/b.dat",  sz, b);
-    file_operations::read_vector<real>("./dat_files/c.dat",  sz, c);
-    file_operations::read_vector<real>("./dat_files/d.dat",  sz, d);
 
 
     std::cout << sz << std::endl;
@@ -144,34 +133,19 @@ int main(int argc, char **args)
     
     vec_ops.assign_scalar(0.0, x);
 
-
-    sherman_morrison_linear_system_solve_t SM(&prec, &vec_ops, &log);
-    
-    //lin_solver_bicgstabl_t lin_solver_bicgstabl(&vec_ops, &log);
+    lin_solver_bicgstabl_t lin_solver_bicgstabl(&vec_ops, &log);
     monitor_t *mon;
-    //mon = &lin_solver_bicgstabl.monitor();
-    mon = &SM.get_linsolver_handle()->monitor();
-
+    mon = &lin_solver_bicgstabl.monitor();
+   
     mon->init(rel_tol, real(0.f), max_iters);
     mon->set_save_convergence_history(true);
     mon->set_divide_out_norms_by_rel_base(true);
-    //lin_solver_bicgstabl.set_preconditioner(&prec);
-    //SM.get_linsolver_handle()->set_preconditioner(&prec);
-
-
-
-    //lin_solver_bicgstabl.set_use_precond_resid(use_precond_resid);
-    //lin_solver_bicgstabl.set_resid_recalc_freq(resid_recalc_freq);
-    //lin_solver_bicgstabl.set_basis_size(basis_sz);
-    SM.get_linsolver_handle()->set_use_precond_resid(use_precond_resid);
-    SM.get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
-    SM.get_linsolver_handle()->set_basis_size(basis_sz);
-
-    //bool res_flag = lin_solver_bicgstabl.solve(Ax, b, x);
-    //bool res_flag = SM.solve(Ax, b, x);
-    bool res_flag = SM.solve(Ax, c, d, alpha, b, beta, x, v);
-    int iters_performed = mon->iters_performed();
-
+    lin_solver_bicgstabl.set_preconditioner(&prec);
+    lin_solver_bicgstabl.set_use_precond_resid(use_precond_resid);
+    lin_solver_bicgstabl.set_resid_recalc_freq(resid_recalc_freq);
+    lin_solver_bicgstabl.set_basis_size(basis_sz);
+    
+    bool res_flag = lin_solver_bicgstabl.solve(Ax, b, x);
     if (res_flag) 
         log.info("lin_solver returned success result");
     else
@@ -179,14 +153,11 @@ int main(int argc, char **args)
 
 
     file_operations::write_vector<real>("./dat_files/x.dat", sz, x);
-    std::cout << "v=" << v << std::endl;
 
     free(A);
     free(iP);
     free(x0);
     free(b);
-    free(c);
-    free(d);
     free(x);
     return 0;
 }

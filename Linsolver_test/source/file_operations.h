@@ -37,9 +37,9 @@ void write_matrix(const std::string &f_name, int Row, int Col, T *matrix, unsign
         for(int j=0;j<Col;j++)
         {
             if(j<Col-1)
-                f << std::fixed << std::setprecision(prec) << matrix[I2(i,j,Row)] << " ";
+                f << std::setprecision(prec) << matrix[I2(i,j,Row)] << " ";
             else
-                f << std::fixed << std::setprecision(prec) << matrix[I2(i,j,Row)];
+                f << std::setprecision(prec) << matrix[I2(i,j,Row)];
 
         }
         f << std::endl;
