@@ -71,19 +71,25 @@ public:
     void F(const TC*& u, const T alpha, TC*& v)
     {
         
-        vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u, TC(1.0), (const TC_vec&)gradient_x, (TC*&)u_x_hat);
-        vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u, TC(1.0), (const TC_vec&)gradient_y, (TC*&)u_y_hat);
+        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_x, u_x_hat);
+        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_y, u_y_hat);
         ifft(u_x_hat,u_x_ext);
         ifft(u_y_hat,u_y_ext);
         ifft((TC_vec&)u,u_ext);
-        //z=x*y;
+
+         //z=x*y;
         vec_ops_R->mul_pointwise(1.0, u_x_ext, 1.0, u_ext, w1_ext);
         vec_ops_R->mul_pointwise(1.0, u_y_ext, 1.0, u_ext, w2_ext);
         fft(w1_ext,u_x_hat);
         fft(w2_ext,u_y_hat);
-        vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u, TC(b_val), (const TC_vec&)biharmonic, (TC*&)v);
-        vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u, TC(alpha), (const TC_vec&)Laplace, (TC*&)b_hat);
-        vec_ops_C->add_mul(TC(alpha*a_val), (const TC_vec&) u_x_hat, TC(alpha*a_val), (const TC_vec&) u_y_hat, TC(1.0), (TC_vec&) b_hat);
+        // b_val*biharmonic*u->v
+        vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u, TC(b_val), (const TC_vec&)biharmonic, v);
+        // alpha*Laplace*u->b_hat
+        vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u, TC(alpha), (const TC_vec&)Laplace, b_hat);
+        // alpha*a_val*(uu_x)+alpha*a_val*(uu_y)+b_hat->b_hat
+        vec_ops_C->add_mul(TC(alpha*a_val), (const TC_vec&) u_x_hat, TC(alpha*a_val), (const TC_vec&) u_y_hat, TC(1.0), b_hat);
+        // b_hat+v->v
+        vec_ops_C->add_mul(TC(1.0), (const TC_vec&)b_hat, v);
         
     }
 
@@ -162,8 +168,6 @@ public:
         free(Laplace_h);
         free(biharmonic_h);
 
-
-
     }
 //ENDS
 
@@ -196,8 +200,8 @@ private:
     cufft_wrap_R2C<T> *CUFFT;
     TC_vec gradient_x=NULL;
     TC_vec gradient_y=NULL;
-    T_vec Laplace=NULL;
-    T_vec biharmonic=NULL;
+    TC_vec Laplace=NULL;
+    TC_vec biharmonic=NULL;
     TC_vec u_x_hat=NULL;
     TC_vec u_y_hat=NULL;
     TC_vec b_hat=NULL;
@@ -215,8 +219,8 @@ private:
         My=CUFFT->get_reduced_size();
         gradient_x = device_allocate<TC>(Nx*My);
         gradient_y = device_allocate<TC>(Nx*My);
-        Laplace = device_allocate<T>(Nx*My);
-        biharmonic = device_allocate<T>(Nx*My);
+        Laplace = device_allocate<TC>(Nx*My);
+        biharmonic = device_allocate<TC>(Nx*My);
         u_x_hat = device_allocate<TC>(Nx*My);
         u_y_hat = device_allocate<TC>(Nx*My);
         w1_ext = device_allocate<T>(Nx*Ny);
@@ -251,17 +255,17 @@ private:
 
     void set_gradient_coefficients()
     {
-        gradient_Fourier<T, TC>(dimGrid_F, dimBlock, Nx, My, gradient_x, gradient_y);
+        gradient_Fourier<TC>(dimGrid_F, dimBlock, Nx, My, gradient_x, gradient_y);
     }
 
     void set_Laplace_coefficients()
     {
-        Laplace_Fourier<T, TC>(dimGrid_F, dimBlock, Nx, My, gradient_x, gradient_y, Laplace);
+        Laplace_Fourier<TC>(dimGrid_F, dimBlock, Nx, My, gradient_x, gradient_y, Laplace);
     }
    
     void set_biharmonic_coefficients()
     {
-        biharmonic_Fourier<T, TC>(dimGrid_F, dimBlock, Nx, My, gradient_x, gradient_y, biharmonic);
+        biharmonic_Fourier<TC>(dimGrid_F, dimBlock, Nx, My, gradient_x, gradient_y, biharmonic);
     }
 
     void ifft(TC_vec& u_hat_, T_vec& u_)
@@ -274,7 +278,6 @@ private:
     {
         CUFFT->fft(u_, u_hat_);
     }
-
 
 };
 

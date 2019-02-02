@@ -12,7 +12,8 @@ cufft_test_float: source/cufft_test.cpp
 	nvcc -I source/ -DSCALAR_TYPE=float -g source/cufft_test.cpp O/cufft_test_kernels.o -lcufft -o cufft_test.bin 2>results_make.txt	
 cufft_test_2D_double: source/cufft_test_2D.cpp
 	nvcc -I source/ -g source/cufft_test_kernels.cu -c -o O/cufft_test_kernels.o 2>results_make.txt
-	nvcc -I source/ -DSCALAR_TYPE=double -g source/cufft_test_2D.cpp O/cufft_test_kernels.o -lcufft -o cufft_test_2D.bin 2>results_make.txt
+	nvcc -I source/ -DSCALAR_TYPE=double -g source/cufft_test_2D.cpp O/cufft_test_kernels.o -lcufft -lcublas -o cufft_test_2D.bin 2>results_make.txt
+	nvcc -I source/ -DSCALAR_TYPE=double -g source/cufft_test_2D_1.cpp O/cufft_test_kernels.o O/gpu_vector_operations_kernels.o -lcufft -lcublas -o cufft_test_2D.bin 2>results_make.txt
 gpu_vector_operations:
 	nvcc -I source/ -g -G source/gpu_vector_operations_kernels.cu -c -o O/gpu_vector_operations_kernels.o 2>results_make.txt
 	nvcc -I source/ -DSCALAR_TYPE=double -g -G source/test_vector_operations.cpp O/gpu_vector_operations_kernels.o -lcublas -o test_vector_operations.bin 2>results_make.txt

@@ -12,14 +12,14 @@
 namespace file_operations
 {
 template <class T>
-void write_vector(const std::string &f_name, int N, T *vec)
+void write_vector(const std::string &f_name, int N, T *vec, unsigned int prec=16)
 {
         std::ofstream f(f_name.c_str(), std::ofstream::out);
         if (!f) throw std::runtime_error("print_vector: error while opening file " + f_name);
 
         for (int i = 0; i < N; ++i)
         {
-            if (!(f << std::setprecision(16) << vec[i] << " " << std::endl))
+            if (!(f << std::setprecision(prec) << vec[i] << " " << std::endl))
                 throw std::runtime_error("print_vector: error while writing to file " + f_name);
         } 
         f.close();
@@ -27,7 +27,7 @@ void write_vector(const std::string &f_name, int N, T *vec)
 
 
 template <class T>
-void write_matrix(const std::string &f_name, int Row, int Col, T *matrix)
+void write_matrix(const std::string &f_name, int Row, int Col, T *matrix, unsigned int prec=16)
 {
     int N=Col;
     std::ofstream f(f_name.c_str(), std::ofstream::out);
@@ -37,9 +37,9 @@ void write_matrix(const std::string &f_name, int Row, int Col, T *matrix)
         for(int j=0;j<Col;j++)
         {
             if(j<Col-1)
-                f << std::setprecision(16) << matrix[I2(i,j,Row)] << " ";
+                f << std::fixed << std::setprecision(prec) << matrix[I2(i,j,Row)] << " ";
             else
-                f << matrix[I2(i,j,Row)];
+                f << std::fixed << std::setprecision(prec) << matrix[I2(i,j,Row)];
 
         }
         f << std::endl;

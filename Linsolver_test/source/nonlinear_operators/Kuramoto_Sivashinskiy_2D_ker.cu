@@ -1,8 +1,8 @@
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D_ker.h>
 
 
-template<typename T, typename T_C>
-__global__ void gradient_Fourier_kernel(size_t Nx, size_t My, T_C *gradient_x, T_C *gradient_y)
+template<typename T_C>
+__global__ void gradient_Fourier_kernel(int Nx, int My, T_C *gradient_x, T_C *gradient_y)
 {
 
     unsigned int j=blockDim.x * blockIdx.x + threadIdx.x;
@@ -16,14 +16,14 @@ __global__ void gradient_Fourier_kernel(size_t Nx, size_t My, T_C *gradient_x, T
     
     int n=k;
     
-    gradient_x[I2(j,k,Nx)]=T_C(T(0.0),T(m));
-    gradient_y[I2(j,k,Nx)]=T_C(T(0.0),T(n));
+    gradient_x[I2(j,k,Nx)]=T_C(0,m);
+    gradient_y[I2(j,k,Nx)]=T_C(0,n);
 
 }
 
 
-template<typename T, typename T_C>
-__global__ void Laplace_Fourier_kernel(size_t Nx, size_t My, T_C *gradient_x, T_C *gradient_y, T *Laplace)
+template<typename T_C>
+__global__ void Laplace_Fourier_kernel(int Nx, int My, T_C *gradient_x, T_C *gradient_y, T_C *Laplace)
 {
 
     unsigned int j=blockDim.x * blockIdx.x + threadIdx.x;
@@ -34,12 +34,12 @@ __global__ void Laplace_Fourier_kernel(size_t Nx, size_t My, T_C *gradient_x, T_
     T_C x2 = gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)];
     T_C y2 = gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)];
 
-    Laplace[I2(j,k,Nx)]= x2.real() + y2.real();
+    Laplace[I2(j,k,Nx)] = x2 + y2;
 
 }
 
-template<typename T, typename T_C>
-__global__ void biharmonic_Fourier_kernel(size_t Nx, size_t My, T_C *gradient_x, T_C *gradient_y, T *biharmonic)
+template<typename T_C>
+__global__ void biharmonic_Fourier_kernel(int Nx, int My, T_C *gradient_x, T_C *gradient_y, T_C *biharmonic)
 {
 
 
@@ -48,11 +48,11 @@ __global__ void biharmonic_Fourier_kernel(size_t Nx, size_t My, T_C *gradient_x,
     
     if((j>=Nx)||(k>=My)) return;
 
-    T_C x4=gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)];
-    T_C y4=gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)];
-    T_C x2y2=gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)];
+    T_C x4 = gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)];
+    T_C y4 = gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)];
+    T_C x2y2 = gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)];
     
-    biharmonic[I2(j,k,Nx)]=x4.real()+T(2.0)*x2y2.real()+y4.real();
+    biharmonic[I2(j,k,Nx)] = x4+T_C(2.0,0.0)*x2y2+y4;
 
 }
 
@@ -60,32 +60,32 @@ __global__ void biharmonic_Fourier_kernel(size_t Nx, size_t My, T_C *gradient_x,
 
 
 
-template<typename T, typename T_C>
-void gradient_Fourier(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, T_C *gradient_x, T_C *gradient_y)
+template<typename T_C>
+void gradient_Fourier(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, T_C*& gradient_x, T_C*& gradient_y)
 {
-    gradient_Fourier_kernel<T,T_C><<<dimGrid, dimBlock>>>(Nx,My,gradient_x,gradient_y);
+    gradient_Fourier_kernel<T_C><<<dimGrid, dimBlock>>>(Nx,My,gradient_x,gradient_y);
 }
 
 
 
-template<typename T, typename T_C>
-void Laplace_Fourier(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, T_C *gradient_x, T_C *gradient_y, T *Laplce)
+template<typename T_C>
+void Laplace_Fourier(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, T_C*& gradient_x, T_C*& gradient_y, T_C*& Laplce)
 {
-    Laplace_Fourier_kernel<T,T_C><<<dimGrid, dimBlock>>>(Nx,My,gradient_x, gradient_y, Laplce);
+    Laplace_Fourier_kernel<T_C><<<dimGrid, dimBlock>>>(Nx,My,gradient_x, gradient_y, Laplce);
 }
 
 
 
-template<typename T, typename T_C>
-void biharmonic_Fourier(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, T_C *gradient_x, T_C *gradient_y, T *biharmonic)
+template<typename T_C>
+void biharmonic_Fourier(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, T_C*& gradient_x, T_C*& gradient_y, T_C*& biharmonic)
 {
-    biharmonic_Fourier_kernel<T,T_C><<<dimGrid, dimBlock>>>(Nx,My,gradient_x, gradient_y, biharmonic);
+    biharmonic_Fourier_kernel<T_C><<<dimGrid, dimBlock>>>(Nx,My,gradient_x, gradient_y, biharmonic);
 }
 
 //explicit instantiation
-template void gradient_Fourier<float, thrust::complex<float> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<float> *gradient_x, thrust::complex<float> *gradient_y);
-template void gradient_Fourier<double, thrust::complex<double> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<double> *gradient_x, thrust::complex<double> *gradient_y);
-template void Laplace_Fourier<float, thrust::complex<float> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<float> *gradient_x, thrust::complex<float> *gradient_y, float *Laplce);
-template void Laplace_Fourier<double, thrust::complex<double> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<double> *gradient_x, thrust::complex<double> *gradient_y, double *Laplce);
-template void biharmonic_Fourier<float, thrust::complex<float> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<float> *gradient_x, thrust::complex<float> *gradient_y, float *biharmonic);
-template void biharmonic_Fourier<double, thrust::complex<double> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<double> *gradient_x, thrust::complex<double> *gradient_y, double *biharmonic);
+template void gradient_Fourier<thrust::complex<float> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<float>*& gradient_x, thrust::complex<float>*& gradient_y);
+template void gradient_Fourier<thrust::complex<double> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<double>*& gradient_x, thrust::complex<double>*& gradient_y);
+template void Laplace_Fourier<thrust::complex<float> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<float>*& gradient_x, thrust::complex<float>*& gradient_y, thrust::complex<float>*& Laplce);
+template void Laplace_Fourier<thrust::complex<double> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<double>*& gradient_x, thrust::complex<double>*& gradient_y, thrust::complex<double>*& Laplce);
+template void biharmonic_Fourier<thrust::complex<float> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<float>*& gradient_x, thrust::complex<float>*& gradient_y, thrust::complex<float>*& biharmonic);
+template void biharmonic_Fourier<thrust::complex<double> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<double>*& gradient_x, thrust::complex<double>*& gradient_y, thrust::complex<double>*& biharmonic);

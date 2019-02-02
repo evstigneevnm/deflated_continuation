@@ -24,8 +24,8 @@ int main(int argc, char const *argv[])
 
 
     init_cuda(-1);
-    size_t Nx=256;
-    size_t Ny=256;
+    size_t Nx=8;
+    size_t Ny=8;
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny);
     size_t My=CUFFT_C2R->get_reduced_size();
     cublas_wrap *CUBLAS = new cublas_wrap(true);
@@ -40,7 +40,6 @@ int main(int argc, char const *argv[])
     dim3 Grids;
     dim3 Grids_F;
     KS2D->get_cuda_grid(Grids, Grids_F, Blocks);
-    KS2D->tests();
 
     printf("Blocks = (%i,%i,%i)\n", Blocks.x, Blocks.y, Blocks.z);
     printf("Grids = (%i,%i,%i)\n", Grids.x, Grids.y, Grids.z);
@@ -48,8 +47,25 @@ int main(int argc, char const *argv[])
 
     thrust_complex *u_in_hat = device_allocate<thrust_complex>(Nx*My);
     thrust_complex *u_out_hat = device_allocate<thrust_complex>(Nx*My);
+    vec_ops_C->assign_scalar(thrust_complex(1.0,0.0), u_in_hat);
+    thrust_complex* u_hat_h=(thrust_complex*)malloc(sizeof(thrust_complex)*Nx*Ny);
+    device_2_host_cpy<thrust_complex>(u_hat_h, u_in_hat, Nx*My);
+    file_operations::write_matrix<thrust_complex>("u_in_hat.dat",Nx,My,u_hat_h, 3);
+
+
     KS2D->F((const thrust_complex*&)u_in_hat, 1.0, u_out_hat);
 
+
+    
+    bool input_finit =vec_ops_C->check_is_valid_number(u_in_hat);
+    bool output_finit =vec_ops_C->check_is_valid_number(u_out_hat);
+    std::string test_in(true==(bool)input_finit?"Ok":"fail");
+    std::string test_out(true==(bool)output_finit?"Ok":"fail");
+    std::cout << test_in << " " << test_out << std::endl;
+    device_2_host_cpy<thrust_complex>(u_hat_h, u_out_hat, Nx*My);
+    file_operations::write_matrix<thrust_complex>("u_out_hat.dat",Nx,My,u_hat_h, 3);
+
+    free(u_hat_h);
     cudaFree(u_in_hat);
     cudaFree(u_out_hat);
 
