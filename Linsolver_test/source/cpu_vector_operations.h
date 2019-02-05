@@ -7,12 +7,23 @@ struct cpu_vector_operations
 {
     typedef T  scalar_type;
     typedef T* vector_type;
+    bool location;
 
-    cpu_vector_operations(int sz) : sz_(sz)
+    cpu_vector_operations(size_t sz) : sz_(sz)
     {
+        location=false;
+    }
+    
+    size_t get_vector_size()
+    {
+        return sz_;
+    }
+    bool device_location()
+    {
+        return location;
     }
 
-    int     sz_;
+    size_t     sz_;
 
     void init_vector(vector_type& x)const 
     {

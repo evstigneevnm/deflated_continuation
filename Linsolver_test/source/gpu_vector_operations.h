@@ -56,16 +56,17 @@ struct gpu_vector_operations
     typedef T  scalar_type;
     typedef T* vector_type;
     typedef typename gpu_vector_operations_type::vec_ops_cuComplex_type_hlp<T>::norm_type Tsc;
-
+    bool location;
 
     gpu_vector_operations(size_t sz_, cublas_wrap *cuBLAS_) : sz(sz_), cuBLAS(cuBLAS_)
     {
         calculate_cuda_grid();
+        location=true;
     }
 
     gpu_vector_operations(size_t sz_, dim3 dimBlock_, dim3 dimGrid_) : sz(sz_), dimBlock(dimBlock_), dimGrid(dimGrid_)
     {
-
+        location=true;
     }
 
     void init_vector(vector_type& x)const 
@@ -86,7 +87,14 @@ struct gpu_vector_operations
     {
         
     }
-
+    size_t get_vector_size()
+    {
+        return sz;
+    }
+    bool device_location()
+    {
+        return location;
+    }
 
     bool check_is_valid_number(const vector_type &x)const;
     //Observe, that for complex type we need template spetialization! vector type is compelx, but norm type is real!
@@ -162,6 +170,12 @@ struct gpu_vector_operations
     //calc: z := (mul_x*x)*(mul_y*y)
     void mul_pointwise(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                         vector_type& z)const;
+    //calc: z := mul_x*x + mul_y*y + mul_w*w + mul_z*z;
+    void add_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
+                            const scalar_type mul_w, const vector_type& w, const scalar_type mul_z, vector_type& z)const;    
+    //calc: z := mul_x*x + mul_y*y + mul_v*v + mul_w*w;
+    void assign_mul(scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
+                                        scalar_type mul_v, const vector_type& v, const scalar_type mul_w, const vector_type& w, vector_type& z)const;
 
 //*/
 private:

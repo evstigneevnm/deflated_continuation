@@ -35,7 +35,6 @@ __global__ void kernel_convert_2R_values(size_t N, T_C* arrayC, T_R* arrayRR, T_
         arrayRR[j] = arrayC[j].x;
         arrayRI[j] = arrayC[j].y;
 
-
     }
 
 }

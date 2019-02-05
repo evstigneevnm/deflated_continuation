@@ -9,7 +9,7 @@
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
 #include <gpu_vector_operations.h>
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D.h>
+//#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D.h>
 #include "macros.h"
 #include "file_operations.h"
 
