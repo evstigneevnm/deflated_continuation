@@ -156,7 +156,7 @@ public:
         // d^2du->b_hat
         vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u_0, TC(1.0), (const TC_vec&)Laplace, dv); 
 
-        //a_val*alpha*(u_x_hat0+u_y_hat0)-> u_y_hat0
+        //a_val*alpha*(u_x_hat0+u_y_hat0)->u_y_hat0
         vec_ops_C->add_mul(TC(1.0), u_x_hat0, TC(1.0), u_y_hat0);
         // a_val*u_y_hat0+dv->dv
         vec_ops_C->add_mul(TC(a_val), u_y_hat0, TC(1.0), dv);

@@ -13,6 +13,8 @@
 #define Blocks_x_ 64
 #define Blocks_y_ 16
 
+
+
 int main(int argc, char const *argv[])
 {
     typedef SCALAR_TYPE real;
@@ -22,10 +24,9 @@ int main(int argc, char const *argv[])
     typedef cufft_wrap_R2C<real> cufft_type;
     typedef Kuramoto_Sivashinskiy_2D<cufft_type, gpu_vector_operations_real, gpu_vector_operations_complex, Blocks_x_, Blocks_y_> KS_2D;
 
-
     init_cuda(-1);
-    size_t Nx=16;
-    size_t Ny=16;
+    size_t Nx=128;
+    size_t Ny=256;
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny);
     size_t My=CUFFT_C2R->get_reduced_size();
     cublas_wrap *CUBLAS = new cublas_wrap(true);
@@ -78,7 +79,7 @@ int main(int argc, char const *argv[])
     std::string test_din(true==(bool)input_finit?"Ok":"fail");
     std::string test_dout(true==(bool)output_finit?"Ok":"fail");
     std::cout << test_din << " " << test_dout << std::endl;    
-    output_finit =vec_ops_C->check_is_valid_number(dalpha_out_hat);
+    output_finit = vec_ops_C->check_is_valid_number(dalpha_out_hat);
     std::string test_ain(true==(bool)output_finit?"Ok":"fail");
     std::cout << test_ain << std::endl;    
     device_2_host_cpy<complex>(u_hat_h, u_out_hat, Nx*My);
