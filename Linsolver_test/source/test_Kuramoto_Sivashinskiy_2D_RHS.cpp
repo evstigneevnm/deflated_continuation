@@ -84,8 +84,10 @@ int main(int argc, char const *argv[])
     std::cout << test_ain << std::endl;    
     device_2_host_cpy<complex>(u_hat_h, u_out_hat, Nx*My);
     file_operations::write_matrix<complex>("u_out_hat.dat",Nx,My,u_hat_h, 3);
+    
     device_2_host_cpy<complex>(u_hat_h, du_out_hat, Nx*My);
     file_operations::write_matrix<complex>("du_out_hat.dat",Nx,My,u_hat_h, 3);
+
     device_2_host_cpy<complex>(u_hat_h, dalpha_out_hat, Nx*My);
     file_operations::write_matrix<complex>("dalpha_out_hat.dat",Nx,My,u_hat_h, 3);
 

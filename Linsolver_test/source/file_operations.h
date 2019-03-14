@@ -19,7 +19,7 @@ void write_vector(const std::string &f_name, int N, T *vec, unsigned int prec=16
 
         for (int i = 0; i < N; ++i)
         {
-            if (!(f << std::setprecision(prec) << vec[i] << " " << std::endl))
+            if (!(f << std::setprecision(prec) << vec[i] <<  std::endl))
                 throw std::runtime_error("print_vector: error while writing to file " + f_name);
         } 
         f.close();

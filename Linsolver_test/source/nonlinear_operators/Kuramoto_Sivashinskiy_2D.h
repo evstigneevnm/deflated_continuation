@@ -106,6 +106,7 @@ public:
 
 
     }
+
     //variational jacobian for 2D KS equations J=dF/du
     //returns vector dv as Jdu->dv, where J(u_0,alpha_0) linearized at (u_0, alpha_0) by set_linearization_point
     void jacobian_u(const TC*& du, TC*& dv)
@@ -149,17 +150,18 @@ public:
         vec_ops_R->mul_pointwise(1.0, u_y_ext_0, 1.0, u_ext_0, w2_ext_0);
 
         //du_x0*u_0->u_x_hat0
-        fft(w1_ext_0,u_x_hat0);
+        fft(w1_ext_0, u_x_hat0);
         //du_y0*u_0->u_y_hat0
-        fft(w2_ext_0,u_y_hat0);
+        fft(w2_ext_0, u_y_hat0);
 
         // d^2du->b_hat
-        vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u_0, TC(1.0), (const TC_vec&)Laplace, dv); 
+        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u_0, TC(1.0), (const TC_vec&)Laplace, dv); 
 
         //a_val*alpha*(u_x_hat0+u_y_hat0)->u_y_hat0
-        vec_ops_C->add_mul(TC(1.0), u_x_hat0, TC(1.0), u_y_hat0);
+        vec_ops_C->add_mul(TC(1.0,0.0), u_x_hat0, TC(1.0,0.0), u_y_hat0);
+        
         // a_val*u_y_hat0+dv->dv
-        vec_ops_C->add_mul(TC(a_val), u_y_hat0, TC(1.0), dv);
+        vec_ops_C->add_mul(TC(a_val), u_y_hat0, TC(1.0,0.0), dv);
 
     }
 
@@ -298,6 +300,10 @@ private:
     {
         FFT->fft(u_, u_hat_);
     }
+
+
+    
+
 
 };
 

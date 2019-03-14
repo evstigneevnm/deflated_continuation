@@ -1,6 +1,8 @@
 #ifndef __cpu_vector_operations_H__
 #define __cpu_vector_operations_H__
 
+#include <cmath>
+
 
 template <typename T>
 struct cpu_vector_operations
@@ -9,7 +11,8 @@ struct cpu_vector_operations
     typedef T* vector_type;
     bool location;
 
-    cpu_vector_operations(size_t sz) : sz_(sz)
+    cpu_vector_operations(size_t sz):
+    sz_(sz)
     {
         location=false;
     }

@@ -8,7 +8,7 @@
 //#include <numerical_algos/lin_solvers/bicgstab.h>
 #include <file_operations.h>
 #include <cpu_vector_operations.h>
-#include <sherman_morrison_linear_system_solve.h>
+#include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 
 
 using namespace numerical_algos::lin_solvers;
@@ -23,23 +23,25 @@ struct system_operator: public cpu_vector_operations_real
 {
     int sz;
     vector_t A;
-    system_operator(int sz_, vector_t A_) : sz(sz_), A(A_), cpu_vector_operations(sz_)
+    system_operator(int sz_, vector_t& A_): 
+    sz(sz_), 
+    A(A_), 
+    cpu_vector_operations(sz_)
     {
     }
+
     void apply(const vector_t& x, vector_t& f)const
     {
-        matrix_vector_prod(A, x, f);
-         //assign(x, f);
-        //file_operations::write_vector<real>("x_test.dat", sz, x);
-        //file_operations::write_vector<real>("f_test.dat", sz, f);
+        matrix_vector_prod(x, f);
+        //assign(x, f);
     }
 private:
-    void matrix_vector_prod(const vector_t &mat, const vector_t &vec, vector_t &result)const
+    void matrix_vector_prod(const vector_t &vec, vector_t &result)const
     {
 
         for (int i=0; i<sz; i++)
         {
-            real *mat_row = &mat[I2(i,0,sz)];
+            real *mat_row = &A[I2(i, 0, sz)];
             result[i] = scalar_prod(mat_row, vec);
         }
     }
@@ -51,51 +53,51 @@ struct prec_operator:public cpu_vector_operations_real
 {
     int sz;
     vector_t iP;
-    real* some_vec;
+    vector_t some_vec;
     const system_operator *op;
 
     
 
-    prec_operator(int sz_, vector_t iP_): sz(sz_), iP(iP_), cpu_vector_operations(sz_)
+    prec_operator(int sz_, vector_t& iP_): 
+    sz(sz_), 
+    iP(iP_), 
+    cpu_vector_operations(sz_)
     {
-        
-        some_vec=(real*)malloc(sizeof(real)*sz);
-        if(some_vec==NULL)
-            throw std::runtime_error("prec_operator: error while allocating vector memory");
+        init_vector(some_vec); start_use_vector(some_vec);
     }
     ~prec_operator()
     {
-        free(some_vec);
+        stop_use_vector(some_vec); free_vector(some_vec);
     }
 
     void set_operator(const system_operator *op_)
     {
-        op=op_;
+        op = op_;
     }
 
     void apply(vector_t& x)const
     {
-       matrix_vector_prod(iP, x, some_vec);
+       matrix_vector_prod(x, some_vec);
        assign(some_vec, x);
     }
 
 private:
 
-    void matrix_vector_prod(const vector_t &mat, vector_t &vec, real *result)const
+    void matrix_vector_prod(vector_t &vec, real *result)const
     {
         
         for (int i=0; i<sz; i++)
         {
-            real *mat_row = &mat[I2(i,0,sz)];
-            result[i] = scalar_prod(&mat[I2(i,0,sz)], vec);
+            real *mat_row = &iP[I2(i,0,sz)];
+            result[i] = scalar_prod(mat_row, vec);
         }
     }
 
 };
 
-typedef utils::log_std                                                                  log_t;
-typedef default_monitor<cpu_vector_operations_real,log_t>                                    monitor_t;
-typedef bicgstabl<system_operator,prec_operator,cpu_vector_operations_real,monitor_t,log_t>  lin_solver_bicgstabl_t;
+typedef utils::log_std log_t;
+typedef default_monitor<cpu_vector_operations_real,log_t> monitor_t;
+typedef bicgstabl<system_operator,prec_operator,cpu_vector_operations_real,monitor_t,log_t> lin_solver_bicgstabl_t;
 // Sherman Morrison class
 typedef sherman_morrison_linear_system_solve<system_operator,prec_operator,cpu_vector_operations_real,monitor_t,log_t,bicgstabl> sherman_morrison_linear_system_solve_t;
 
@@ -114,23 +116,24 @@ int main(int argc, char **args)
 
     int sz = file_operations::read_matrix_size("./dat_files/A.dat");
     vector_t A, iP, x, x0, b, c, d;
+    cpu_vector_operations_real vec_ops(sz);
+
 
     A=(vector_t) malloc(sz*sz*sizeof(real));
     iP=(vector_t) malloc(sz*sz*sizeof(real));
-
     x0=(vector_t) malloc(sz*sizeof(real));
     x=(vector_t) malloc(sz*sizeof(real));
     c=(vector_t) malloc(sz*sizeof(real));
     d=(vector_t) malloc(sz*sizeof(real));
-
     b=(vector_t) malloc(sz*sizeof(real));
-    real alpha=1.0/100.0;
-    real beta=1.0;
+
+    real alpha=1.0/30.0;
+    real beta=2.0;
     real v=0.0;
 
     file_operations::read_matrix<real>("./dat_files/A.dat",  sz, sz, A);
     file_operations::read_matrix<real>("./dat_files/iP.dat",  sz, sz, iP);
-    file_operations::read_vector<real>("./dat_files/x0.dat",  sz, x0);
+    //file_operations::read_vector<real>("./dat_files/x0.dat",  sz, x0);
     file_operations::read_vector<real>("./dat_files/b.dat",  sz, b);
     file_operations::read_vector<real>("./dat_files/c.dat",  sz, c);
     file_operations::read_vector<real>("./dat_files/d.dat",  sz, d);
@@ -138,48 +141,61 @@ int main(int argc, char **args)
 
     std::cout << sz << std::endl;
     log_t log;
-    cpu_vector_operations_real vec_ops(sz);
     system_operator Ax(sz, A);
     prec_operator prec(sz, iP);
     
-    vec_ops.assign_scalar(0.0, x);
-
-
-    sherman_morrison_linear_system_solve_t SM(&prec, &vec_ops, &log);
+    vec_ops.assign_scalar(1.0, x);
+    monitor_t *mon;
     
     //lin_solver_bicgstabl_t lin_solver_bicgstabl(&vec_ops, &log);
-    monitor_t *mon;
+    //lin_solver_bicgstabl.set_preconditioner(&prec);
     //mon = &lin_solver_bicgstabl.monitor();
+
+    sherman_morrison_linear_system_solve_t SM(&prec, &vec_ops, &log);   
     mon = &SM.get_linsolver_handle()->monitor();
 
-    mon->init(rel_tol, real(0.f), max_iters);
+    mon->init(rel_tol, real(0), max_iters);
     mon->set_save_convergence_history(true);
     mon->set_divide_out_norms_by_rel_base(true);
-    //lin_solver_bicgstabl.set_preconditioner(&prec);
-    //SM.get_linsolver_handle()->set_preconditioner(&prec);
 
 
+    bool res_flag;
+    int iters_performed;
 
-    //lin_solver_bicgstabl.set_use_precond_resid(use_precond_resid);
-    //lin_solver_bicgstabl.set_resid_recalc_freq(resid_recalc_freq);
-    //lin_solver_bicgstabl.set_basis_size(basis_sz);
+    // lin_solver_bicgstabl.set_use_precond_resid(use_precond_resid);
+    // lin_solver_bicgstabl.set_resid_recalc_freq(resid_recalc_freq);
+    // lin_solver_bicgstabl.set_basis_size(basis_sz);
+    // bool res_flag = lin_solver_bicgstabl.solve(Ax, b, x);
+
     SM.get_linsolver_handle()->set_use_precond_resid(use_precond_resid);
     SM.get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
     SM.get_linsolver_handle()->set_basis_size(basis_sz);
-
-    //bool res_flag = lin_solver_bicgstabl.solve(Ax, b, x);
-    //bool res_flag = SM.solve(Ax, b, x);
-    bool res_flag = SM.solve(Ax, c, d, alpha, b, beta, x, v);
-    int iters_performed = mon->iters_performed();
+    
+    res_flag = SM.solve(Ax, c, d, alpha, b, beta, x, v);
+    iters_performed = mon->iters_performed();
 
     if (res_flag) 
         log.info("lin_solver returned success result");
     else
         log.info("lin_solver returned fail result");
 
+    file_operations::write_vector<real>("./dat_files/x_r1.dat", sz, x);
+    std::cout << " v = " << v << std::endl;
 
-    file_operations::write_vector<real>("./dat_files/x.dat", sz, x);
-    std::cout << "v=" << v << std::endl;
+    //test (beta A - 1/alpha d c^T) u = b;
+    std::cout << "\n ========= \ntesting: (beta A - 1/alpha d c^T) u = b \n";
+    res_flag = SM.solve(beta, Ax, alpha, c, d, b, x);
+    
+    iters_performed = mon->iters_performed();
+
+    if (res_flag)
+        log.info("lin_solver returned success result");
+    else
+        log.info("lin_solver returned fail result");    
+  
+
+    file_operations::write_vector<real>("./dat_files/x_sm.dat", sz, x);
+
 
     free(A);
     free(iP);

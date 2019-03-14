@@ -3,7 +3,7 @@
 
 
 #ifndef I2
-    #define I2(i, j, Col) (i)+(j)*(Col)
+    #define I2(i, j, Col) (j)+(i)*(Col)
 #endif
 
 
