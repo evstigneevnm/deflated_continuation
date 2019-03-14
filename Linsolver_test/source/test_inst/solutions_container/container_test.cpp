@@ -3,11 +3,12 @@
 #include <cpu_vector_operations.h>
 
 typedef SFLOATTYPE real;
-typedef real* vector_t;
 typedef cpu_vector_operations<real> vector_operations;
+typedef typename vector_operations::vector_type  vector_t;
 
 void init_vec(size_t N, vector_t& array, real init)
 {
+    //test CPU only
     for(int j=0;j<N;j++)
         array[j]=j+init;
 }
@@ -31,7 +32,6 @@ int main(int argc, char const *argv[])
     init_vec(N, array, 111);    
     ST.push( array);
     
-    vec_ops->free_vector(array); vec_ops->stop_use_vector(array);
 
     ST[0][4]=7.777;
     
@@ -39,7 +39,20 @@ int main(int argc, char const *argv[])
     {
         std::cout << ST[j][4] << std::endl;
     }
+    std::cout << "sizeof(solution_storage) = " << sizeof(solution_storage<vector_operations>) << std::endl;
     
+    real beta=-1;
+    vector_t c;
+    vec_ops->init_vector(c); vec_ops->start_use_vector(c);
+
+
+    init_vec(N, array, 11.001);
+
+    ST.calc_distance(array, beta, c);
+    printf("\n beta-1 = %le, norm(c) = %le\n", double(beta-1), double(vec_ops->norm(c)) );
+
+    vec_ops->free_vector(c); vec_ops->stop_use_vector(c);
+    vec_ops->free_vector(array); vec_ops->stop_use_vector(array);
     delete [] vec_ops; 
     return 0;
 }

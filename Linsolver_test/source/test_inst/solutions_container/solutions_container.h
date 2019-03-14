@@ -3,6 +3,7 @@
 
 
 #include <vector>
+#include <cmath>
 
 using namespace std;
 
@@ -17,12 +18,18 @@ public:
     solution_storage(vector_operations*& vec_ops_, int number_of_solutions_):
     vec_ops(vec_ops_)
     {
+        
         container.reserve(number_of_solutions_);
+        vec_ops->init_vector(distance_help); vec_ops->start_use_vector(distance_help);
+
     }
     ~solution_storage()
     {
+        
         container.clear();
         elements_number=0;
+        vec_ops->stop_use_vector(distance_help); vec_ops->free_vector(distance_help);
+
     }
 
     void push(const T_vec& vect)
@@ -31,15 +38,52 @@ public:
         elements_number++;
     }
 
-
     unsigned int get_size()
     {
         return elements_number;
     }
 
+    void calc_distance(const T_vec& x, T& beta, T_vec& c, int P = 2)
+    {
+        calc_distance_norms(x, c, P);
+        beta = distance;
+    }
+
+
+
 private:
+    T distance = 1;
+    T_vec distance_help;
+
     unsigned int elements_number = 0;
     vector_operations* vec_ops;
+    
+    void calc_distance_norms(const T_vec& x, T_vec& c, int p)
+    {
+        T distance_der;
+
+        distance = T(1)/(std::pow(vec_ops->norm(x),p)*(elements_number+1));
+        distance_der = T(p)/(std::pow(vec_ops->norm(x),p+2)*(elements_number+1));
+        //calc: y := mul_x*x
+        // c = distance_der*(x-0)
+        vec_ops->assign_mul(distance_der, x, c);
+        //xxx vec_ops->assign_scalar(0.0, c);
+        for(int j=0;j<elements_number;j++)
+        {
+            //calc: z := mul_x*x + mul_y*y
+            //distance_help := x - container[j].get_ref()
+            vec_ops->assign_mul(T(1), x, T(-1), container[j].get_ref(), distance_help);
+
+            distance += T(1)/(std::pow(vec_ops->norm(distance_help),p)*(elements_number+1));
+            distance_der = T(p)/(std::pow(vec_ops->norm(distance_help),p+2)*(elements_number+1));
+            //calc: y := mul_x*x + mul_y*y
+            //c := c + distance_der*distance_help
+            vec_ops->add_mul(distance_der, distance_help, T(1), c);
+        }
+        distance+=T(1);
+
+    }
+
     //  XXX
     //  nested class started!
         class internal_container
@@ -73,11 +117,12 @@ private:
             {
                 if((allocated)&&(owned))
                 {
-                    vec_ops->free_vector(array_); vec_ops->stop_use_vector(array_);
+                    vec_ops->stop_use_vector(array_); vec_ops->free_vector(array_);
                 }
 
             }
-            //operator overloading and references
+            // operator overloading and references
+            // if located on GPU, then this can be accessed only in a kernel!
             T operator [](size_t i) const
             {
                 return array_[i];
@@ -86,6 +131,7 @@ private:
             {
                 return array_[i];
             }
+            //reference to the internal storage
             T_vec& get_ref()
             {
                 return array_;

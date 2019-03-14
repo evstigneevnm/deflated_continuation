@@ -57,6 +57,11 @@ struct cpu_vector_operations
         for (int i = 0;i < sz_;++i) res += x[i]*x[i];
         return std::sqrt(res);
     }
+    scalar_type norm_sq(const vector_type &x)const
+    {
+        T    res(0.f);
+        for (int i = 0;i < sz_;++i) res += x[i]*x[i];
+    }    
     scalar_type     scalar_prod(const vector_type &x, const vector_type &y)const
     {
         T    res(0.f);
