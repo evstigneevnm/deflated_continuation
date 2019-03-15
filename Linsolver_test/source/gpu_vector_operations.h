@@ -58,13 +58,18 @@ struct gpu_vector_operations
     typedef typename gpu_vector_operations_type::vec_ops_cuComplex_type_hlp<T>::norm_type Tsc;
     bool location;
 
-    gpu_vector_operations(size_t sz_, cublas_wrap *cuBLAS_) : sz(sz_), cuBLAS(cuBLAS_)
+    gpu_vector_operations(size_t sz_, cublas_wrap *cuBLAS_):
+    sz(sz_), 
+    cuBLAS(cuBLAS_)
     {
         calculate_cuda_grid();
         location=true;
     }
 
-    gpu_vector_operations(size_t sz_, dim3 dimBlock_, dim3 dimGrid_) : sz(sz_), dimBlock(dimBlock_), dimGrid(dimGrid_)
+    gpu_vector_operations(size_t sz_, dim3 dimBlock_, dim3 dimGrid_): 
+    sz(sz_), 
+    dimBlock(dimBlock_), 
+    dimGrid(dimGrid_)
     {
         location=true;
     }
