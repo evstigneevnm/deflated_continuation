@@ -165,7 +165,7 @@ struct gpu_vector_operations
         cuBLAS->axpy<scalar_type>(sz, mul_x, x, y);
     }
     //calc: z := mul_x*x + mul_y*y
-    void assign_mul(scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
+    void assign_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                                vector_type& z)const;
     //calc: y := mul_x*x + mul_y*y
     void add_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, vector_type& y)const;    //calc: z := mul_x*x + mul_y*y + mul_z*z
@@ -175,6 +175,13 @@ struct gpu_vector_operations
     //calc: z := (mul_x*x)*(mul_y*y)
     void mul_pointwise(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                         vector_type& z)const;
+    //calc: x := x*mul_y*y
+    void mul_pointwise(vector_type& x, const scalar_type mul_y, const vector_type& y)const;
+    //calc: z := (mul_x*x)/(mul_y*y)
+    void div_pointwise(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
+                        vector_type& z)const;
+    //calc: x := x/(mul_y*y)
+    void div_pointwise(vector_type& x, const scalar_type mul_y, const vector_type& y)const;
     //calc: z := mul_x*x + mul_y*y + mul_w*w + mul_z*z;
     void add_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                             const scalar_type mul_w, const vector_type& w, const scalar_type mul_z, vector_type& z)const;    

@@ -13,11 +13,12 @@ public:
     typedef typename vector_operations::vector_type  T_vec;
 
     
-    solution_storage(vector_operations*& vec_ops_, int number_of_solutions_):
-    vec_ops(vec_ops_)
+    solution_storage(vector_operations*& vec_ops_, int number_of_solutions_, T norm_weight_):
+    vec_ops(vec_ops_),
+    norm_weight(norm_weight_)
     {
         //reserve elements in container
-        //each is of size about 56 bytes => can reserve more =)
+        //each is of size about 60 bytes => can reserve more =)
         container.reserve(number_of_solutions_);
         vec_ops->init_vector(distance_help); vec_ops->start_use_vector(distance_help);
 
@@ -33,8 +34,10 @@ public:
 
     void push(const T_vec& vect)
     {
-        container.emplace_back(internal_container(vec_ops, vect));
+    
+        container.emplace_back( internal_container(vec_ops, vect) );
         elements_number++;
+    
     }
 
     unsigned int get_size()
@@ -53,6 +56,7 @@ public:
 private:
     T distance = 1;
     T_vec distance_help;
+    T norm_weight;
 
     unsigned int elements_number = 0;
     vector_operations* vec_ops;
@@ -61,11 +65,11 @@ private:
     {
         T distance_der;
 
-        distance = T(1)/(std::pow(vec_ops->norm(x),p)*(elements_number+1));
-        distance_der = T(p)/(std::pow(vec_ops->norm(x),p+2)*(elements_number+1));
+        distance = T(1)/(std::pow(vec_ops->norm(x)/norm_weight,p)*(elements_number+1));
+        distance_der = T(p)/(std::pow(vec_ops->norm(x)/norm_weight,p+2)*(elements_number+1));
         //calc: y := mul_x*x
         // c = distance_der*(x-0)
-        vec_ops->assign_mul(distance_der, x, c);
+        vec_ops->assign_mul(distance_der/norm_weight, x, c);
         //xxx vec_ops->assign_scalar(0.0, c);
         for(int j=0;j<elements_number;j++)
         {
@@ -73,11 +77,11 @@ private:
             //distance_help := x - container[j].get_ref()
             vec_ops->assign_mul(T(1), x, T(-1), container[j].get_ref(), distance_help);
 
-            distance += T(1)/(std::pow(vec_ops->norm(distance_help),p)*(elements_number+1));
-            distance_der = T(p)/(std::pow(vec_ops->norm(distance_help),p+2)*(elements_number+1));
+            distance += T(1)/(std::pow(vec_ops->norm(distance_help/norm_weight),p)*(elements_number+1));
+            distance_der = T(p)/(std::pow(vec_ops->norm(distance_help/norm_weight),p+2)*(elements_number+1));
             //calc: y := mul_x*x + mul_y*y
             //c := c + distance_der*distance_help
-            vec_ops->add_mul(distance_der, distance_help, T(1), c);
+            vec_ops->add_mul(distance_der/norm_weight, distance_help, T(1), c);
         }
         distance+=T(1);
 
@@ -154,7 +158,7 @@ private:
 
         };
     //  XXX
-    //  nested class stoped!
+    //  nested class stopped!
 
 public:
     //operator overloading

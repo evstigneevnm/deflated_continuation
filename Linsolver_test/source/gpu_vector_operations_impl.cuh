@@ -8,10 +8,10 @@
 
 
 template<typename T>
-__host__ __global__ void check_is_valid_number_kernel(int N, const T* x, bool* result);
+__global__ void check_is_valid_number_kernel(int N, const T* x, bool* result);
 
 template<>
-__host__ __global__ void check_is_valid_number_kernel(int N, const float* x, bool* result)
+__global__ void check_is_valid_number_kernel(int N, const float* x, bool* result)
 {
     
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
@@ -26,7 +26,7 @@ __host__ __global__ void check_is_valid_number_kernel(int N, const float* x, boo
 }
 
 template<>
-__host__ __global__ void check_is_valid_number_kernel(int N, const double* x, bool* result)
+__global__ void check_is_valid_number_kernel(int N, const double* x, bool* result)
 {
     
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
@@ -41,7 +41,7 @@ __host__ __global__ void check_is_valid_number_kernel(int N, const double* x, bo
 }
 
 template<>
-__host__ __global__ void check_is_valid_number_kernel(int N, const thrust::complex<double>* x, bool* result)
+__global__ void check_is_valid_number_kernel(int N, const thrust::complex<double>* x, bool* result)
 {
     
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
@@ -56,7 +56,7 @@ __host__ __global__ void check_is_valid_number_kernel(int N, const thrust::compl
 }
 
 template<>
-__host__ __global__ void check_is_valid_number_kernel(int N, const thrust::complex<float>* x, bool* result)
+__global__ void check_is_valid_number_kernel(int N, const thrust::complex<float>* x, bool* result)
 {
     
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
@@ -83,7 +83,7 @@ bool gpu_vector_operations<T, BLOCK_SIZE>::check_is_valid_number(const vector_ty
 }
 //===
 template<typename T> 
-__host__ __global__ void assign_scalar_kernel(size_t N, const T scalar, T* x)
+__global__ void assign_scalar_kernel(size_t N, const T scalar, T* x)
 {
 
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
@@ -100,7 +100,7 @@ void gpu_vector_operations<T, BLOCK_SIZE>::assign_scalar(const scalar_type scala
 }
 //===
 template<typename T>
-__host__ __global__ void add_mul_scalar_kernel(size_t N, const T scalar, const T mul_x, T* x)
+__global__ void add_mul_scalar_kernel(size_t N, const T scalar, const T mul_x, T* x)
 {
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
     if(j>=N) return;
@@ -115,7 +115,7 @@ void gpu_vector_operations<T, BLOCK_SIZE>::add_mul_scalar(const scalar_type scal
 }
 //===
 template<typename T>
-__host__ __global__ void assign_mul_kernel(size_t N, const T mul_x, const T* x, T* y)
+__global__ void assign_mul_kernel(size_t N, const T mul_x, const T* x, T* y)
 {
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
     if(j>=N) return;
@@ -131,7 +131,7 @@ void gpu_vector_operations<T, BLOCK_SIZE>::assign_mul(const scalar_type mul_x, c
 }
 //===
 template<typename T>
-__host__ __global__ void assign_mul_kernel(size_t N, const T mul_x, const T* x, const T mul_y, const T* y, T* z)
+__global__ void assign_mul_kernel(size_t N, const T mul_x, const T* x, const T mul_y, const T* y, T* z)
 {
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
     if(j>=N) return;
@@ -149,7 +149,7 @@ void gpu_vector_operations<T, BLOCK_SIZE>::assign_mul(scalar_type mul_x, const v
 //===
 
 template<typename T>
-__host__ __global__ void add_mul_kernel(size_t N,const T mul_x, const T* x, const T mul_y, T* y)
+__global__ void add_mul_kernel(size_t N,const T mul_x, const T* x, const T mul_y, T* y)
 {
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
     if(j>=N) return;
@@ -165,7 +165,7 @@ void gpu_vector_operations<T, BLOCK_SIZE>::add_mul(const scalar_type mul_x, cons
 //===
 
 template<typename T>
-__host__ __global__ void add_mul_kernel(size_t N, const T  mul_x, const T*  x, const T mul_y, const T* y, const T mul_z, T* z)
+__global__ void add_mul_kernel(size_t N, const T  mul_x, const T*  x, const T mul_y, const T* y, const T mul_z, T* z)
 {
 
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
@@ -183,7 +183,7 @@ void gpu_vector_operations<T, BLOCK_SIZE>::add_mul(const scalar_type mul_x, cons
 //===
 
 template<typename T>
-__host__ __global__ void mul_pointwise_kernel(size_t N, const T mul_x, const T* x, const T mul_y, const T* y, T* z)
+__global__ void mul_pointwise_kernel(size_t N, const T mul_x, const T* x, const T mul_y, const T* y, T* z)
 {
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
     if(j>=N) return;
@@ -198,8 +198,57 @@ void gpu_vector_operations<T, BLOCK_SIZE>::mul_pointwise(const scalar_type mul_x
     mul_pointwise_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, mul_x, x, mul_y, y, z);
 }
 //===
+
 template<typename T>
-__host__ __global__ void add_mul_kernel(size_t N, const T  mul_x, const T*  x, const T mul_y, const T* y, const T mul_w, const T* w, const T mul_z, T* z)
+__global__ void mul_pointwise_kernel(size_t N, T* x, const T mul_y, const T* y)
+{
+    unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
+    if(j>=N) return;
+
+    x[j] *= (mul_y*y[j]);
+}
+
+template <typename T, int BLOCK_SIZE>
+void gpu_vector_operations<T, BLOCK_SIZE>::mul_pointwise(vector_type& x, const scalar_type mul_y, const vector_type& y)const
+{
+    mul_pointwise_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, x, mul_y, y);
+}
+//===
+
+template<typename T>
+__global__ void div_pointwise_kernel(size_t N, const T mul_x, const T* x, const T mul_y, const T* y, T* z)
+{
+    unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
+    if(j>=N) return;
+
+    z[j] = (mul_x*x[j])/(mul_y*y[j]);
+}
+
+template <typename T, int BLOCK_SIZE>
+void gpu_vector_operations<T, BLOCK_SIZE>::div_pointwise(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
+                    vector_type& z)const
+{
+    div_pointwise_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, mul_x, x, mul_y, y, z);
+}
+//===
+
+template<typename T>
+__global__ void div_pointwise_kernel(size_t N, T* x, const T mul_y, const T* y)
+{
+    unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
+    if(j>=N) return;
+
+    x[j] /= (mul_y*y[j]);
+}
+
+template <typename T, int BLOCK_SIZE>
+void gpu_vector_operations<T, BLOCK_SIZE>::div_pointwise(vector_type& x, const scalar_type mul_y, const vector_type& y)const
+{
+    div_pointwise_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, x, mul_y, y);
+}
+//===
+template<typename T>
+__global__ void add_mul_kernel(size_t N, const T  mul_x, const T*  x, const T mul_y, const T* y, const T mul_w, const T* w, const T mul_z, T* z)
 {
 
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
@@ -216,7 +265,7 @@ void gpu_vector_operations<T, BLOCK_SIZE>::add_mul(const scalar_type mul_x, cons
 }
 //===
 template<typename T>
-__host__ __global__ void assign_mul_kernel(size_t N, const T mul_x, const T* x, const T mul_y, const T* y, 
+__global__ void assign_mul_kernel(size_t N, const T mul_x, const T* x, const T mul_y, const T* y, 
                                     const T mul_v, const T* v, const T mul_w, const T* w, T* z)
 {
     unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;

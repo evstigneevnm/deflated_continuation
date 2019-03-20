@@ -127,8 +127,8 @@ int main(int argc, char **args)
     d=(vector_t) malloc(sz*sizeof(real));
     b=(vector_t) malloc(sz*sizeof(real));
 
-    real alpha=1.0/30.0;
-    real beta=2.0;
+    real alpha=1.0/1.0;
+    real beta=1.9;
     real v=0.0;
 
     file_operations::read_matrix<real>("./dat_files/A.dat",  sz, sz, A);

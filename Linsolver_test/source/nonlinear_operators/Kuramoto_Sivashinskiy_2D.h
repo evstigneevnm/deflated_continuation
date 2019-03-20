@@ -1,16 +1,41 @@
 #ifndef __KURAMOTO_SIVASHINSKIY_2D__
 #define __KURAMOTO_SIVASHINSKIY_2D__
 
+
+/*
+Problem class for:
+(1)    lambda*(a_val*(uu_x+uu_y)+L(u))+b_val*B(u)
+
+solves using Fourier method via FFT
+Constructor sets up constant scalars "a_val" and "b_val"
+includes the following methods:
+- F(x,lambda) solves (1) for given (x,lambda)
+- set_linearization_point(x0, lambda0) sets point of linearization for calculation of Jacobians
+- jacobian_u(x) solves Jacobian F_x at (x0, lambda0) for given x using variational formulation
+- jacobian_lambda(x) solves Jacobian F_lambda at (x0, lambda0) for given x using variational formulation
+- preconditioner_jacobian_u(dr) applies Jacobi preconditioner for the Jacobian F_x at given (x0, lambda0)
+axillary:
+- set_cuda_grid calculates CUDA grid
+- get_cuda_grid returns calculated grid
+
+
+*/
+
+
+
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D_ker.h>
 
 
-template<class FFT_type, class VectorOperations_R, class VectorOperations_C, unsigned int BLOCK_SIZE_x=64, unsigned int BLOCK_SIZE_y=16>
+template<class FFT_type, 
+class VectorOperations_R, class VectorOperations_C, class VectorOperations_RC_reduced, 
+unsigned int BLOCK_SIZE_x=64, unsigned int BLOCK_SIZE_y=16>
 class Kuramoto_Sivashinskiy_2D
 {
 public:
     
     typedef VectorOperations_R vector_operations_real;
     typedef VectorOperations_C vector_operations_complex;
+    typedef VectorOperations_RC_reduced vector_operations_real_im;
     typedef typename VectorOperations_R::scalar_type  T;
     typedef typename VectorOperations_R::vector_type  T_vec;
     typedef typename VectorOperations_C::scalar_type  TC;
@@ -18,14 +43,31 @@ public:
     
 
 
-    Kuramoto_Sivashinskiy_2D(T a_val_, T b_val_, size_t Nx_, size_t Ny_, vector_operations_real *vec_ops_R_, vector_operations_complex *vec_ops_C_, FFT_type *FFT_): Nx(Nx_), Ny(Ny_), vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), FFT(FFT_), a_val(a_val_), b_val(b_val_)
+    Kuramoto_Sivashinskiy_2D(T a_val_, T b_val_, size_t Nx_, size_t Ny_, 
+        vector_operations_real *vec_ops_R_, 
+        vector_operations_complex *vec_ops_C_, 
+        vector_operations_real *vec_ops_R_im_,
+        FFT_type *FFT_): 
+    Nx(Nx_), Ny(Ny_), 
+    vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), vec_ops_R_im(vec_ops_R_im_),
+    FFT(FFT_), 
+    a_val(a_val_), b_val(b_val_)
     {
         common_constructor_operation();
         calculate_cuda_grid();
         init_all_derivatives();
     }
 
-    Kuramoto_Sivashinskiy_2D(T a_val_, T b_val_, size_t Nx_, size_t Ny_, dim3 dimGrid_, dim3 dimGrid_F_, dim3 dimBlock_, vector_operations_real *vec_ops_R_, vector_operations_complex *vec_ops_C_, FFT_type &FFT_): Nx(Nx_), Ny(Ny_), dimGrid(dimGrid_), dimGrid_F(dimGrid_F_), dimBlock(dimBlock_), vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), FFT(FFT_), a_val(a_val_), b_val(b_val_)
+    Kuramoto_Sivashinskiy_2D(T a_val_, T b_val_, size_t Nx_, size_t Ny_, dim3 dimGrid_, dim3 dimGrid_F_, dim3 dimBlock_, 
+        vector_operations_real *vec_ops_R_, 
+        vector_operations_complex *vec_ops_C_, 
+        vector_operations_real *vec_ops_R_im_,
+        FFT_type &FFT_): 
+    Nx(Nx_), Ny(Ny_), 
+    dimGrid(dimGrid_), dimGrid_F(dimGrid_F_), dimBlock(dimBlock_), 
+    vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), vec_ops_R_im(vec_ops_R_im_),
+    FFT(FFT_), 
+    a_val(a_val_), b_val(b_val_)
     {
         common_constructor_operation();
         init_all_derivatives();
@@ -44,6 +86,10 @@ public:
         vec_ops_C->stop_use_vector(u_x_hat0); vec_ops_C->free_vector(u_x_hat0);
         vec_ops_C->stop_use_vector(u_y_hat0); vec_ops_C->free_vector(u_y_hat0);
 
+        vec_ops_C->stop_use_vector(u_helper_1); vec_ops_C->free_vector(u_helper_1);
+        vec_ops_C->stop_use_vector(u_helper_2); vec_ops_C->free_vector(u_helper_2);
+
+
         vec_ops_R->stop_use_vector(w1_ext); vec_ops_R->free_vector(w1_ext);
         vec_ops_R->stop_use_vector(w2_ext); vec_ops_R->free_vector(w2_ext);
         vec_ops_R->stop_use_vector(w1_ext_0); vec_ops_R->free_vector(w1_ext_0);
@@ -58,7 +104,6 @@ public:
         vec_ops_R->stop_use_vector(du_ext); vec_ops_R->free_vector(du_ext);
         vec_ops_R->stop_use_vector(du_x_ext); vec_ops_R->free_vector(du_x_ext);
         vec_ops_R->stop_use_vector(du_y_ext); vec_ops_R->free_vector(du_y_ext);
-        
 
     }
 
@@ -66,7 +111,7 @@ public:
     //   F(u,alpha)=v
     void F(const TC*& u, const T alpha, TC*& v)
     {
-        
+
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_x, u_x_hat);
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_y, u_y_hat);
         ifft(u_x_hat,u_x_ext);
@@ -78,6 +123,7 @@ public:
         vec_ops_R->mul_pointwise(1.0, u_y_ext, 1.0, u_ext, w2_ext);
         fft(w1_ext,u_x_hat);
         fft(w2_ext,u_y_hat);
+
         // b_val*biharmonic*u->v
         vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u, TC(b_val), (const TC_vec&)biharmonic, v);
         // alpha*Laplace*u->b_hat
@@ -88,7 +134,17 @@ public:
         vec_ops_C->add_mul(TC(1.0), (const TC_vec&)b_hat, v);
         
     }
+    void F(const T_vec& u, const T alpha, T_vec& v)
+    {
+        // TC_vec uC_in; //helping vector for R_im to C
+        // TC_vec uC_out; //helping vector for R_im to C
+        // T_vec uRim_in; //helping vector for C to R_im
+        // T_vec uRim_out; //helping vector for C to R_im
+        R2C(u, uC_in);
+        F((const TC*&) uC_in, alpha, (TC*&)uC_out);
+        C2R(uC_out, v);
 
+    }
 
     //sets (u_0, alpha_0) for jacobian linearization
     //stores alpha_0, u_0, u_ext_0, u_x_ext_0, u_y_ext_0
@@ -143,7 +199,7 @@ public:
 
     }
     //variational jacobian for 2D KS equations J=dF/dalpha
-    void jacobian_alpha(TC*& dv)
+    void jacobian_alpha(TC_vec& dv)
     {
         vec_ops_R->mul_pointwise(1.0, u_x_ext_0, 1.0, u_ext_0, w1_ext_0);
         vec_ops_R->mul_pointwise(1.0, u_y_ext_0, 1.0, u_ext_0, w2_ext_0);
@@ -164,6 +220,15 @@ public:
 
     }
 
+
+    void preconditioner_jaobian_u(TC_vec& dr)
+    {
+        //calc: z := mul_x*x + mul_y*y
+        //vec_ops_C->assign_mul(mul_x,  x,  mul_y, y, z); //b_val*biharmonic+lambda*laplace->z
+        //calc: x := x/(mul_y*y)
+        //vec_ops_C->div_pointwise(x, mul_y, y); //dr=dr/(1*z);
+
+    }
 
     void set_cuda_grid(dim3 dimGrid_, dim3 dimGrid_F_, dim3 dimBlock_)
     {
@@ -188,38 +253,62 @@ private:
     dim3 dimGrid_F;
     vector_operations_real *vec_ops_R;
     vector_operations_complex *vec_ops_C;
+    vector_operations_real_im *vec_ops_R_im;
 
-
-    size_t Nx, Ny, My;
+    size_t Nx, Ny, My; //size in physical space Nx*Ny
+                       //size in Fourier space Nx*My
+                       //size in reduced Fourier space Nx*My-1
     FFT_type *FFT;
-    TC_vec gradient_x=NULL;
-    TC_vec gradient_y=NULL;
-    TC_vec Laplace=NULL;
-    TC_vec biharmonic=NULL;
-    TC_vec u_x_hat=NULL;
-    TC_vec u_y_hat=NULL;
-    TC_vec b_hat=NULL;
-    TC_vec u_0=NULL; // linearization point solution
-    TC_vec u_x_hat0=NULL;
-    TC_vec u_y_hat0=NULL;
+    TC_vec gradient_x=nullptr;
+    TC_vec gradient_y=nullptr;
+    TC_vec Laplace=nullptr;
+    TC_vec biharmonic=nullptr;
+    TC_vec u_x_hat=nullptr;
+    TC_vec u_y_hat=nullptr;
+    TC_vec b_hat=nullptr;
+    TC_vec u_0=nullptr; // linearization point solution
+    TC_vec u_x_hat0=nullptr;
+    TC_vec u_y_hat0=nullptr;
+    
+    TC_vec u_helper_1 = nullptr;  //vector for using only R outside
+    TC_vec u_helper_2 = nullptr;  //vector for using only R outside
 
 
     T alpha_0=0.0;   // linearization point parameter
 
-    T_vec w1_ext=NULL;
-    T_vec w2_ext=NULL;
-    T_vec w1_ext_0=NULL;
-    T_vec w2_ext_0=NULL;    
-    T_vec u_ext=NULL;
-    T_vec u_x_ext=NULL;
-    T_vec u_y_ext=NULL;
+    T_vec w1_ext=nullptr;
+    T_vec w2_ext=nullptr;
+    T_vec w1_ext_0=nullptr;
+    T_vec w2_ext_0=nullptr;    
+    T_vec u_ext=nullptr;
+    T_vec u_x_ext=nullptr;
+    T_vec u_y_ext=nullptr;
 
-    T_vec u_ext_0=NULL;
-    T_vec u_x_ext_0=NULL;
-    T_vec u_y_ext_0=NULL;
-    T_vec du_ext=NULL;
-    T_vec du_x_ext=NULL;
-    T_vec du_y_ext=NULL;
+    T_vec u_ext_0=nullptr;
+    T_vec u_x_ext_0=nullptr;
+    T_vec u_y_ext_0=nullptr;
+    T_vec du_ext=nullptr;
+    T_vec du_x_ext=nullptr;
+    T_vec du_y_ext=nullptr;
+
+    TC_vec uC_in; //helping vector for R_im to C
+    TC_vec uC_out; //helping vector for R_im to C
+    T_vec uRim_in; //helping vector for C to R_im
+    T_vec uRim_out; //helping vector for C to R_im
+
+
+    void C2R(const TC_vec& vec_C, T_vec& vec_R)
+    {
+
+        C2R_(BLOCK_SIZE_x*BLOCK_SIZE_y, Nx, My, vec_C, vec_R);
+
+    }
+
+    void R2C(const TC_vec& vec_C, T_vec& vec_R)
+    {
+
+        R2C_(BLOCK_SIZE_x*BLOCK_SIZE_y, Nx, My, vec_R, vec_C);
+    }
 
 
     void common_constructor_operation()
@@ -236,6 +325,9 @@ private:
         vec_ops_C->init_vector(u_x_hat0); vec_ops_C->start_use_vector(u_x_hat0); 
         vec_ops_C->init_vector(u_y_hat0); vec_ops_C->start_use_vector(u_y_hat0); 
  
+        vec_ops_C->init_vector(u_helper_1); vec_ops_C->start_use_vector(u_helper_1); 
+        vec_ops_C->init_vector(u_helper_2); vec_ops_C->start_use_vector(u_helper_2);
+
         vec_ops_R->init_vector(w1_ext); vec_ops_R->start_use_vector(w1_ext); 
         vec_ops_R->init_vector(w2_ext); vec_ops_R->start_use_vector(w2_ext); 
         vec_ops_R->init_vector(w1_ext_0); vec_ops_R->start_use_vector(w1_ext_0); 
@@ -249,7 +341,6 @@ private:
         vec_ops_R->init_vector(du_ext); vec_ops_R->start_use_vector(du_ext);
         vec_ops_R->init_vector(du_x_ext); vec_ops_R->start_use_vector(du_x_ext);
         vec_ops_R->init_vector(du_y_ext); vec_ops_R->start_use_vector(du_y_ext);
-
     }
 
     void init_all_derivatives()
@@ -270,7 +361,6 @@ private:
         dimGrid=s_dimGrid;
         dim3 s_dimGrid_F( blocks_x, blocks_y_F);
         dimGrid_F=s_dimGrid_F;
-
     }
 
 
