@@ -40,7 +40,8 @@ public:
     typedef typename VectorOperations_R::vector_type  T_vec;
     typedef typename VectorOperations_C::scalar_type  TC;
     typedef typename VectorOperations_C::vector_type  TC_vec;
-    
+    typedef typename VectorOperations_RC_reduced::scalar_type  T_im;
+    typedef typename VectorOperations_RC_reduced::vector_type  T_vec_im;   
 
 
     Kuramoto_Sivashinskiy_2D(T a_val_, T b_val_, size_t Nx_, size_t Ny_, 
@@ -134,7 +135,7 @@ public:
         vec_ops_C->add_mul(TC(1.0), (const TC_vec&)b_hat, v);
         
     }
-    void F(const T_vec& u, const T alpha, T_vec& v)
+    void F(const T_vec_im& u, const T alpha, T_vec_im& v)
     {
         // TC_vec uC_in; //helping vector for R_im to C
         // TC_vec uC_out; //helping vector for R_im to C
@@ -297,17 +298,17 @@ private:
     T_vec uRim_out; //helping vector for C to R_im
 
 
-    void C2R(const TC_vec& vec_C, T_vec& vec_R)
+    void C2R(const TC_vec& vec_C, T_vec_im& vec_R)
     {
 
-        C2R_(BLOCK_SIZE_x*BLOCK_SIZE_y, Nx, My, vec_C, vec_R);
+        C2R_<TC, T_vec_im, TC_vec>(BLOCK_SIZE_x*BLOCK_SIZE_y, Nx, My, (TC_vec&) vec_C, vec_R);
 
     }
 
-    void R2C(const TC_vec& vec_C, T_vec& vec_R)
+    void R2C(const T_vec_im& vec_R, TC_vec& vec_C)
     {
 
-        R2C_(BLOCK_SIZE_x*BLOCK_SIZE_y, Nx, My, vec_R, vec_C);
+        R2C_<TC, T_vec_im, TC_vec>(BLOCK_SIZE_x*BLOCK_SIZE_y, Nx, My, (T_vec_im&)vec_R, vec_C);
     }
 
 

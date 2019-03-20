@@ -61,8 +61,8 @@ __global__ void biharmonic_Fourier_kernel(int Nx, int My, T_C *gradient_x, T_C *
 }
 
 
-template<typename T, typename T_C>
-__global__ void C2R_kernel(size_t N, T_C*& arrayC, T*& arrayR_im)
+template<typename TC, typename T_vec_im, typename TC_vec>
+__global__ void C2R_kernel(size_t N, TC_vec arrayC, T_vec_im arrayR_im)
 {
 
 
@@ -75,8 +75,8 @@ __global__ void C2R_kernel(size_t N, T_C*& arrayC, T*& arrayR_im)
 }
 
 
-template<typename T, typename T_C>
-__global__ void R2C_kernel(size_t N, T*& arrayR_im, T_C*& arrayC)
+template<typename TC, typename T_vec_im, typename TC_vec>
+__global__ void R2C_kernel(size_t N, T_vec_im arrayR_im, TC_vec arrayC)
 {
 
 
@@ -84,10 +84,10 @@ __global__ void R2C_kernel(size_t N, T*& arrayR_im, T_C*& arrayC)
     
     if(j>=N) return;
     
-    T_C val = (0, arrayR_im[j]);
+    TC val = TC(0, arrayR_im[j]);
     arrayC[j+1] = val;
 
-    arrayC[0]=T_C(0,0);
+    arrayC[0]=TC(0,0);
 
 }
 
@@ -115,26 +115,27 @@ void biharmonic_Fourier(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, T_C*&
 }
 
 
-template<typename T, typename T_C>
-void C2R_(unsigned int BLOCK_SIZE, size_t Nx, size_t My, T_C*& arrayC, T*& arrayR_im)
+template<typename TC, typename T_vec_im, typename TC_vec>
+void C2R_(unsigned int BLOCK_SIZE, size_t Nx, size_t My, TC_vec& arrayC, T_vec_im& arrayR_im)
 {
     size_t N = Nx*My-1;
     dim3 threads(BLOCK_SIZE);
     int blocks_x=(N+BLOCK_SIZE)/BLOCK_SIZE;
     dim3 blocks(blocks_x);
 
-    C2R_kernel<T, T_C><<< blocks, threads>>>(N, arrayC, arrayR_im);
+    C2R_kernel<TC, T_vec_im, TC_vec><<< blocks, threads>>>(N, arrayC, arrayR_im);
 
 }
-template<typename T, typename T_C>
-void R2C_(unsigned int BLOCK_SIZE, size_t Nx, size_t My, T*& arrayR_im, T_C*& arrayC)
+
+template<typename TC, typename T_vec_im, typename TC_vec>
+void R2C_(unsigned int BLOCK_SIZE, size_t Nx, size_t My, T_vec_im& arrayR_im, TC_vec& arrayC)
 {
     size_t N = Nx*My-1;
     dim3 threads(BLOCK_SIZE);
     int blocks_x=(N+BLOCK_SIZE)/BLOCK_SIZE;
     dim3 blocks(blocks_x);
 
-    R2C_kernel<T, T_C><<< blocks, threads>>>(N, arrayR_im, arrayC);
+    R2C_kernel<TC, T_vec_im, TC_vec><<< blocks, threads>>>(N, arrayR_im, arrayC);
 
 }
 
@@ -146,8 +147,8 @@ template void Laplace_Fourier<thrust::complex<double> >(dim3 dimGrid, dim3 dimBl
 template void biharmonic_Fourier<thrust::complex<float> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<float>*& gradient_x, thrust::complex<float>*& gradient_y, thrust::complex<float>*& biharmonic);
 template void biharmonic_Fourier<thrust::complex<double> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<double>*& gradient_x, thrust::complex<double>*& gradient_y, thrust::complex<double>*& biharmonic);
 
-template void C2R_<float, thrust::complex<float> >(unsigned int BLOCK_SIZE, size_t Nx, size_t My, thrust::complex<float>*& arrayC, float*& arrayR_im);
-template void C2R_<double, thrust::complex<double> >(unsigned int BLOCK_SIZE, size_t Nx, size_t My, thrust::complex<double>*& arrayC, double*& arrayR_im);
+template void C2R_<thrust::complex<float>, float*, thrust::complex<float>* >(unsigned int BLOCK_SIZE, size_t Nx, size_t My, thrust::complex<float>*& arrayC, float*& arrayR_im);
+template void C2R_<thrust::complex<double>, double*, thrust::complex<double>* >(unsigned int BLOCK_SIZE, size_t Nx, size_t My, thrust::complex<double>*& arrayC, double*& arrayR_im);
 
-template void R2C_<float, thrust::complex<float> >(unsigned int BLOCK_SIZE, size_t Nx, size_t My, float*& arrayR_im, thrust::complex<float>*& arrayC);
-template void R2C_<double, thrust::complex<double> >(unsigned int BLOCK_SIZE, size_t Nx, size_t My, double*& arrayR_im, thrust::complex<double>*& arrayC);
+template void R2C_<thrust::complex<float>, float*, thrust::complex<float>* >(unsigned int BLOCK_SIZE, size_t Nx, size_t My, float*& arrayR_im, thrust::complex<float>*& arrayC);
+template void R2C_<thrust::complex<double>, double*, thrust::complex<double>* >(unsigned int BLOCK_SIZE, size_t Nx, size_t My, double*& arrayR_im, thrust::complex<double>*& arrayC);

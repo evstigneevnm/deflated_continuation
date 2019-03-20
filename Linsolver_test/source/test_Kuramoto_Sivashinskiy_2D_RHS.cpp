@@ -30,6 +30,7 @@ int main(int argc, char const *argv[])
             Blocks_x_, Blocks_y_> KS_2D;
     typedef typename gpu_vector_operations_real::vector_type real_vec; 
     typedef typename gpu_vector_operations_complex::vector_type complex_vec;
+    typedef typename gpu_vector_operations_real_reduced::vector_type real_im_vec;
 
     init_cuda(-1);
     size_t Nx=256;
@@ -49,12 +50,14 @@ int main(int argc, char const *argv[])
     printf("Grids = (%i,%i,%i)\n", Grids.x, Grids.y, Grids.z);
     printf("GridsFourier = (%i,%i,%i)\n", Grids_F.x, Grids_F.y, Grids_F.z);
 
-    real_vec u_in, u_out;
+    real_im_vec u_in, u_out;
     vec_ops_R_im->init_vector(u_in); vec_ops_R_im->start_use_vector(u_in);
     vec_ops_R_im->init_vector(u_out); vec_ops_R_im->start_use_vector(u_out);
 
+    KS2D->F(u_in, 2.0, u_out);
 
-
+    vec_ops_R_im->stop_use_vector(u_in); vec_ops_R_im->free_vector(u_in);
+    vec_ops_R_im->stop_use_vector(u_out); vec_ops_R_im->free_vector(u_out);
     
     delete KS2D;
     delete vec_ops_R;
