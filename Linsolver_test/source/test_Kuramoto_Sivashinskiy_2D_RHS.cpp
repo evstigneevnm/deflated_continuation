@@ -7,8 +7,8 @@
 #include <external_libraries/cublas_wrap.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D.h>
 #include "macros.h"
-#include "file_operations.h"
-#include <gpu_vector_operations.h>
+#include "gpu_file_operations.h"
+#include "gpu_vector_operations.h"
 
 #define Blocks_x_ 64
 #define Blocks_y_ 16
@@ -33,8 +33,8 @@ int main(int argc, char const *argv[])
     typedef typename gpu_vector_operations_real_reduced::vector_type real_im_vec;
 
     init_cuda(-1);
-    size_t Nx=256;
-    size_t Ny=256;
+    size_t Nx=128;
+    size_t Ny=128;
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny);
     size_t My=CUFFT_C2R->get_reduced_size();
     cublas_wrap *CUBLAS = new cublas_wrap(true);
@@ -53,11 +53,24 @@ int main(int argc, char const *argv[])
     real_im_vec u_in, u_out;
     vec_ops_R_im->init_vector(u_in); vec_ops_R_im->start_use_vector(u_in);
     vec_ops_R_im->init_vector(u_out); vec_ops_R_im->start_use_vector(u_out);
+    vec_ops_R_im->assign_scalar(1.0, u_in);
 
-    KS2D->F(u_in, 2.0, u_out);
+    complex_vec uC_in, uC_out;
+    vec_ops_C->init_vector(uC_in); vec_ops_C->start_use_vector(uC_in);
+    vec_ops_C->init_vector(uC_out); vec_ops_C->start_use_vector(uC_out);
+    vec_ops_C->assign_scalar(complex(0.0,1.0), uC_in);
+
+    KS2D->F(u_in, 25.0, u_out);
+    //KS2D->F((complex_vec&)uC_in, 25.0, (complex_vec&)uC_out);
+
+    
+    //gpu_file_operations::write_matrix<complex>("uC_out.dat",  My, Nx, uC_out, 3);
+    gpu_file_operations::write_vector<real>("u_im_out.dat", Nx*My-1, u_out, 3);
 
     vec_ops_R_im->stop_use_vector(u_in); vec_ops_R_im->free_vector(u_in);
     vec_ops_R_im->stop_use_vector(u_out); vec_ops_R_im->free_vector(u_out);
+    vec_ops_C->stop_use_vector(uC_in); vec_ops_C->free_vector(uC_in);
+    vec_ops_C->stop_use_vector(uC_out); vec_ops_C->free_vector(uC_out);
     
     delete KS2D;
     delete vec_ops_R;

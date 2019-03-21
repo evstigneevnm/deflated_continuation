@@ -87,8 +87,8 @@ public:
         vec_ops_C->stop_use_vector(u_x_hat0); vec_ops_C->free_vector(u_x_hat0);
         vec_ops_C->stop_use_vector(u_y_hat0); vec_ops_C->free_vector(u_y_hat0);
 
-        vec_ops_C->stop_use_vector(u_helper_1); vec_ops_C->free_vector(u_helper_1);
-        vec_ops_C->stop_use_vector(u_helper_2); vec_ops_C->free_vector(u_helper_2);
+        vec_ops_C->stop_use_vector(u_helper_in); vec_ops_C->free_vector(u_helper_in);
+        vec_ops_C->stop_use_vector(u_helper_out); vec_ops_C->free_vector(u_helper_out);
 
 
         vec_ops_R->stop_use_vector(w1_ext); vec_ops_R->free_vector(w1_ext);
@@ -110,7 +110,7 @@ public:
 
     //nonlinear Kuramoto Sivashinskiy 2D operator:
     //   F(u,alpha)=v
-    void F(const TC*& u, const T alpha, TC*& v)
+    void F(const TC_vec& u, const T alpha, TC_vec& v)
     {
 
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_x, u_x_hat);
@@ -139,11 +139,9 @@ public:
     {
         // TC_vec uC_in; //helping vector for R_im to C
         // TC_vec uC_out; //helping vector for R_im to C
-        // T_vec uRim_in; //helping vector for C to R_im
-        // T_vec uRim_out; //helping vector for C to R_im
-        R2C(u, uC_in);
-        F((const TC*&) uC_in, alpha, (TC*&)uC_out);
-        C2R(uC_out, v);
+        R2C(u, u_helper_in);
+        F(u_helper_in, alpha, u_helper_out);
+        C2R(u_helper_out, v);
 
     }
 
@@ -271,8 +269,8 @@ private:
     TC_vec u_x_hat0=nullptr;
     TC_vec u_y_hat0=nullptr;
     
-    TC_vec u_helper_1 = nullptr;  //vector for using only R outside
-    TC_vec u_helper_2 = nullptr;  //vector for using only R outside
+    TC_vec u_helper_in = nullptr;  //vector for using only R outside
+    TC_vec u_helper_out = nullptr;  //vector for using only R outside
 
 
     T alpha_0=0.0;   // linearization point parameter
@@ -291,11 +289,6 @@ private:
     T_vec du_ext=nullptr;
     T_vec du_x_ext=nullptr;
     T_vec du_y_ext=nullptr;
-
-    TC_vec uC_in; //helping vector for R_im to C
-    TC_vec uC_out; //helping vector for R_im to C
-    T_vec uRim_in; //helping vector for C to R_im
-    T_vec uRim_out; //helping vector for C to R_im
 
 
     void C2R(const TC_vec& vec_C, T_vec_im& vec_R)
@@ -326,8 +319,8 @@ private:
         vec_ops_C->init_vector(u_x_hat0); vec_ops_C->start_use_vector(u_x_hat0); 
         vec_ops_C->init_vector(u_y_hat0); vec_ops_C->start_use_vector(u_y_hat0); 
  
-        vec_ops_C->init_vector(u_helper_1); vec_ops_C->start_use_vector(u_helper_1); 
-        vec_ops_C->init_vector(u_helper_2); vec_ops_C->start_use_vector(u_helper_2);
+        vec_ops_C->init_vector(u_helper_in); vec_ops_C->start_use_vector(u_helper_in); 
+        vec_ops_C->init_vector(u_helper_out); vec_ops_C->start_use_vector(u_helper_out);
 
         vec_ops_R->init_vector(w1_ext); vec_ops_R->start_use_vector(w1_ext); 
         vec_ops_R->init_vector(w2_ext); vec_ops_R->start_use_vector(w2_ext); 

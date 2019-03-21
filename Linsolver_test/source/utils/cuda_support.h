@@ -223,6 +223,13 @@ void host_allocate_all(int Nx, int Ny, int Nz, int count, ...)
 
 }
 
+
+template <class T>
+void host_deallocate(T* array)
+{
+    free(array);
+}
+
 template <class T>
 void host_deallocate_all(int count, ...)
 {
