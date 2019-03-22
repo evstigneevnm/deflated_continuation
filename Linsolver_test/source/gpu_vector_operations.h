@@ -111,7 +111,7 @@ struct gpu_vector_operations
         return result;
     }
     //for GPU pointer storage with call from CPU
-    void norm(const vector_type &x, Tsc *result)
+    void norm(const vector_type &x, Tsc* result)
     {
         cuBLAS->norm2<T>(sz, x, result);
     }    
@@ -188,6 +188,8 @@ struct gpu_vector_operations
     //calc: z := mul_x*x + mul_y*y + mul_v*v + mul_w*w;
     void assign_mul(scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                                         scalar_type mul_v, const vector_type& v, const scalar_type mul_w, const vector_type& w, vector_type& z)const;
+    //calc: x[at]=val_x
+    void set_value_at_point(scalar_type val_x, size_t at, vector_type& x);
 
 //*/
 private:

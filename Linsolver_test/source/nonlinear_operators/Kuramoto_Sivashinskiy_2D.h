@@ -115,24 +115,30 @@ public:
 
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_x, u_x_hat);
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_y, u_y_hat);
-        ifft(u_x_hat,u_x_ext);
-        ifft(u_y_hat,u_y_ext);
-        ifft((TC_vec&)u,u_ext);
+        
+        ifft(u_x_hat, u_x_ext);
+        ifft(u_y_hat, u_y_ext);
+        ifft((TC_vec&)u, u_ext);
 
-         //z=x*y;
+        //z=x*y;
         vec_ops_R->mul_pointwise(1.0, u_x_ext, 1.0, u_ext, w1_ext);
         vec_ops_R->mul_pointwise(1.0, u_y_ext, 1.0, u_ext, w2_ext);
-        fft(w1_ext,u_x_hat);
-        fft(w2_ext,u_y_hat);
+        fft(w1_ext, u_x_hat);
+        fft(w2_ext, u_y_hat);
 
         // b_val*biharmonic*u->v
         vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u, TC(b_val), (const TC_vec&)biharmonic, v);
+       
         // alpha*Laplace*u->b_hat
         vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u, TC(alpha), (const TC_vec&)Laplace, b_hat);
+ 
         // alpha*a_val*(uu_x)+alpha*a_val*(uu_y)+b_hat->b_hat
         vec_ops_C->add_mul(TC(alpha*a_val), (const TC_vec&) u_x_hat, TC(alpha*a_val), (const TC_vec&) u_y_hat, TC(1.0), b_hat);
+       
         // b_hat+v->v
         vec_ops_C->add_mul(TC(1.0), (const TC_vec&)b_hat, v);
+       
+
         
     }
     void F(const T_vec_im& u, const T alpha, T_vec_im& v)
@@ -161,9 +167,15 @@ public:
 
     }
 
+    void set_linearization_point(const T_vec_im& u_0_, const T alpha_0_)
+    {
+        R2C(u_0_, u_helper_in);
+        set_linearization_point(u_helper_in, alpha_0_);
+    }
+
     //variational jacobian for 2D KS equations J=dF/du
     //returns vector dv as Jdu->dv, where J(u_0,alpha_0) linearized at (u_0, alpha_0) by set_linearization_point
-    void jacobian_u(const TC*& du, TC*& dv)
+    void jacobian_u(const TC_vec& du, TC_vec& dv)
     {
         ifft((TC_vec&)du, du_ext);
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) du, TC(1.0,0.0), (const TC_vec&)gradient_x, u_x_hat);
@@ -197,6 +209,13 @@ public:
         vec_ops_C->add_mul(TC(a_val*alpha_0), u_y_hat, TC(1.0), b_hat, TC(1.0), dv);
 
     }
+    void jacobian_u(const T_vec_im& du, T_vec_im& dv)
+    {
+        R2C(du, u_helper_in);
+        jacobian_u(u_helper_in, u_helper_out);
+        C2R(u_helper_out, dv);
+    }
+
     //variational jacobian for 2D KS equations J=dF/dalpha
     void jacobian_alpha(TC_vec& dv)
     {
@@ -218,15 +237,29 @@ public:
         vec_ops_C->add_mul(TC(a_val), u_y_hat0, TC(1.0,0.0), dv);
 
     }
-
-
-    void preconditioner_jaobian_u(TC_vec& dr)
+    void jacobian_alpha(T_vec_im& dv)
     {
-        //calc: z := mul_x*x + mul_y*y
-        //vec_ops_C->assign_mul(mul_x,  x,  mul_y, y, z); //b_val*biharmonic+lambda*laplace->z
-        //calc: x := x/(mul_y*y)
-        //vec_ops_C->div_pointwise(x, mul_y, y); //dr=dr/(1*z);
+        R2C(dv, u_helper_in);
+        jacobian_alpha((TC_vec&) u_helper_in);
+        C2R(u_helper_in, dv);
+    }
 
+
+    void preconditioner_jacobian_u(TC_vec& dr)
+    {
+
+        //calc: z := mul_x*x + mul_y*y
+        vec_ops_C->assign_mul(TC(b_val),  (const TC_vec&)biharmonic,  TC(alpha_0), (const TC_vec&)Laplace, b_hat); //b_val*biharmonic+lambda*laplace->z
+        vec_ops_C->set_value_at_point(TC(1), 0, b_hat);
+        //calc: x := x/(mul_y*y)
+        vec_ops_C->div_pointwise(dr, TC(1), (const TC_vec&)b_hat); //dr=dr/(1*z);
+
+    }
+    void preconditioner_jacobian_u(T_vec_im& dr)
+    {
+        R2C(dr, u_helper_in);
+        preconditioner_jacobian_u(u_helper_in);
+        C2R(u_helper_in, dr);
     }
 
     void set_cuda_grid(dim3 dimGrid_, dim3 dimGrid_F_, dim3 dimBlock_)
@@ -242,6 +275,27 @@ public:
         dimGrid_F_=dimGrid_F;
         dimBlock_=dimBlock;
 
+    }
+    
+    void C2R(const TC_vec& vec_C, T_vec_im& vec_R)
+    {
+        C2R_<TC, T_vec_im, TC_vec>(BLOCK_SIZE_x*BLOCK_SIZE_y, Nx, My, (TC_vec&) vec_C, vec_R);
+    }
+
+    void R2C(const T_vec_im& vec_R, TC_vec& vec_C)
+    {
+        R2C_<TC, T_vec_im, TC_vec>(BLOCK_SIZE_x*BLOCK_SIZE_y, Nx, My, (T_vec_im&)vec_R, vec_C);
+    }
+    
+    void physical_solution(TC_vec& u_in, T_vec& u_out)
+    {
+       ifft(u_in, u_out);
+    }
+
+    void physical_solution(T_vec_im& u_in, T_vec& u_out)
+    {
+       R2C(u_in, u_helper_in);
+       physical_solution(u_helper_in, u_out);
     }
 
 
@@ -278,7 +332,7 @@ private:
     T_vec w1_ext=nullptr;
     T_vec w2_ext=nullptr;
     T_vec w1_ext_0=nullptr;
-    T_vec w2_ext_0=nullptr;    
+    T_vec w2_ext_0=nullptr;
     T_vec u_ext=nullptr;
     T_vec u_x_ext=nullptr;
     T_vec u_y_ext=nullptr;
@@ -290,19 +344,6 @@ private:
     T_vec du_x_ext=nullptr;
     T_vec du_y_ext=nullptr;
 
-
-    void C2R(const TC_vec& vec_C, T_vec_im& vec_R)
-    {
-
-        C2R_<TC, T_vec_im, TC_vec>(BLOCK_SIZE_x*BLOCK_SIZE_y, Nx, My, (TC_vec&) vec_C, vec_R);
-
-    }
-
-    void R2C(const T_vec_im& vec_R, TC_vec& vec_C)
-    {
-
-        R2C_<TC, T_vec_im, TC_vec>(BLOCK_SIZE_x*BLOCK_SIZE_y, Nx, My, (T_vec_im&)vec_R, vec_C);
-    }
 
 
     void common_constructor_operation()
@@ -382,6 +423,8 @@ private:
     void fft(T_vec& u_, TC_vec& u_hat_)
     {
         FFT->fft(u_, u_hat_);
+        // TC scale = TC((1.0)/(Nx*Ny), 0);
+        // vec_ops_C->scale(scale, u_hat_);        
     }
 
 

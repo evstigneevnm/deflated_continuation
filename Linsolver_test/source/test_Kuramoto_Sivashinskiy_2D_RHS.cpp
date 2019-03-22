@@ -33,8 +33,8 @@ int main(int argc, char const *argv[])
     typedef typename gpu_vector_operations_real_reduced::vector_type real_im_vec;
 
     init_cuda(-1);
-    size_t Nx=128;
-    size_t Ny=128;
+    size_t Nx=16;
+    size_t Ny=16;
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny);
     size_t My=CUFFT_C2R->get_reduced_size();
     cublas_wrap *CUBLAS = new cublas_wrap(true);
@@ -49,24 +49,39 @@ int main(int argc, char const *argv[])
     printf("Blocks = (%i,%i,%i)\n", Blocks.x, Blocks.y, Blocks.z);
     printf("Grids = (%i,%i,%i)\n", Grids.x, Grids.y, Grids.z);
     printf("GridsFourier = (%i,%i,%i)\n", Grids_F.x, Grids_F.y, Grids_F.z);
+    real lambda_0 = 5.5;
 
     real_im_vec u_in, u_out;
     vec_ops_R_im->init_vector(u_in); vec_ops_R_im->start_use_vector(u_in);
     vec_ops_R_im->init_vector(u_out); vec_ops_R_im->start_use_vector(u_out);
     vec_ops_R_im->assign_scalar(1.0, u_in);
 
+    real_vec u_out_ph;
+    vec_ops_R->init_vector(u_out_ph); vec_ops_R->start_use_vector(u_out_ph);
+
     complex_vec uC_in, uC_out;
     vec_ops_C->init_vector(uC_in); vec_ops_C->start_use_vector(uC_in);
     vec_ops_C->init_vector(uC_out); vec_ops_C->start_use_vector(uC_out);
     vec_ops_C->assign_scalar(complex(0.0,1.0), uC_in);
 
-    KS2D->F(u_in, 25.0, u_out);
-    //KS2D->F((complex_vec&)uC_in, 25.0, (complex_vec&)uC_out);
-
+    KS2D->F(u_in, lambda_0, u_out);
+    KS2D->F(uC_in, lambda_0, uC_out);
+    KS2D->set_linearization_point(u_in, lambda_0);
     
-    //gpu_file_operations::write_matrix<complex>("uC_out.dat",  My, Nx, uC_out, 3);
-    gpu_file_operations::write_vector<real>("u_im_out.dat", Nx*My-1, u_out, 3);
+    KS2D->jacobian_u(u_in, u_out);
+    KS2D->jacobian_u(uC_in, uC_out);
 
+    KS2D->preconditioner_jacobian_u(u_out);
+    KS2D->preconditioner_jacobian_u(uC_out);
+    
+    KS2D->physical_solution(u_out, u_out_ph);
+
+    // gpu_file_operations::write_matrix<complex>("uC_out_M.dat",  My, Nx, uC_out, 3);
+    gpu_file_operations::write_vector<complex>("uC_out.dat",  My*Nx, uC_out, 3);
+    gpu_file_operations::write_vector<real>("u_im_out.dat", Nx*My-1, u_out, 3);
+    gpu_file_operations::write_matrix<real>("u_out.dat", Nx, Ny, u_out_ph, 3);
+
+    vec_ops_R->stop_use_vector(u_out_ph); vec_ops_R->free_vector(u_out_ph);
     vec_ops_R_im->stop_use_vector(u_in); vec_ops_R_im->free_vector(u_in);
     vec_ops_R_im->stop_use_vector(u_out); vec_ops_R_im->free_vector(u_out);
     vec_ops_C->stop_use_vector(uC_in); vec_ops_C->free_vector(uC_in);

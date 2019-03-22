@@ -282,6 +282,22 @@ void gpu_vector_operations<T, BLOCK_SIZE>::assign_mul(scalar_type mul_x, const v
     assign_mul_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, mul_x, x, mul_y, y, mul_v, v, mul_w, w, z);
 }
 //===
+template<typename T>
+__global__ void set_value_at_point_kernel(size_t N, T val_x, size_t at, T* x)
+{
+    unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
+    if(j>=N) return;
+    if(at>=N) return;
+    x[at] = T(val_x);
+}
+
+
+template <typename T, int BLOCK_SIZE>
+void gpu_vector_operations<T, BLOCK_SIZE>::set_value_at_point(scalar_type val_x, size_t at, vector_type& x)
+{
+    set_value_at_point_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, val_x, at, x);
+}
+//===
 
 template <typename T, int BLOCK_SIZE>
 void gpu_vector_operations<T, BLOCK_SIZE>::calculate_cuda_grid()
