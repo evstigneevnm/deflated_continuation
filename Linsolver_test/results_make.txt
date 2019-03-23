@@ -1,0 +1,31 @@
+nvcc warning : The 'compute_20', 'sm_20', and 'sm_21' architectures are deprecated, and may be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+In file included from /usr/local/cuda/bin/..//include/device_types.h:53:0,
+                 from /usr/local/cuda/bin/..//include/builtin_types.h:56,
+                 from /usr/local/cuda/bin/..//include/cuda_runtime.h:86,
+                 from source/utils/cuda_support.h:29,
+                 from source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp:5:
+/usr/local/cuda/bin/..//include/host_defines.h:186:0: warning: "__host__" redefined [enabled by default]
+ #define __host__ \
+ ^
+In file included from /usr/local/cuda/bin/..//include/thrust/detail/config/config.h:31:0,
+                 from /usr/local/cuda/bin/..//include/thrust/detail/config.h:22,
+                 from /usr/local/cuda/bin/..//include/thrust/complex.h:24,
+                 from source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp:4:
+/usr/local/cuda/bin/..//include/thrust/detail/config/host_device.h:36:0: note: this is the location of the previous definition
+ #define __host__
+ ^
+In file included from /usr/local/cuda/bin/..//include/device_types.h:53:0,
+                 from /usr/local/cuda/bin/..//include/builtin_types.h:56,
+                 from /usr/local/cuda/bin/..//include/cuda_runtime.h:86,
+                 from source/utils/cuda_support.h:29,
+                 from source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp:5:
+/usr/local/cuda/bin/..//include/host_defines.h:188:0: warning: "__device__" redefined [enabled by default]
+ #define __device__ \
+ ^
+In file included from /usr/local/cuda/bin/..//include/thrust/detail/config/config.h:31:0,
+                 from /usr/local/cuda/bin/..//include/thrust/detail/config.h:22,
+                 from /usr/local/cuda/bin/..//include/thrust/complex.h:24,
+                 from source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp:4:
+/usr/local/cuda/bin/..//include/thrust/detail/config/host_device.h:40:0: note: this is the location of the previous definition
+ #define __device__
+ ^

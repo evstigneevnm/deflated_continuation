@@ -19,7 +19,7 @@ public:
 
     }
 
-    void apply(const vector_t& x, vector_t& f)const
+    void apply(const T_vec& x, T_vec& f)const
     {
         nonlin_op->jacobian_u(x, f)
     }

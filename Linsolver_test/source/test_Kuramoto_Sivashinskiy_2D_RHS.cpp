@@ -33,8 +33,8 @@ int main(int argc, char const *argv[])
     typedef typename gpu_vector_operations_real_reduced::vector_type real_im_vec;
 
     init_cuda(-1);
-    size_t Nx=16;
-    size_t Ny=16;
+    size_t Nx=128;
+    size_t Ny=128;
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny);
     size_t My=CUFFT_C2R->get_reduced_size();
     cublas_wrap *CUBLAS = new cublas_wrap(true);
@@ -49,7 +49,7 @@ int main(int argc, char const *argv[])
     printf("Blocks = (%i,%i,%i)\n", Blocks.x, Blocks.y, Blocks.z);
     printf("Grids = (%i,%i,%i)\n", Grids.x, Grids.y, Grids.z);
     printf("GridsFourier = (%i,%i,%i)\n", Grids_F.x, Grids_F.y, Grids_F.z);
-    real lambda_0 = 5.5;
+    real lambda_0 = 8.5;
 
     real_im_vec u_in, u_out;
     vec_ops_R_im->init_vector(u_in); vec_ops_R_im->start_use_vector(u_in);

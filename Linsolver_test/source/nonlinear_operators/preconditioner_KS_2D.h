@@ -19,11 +19,9 @@ public:
 
     }
 
-    void apply(vector_t& x)const
+    void apply(T_vec& x)const
     {
-        // we must apply some general framework for the preconditioner?!
-        
-
+        nonlin_op->preconditioner_jacobian_u(T_vec);
     }
 
 private:
