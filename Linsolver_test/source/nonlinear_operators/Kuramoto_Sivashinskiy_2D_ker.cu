@@ -16,8 +16,8 @@ __global__ void gradient_Fourier_kernel(int Nx, int My, T_C *gradient_x, T_C *gr
     
     int n=k;
     
-    gradient_x[I2(j,k,Nx)]=T_C(0,m);
-    gradient_y[I2(j,k,Nx)]=T_C(0,n);
+    gradient_x[I2(j,k,My)]=T_C(0,m);
+    gradient_y[I2(j,k,My)]=T_C(0,n);
 
 }
 
@@ -33,10 +33,10 @@ __global__ void Laplace_Fourier_kernel(int Nx, int My, T_C *gradient_x, T_C *gra
     
     if((j>=Nx)||(k>=My)) return;
 
-    T_C x2 = gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)];
-    T_C y2 = gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)];
+    T_C x2 = gradient_x[I2(j,k,My)]*gradient_x[I2(j,k,My)];
+    T_C y2 = gradient_y[I2(j,k,My)]*gradient_y[I2(j,k,My)];
 
-    Laplace[I2(j,k,Nx)] = T_C(x2.real() + y2.real(), 0.0);
+    Laplace[I2(j,k,My)] = T_C(x2.real() + y2.real(), 0.0);
 
 }
 
@@ -52,11 +52,11 @@ __global__ void biharmonic_Fourier_kernel(int Nx, int My, T_C *gradient_x, T_C *
     
     if((j>=Nx)||(k>=My)) return;
 
-    T_C x4 = gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)];
-    T_C y4 = gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)];
-    T_C x2y2 = gradient_x[I2(j,k,Nx)]*gradient_x[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)]*gradient_y[I2(j,k,Nx)];
+    T_C x4 = gradient_x[I2(j,k,My)]*gradient_x[I2(j,k,My)]*gradient_x[I2(j,k,My)]*gradient_x[I2(j,k,My)];
+    T_C y4 = gradient_y[I2(j,k,My)]*gradient_y[I2(j,k,My)]*gradient_y[I2(j,k,My)]*gradient_y[I2(j,k,My)];
+    T_C x2y2 = gradient_x[I2(j,k,My)]*gradient_x[I2(j,k,My)]*gradient_y[I2(j,k,My)]*gradient_y[I2(j,k,My)];
     
-    biharmonic[I2(j,k,Nx)] = T_C(x4.real()+2.0*x2y2.real()+y4.real(), 0.0);
+    biharmonic[I2(j,k,My)] = T_C(x4.real()+2.0*x2y2.real()+y4.real(), 0.0);
 
 }
 

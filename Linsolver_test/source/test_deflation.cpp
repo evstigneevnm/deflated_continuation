@@ -33,7 +33,7 @@ int main(int argc, char const *argv[])
     
     //linsolver control
     unsigned int lin_solver_max_it = 200;
-    real lin_solver_tol = 1.0e-9;
+    real lin_solver_tol = 1.0e-10;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;
@@ -43,12 +43,12 @@ int main(int argc, char const *argv[])
 
 
     init_cuda(-1);
-    size_t Nx=64;
-    size_t Ny=64;
+    size_t Nx=256;
+    size_t Ny=256;
 
     fft_t *CUFFT_C2R = new fft_t(Nx, Ny);
     size_t My=CUFFT_C2R->get_reduced_size();
-    cublas_wrap *CUBLAS = new cublas_wrap(true);
+    cublas_wrap *CUBLAS = new cublas_wrap();
     CUBLAS->set_pointer_location_device(false);
 
     vec_ops_real *vec_ops_R = new vec_ops_real(Nx*Ny, CUBLAS);
@@ -79,7 +79,7 @@ int main(int argc, char const *argv[])
 
     convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops_R_im, KS2D, log, newton_def_tol, newton_def_max_it, real(1) );
 
-    sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops_R_im, 20, real(15.0));
+    sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops_R_im, 20, real(85.0));
 
     system_operator_def_t *system_operator_def = new system_operator_def_t(vec_ops_R_im, KS2D, SM, sol_storage_def);
     newton_def_t *newton_def = new newton_def_t(vec_ops_R_im, system_operator_def, conv_newton_def);
@@ -93,8 +93,10 @@ int main(int argc, char const *argv[])
 
     KS2D->fourier_solution(u_out_ph, u_in);
 
+
+
     real lambda;
-    bool found_solution = false;
+    bool found_solution = true;
     unsigned int solution_number = 0;
     while(found_solution)
     {

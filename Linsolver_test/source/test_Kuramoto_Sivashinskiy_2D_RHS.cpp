@@ -33,8 +33,8 @@ int main(int argc, char const *argv[])
     typedef typename gpu_vector_operations_real_reduced::vector_type real_im_vec;
 
     init_cuda(-1);
-    size_t Nx=128;
-    size_t Ny=128;
+    size_t Nx=32;
+    size_t Ny=32;
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny);
     size_t My=CUFFT_C2R->get_reduced_size();
     cublas_wrap *CUBLAS = new cublas_wrap(true);
