@@ -9,7 +9,7 @@ namespace numerical_algos
 namespace newton_method_extended
 {
 
-template<class vector_operations, class system_operator, class convergence_strategy, class solution_point/*, class nonlinear_operator, class linear_operator*/>
+template<class vector_operations, class linear_operator, class system_operator, class convergence_strategy, class solution_point/*, class nonlinear_operator, */>
 class newton_solver_extended
 {
 public:
@@ -30,35 +30,38 @@ public:
 
     }
 
-    void solve(const T_vec& x0, const T& lambda0, T_vec& x, T& lambda)
+    bool solve(const linear_operator& Ax, const T_vec& x0, const T& lambda0, T_vec& x, T& lambda)
     {
         int result_status = 1;
         T delta_lambda = T(1);
         vec_ops->assign(x0, x);
         lambda = lambda0;
         vec_ops->assign_scalar(T(1), delta_x);
+        bool converged = false;
         bool finished = false;
         while(!finished)
         {
-            system_op->set_linearization_point(x,labda);
-            system_op->solve(x, lambda, delta_x, delta_lambda);
+            system_op->solve(Ax, x, lambda, delta_x, delta_lambda);
             finished = conv_strat->check_convergence(x, lambda, delta_x, delta_lambda, result_status);
         }
+        if(result_status==0)
+            converged = true;
 
+        return converged;
     }
 
-    void solve(const solution_point& x0, solution_point& x)
-    {
-        //to be used for extended system operation with class container for the extended solution.
-        //i intend to unpack solution_point and pass to the solve(x0, l0, x, l)
-        //...
+    // void solve(const solution_point& x0, solution_point& x)
+    // {
+    //     //to be used for extended system operation with class container for the extended solution.
+    //     //i intend to unpack solution_point and pass to the solve(x0, l0, x, l)
+    //     //...
 
-    }
+    // }
     
 
 
 private:
-    vector_operations* vec_ops_;
+    vector_operations* vec_ops;
     system_operator* system_op;
     convergence_strategy* conv_strat;
     T_vec delta_x;

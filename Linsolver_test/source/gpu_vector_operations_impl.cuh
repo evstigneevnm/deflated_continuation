@@ -5,6 +5,49 @@
 #include <utils/cuda_support.h>
 #include <external_libraries/cublas_wrap.h>
 #include <gpu_vector_operations.h>
+#include <utils/curand_safe_call.h>
+#include <thrust/complex.h>
+
+
+
+template<typename T>
+void curandGenerateUniformDistribution_spec(curandGenerator_t gen, T*& vector, size_t size);
+
+
+template<>
+void curandGenerateUniformDistribution_spec<float>(curandGenerator_t gen, float*& vector, size_t size)
+{
+    CURAND_SAFE_CALL( curandGenerateUniform(gen, vector, size) );
+}
+
+template<>
+void curandGenerateUniformDistribution_spec<double>(curandGenerator_t gen, double*& vector, size_t size)
+{
+    CURAND_SAFE_CALL( curandGenerateUniformDouble(gen, vector, size) );
+}
+
+template<>
+void curandGenerateUniformDistribution_spec<thrust::complex<float>>(curandGenerator_t gen, thrust::complex<float>*& vector, size_t size)
+{
+    
+   std::cout << "complex type not supported yet!\n";
+}
+
+template<>
+void curandGenerateUniformDistribution_spec<thrust::complex<double>>(curandGenerator_t gen, thrust::complex<double>*& vector, size_t size)
+{
+    std::cout << "complex type not supported yet!\n";
+}
+
+
+
+template <typename T, int BLOCK_SIZE>
+void gpu_vector_operations<T, BLOCK_SIZE>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector, size_t size)
+{
+    curandGenerateUniformDistribution_spec<T>(gen, vector, size);
+}
+
+
 
 
 template<typename T>

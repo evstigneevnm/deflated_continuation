@@ -1,6 +1,9 @@
 #ifndef __LINEAR_OPERATOR_KS_2D_H__
 #define __LINEAR_OPERATOR_KS_2D_H__
 
+namespace nonlinear_operators
+{
+
 
 template<class vector_operations, class nonlinear_operator> 
 class linear_operator_KS_2D
@@ -21,7 +24,7 @@ public:
 
     void apply(const T_vec& x, T_vec& f)const
     {
-        nonlin_op->jacobian_u(x, f)
+        nonlin_op->jacobian_u(x, f);
     }
 
 private:
@@ -29,6 +32,6 @@ private:
 
 };
 
-
+}
 
 #endif

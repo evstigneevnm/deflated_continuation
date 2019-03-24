@@ -20,10 +20,10 @@ axillary:
 
 
 */
-
-
-
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D_ker.h>
+
+namespace nonlinear_operators
+{
 
 
 template<class FFT_type, 
@@ -283,7 +283,7 @@ public:
     }
 
     void R2C(const T_vec_im& vec_R, TC_vec& vec_C)
-    {
+    { 
         R2C_<TC, T_vec_im, TC_vec>(BLOCK_SIZE_x*BLOCK_SIZE_y, Nx, My, (T_vec_im&)vec_R, vec_C);
     }
     
@@ -297,7 +297,17 @@ public:
        R2C(u_in, u_helper_in);
        physical_solution(u_helper_in, u_out);
     }
+    
+    void fourier_solution(T_vec& u_in, TC_vec& u_out)
+    {
+       fft(u_in, u_out); 
+    }
 
+    void fourier_solution(T_vec& u_in, T_vec_im& u_out)
+    {
+        fourier_solution(u_in, u_helper_out);
+        C2R(u_helper_out, u_out);
+    }
 
 private:
     T a_val,b_val;
@@ -433,9 +443,6 @@ private:
 
 };
 
-
-
-
-
+}
 
 #endif

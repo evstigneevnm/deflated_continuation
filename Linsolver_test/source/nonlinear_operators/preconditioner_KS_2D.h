@@ -1,6 +1,9 @@
 #ifndef __PRECONDITIONER_KS_2D_H__
 #define __PRECONDITIONER_KS_2D_H__
 
+namespace nonlinear_operators
+{
+
 template<class vector_operations, class nonlinear_operator> 
 class preconditioner_KS_2D
 {
@@ -21,7 +24,7 @@ public:
 
     void apply(T_vec& x)const
     {
-        nonlin_op->preconditioner_jacobian_u(T_vec);
+        nonlin_op->preconditioner_jacobian_u(x);
     }
 
 private:
@@ -29,5 +32,9 @@ private:
 
     
 };
+
+
+}
+
 
 #endif

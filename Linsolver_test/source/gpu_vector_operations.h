@@ -4,6 +4,8 @@
 #include <cuda_runtime.h>
 #include <utils/cuda_support.h>
 #include <external_libraries/cublas_wrap.h>
+#include <utils/curand_safe_call.h>
+#include <random>
 
 namespace gpu_vector_operations_type{
 
@@ -50,7 +52,7 @@ struct vec_ops_cuComplex_type_hlp< thrust::complex<double> >
 
 
 
-template <typename T, int BLOCK_SIZE = 256>
+template <typename T, int BLOCK_SIZE = 1024>
 struct gpu_vector_operations
 {
     typedef T  scalar_type;
@@ -126,7 +128,7 @@ struct gpu_vector_operations
     {
         cuBLAS->dot<scalar_type>(sz, x, y, result);
     }
-   //calc: x := <vector_type with all elements equal to given scalar value> 
+    //calc: x := <vector_type with all elements equal to given scalar value> 
     void assign_scalar(const scalar_type scalar, vector_type& x)const;
     //calc: ||x||_2=norm, x=x/norm, return norm.
     Tsc normalize(vector_type& x)
@@ -191,6 +193,23 @@ struct gpu_vector_operations
     //calc: x[at]=val_x
     void set_value_at_point(scalar_type val_x, size_t at, vector_type& x);
 
+    //calc: x := <pseudo random vector with values in [0,1] > 
+    void assign_random(vector_type& vec)
+    {
+        //vec is on the device!!!
+        std::random_device r;
+        curandGenerator_t gen;
+        /* Create pseudo-random number generator */
+        CURAND_SAFE_CALL( curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT) );
+        /* Set seed */
+        CURAND_SAFE_CALL( curandSetPseudoRandomGeneratorSeed(gen, r()) );
+        /* Generate n doubles on device */
+        curandGenerateUniformDistribution(gen, vec, sz);    
+        CURAND_SAFE_CALL(curandDestroyGenerator(gen));
+
+    }
+
+
 //*/
 private:
     cublas_wrap *cuBLAS;
@@ -198,7 +217,7 @@ private:
     dim3 dimBlock;
     dim3 dimGrid;
     void calculate_cuda_grid();
-
+    void curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector, size_t size);
 };
 
 

@@ -21,7 +21,7 @@ int main(int argc, char const *argv[])
     typedef thrust::complex<real> complex;
     typedef gpu_vector_operations<real> gpu_vector_operations_real;
     typedef gpu_vector_operations<complex> gpu_vector_operations_complex;
-    init_cuda(-1);
+    init_cuda(1);
 
     cublas_wrap *CUBLAS = new cublas_wrap(true);
     gpu_vector_operations_real *vec_ops_R = new gpu_vector_operations_real(N, CUBLAS);
@@ -34,10 +34,16 @@ int main(int argc, char const *argv[])
     vec_ops_R->start_use_vector(u1_d); vec_ops_R->start_use_vector(u2_d); vec_ops_R->start_use_vector(u3_d);
     vec_ops_C->start_use_vector(z1_d); vec_ops_C->start_use_vector(z2_d); vec_ops_C->start_use_vector(z3_d);
 
-    vec_ops_R->assign_scalar(0.5, u1_d); 
+    //vec_ops_R->assign_scalar(0.5, u1_d);
+    vec_ops_R->assign_random(u1_d);
+    real norm_u1 = vec_ops_R->norm(u1_d);
+    printf("||u1||=%lf\n", double(norm_u1));
+
     vec_ops_C->assign_scalar(complex(0.5), z1_d);
+
     vec_ops_R->assign_scalar(-0.5, u2_d); 
     vec_ops_C->assign_scalar(complex(-0.5,0.3), z2_d);
+
     vec_ops_R->assign_scalar(123.0, u3_d); 
     vec_ops_C->assign_scalar(complex(0,2.2), z3_d);
 
@@ -46,14 +52,12 @@ int main(int argc, char const *argv[])
     
     vec_ops_C->add_mul(complex(0,1), z1_d, complex(2.0), (complex*&) u2_d, complex(-1.0), z3_d);
 
-
-    
-
     vec_ops_R->add_mul_scalar(1.0, 0.5, u3_d);
     vec_ops_C->add_mul_scalar(complex(0,1.0), complex(0.5,0.5), z3_d);
+
     vec_ops_C->swap(z3_d,z2_d);
     vec_ops_R->assign_mul(2.0, u1_d, u3_d);
-    vec_ops_C->add_mul(complex(0.0,2.3), (complex*&)u3_d, z3_d);
+    vec_ops_C->add_mul(complex(0.0,2.3), z1_d, z3_d);
     vec_ops_C->assign_mul(1.0, z3_d, 2.0, z2_d, z1_d);
     real z1norm=0.0;
     vec_ops_C->norm(z1_d,&z1norm);

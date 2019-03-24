@@ -23,7 +23,7 @@ int main(int argc, char const *argv[])
     typedef gpu_vector_operations<complex> gpu_vector_operations_complex;
     typedef gpu_vector_operations<real> gpu_vector_operations_real_reduced;
     typedef cufft_wrap_R2C<real> cufft_type;
-    typedef Kuramoto_Sivashinskiy_2D<cufft_type, 
+    typedef nonlinear_operators::Kuramoto_Sivashinskiy_2D<cufft_type, 
             gpu_vector_operations_real, 
             gpu_vector_operations_complex, 
             gpu_vector_operations_real_reduced,

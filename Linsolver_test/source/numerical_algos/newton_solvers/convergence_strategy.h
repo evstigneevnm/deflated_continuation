@@ -21,10 +21,10 @@ private:
     typedef utils::logged_obj_base<logging> logged_obj_t;
 
 public:    
-    convergence_strategy(vector_operations*& vec_ops_, nonlinear_operator*& nonlin_op_, logging*& log_, T tolerance_, unsigned int maximum_iterations_, T newton_wight_, bool verbose_):
+    convergence_strategy(vector_operations*& vec_ops_, nonlinear_operator*& nonlin_op_, logging*& log_, T tolerance_, unsigned int maximum_iterations_, T newton_wight_, bool verbose_ = true):
     vec_ops(vec_ops_),
     nonlin_op(nonlin_op_),
-    log_(log),
+    log(log_),
     iterations(0),
     tolerance(tolerance_),
     maximum_iterations(maximum_iterations_),
@@ -53,39 +53,44 @@ public:
         T normFx1 = vec_ops->norm(Fx);
         
         iterations++;
-        logged_obj_t::info_f("iteration %i, previous residual %le, current residual %le",iterations, (double)normFx, (double)normFx1);
+        log->info_f("iteration %i, previous residual %le, current residual %le",iterations, (double)normFx, (double)normFx1);
 
         if(std::isnan(normFx))
         {
-            logged_obj_t::info("Newton initial vector caused nan.");
+            log->info("Newton initial vector caused nan.");
             finish = true;
             result_status = 3;
         }
         else if(std::isnan(normFx1))
         {
-            logged_obj_t::info("Newton updated vector caused nan.");
+            log->info("Newton updated vector caused nan.");
             finish = true;
             result_status = 3;
         }else if(std::isinf(normFx))
         {
-            logged_obj_t::info("Newton initial vector caused inf.");
+            log->info("Newton initial vector caused inf.");
             finish = true;
             result_status = 2;            
         }else if(std::isinf(normFx1))
         {
-            logged_obj_t::info("Newton update caused inf.");
+            log->info("Newton update caused inf.");
             finish = true;
             result_status = 2;            
+        }else
+        {   
+            //update solution
+            lambda = lambda1;
+            vec_ops->assign(x1,x);
         }
         if(normFx1<tolerance)
         {
-            logged_obj_t::info("Newton converged with %le.", (double)normFx1);
+            log->info_f("Newton converged with %le.", (double)normFx1);
             result_status = 0;
             finish = true;
         }
         else if(iterations>=maximum_iterations)
         {
-            logged_obj_t::info("Newton max iterations (%i) reached.", iterations);
+            log->info("Newton max iterations (%i) reached.", iterations);
             result_status = 1;
             finish = true;
         }
@@ -110,5 +115,8 @@ private:
     bool verbose;
 };
 
+
+}
+}
 
 #endif
