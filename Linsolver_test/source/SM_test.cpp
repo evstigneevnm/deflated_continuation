@@ -97,7 +97,7 @@ private:
 
 typedef utils::log_std log_t;
 typedef default_monitor<cpu_vector_operations_real,log_t> monitor_t;
-typedef bicgstabl<system_operator,prec_operator,cpu_vector_operations_real,monitor_t,log_t> lin_solver_bicgstabl_t;
+//typedef bicgstabl<system_operator,prec_operator,cpu_vector_operations_real,monitor_t,log_t> lin_solver_bicgstabl_t;
 // Sherman Morrison class
 typedef sherman_morrison_linear_system_solve<system_operator,prec_operator,cpu_vector_operations_real,monitor_t,log_t,bicgstabl> sherman_morrison_linear_system_solve_t;
 
@@ -146,17 +146,22 @@ int main(int argc, char **args)
     
     vec_ops.assign_scalar(1.0, x);
     monitor_t *mon;
+    monitor_t *mon_original;
     
     //lin_solver_bicgstabl_t lin_solver_bicgstabl(&vec_ops, &log);
     //lin_solver_bicgstabl.set_preconditioner(&prec);
     //mon = &lin_solver_bicgstabl.monitor();
 
-    sherman_morrison_linear_system_solve_t SM(&prec, &vec_ops, &log);   
-    mon = &SM.get_linsolver_handle()->monitor();
+    sherman_morrison_linear_system_solve_t *SM = new sherman_morrison_linear_system_solve_t(&prec, &vec_ops, &log);   
+    mon = &SM->get_linsolver_handle()->monitor();
+    mon_original = &SM->get_linsolver_handle_original()->monitor();
 
     mon->init(rel_tol, real(0), max_iters);
     mon->set_save_convergence_history(true);
     mon->set_divide_out_norms_by_rel_base(true);
+    mon_original->init(rel_tol, real(0), max_iters);
+    mon_original->set_save_convergence_history(true);
+    mon_original->set_divide_out_norms_by_rel_base(true);
 
 
     bool res_flag;
@@ -167,11 +172,16 @@ int main(int argc, char **args)
     // lin_solver_bicgstabl.set_basis_size(basis_sz);
     // bool res_flag = lin_solver_bicgstabl.solve(Ax, b, x);
 
-    SM.get_linsolver_handle()->set_use_precond_resid(use_precond_resid);
-    SM.get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
-    SM.get_linsolver_handle()->set_basis_size(basis_sz);
-    
-    res_flag = SM.solve(Ax, c, d, alpha, b, beta, x, v);
+    SM->get_linsolver_handle()->set_use_precond_resid(use_precond_resid);
+    SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
+    SM->get_linsolver_handle()->set_basis_size(basis_sz);
+    SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
+    SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
+    SM->get_linsolver_handle_original()->set_basis_size(basis_sz);
+
+
+    std::cout << "\n ========= \ntesting: rank1_update(A)u = b; v=f(u,b) \n";
+    res_flag = SM->solve(Ax, c, d, alpha, b, beta, x, v);
     iters_performed = mon->iters_performed();
 
     if (res_flag) 
@@ -184,7 +194,7 @@ int main(int argc, char **args)
 
     //test (beta A - 1/alpha d c^T) u = b;
     std::cout << "\n ========= \ntesting: (beta A - 1/alpha d c^T) u = b \n";
-    res_flag = SM.solve(beta, Ax, alpha, c, d, b, x);
+    res_flag = SM->solve(beta, Ax, alpha, c, d, b, x);
     
     iters_performed = mon->iters_performed();
 
@@ -196,6 +206,17 @@ int main(int argc, char **args)
 
     file_operations::write_vector<real>("./dat_files/x_sm.dat", sz, x);
 
+    std::cout << "\n ========= \ntesting: A u = b \n";
+    res_flag = SM->solve(Ax, b, x);
+    iters_performed = mon->iters_performed();
+    if (res_flag)
+        log.info("lin_solver returned success result");
+    else
+        log.info("lin_solver returned fail result");    
+  
+
+    file_operations::write_vector<real>("./dat_files/x_orig.dat", sz, x);
+            
 
     free(A);
     free(iP);

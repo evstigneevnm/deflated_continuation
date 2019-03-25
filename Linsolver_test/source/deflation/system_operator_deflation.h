@@ -4,7 +4,7 @@
 namespace deflation
 {
 
-template<class vector_operations, class nonliner_operator, class linear_operator, class sherman_morrison_linear_system_solver, class solution_storage>
+template<class vector_operations, class nonlinear_operator, class linear_operator, class sherman_morrison_linear_system_solver, class solution_storage>
 class system_operator_deflation
 {
 public:
@@ -12,9 +12,9 @@ public:
     typedef typename vector_operations::vector_type  T_vec;
     
 
-    system_operator_deflation(vector_operations*& vec_ops_, nonliner_operator*& nonlin_op_, sherman_morrison_linear_system_solver*& SM_solver_, solution_storage*& sol_storage_):
+    system_operator_deflation(vector_operations*& vec_ops_, linear_operator*& lin_op_, sherman_morrison_linear_system_solver*& SM_solver_, solution_storage*& sol_storage_):
     vec_ops(vec_ops_),
-    nonlin_op(nonlin_op_),
+    lin_op(lin_op_),
     SM_solver(SM_solver_),
     sol_storage(sol_storage_)
     {
@@ -29,7 +29,7 @@ public:
         vec_ops->stop_use_vector(c); vec_ops->free_vector(c);
     }
 
-    bool solve(const linear_operator& Ax, const T_vec& x, const T lambda, T_vec& d_x, T& d_lambda)
+    bool solve(nonlinear_operator* nonlin_op, const T_vec& x, const T lambda, T_vec& d_x, T& d_lambda)
     {
         bool flag_lin_solver;
         
@@ -38,13 +38,13 @@ public:
         vec_ops->assign(f, b);
         vec_ops->add_mul_scalar(T(0), T(-1), b); //b=-F(x,lambda)
         sol_storage->calc_distance(x, beta, c); //beta = 1/||x-x0_j||, c = (x-x0_j)
-        flag_lin_solver = SM_solver->solve(beta, Ax, T(1), c, f, b, d_x);
+        flag_lin_solver = SM_solver->solve(beta, *lin_op, T(1), c, f, b, d_x);
         d_lambda = 0;
         return flag_lin_solver;
     }
 private:
     vector_operations* vec_ops;
-    nonliner_operator* nonlin_op;
+    linear_operator* lin_op;
     sherman_morrison_linear_system_solver* SM_solver;
     solution_storage* sol_storage;
     T_vec b;

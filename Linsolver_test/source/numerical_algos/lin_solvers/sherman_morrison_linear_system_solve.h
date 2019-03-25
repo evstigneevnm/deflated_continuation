@@ -202,15 +202,23 @@ public:
                         VectorOperations,
                         Monitor, Log>           linear_solver_type;
 
-    sherman_morrison_linear_system_solve(const Preconditioner *prec_, const VectorOperations *vec_ops_, Log *log_): 
+    typedef LinearSolver<LinearOperator, 
+                        Preconditioner,
+                        VectorOperations,
+                        Monitor, Log>           linear_solver_original_type;
+
+    sherman_morrison_linear_system_solve(Preconditioner* prec_, const VectorOperations* vec_ops_, Log *log_): 
     linear_solver(vec_ops_,log_), 
     prec(vec_ops_), 
-    oper(vec_ops_) 
+    oper(vec_ops_),
+    linear_solver_original(vec_ops_,log_)
     {
         
         linear_solver.set_preconditioner(&prec);
         prec.set_inherited_preconditioner(prec_);
-
+        //sets preconditioner for the progonal linear solver
+        
+        linear_solver_original.set_preconditioner(prec_);
     }
 
     ~sherman_morrison_linear_system_solve()
@@ -223,7 +231,10 @@ public:
     {
         return &linear_solver;
     }
-
+    linear_solver_original_type *get_linsolver_handle_original()
+    {
+        return &linear_solver_original;
+    }
 
 
     //solves full extended system with rank 1 update
@@ -252,8 +263,21 @@ public:
         return flag;
     }
 
+    //solves the original system Au=b
+    //this method simply passes all to the original linear solver used in the constructor
+    //this avoids adding another linear solver object explicitely
+    bool solve(const LinearOperator &A,  const vector_type &b, vector_type &u) const
+    {
+        bool flag = false;
+        flag = linear_solver_original.solve(A, b, u);
+        return flag;
+    }
+
+
 private:
     linear_solver_type linear_solver;
+    linear_solver_original_type linear_solver_original;
+
     LinearOperator_SM_t oper;
     Preconditioner_SM_t prec;
 

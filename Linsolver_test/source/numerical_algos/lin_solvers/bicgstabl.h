@@ -221,6 +221,10 @@ public:
             monitor_ += basis_sz_;
         }
 
+        res = monitor_.converged();
+        if(!res)
+            logged_obj_t::info_f("solve: linear solver failed to converge");
+        
         return res;
 
     }

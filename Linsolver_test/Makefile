@@ -2,8 +2,10 @@ cpu_1st_call_alloc_test_float: source/numerical_algos/lin_solvers/tests/cpu_1st_
 	g++ -I source/ -DSCALAR_TYPE=float -std=c++11 -O3 source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp -o cpu_1st_call_alloc_test_float.bin
 cpu_1st_call_alloc_test_double: source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp
 	g++ -I source/ -DSCALAR_TYPE=double -std=c++11 -O3 source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp -o cpu_1st_call_alloc_test_double.bin
-SM_test: source/SM_test.cpp
-	g++ -I source/ -DSCALAR_TYPE=double -std=c++11 -g source/SM_test.cpp -o SM_test.bin
+SM_test_rel: source/SM_test.cpp
+	g++ -I source/ -DSCALAR_TYPE=double -std=c++11 -O3 source/SM_test.cpp -o SM_test.bin 2>results_make.txt
+SM_test_deb: source/SM_test.cpp
+	g++ -I source/ -DSCALAR_TYPE=double -std=c++11 -G -g source/SM_test.cpp -o SM_test.bin 2>results_make.txt
 lin_solvers_test: source/linear_solvers_test.cpp
 	g++ -I source/ -DSCALAR_TYPE=double -std=c++11 -g source/linear_solvers_test.cpp -o linear_solvers_test.bin
 cufft_test_double: source/cufft_test.cpp

@@ -27,7 +27,7 @@
         vec_ops_real_im, KS_2D> lin_op_t;
     
     typedef nonlinear_operators::preconditioner_KS_2D<
-        vec_ops_real_im, KS_2D> prec_t;
+        vec_ops_real_im, KS_2D, lin_op_t> prec_t;
 
     typedef numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
         lin_op_t,
@@ -38,7 +38,7 @@
         numerical_algos::lin_solvers::bicgstabl> sherman_morrison_linear_system_solve_t;
 
 
-    typedef numerical_algos::newton_method_extended::convergence_strategy<
+    typedef deflation::newton_method_extended::convergence_strategy<
         vec_ops_real_im, 
         KS_2D, 
         log_t> convergence_newton_def_t;
@@ -54,12 +54,30 @@
 
     typedef numerical_algos::newton_method_extended::newton_solver_extended<
         vec_ops_real_im, 
-        lin_op_t,
+        KS_2D,
         system_operator_def_t, 
         convergence_newton_def_t, 
         real /* point solution class here instead of real!*/ 
         > newton_def_t;
     
+    typedef nonlinear_operators::newton_method::convergence_strategy<
+        vec_ops_real_im, 
+        KS_2D, 
+        log_t> convergence_newton_t;
+    
+    typedef nonlinear_operators::system_operator<
+        vec_ops_real_im, 
+        KS_2D,
+        lin_op_t,
+        sherman_morrison_linear_system_solve_t> system_operator_t;
+    typedef numerical_algos::newton_method::newton_solver<
+        vec_ops_real_im, 
+        KS_2D,
+        system_operator_t, 
+        convergence_newton_t
+        > newton_t;
+
+
     typedef typename vec_ops_real::vector_type real_vec; 
     typedef typename vec_ops_complex::vector_type complex_vec;
     typedef typename vec_ops_real_im::vector_type real_im_vec;

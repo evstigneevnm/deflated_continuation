@@ -9,7 +9,7 @@ namespace numerical_algos
 namespace newton_method_extended
 {
 
-template<class vector_operations, class linear_operator, class system_operator, class convergence_strategy, class solution_point/*, class nonlinear_operator, */>
+template<class vector_operations, class nonlinear_operator, class system_operator, class convergence_strategy, class solution_point/*, class nonlinear_operator, */>
 class newton_solver_extended
 {
 public:
@@ -30,7 +30,7 @@ public:
 
     }
 
-    bool solve(const linear_operator& Ax, const T_vec& x0, const T& lambda0, T_vec& x, T& lambda)
+    bool solve(nonlinear_operator* nonlin_op, const T_vec& x0, const T& lambda0, T_vec& x, T& lambda)
     {
         int result_status = 1;
         T delta_lambda = T(1);
@@ -39,13 +39,25 @@ public:
         vec_ops->assign_scalar(T(1), delta_x);
         bool converged = false;
         bool finished = false;
+        bool linsolver_converged = false;
+        conv_strat->reset_iterations(); //reset iteration count, newton wight and iteration history
         while(!finished)
         {
-            system_op->solve(Ax, x, lambda, delta_x, delta_lambda);
-            finished = conv_strat->check_convergence(x, lambda, delta_x, delta_lambda, result_status);
+            linsolver_converged = system_op->solve(nonlin_op, x, lambda, delta_x, delta_lambda);
+            if(linsolver_converged)
+            {
+                finished = conv_strat->check_convergence(nonlin_op, x, lambda, delta_x, delta_lambda, result_status);
+            }
+            else
+            {
+                finished = true;
+                result_status = 4;
+            }
+
         }
         if(result_status==0)
             converged = true;
+
 
         return converged;
     }

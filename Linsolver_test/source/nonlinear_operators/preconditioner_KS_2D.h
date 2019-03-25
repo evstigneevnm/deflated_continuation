@@ -4,7 +4,7 @@
 namespace nonlinear_operators
 {
 
-template<class vector_operations, class nonlinear_operator> 
+template<class vector_operations, class nonlinear_operator, class linear_operator> 
 class preconditioner_KS_2D
 {
 public:
@@ -21,6 +21,11 @@ public:
     {
 
     }
+    
+    void set_operator(const linear_operator *op_)
+    {
+        lin_op = (linear_operator*)op_;
+    }
 
     void apply(T_vec& x)const
     {
@@ -29,6 +34,7 @@ public:
 
 private:
     nonlinear_operator* nonlin_op;
+    linear_operator* lin_op;
 
     
 };

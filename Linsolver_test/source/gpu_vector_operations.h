@@ -78,7 +78,8 @@ struct gpu_vector_operations
 
     void init_vector(vector_type& x)const 
     {
-        x = NULL;
+        //x = NULL;
+        x = device_allocate<T>(sz);
     }
     void free_vector(vector_type& x)const 
     {
@@ -87,8 +88,8 @@ struct gpu_vector_operations
     }
     void start_use_vector(vector_type& x)const
     {
-        if (x == NULL) 
-            x = device_allocate<T>(sz);
+        //if (x == NULL) 
+        //    x = device_allocate<T>(sz);
     }
     void stop_use_vector(vector_type& x)const
     {

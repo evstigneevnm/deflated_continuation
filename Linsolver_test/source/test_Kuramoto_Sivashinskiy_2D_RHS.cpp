@@ -49,7 +49,7 @@ int main(int argc, char const *argv[])
     printf("Blocks = (%i,%i,%i)\n", Blocks.x, Blocks.y, Blocks.z);
     printf("Grids = (%i,%i,%i)\n", Grids.x, Grids.y, Grids.z);
     printf("GridsFourier = (%i,%i,%i)\n", Grids_F.x, Grids_F.y, Grids_F.z);
-    real lambda_0 = 8.5;
+    real lambda_0 = 42.0;
 
     real_im_vec u_in, u_out;
     vec_ops_R_im->init_vector(u_in); vec_ops_R_im->start_use_vector(u_in);

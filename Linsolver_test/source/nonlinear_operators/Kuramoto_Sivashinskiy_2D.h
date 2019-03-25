@@ -357,7 +357,7 @@ private:
 
 
     void common_constructor_operation()
-    {   
+    {  
         My=FFT->get_reduced_size();
         vec_ops_C->init_vector(gradient_x); vec_ops_C->start_use_vector(gradient_x); 
         vec_ops_C->init_vector(gradient_y); vec_ops_C->start_use_vector(gradient_y); 

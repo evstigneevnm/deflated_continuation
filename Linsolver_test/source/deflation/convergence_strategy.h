@@ -1,12 +1,13 @@
-#ifndef __CONVERGENCE_STRATEGY_H__
-#define __CONVERGENCE_STRATEGY_H__
+#ifndef __CONVERGENCE_STRATEGY_DEFLATION_H__
+#define __CONVERGENCE_STRATEGY_DEFLATION_H__
 /*
-converhence rules for Newton iterator
+converhence rules for Newton iterator for deflation process
 */
 #include <cmath>
+#include <vector>
 #include <utils/logged_obj_base.h>
 
-namespace numerical_algos
+namespace deflation
 {
 namespace newton_method_extended
 {
@@ -21,18 +22,23 @@ private:
     typedef utils::logged_obj_base<logging> logged_obj_t;
 
 public:    
-    convergence_strategy(vector_operations*& vec_ops_, nonlinear_operator*& nonlin_op_, logging*& log_, T tolerance_, unsigned int maximum_iterations_, T newton_wight_, bool verbose_ = true):
+    convergence_strategy(vector_operations*& vec_ops_, logging*& log_, T tolerance_, unsigned int maximum_iterations_, T newton_wight_, bool store_norms_history_ = false, bool verbose_ = true):
     vec_ops(vec_ops_),
-    nonlin_op(nonlin_op_),
     log(log_),
     iterations(0),
     tolerance(tolerance_),
     maximum_iterations(maximum_iterations_),
     newton_wight(newton_wight_),
-    verbose(verbose_)
+    newton_wight_initial(newton_wight_),
+    verbose(verbose_),
+    store_norms_history(store_norms_history_)
     {
         vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
         vec_ops->init_vector(Fx); vec_ops->start_use_vector(Fx);
+        if(store_norms_history)
+        {
+            norms_evolution.reserve(maximum_iterations);
+        }
     }
     ~convergence_strategy()
     {
@@ -41,7 +47,7 @@ public:
     }
 
 
-    bool check_convergence(T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status)
+    bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status)
     {
         bool finish = false;
         nonlin_op->F(x, lambda, Fx);
@@ -51,7 +57,11 @@ public:
         T lambda1 = lambda + newton_wight*delta_lambda;
         nonlin_op->F(x1, lambda1, Fx);
         T normFx1 = vec_ops->norm(Fx);
-        
+        if(store_norms_history)
+        {
+            norms_evolution.push_back(normFx1);
+        }
+
         iterations++;
         log->info_f("iteration %i, previous residual %le, current residual %le",iterations, (double)normFx, (double)normFx1);
 
@@ -102,17 +112,32 @@ public:
     {
         return iterations;
     }
+    void reset_iterations()
+    {
+        iterations = 0;
+        reset_wight();
+        norms_evolution.clear();
+    }
+    void reset_wight()
+    {
+        newton_wight = newton_wight_initial;
+    }
+    std::vector<T>* get_norms_history_handle()
+    {
+        return &norms_evolution;
+    }
 
 private:
     vector_operations* vec_ops;
-    nonlinear_operator* nonlin_op;
     logging* log;
     unsigned int maximum_iterations;
     unsigned int iterations;
     T tolerance;
     T_vec x1, Fx;
-    T newton_wight;
-    bool verbose;
+    T newton_wight, newton_wight_initial;
+    bool verbose, store_norms_history;
+    std::vector<T> norms_evolution;
+
 };
 
 
