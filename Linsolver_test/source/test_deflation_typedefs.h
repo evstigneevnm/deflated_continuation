@@ -69,7 +69,9 @@
         vec_ops_real_im, 
         KS_2D,
         lin_op_t,
-        sherman_morrison_linear_system_solve_t> system_operator_t;
+        sherman_morrison_linear_system_solve_t
+        > system_operator_t;
+        
     typedef numerical_algos::newton_method::newton_solver<
         vec_ops_real_im, 
         KS_2D,
@@ -77,6 +79,13 @@
         convergence_newton_t
         > newton_t;
 
+
+    typedef deflation::deflation_operator<
+        vec_ops_real_im,
+        newton_def_t,
+        KS_2D,
+        sol_storage_def_t
+        >deflation_operator_t;
 
     typedef typename vec_ops_real::vector_type real_vec; 
     typedef typename vec_ops_complex::vector_type complex_vec;

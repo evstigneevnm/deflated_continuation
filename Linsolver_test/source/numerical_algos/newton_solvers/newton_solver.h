@@ -63,7 +63,10 @@ public:
     }
 
 
-
+    convergence_strategy* get_convergence_strategy_handle()
+    {
+        return conv_strat;
+    }
 
 private:
     vector_operations* vec_ops;

@@ -176,7 +176,30 @@ public:
 
 
 private:    
-    std::vector<internal_container> container;  
+    //define types in order to use iterators
+    typedef typename std::vector<internal_container> container_t;
+    container_t container;  
+    typedef typename container_t::iterator iterator_t;
+    typedef typename container_t::const_iterator const_iterator_t;
+
+public:
+    //recast iterators from std::vector<internal_container> to use in for(auto& x:...)
+    inline iterator_t begin() noexcept 
+    { 
+        return container.begin(); 
+    }
+    inline const_iterator_t cbegin() const noexcept 
+    { 
+        return container.cbegin(); 
+    }
+    inline iterator_t end() noexcept 
+    { 
+        return container.end(); 
+    }
+    inline const_iterator_t cend() const noexcept 
+    { 
+        return container.cend(); 
+    }
 
 };
 

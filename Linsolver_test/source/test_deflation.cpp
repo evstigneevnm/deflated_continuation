@@ -22,6 +22,7 @@
 #include <deflation/system_operator_deflation.h>
 #include <deflation/solution_storage.h>
 #include <deflation/convergence_strategy.h>
+#include <deflation/deflation_operator.h>
 
 #include <numerical_algos/newton_solvers/newton_solver.h>
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
@@ -34,22 +35,22 @@ int main(int argc, char const *argv[])
 {
     
     //linsolver control
-    unsigned int lin_solver_max_it = 300;
-    real lin_solver_tol = 5.0e-12;
+    unsigned int lin_solver_max_it = 1300;
+    real lin_solver_tol = 5.0e-10;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;
     //newton deflation control
-    unsigned int newton_def_max_it = 1000;
+    unsigned int newton_def_max_it = 350;
     real newton_def_tol = 5.0e-8;
 
 
     init_cuda(4);
-    size_t Nx=1024;
-    size_t Ny=1024;
+    size_t Nx=128;
+    size_t Ny=128;
     real norm_wight = std::sqrt(real(Nx*Ny));
 
-    real lambda_0 = 7.3;
+    real lambda_0 = 23.3;
     real a_val = 2.0;
     real b_val = 4.0;
 
@@ -84,7 +85,7 @@ int main(int argc, char const *argv[])
     SM->get_linsolver_handle()->set_basis_size(basis_sz);
 
     convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops_R_im, log, newton_def_tol, newton_def_max_it, real(1), true );
-    sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops_R_im, 20, norm_wight );
+    sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops_R_im, 50, norm_wight );
     system_operator_def_t *system_operator_def = new system_operator_def_t(vec_ops_R_im, Ax, SM, sol_storage_def);
     newton_def_t *newton_def = new newton_def_t(vec_ops_R_im, system_operator_def, conv_newton_def);
 
@@ -102,64 +103,29 @@ int main(int argc, char const *argv[])
 
 
 
-    real_im_vec u_in, u_out, u_out_1;
-    vec_ops_R_im->init_vector(u_in); vec_ops_R_im->start_use_vector(u_in);
-    vec_ops_R_im->init_vector(u_out); vec_ops_R_im->start_use_vector(u_out);
-    vec_ops_R_im->init_vector(u_out_1); vec_ops_R_im->start_use_vector(u_out_1);
     real_vec u_out_ph;
     vec_ops_R->init_vector(u_out_ph); vec_ops_R->start_use_vector(u_out_ph);
-    vec_ops_R->assign_random(u_out_ph);
-
-    KS2D->fourier_solution(u_out_ph, u_in);
 
 
+    deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R_im, newton_def, 5);
 
-    real lambda;
-    bool found_solution = true;
-    unsigned int solution_number = 0;
-    while(found_solution)
-    {
-        found_solution = newton_def->solve(KS2D, u_in, lambda_0, u_out, lambda);
-        if(found_solution)
-        {
-            //TODO: use residual history to restart stucked initial points!
-            //works much better!
-            for(auto& x: *conv_newton_def->get_norms_history_handle())
-                std::cout << x << std::endl;
+    
+    deflation_op->execute(lambda_0, KS2D, sol_storage_def);
+    
 
-            printf("solving with simple Newton solver to increase accuracy\n");
-            newton->solve(KS2D, u_out, lambda_0, u_out_1);
-
-            sol_storage_def->push(u_out_1);
-            KS2D->physical_solution(u_out_1, u_out_ph);
-            std::ostringstream stringStream;
-            stringStream << "u_out_" << solution_number << ".dat";
-            gpu_file_operations::write_matrix<real>(stringStream.str(), Nx, Ny, u_out_ph);
-            solution_number++;
-            
-            vec_ops_R->assign_random(u_out_ph);
-            
-            KS2D->fourier_solution(u_out_ph, u_in);
-
-            printf("\n================= found %i solutions =================\n", solution_number);
-        }
+    unsigned int p=0;
+    for(auto &x: *sol_storage_def)
+    {        
+        KS2D->physical_solution((real_im_vec&)x, u_out_ph);
+        std::ostringstream stringStream;
+        stringStream << "u_out_" << (p++) << ".dat";
+        gpu_file_operations::write_matrix<real>(stringStream.str(), Nx, Ny, u_out_ph);
     }
-    printf("\n lambda = %lf\n", (double)lambda);
-    printf("\n================= found %i solutions =================\n", solution_number);
-
-
-
-    //gpu_file_operations::write_vector<real>("u_im_out.dat", Nx*My-1, u_out, 3);
-    //gpu_file_operations::write_vector<real>("u_out_vec.dat", Nx*Ny, u_out_ph, 3);
-
-    vec_ops_R_im->stop_use_vector(u_in); vec_ops_R_im->free_vector(u_in);
-    vec_ops_R_im->stop_use_vector(u_out); vec_ops_R_im->free_vector(u_out);
-    vec_ops_R_im->stop_use_vector(u_out_1); vec_ops_R_im->free_vector(u_out_1);
+    
     vec_ops_R->stop_use_vector(u_out_ph); vec_ops_R->free_vector(u_out_ph);
 
-    delete vec_ops_R;
-    delete vec_ops_C;
-    delete vec_ops_R_im;
+    
+    delete deflation_op;
     delete KS2D;
     delete prec;
     delete SM;
@@ -172,6 +138,10 @@ int main(int argc, char const *argv[])
     delete conv_newton;
     delete system_operator;
     delete newton;
+
+    delete vec_ops_R;
+    delete vec_ops_C;
+    delete vec_ops_R_im;
 
     return 0;
 }

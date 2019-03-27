@@ -309,6 +309,13 @@ public:
         C2R(u_helper_out, u_out);
     }
 
+    void randomize_vector(T_vec_im& u_out)
+    {
+        vec_ops_R->assign_random(du_x_ext);
+        fourier_solution(du_x_ext, u_out);
+    }
+
+
 private:
     T a_val,b_val;
     dim3 dimGrid;

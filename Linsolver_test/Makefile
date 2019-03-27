@@ -21,14 +21,23 @@ cufft_test_2D_double: source/cufft_test_2D.cpp
 gpu_vector_operations:
 	nvcc -I source/ -std=c++11 -g -G source/gpu_vector_operations_kernels.cu -c -o O/gpu_vector_operations_kernels.o 2>results_make.txt
 	nvcc -I source/ -DSCALAR_TYPE=double -std=c++11 -g -G -lcurand source/test_vector_operations.cpp O/gpu_vector_operations_kernels.o -lcublas -o test_vector_operations.bin 2>results_make.txt
+gpu_vector_operations_ker:
+	nvcc -I source/ -std=c++11 -O3 source/gpu_vector_operations_kernels.cu -c -o O/gpu_vector_operations_kernels.o 2>results_make.txt
 KS_2D_ker:
-	nvcc -I source/ -std=c++11 -g source/nonlinear_operators/Kuramoto_Sivashinskiy_2D_ker.cu -c -o O/Kuramoto_Sivashinskiy_2D_ker.o 2>results_make.txt
+	nvcc -I source/ -std=c++11 -O3 source/nonlinear_operators/Kuramoto_Sivashinskiy_2D_ker.cu -c -o O/Kuramoto_Sivashinskiy_2D_ker.o 2>results_make.txt
 KS_2D_double: source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp
+	nvcc -I source/ -std=c++11 -g source/nonlinear_operators/Kuramoto_Sivashinskiy_2D_ker.cu -c -o O/Kuramoto_Sivashinskiy_2D_ker.o 2>results_make.txt
 	nvcc -I source/ -DSCALAR_TYPE=double -std=c++11 -g source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o -lcufft -lcublas -lcurand -o test_Kuramoto_Sivashinskiy_2D_RHS.bin 2>results_make.txt
 KS_2D_float: source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp
+	nvcc -I source/ -std=c++11 -g source/nonlinear_operators/Kuramoto_Sivashinskiy_2D_ker.cu -c -o O/Kuramoto_Sivashinskiy_2D_ker.o 2>results_make.txt
 	nvcc -I source/ -DSCALAR_TYPE=float -std=c++11 -g source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o -lcufft -lcublas -lcurand -o test_Kuramoto_Sivashinskiy_2D_RHS.bin 2>results_make.txt
 
 deflation_KS_2D_float: source/test_deflation.cpp
 	nvcc -I source/ -DSCALAR_TYPE=float -std=c++11 -g source/test_deflation.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o -lcufft -lcublas -lcurand -o test_deflation.bin 2>results_make.txt
 deflation_KS_2D_double: source/test_deflation.cpp
 	nvcc -I source/ -DSCALAR_TYPE=double -std=c++11 -g source/test_deflation.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o -lcufft -lcublas -lcurand -o test_deflation.bin 2>results_make.txt
+
+deflation_KS_2D_float_rel: source/test_deflation.cpp
+	nvcc -I source/ -DSCALAR_TYPE=float -std=c++11 -O3 source/test_deflation.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o -lcufft -lcublas -lcurand -o test_deflation.bin 2>results_make.txt
+deflation_KS_2D_double_rel: source/test_deflation.cpp
+	nvcc -I source/ -DSCALAR_TYPE=double -std=c++11 -O3 source/test_deflation.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o -lcufft -lcublas -lcurand -o test_deflation.bin 2>results_make.txt	
