@@ -62,6 +62,8 @@ private:
         mutable scalar_type alpha, beta, gamma, v;
 
         mutable vector_type z;
+        mutable bool small_alpha=false;
+        mutable bool use_small_alpha = false;
 
         LinearOperator_SM(const vector_operations_type *vector_operations_)
         {
@@ -89,6 +91,11 @@ private:
             beta = beta_;
             gamma = scalar_type(1);
             v=0.0;
+            if((use_small_alpha)&&(alpha<1.0e-3))
+            {
+                std::cout << "\n==============SMALL ALPHA===========\n";
+                small_alpha=true;
+            }
         }
         void set_vectors(const scalar_type& gamma_, const vector_type& c_, const vector_type& d_, const scalar_type& alpha_) const
         {
@@ -97,7 +104,20 @@ private:
             alpha = alpha_;
             gamma = gamma_;
             v=0.0;
+            if((use_small_alpha)&&(alpha<1.0e-3))
+            {
+                std::cout << "\n==============SMALL ALPHA===========\n";
+                small_alpha=true;
+            }            
         }        
+        void scale_solution(vector_type &u) const
+        {
+            if(small_alpha)
+            {
+                vector_operations->scale(alpha, u);
+            }
+        }
+
         scalar_type get_scalar(vector_type &u) const
         {
             scalar_type cTu_over_alpha=(vector_operations->scalar_prod(c, u))/alpha;
@@ -108,19 +128,36 @@ private:
         const vector_type &get_rhs() const
         {
             //calc: z := mul_x*x + mul_y*y
-            scalar_type beta_over_alpha=beta/alpha;
-            vector_operations->assign_mul(scalar_type(1.0), b, -beta_over_alpha, d, z);
+            if(small_alpha)
+            {
+                vector_operations->assign_mul(alpha, b, -beta, d, z); 
+            }
+            else
+            {
+                scalar_type beta_over_alpha=beta/alpha;
+                vector_operations->assign_mul(scalar_type(1.0), b, -beta_over_alpha, d, z);
+            }
             return z;
+
         }
 
         void apply(const vector_type& u, vector_type& f) const
         {
                         
-            scalar_type cTu_over_alpha=(vector_operations->scalar_prod(c, u))/alpha;
-            inherited_linear_operator->apply(u, f);
-            //f=gamma*f-d/alpha*(cTu);
-            //calc: y := mul_x*x + mul_y*y
-            vector_operations->add_mul(-cTu_over_alpha, d, gamma, f);
+            if(small_alpha)
+            {
+                scalar_type cTu = vector_operations->scalar_prod(c, u);
+                inherited_linear_operator->apply(u, f);
+                vector_operations->add_mul(-cTu, d, alpha*gamma, f);
+            }
+            else
+            {
+                scalar_type cTu_over_alpha=(vector_operations->scalar_prod(c, u))/alpha;
+                inherited_linear_operator->apply(u, f);
+                //f=gamma*f-d/alpha*(cTu);
+                //calc: y := mul_x*x + mul_y*y
+                vector_operations->add_mul(-cTu_over_alpha, d, gamma, f);
+            }
         }
 
 
@@ -138,7 +175,8 @@ private:
         mutable vector_type g;
         mutable scalar_type alpha;
         mutable scalar_type beta;
-        
+        mutable bool small_alpha = false;
+        mutable bool use_small_alpha = false;
 
         Preconditioner_SM(const vector_operations_type *vector_operations_)
         {
@@ -162,6 +200,10 @@ private:
             d = d_;
             alpha = alpha_;
             beta = scalar_type(1);
+            if((alpha<1.0e-3)&&(use_small_alpha))
+            {
+                small_alpha=true;
+            } 
         }
         void set_vectors(const scalar_type& beta_, const vector_type& c_, const vector_type& d_, const scalar_type& alpha_) const
         {
@@ -169,6 +211,10 @@ private:
             d = d_;
             alpha = alpha_;
             beta = beta_;
+            if((alpha<1.0e-3)&&(use_small_alpha))
+            {
+                small_alpha=true;
+            } 
         }        
         void set_inherited_preconditioner(const preconditioner_type *inherited_preconditioner_) const
         {
@@ -176,19 +222,31 @@ private:
         }
         void apply(vector_type& x)const
         {
-            //calc: y := mul_x*x
-            vector_operations->assign_mul(-1.0/alpha, d, g); // g=-1/alpha*d
-            inherited_preconditioner->apply(x); // inv(A)u=>x
-            inherited_preconditioner->apply(g); // inv(A)g=>g
-            
-            scalar_type dot_prod_num = vector_operations->scalar_prod(c, x); // (c,Au):=(c,x)=>cx
-            scalar_type dot_prod_din = vector_operations->scalar_prod(c, g); // (c,Ag):=(c,g)=>cg
-            scalar_type mul_g=-dot_prod_num/(beta+dot_prod_din);
-            // ( x/beta - g/beta*(cx)/(beta+cg) ) -> x
+            if(small_alpha)
+            {
+                inherited_preconditioner->apply(x);
+                inherited_preconditioner->apply(d);
+                scalar_type dot_prod_num = vector_operations->scalar_prod(c, x)/alpha;
+                scalar_type dot_prod_din = vector_operations->scalar_prod(c, d)/alpha;
+                scalar_type mul_g=-dot_prod_num/(beta+dot_prod_din);
+                vector_operations->add_mul(mul_g/beta, d, scalar_type(1/beta), x);
 
-            //calc: y := mul_x*x + mul_y*y
-            vector_operations->add_mul(mul_g/beta, g, scalar_type(1/beta), x);
+            }
+            else
+            {
+                //calc: y := mul_x*x
+                vector_operations->assign_mul(-1.0/alpha, d, g); // g=-1/alpha*d
+                inherited_preconditioner->apply(x); // inv(A)u=>x
+                inherited_preconditioner->apply(g); // inv(A)g=>g
+                
+                scalar_type dot_prod_num = vector_operations->scalar_prod(c, x); // (c,Au):=(c,x)=>cx
+                scalar_type dot_prod_din = vector_operations->scalar_prod(c, g); // (c,Ag):=(c,g)=>cg
+                scalar_type mul_g=-dot_prod_num/(beta+dot_prod_din);
+                // ( x/beta - g/beta*(cx)/(beta+cg) ) -> x
 
+                //calc: y := mul_x*x + mul_y*y
+                vector_operations->add_mul(mul_g/beta, g, scalar_type(1/beta), x);
+            }
         }
 
     };
@@ -235,7 +293,11 @@ public:
     {
         return &linear_solver_original;
     }
-
+    void is_small_alpha(bool use_small_alpha_)
+    {
+        oper.use_small_alpha = use_small_alpha_;
+        prec.use_small_alpha = use_small_alpha_;
+    }
 
     //solves full extended system with rank 1 update
     bool solve(const LinearOperator &A, const vector_type &c, const vector_type &d, const scalar_type &alpha, const vector_type &b, const scalar_type &beta, vector_type &u, scalar_type &v) const
@@ -247,6 +309,7 @@ public:
         prec.set_vectors(c, d, alpha);
         flag = linear_solver.solve(oper, oper.get_rhs(), u);
         v = oper.get_scalar(u);
+        //oper.scale_solution(u);
         return flag;
     }
 
@@ -260,6 +323,7 @@ public:
         oper.set_vectors(beta, c, d, alpha);
         prec.set_vectors(beta, c, d, alpha);
         flag = linear_solver.solve(oper, b, u);
+        oper.scale_solution(u);
         return flag;
     }
 

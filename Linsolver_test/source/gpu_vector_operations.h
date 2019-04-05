@@ -105,19 +105,6 @@ struct gpu_vector_operations
     }
 
     bool check_is_valid_number(const vector_type &x)const;
-    //Observe, that for complex type we need template spetialization! vector type is compelx, but norm type is real!
-    //for *PU pointer storage with call from *PU
-    Tsc norm(const vector_type &x)const
-    {
-        Tsc result;
-        cuBLAS->norm2<T>(sz, x, &result);
-        return result;
-    }
-    //for GPU pointer storage with call from CPU
-    void norm(const vector_type &x, Tsc* result)
-    {
-        cuBLAS->norm2<T>(sz, x, result);
-    }    
     // dot product of two vectors
     scalar_type scalar_prod(const vector_type &x, const vector_type &y)const
     {
@@ -129,6 +116,19 @@ struct gpu_vector_operations
     {
         cuBLAS->dot<scalar_type>(sz, x, y, result);
     }
+     //Observe, that for complex type we need template spetialization! vector type is compelx, but norm type is real!
+    //for *PU pointer storage with call from *PU
+    Tsc norm(const vector_type &x)const
+    {
+        Tsc result;
+        cuBLAS->norm2<T>(sz, x, &result);
+        return result;
+    }
+    //for GPU pointer storage with call from CPU
+    void norm(const vector_type &x, Tsc* result)
+    {
+        cuBLAS->norm2<T>(sz, x, result);
+    } 
     //calc: x := <vector_type with all elements equal to given scalar value> 
     void assign_scalar(const scalar_type scalar, vector_type& x)const;
     //calc: ||x||_2=norm, x=x/norm, return norm.
@@ -142,7 +142,7 @@ struct gpu_vector_operations
     {
         cuBLAS->normalize<T>(sz, x, norm);
     }
-    void scale(const T alpha, vector_type& x)
+    void scale(const T alpha, vector_type& x) const
     {
         cuBLAS->scale<T>(sz, alpha, x);
     }
@@ -153,6 +153,7 @@ struct gpu_vector_operations
     //copy: y := x
     void assign(const vector_type& x, vector_type& y)const
     {
+        //std::cout << sz << "\n";
         cuBLAS->copy<scalar_type>(sz, x, y);
     }
     //swaps vectors: y <-> x

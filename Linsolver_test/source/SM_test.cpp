@@ -127,7 +127,7 @@ int main(int argc, char **args)
     d=(vector_t) malloc(sz*sizeof(real));
     b=(vector_t) malloc(sz*sizeof(real));
 
-    real alpha=1.0/1.0;
+    real alpha=1.0e-5;
     real beta=1.9;
     real v=0.0;
 

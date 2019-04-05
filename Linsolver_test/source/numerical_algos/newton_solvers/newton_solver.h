@@ -5,6 +5,9 @@
 
 */
 
+#include <string>
+#include <stdexcept>
+
 namespace numerical_algos
 {
 namespace newton_method
@@ -31,11 +34,12 @@ public:
 
     }
 
-    bool solve(nonlinear_operator* nonlin_op, const T_vec& x0, const T& lambda0, T_vec& x)
+    //solve inplace
+    void solve(nonlinear_operator* nonlin_op, T_vec& x, const T& lambda)
     {
+        
         int result_status = 1;
         T delta_lambda = T(1);
-        vec_ops->assign(x0, x);
         vec_ops->assign_scalar(T(1), delta_x);
         bool converged = false;
         bool finished = false;
@@ -43,10 +47,10 @@ public:
         conv_strat->reset_iterations();
         while(!finished)
         {
-            linsolver_converged = system_op->solve(nonlin_op, x, lambda0, delta_x);
+            linsolver_converged = system_op->solve(nonlin_op, x, lambda, delta_x);
             if(linsolver_converged)
             {
-                finished = conv_strat->check_convergence(nonlin_op, x, lambda0, delta_x, result_status);
+                finished = conv_strat->check_convergence(nonlin_op, x, lambda, delta_x, result_status);
             }
             else
             {
@@ -58,9 +62,29 @@ public:
         if(result_status==0)
             converged = true;
 
+        if((result_status==2)||(result_status==3))
+        {
+            throw std::runtime_error(std::string("newton_method" __FILE__ " " __STR(__LINE__) "invalid number.") );            
+        }
 
         return converged;
+
     }
+
+    bool solve(nonlinear_operator* nonlin_op, const T_vec& x0, const T& lambda0, T_vec& x)
+    {
+        vec_ops->assign(x0, x);
+        bool converged = false;
+        converged = solve(nonlin_op, x, lambda0);
+        if(!converged)
+        {
+            vec_ops->assign(x0, x);
+        }
+        return converged;
+
+    }
+
+
 
 
     convergence_strategy* get_convergence_strategy_handle()

@@ -156,7 +156,7 @@ public:
     //NOTE: u_ext_0, u_x_ext_0 and u_y_ext_0 MUST NOT BE CHANGED!!!
     void set_linearization_point(const TC_vec& u_0_, const T alpha_0_)
     {
-        u_0=u_0_;
+        vec_ops_C->assign(u_0_,u_0);
         alpha_0=alpha_0_;
         ifft((TC_vec&)u_0,u_ext_0);
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u_0, TC(1.0,0.0), (const TC_vec&)gradient_x, u_x_hat);
@@ -221,27 +221,55 @@ public:
     {
         vec_ops_R->mul_pointwise(1.0, u_x_ext_0, 1.0, u_ext_0, w1_ext_0);
         vec_ops_R->mul_pointwise(1.0, u_y_ext_0, 1.0, u_ext_0, w2_ext_0);
-
         //du_x0*u_0->u_x_hat0
         fft(w1_ext_0, u_x_hat0);
         //du_y0*u_0->u_y_hat0
         fft(w2_ext_0, u_y_hat0);
-
         // d^2du->b_hat
-        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u_0, TC(1.0), (const TC_vec&)Laplace, dv); 
-
+        vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) u_0, TC(1.0), (const TC_vec&)Laplace, dv);
         //a_val*alpha*(u_x_hat0+u_y_hat0)->u_y_hat0
-        vec_ops_C->add_mul(TC(1.0,0.0), u_x_hat0, TC(1.0,0.0), u_y_hat0);
-        
+        vec_ops_C->add_mul(TC(1.0), u_x_hat0, TC(1.0), u_y_hat0);
         // a_val*u_y_hat0+dv->dv
         vec_ops_C->add_mul(TC(a_val), u_y_hat0, TC(1.0,0.0), dv);
+    }    
+    void jacobian_alpha(const TC_vec& x0, const T& alpha, TC_vec& dv)
+    {
+            
+        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) x0, TC(1.0,0.0), (const TC_vec&)gradient_x, u_x_hat);
+        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) x0, TC(1.0,0.0), (const TC_vec&)gradient_y, u_y_hat);
+        
+        ifft(u_x_hat, u_x_ext);
+        ifft(u_y_hat, u_y_ext);
+        ifft(dv, u_ext);
+
+        vec_ops_R->mul_pointwise(1.0, u_x_ext, 1.0, u_ext, w1_ext);
+        vec_ops_R->mul_pointwise(1.0, u_y_ext, 1.0, u_ext, w2_ext);
+        fft(w1_ext, u_x_hat);
+        fft(w2_ext, u_y_hat);
+
+        // d^2du->b_hat
+        vec_ops_C->mul_pointwise(TC(1.0), (const TC_vec&) x0, TC(1.0), (const TC_vec&)Laplace, b_hat); 
+
+        //a_val*alpha*(u_x_hat0+u_y_hat0)->u_y_hat0
+        vec_ops_C->add_mul(TC(1.0,0.0), u_x_hat, TC(1.0,0.0), u_y_hat);
+        
+        
+        vec_ops_C->add_mul(TC(a_val), u_y_hat, TC(1.0), b_hat, TC(1.0), dv);
 
     }
+
     void jacobian_alpha(T_vec_im& dv)
     {
         R2C(dv, u_helper_in);
-        jacobian_alpha((TC_vec&) u_helper_in);
+        jacobian_alpha(u_helper_in);
         C2R(u_helper_in, dv);
+    }
+
+    void jacobian_alpha(const T_vec_im& x0, const T& alpha, T_vec& dv)
+    {
+        R2C(x0, u_helper_in);
+        jacobian_alpha(u_helper_in, alpha, u_helper_out);
+        C2R(u_helper_out, dv);
     }
 
 

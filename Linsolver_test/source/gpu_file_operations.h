@@ -26,6 +26,18 @@ namespace gpu_file_operations
         host_deallocate<T>(vec_cpu);
     }
 
+    template <class T>
+    void read_matrix(const std::string &f_name, size_t Row, size_t Col, T*& matrix_gpu)
+    {
+
+	T* vec_cpu = host_allocate<T>(Row*Col);
+        file_operations::read_matrix<T>(f_name, Row, Col, vec_cpu);
+        host_2_device_cpy(matrix_gpu, vec_cpu, Row*Col);
+	host_deallocate<T>(vec_cpu);
+ 
+    }
+
+
 }
 
 

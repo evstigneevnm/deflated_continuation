@@ -62,7 +62,7 @@ struct cpu_vector_operations
         T    res(0.f);
         for (int i = 0;i < sz_;++i) res += x[i]*x[i];
     }    
-    scalar_type     scalar_prod(const vector_type &x, const vector_type &y)const
+    scalar_type scalar_prod(const vector_type &x, const vector_type &y)const
     {
         T    res(0.f);
         for (int i = 0;i < sz_;++i) 
@@ -80,6 +80,10 @@ struct cpu_vector_operations
     {
         for (int i = 0;i < sz_;++i) x[i] = mul_x*x[i] + scalar;
     }
+    void scale(scalar_type scale, vector_type &x)const
+    {
+           add_mul_scalar(scalar_type(0),scale, x);
+    }
     //copy: y := x
     void            assign(const vector_type& x, vector_type& y)const
     {
@@ -90,6 +94,7 @@ struct cpu_vector_operations
     {
         for (int i = 0;i < sz_;++i) y[i] = mul_x*x[i];
     }
+    
     //calc: z := mul_x*x + mul_y*y
     void            assign_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, const vector_type& y, 
                                vector_type& z)const

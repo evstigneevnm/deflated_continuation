@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <cmath>
+#include <iostream>
 
 namespace deflation
 {
@@ -95,7 +96,7 @@ private:
         class internal_container
         {
         public:
-            internal_container(vector_operations*& vec_ops_, const T_vec& vec_):
+            internal_container(vector_operations* vec_ops_, const T_vec& vec_):
             vec_ops(vec_ops_)
             {
                 vec_size = vec_ops->get_vector_size();
@@ -105,12 +106,14 @@ private:
             //copy constructor
             internal_container(const internal_container& ic_)
             {
+                vec_ops = ic_.vec_ops;
                 vec_size = ic_.vec_size;
                 init_array(ic_.array_);
             }
 
             //move constructor
             internal_container(internal_container&& ic_):
+            vec_ops(ic_.vec_ops),
             vec_size(ic_.vec_size),
             array_(ic_.array_),
             allocated(true),
@@ -142,7 +145,16 @@ private:
             {
                 return array_;
             }
-
+            void copy(T_vec& vec_x)
+            {
+                if((owned)&&(allocated))
+                {
+                    std::cout << "extern:" << vec_ops->check_is_valid_number(vec_x) << std::endl;
+                    std::cout << "intern:" << vec_ops->check_is_valid_number(array_) << std::endl;
+                    std::fflush(stdout);
+                    vec_ops->assign(array_, vec_x);
+                }
+            }
         
         private:
             T_vec array_;
@@ -154,9 +166,10 @@ private:
             void init_array(const T_vec& vec_)
             {
                 vec_ops->init_vector(array_); vec_ops->start_use_vector(array_);
+                vec_ops->assign(vec_, array_);
                 allocated = true;
                 owned = true;
-                vec_ops->assign(vec_, array_);
+                
             }
 
         };

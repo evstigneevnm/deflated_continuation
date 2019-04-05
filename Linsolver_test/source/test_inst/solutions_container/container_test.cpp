@@ -18,7 +18,7 @@ void init_vec(size_t N, vector_t& array, real init)
 
 int main(int argc, char const *argv[])
 {
-    size_t N = 5500000;
+    size_t N = 500000;
     vector_operations *vec_ops = new vector_operations(N);
     solution_storage<vector_operations> ST(vec_ops, 10);
     vector_t array;

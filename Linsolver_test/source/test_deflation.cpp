@@ -27,9 +27,11 @@
 #include <numerical_algos/newton_solvers/newton_solver.h>
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
-#include "gpu_file_operations.h"
-#include "gpu_vector_operations.h"
-#include "test_deflation_typedefs.h"
+#include <continuation/predictor_adaptive.h>
+
+#include <gpu_file_operations.h>
+#include <gpu_vector_operations.h>
+#include <test_deflation_typedefs.h>
 
 int main(int argc, char const *argv[])
 {
@@ -46,11 +48,11 @@ int main(int argc, char const *argv[])
 
 
     init_cuda(4);
-    size_t Nx=128;
-    size_t Ny=128;
+    size_t Nx=1024;
+    size_t Ny=1024;
     real norm_wight = std::sqrt(real(Nx*Ny));
 
-    real lambda_0 = 23.3;
+    real lambda_0 = 7.3;
     real a_val = 2.0;
     real b_val = 4.0;
 
@@ -85,7 +87,7 @@ int main(int argc, char const *argv[])
     SM->get_linsolver_handle()->set_basis_size(basis_sz);
 
     convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops_R_im, log, newton_def_tol, newton_def_max_it, real(1), true );
-    sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops_R_im, 50, norm_wight );
+    sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops_R_im, 50, norm_wight);
     system_operator_def_t *system_operator_def = new system_operator_def_t(vec_ops_R_im, Ax, SM, sol_storage_def);
     newton_def_t *newton_def = new newton_def_t(vec_ops_R_im, system_operator_def, conv_newton_def);
 
@@ -101,7 +103,7 @@ int main(int argc, char const *argv[])
     system_operator_t *system_operator = new system_operator_t(vec_ops_R_im, Ax, SM);
     newton_t *newton = new newton_t(vec_ops_R_im, system_operator, conv_newton);
 
-
+    
 
     real_vec u_out_ph;
     vec_ops_R->init_vector(u_out_ph); vec_ops_R->start_use_vector(u_out_ph);
@@ -110,7 +112,8 @@ int main(int argc, char const *argv[])
     deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R_im, newton_def, 5);
 
     
-    deflation_op->execute(lambda_0, KS2D, sol_storage_def);
+    //deflation_op->execute_all(lambda_0, KS2D, sol_storage_def);
+    deflation_op->find_solution(lambda_0, KS2D, sol_storage_def);
     
 
     unsigned int p=0;
@@ -122,9 +125,15 @@ int main(int argc, char const *argv[])
         gpu_file_operations::write_matrix<real>(stringStream.str(), Nx, Ny, u_out_ph);
     }
     
+    typedef continuation::predictor_adaptive<vec_ops_real_im> predictor_t;
+    predictor_t* predict = new predictor_t(vec_ops_R_im, 4.0, 0.33);
+    
+
+
     vec_ops_R->stop_use_vector(u_out_ph); vec_ops_R->free_vector(u_out_ph);
 
     
+    delete predict;
     delete deflation_op;
     delete KS2D;
     delete prec;

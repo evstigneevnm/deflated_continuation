@@ -34,46 +34,56 @@ public:
         //vec_ops->stop_use_vector(u_out_1); vec_ops->free_vector(u_out_1);
     }
     
-    void execute(T lambda_0, NonlinearOperator* nonlin_op, SolutionStorage* sol_storage)
+
+    bool find_solution(T lambda_0, NonlinearOperator* nonlin_op, SolutionStorage* sol_storage)
     {
         T lambda = lambda_0;
+        bool found_solution = false;
+        unsigned int retries = 0;
+        while((retries<max_retries)&&(found_solution==false))
+        {
+            nonlin_op->randomize_vector(u_in);
+            found_solution = newton->solve(nonlin_op, u_in, lambda_0, u_out, lambda);
+            retries++;
+            if((!found_solution)&&(verbose))
+            {
+                printf("retrying, attempt %i\n", retries);
+            }
+        }
+        if(found_solution)
+        {
+            if(verbose)
+            {
+                for(auto& x: *newton->get_convergence_strategy_handle()->get_norms_history_handle())
+                {
+                    std::cout << x << std::endl;
+                }
+            }
+
+            // if(verbose) printf("solving with simple Newton solver to increase accuracy\n");
+            // newton->solve(nonlin_op, u_out, lambda_0, u_out_1);
+            sol_storage->push(u_out);
+        }        
+
+        return found_solution;
+    }
+
+    void execute_all(T lambda_0, NonlinearOperator* nonlin_op, SolutionStorage* sol_storage)
+    {
         bool found_solution = true;
         
         number_of_solutions = 0;
         while(found_solution)
         {
-            found_solution = false;
-            unsigned int retries = 0;
-            while((retries<max_retries)&&(found_solution==false))
-            {
-                nonlin_op->randomize_vector(u_in);
-                found_solution = newton->solve(nonlin_op, u_in, lambda_0, u_out, lambda);
-                retries++;
-                if((!found_solution)&&(verbose))
-                {
-                    printf("retrying, attempt %i\n", retries);
-                }
-            }
-            
+            found_solution = find_solution(lambda_0, nonlin_op, sol_storage);
             if(found_solution)
             {
-                if(verbose)
-                {
-                    for(auto& x: *newton->get_convergence_strategy_handle()->get_norms_history_handle())
-                    {
-                        std::cout << x << std::endl;
-                    }
-                }
-
-                // if(verbose) printf("solving with simple Newton solver to increase accuracy\n");
-                // newton->solve(nonlin_op, u_out, lambda_0, u_out_1);
-                sol_storage->push(u_out);
                 number_of_solutions++;
-
-                if(verbose) printf("\n================= found %i solutions =================\n", number_of_solutions);
+                if(verbose) printf("\n================= found %i solutions =================\n", number_of_solutions);                
             }
+            
         }
-        if(verbose) printf("\n================= found %i solutions for parameter %le ======\n", number_of_solutions, lambda);        
+        if(verbose) printf("\n================= found %i solutions for parameter %lf ======\n", number_of_solutions, (double)lambda_0);        
     }
 
 

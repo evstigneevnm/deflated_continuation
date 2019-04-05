@@ -1,24 +1,15 @@
-#ifndef __CONVERGENCE_STRATEGY_H__
-#define __CONVERGENCE_STRATEGY_H__
+#ifndef __CONVERGENCE_STRATEGY_CONTINUATION_H__
+#define __CONVERGENCE_STRATEGY_CONTINUATION_H__
 /*
-convergence rules for Newton iterator
-
-return status:
-    0 - ok
-    1 - max iterations exceeded
-    2 - inf update
-    3 - nan update
-    4 - wight update is too small
-
+converhence rules for Newton iterator for deflation process
 */
-
 #include <cmath>
 #include <vector>
 #include <utils/logged_obj_base.h>
 
-namespace nonlinear_operators
+namespace continuation
 {
-namespace newton_method
+namespace newton_method_extended
 {
 
 
@@ -56,40 +47,25 @@ public:
     }
 
 
-    bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T lambda, T_vec& delta_x, int& result_status)
+    bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status)
     {
         bool finish = false;
         nonlin_op->F(x, lambda, Fx);
         T normFx = vec_ops->norm(Fx);
         //update solution
         vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
-        nonlin_op->F(x1, lambda, Fx);
+        T lambda1 = lambda + newton_wight*delta_lambda;
+        nonlin_op->F(x1, lambda1, Fx);
         T normFx1 = vec_ops->norm(Fx);
         if(store_norms_history)
         {
             norms_evolution.push_back(normFx1);
         }
-        log->info_f("iteration %i, previous residual %le, current residual %le",iterations, (double)normFx, (double)normFx1);
-        if(normFx1/normFx>T(2))
-        {
-            newton_wight *= 0.75;
-            log->info_f("adjusting Newton wight to %le and updating...", newton_wight);            
-            vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
-        }
-        if((std::abs(normFx1-normFx)/normFx<T(0.05))&&(iterations>maximum_iterations/3))
-        {
-            newton_wight *= 0.75;
-            log->info_f("adjusting Newton wight to %le and updating...", newton_wight);   
-            vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);            
-        }
-        iterations++;
 
-        if(newton_wight<T(1.0e-6))
-        {
-            log->info_f("Newton wight is too small (%le).", newton_wight);   
-            finish = true;
-            result_status = 4;
-        }
+        iterations++;
+        log->info_f("iteration %i, previous residual %le, current residual %le",iterations, (double)normFx, (double)normFx1);
+        
+
         if(std::isnan(normFx))
         {
             log->info("Newton initial vector caused nan.");
@@ -101,22 +77,20 @@ public:
             log->info("Newton updated vector caused nan.");
             finish = true;
             result_status = 3;
-        }
-        else if(std::isinf(normFx))
+        }else if(std::isinf(normFx))
         {
             log->info("Newton initial vector caused inf.");
             finish = true;
             result_status = 2;            
-        }
-        else if(std::isinf(normFx1))
+        }else if(std::isinf(normFx1))
         {
             log->info("Newton update caused inf.");
             finish = true;
             result_status = 2;            
-        }
-        else
+        }else
         {   
             //update solution
+            lambda = lambda1;
             vec_ops->assign(x1,x);
         }
         if(normFx1<tolerance)
@@ -152,7 +126,7 @@ public:
     std::vector<T>* get_norms_history_handle()
     {
         return &norms_evolution;
-    }    
+    }
 
 private:
     vector_operations* vec_ops;
@@ -162,8 +136,9 @@ private:
     T tolerance;
     T_vec x1, Fx;
     T newton_wight, newton_wight_initial;
-    bool verbose,store_norms_history;
+    bool verbose, store_norms_history;
     std::vector<T> norms_evolution;
+
 };
 
 

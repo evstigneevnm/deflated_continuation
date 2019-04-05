@@ -2,14 +2,17 @@
 #define __CONTINUATION__SOLUTION_POINT_H__
 
 
-template<class vector_operations>
+namespace continuation
+{
+
+template<class VectorOperations>
 class solution_point
 {
 public:
-    typedef typename vector_operations::scalar_type  scalar_type;
-    typedef typename vector_operations::vector_type  vector_type;
+    typedef typename VectorOperations::scalar_type  scalar_type;
+    typedef typename VectorOperations::vector_type  vector_type;
 
-    solution_point(vector_type &solution_, scalar_type parameter_, const vector_operations *vec_ops_): 
+    solution_point(vector_type &solution_, scalar_type parameter_, const VectorOperations *vec_ops_): 
     solution(solution_), 
     parameter(parameter_), 
     vec_ops(vec_ops_)
@@ -18,7 +21,7 @@ public:
     }
     
     //constructor for a fixed vector solution value
-    solution_point(scalar_type solution_value_, scalar_type parameter_, const vector_operations *vec_ops_):
+    solution_point(scalar_type solution_value_, scalar_type parameter_, const VectorOperations *vec_ops_):
     parameter(parameter_),
     vec_ops(vec_ops_)
     {
@@ -58,7 +61,7 @@ protected:
     scalar_type parameter;
     scalar_type solution_norm_2;
     scalar_type solution_norm_1;
-    vector_operations *vec_ops;
+    VectorOperations *vec_ops;
 
     void assign(const solution_point &SA)
     {
@@ -73,6 +76,6 @@ private:
 
 };
 
-
+}
 
 #endif

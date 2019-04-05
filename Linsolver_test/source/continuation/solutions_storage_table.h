@@ -1,6 +1,8 @@
 #ifndef __SOLUTIONS_STORAGE_TABLE_H__
 #define __SOLUTIONS_STORAGE_TABLE_H__
 
+#include <string>
+#include <vector>
 
 class solutions_storage_table
 {

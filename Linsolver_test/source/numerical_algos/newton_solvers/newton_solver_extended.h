@@ -4,6 +4,9 @@
     Newton solver for extended problem (x,lambda) in general
 */
 
+#include <string>
+#include <stdexcept>
+
 namespace numerical_algos
 {
 namespace newton_method_extended
@@ -30,12 +33,11 @@ public:
 
     }
 
-    bool solve(nonlinear_operator* nonlin_op, const T_vec& x0, const T& lambda0, T_vec& x, T& lambda)
+    //inplace
+    bool solve(nonlinear_operator* nonlin_op, T_vec& x, T& lambda)
     {
         int result_status = 1;
         T delta_lambda = T(1);
-        vec_ops->assign(x0, x);
-        lambda = lambda0;
         vec_ops->assign_scalar(T(1), delta_x);
         bool converged = false;
         bool finished = false;
@@ -57,19 +59,28 @@ public:
         }
         if(result_status==0)
             converged = true;
-
+        if((result_status==2)||(result_status==3))
+        {
+            throw std::runtime_error(std::string("newton_method_extended" __FILE__ " " __STR(__LINE__) "invalid number.") );            
+        }
 
         return converged;
     }
 
-    // void solve(const solution_point& x0, solution_point& x)
-    // {
-    //     //to be used for extended system operation with class container for the extended solution.
-    //     //i intend to unpack solution_point and pass to the solve(x0, l0, x, l)
-    //     //...
+    bool solve(nonlinear_operator* nonlin_op, const T_vec& x0, const T& lambda0, T_vec& x, T& lambda)
+    {
+        vec_ops->assign(x0, x);
+        lambda = lambda0;
+        bool converged = false;
+        converged = solve(nonlin_op, x, lambda);
+        if(!converged)
+        {
+            vec_ops->assign(x0, x);
+            lambda = lambda0;
+        }
+        return converged;
+    }   
 
-    // }
-    
     convergence_strategy* get_convergence_strategy_handle()
     {
         return conv_strat;
