@@ -110,7 +110,8 @@ struct gpu_vector_operations
     {
         scalar_type result;
         cuBLAS->dot<scalar_type>(sz, x, y, &result);
-        return result;
+        
+        return (result);
     }
     void scalar_prod(const vector_type &x, const vector_type &y, scalar_type *result)
     {

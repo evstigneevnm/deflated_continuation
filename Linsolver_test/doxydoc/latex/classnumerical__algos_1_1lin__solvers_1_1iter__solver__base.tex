@@ -1,0 +1,198 @@
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base}{\section{numerical\-\_\-algos\-:\-:lin\-\_\-solvers\-:\-:iter\-\_\-solver\-\_\-base$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$ Class Template Reference}
+\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base}\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$}}
+}
+
+
+{\ttfamily \#include $<$iter\-\_\-solver\-\_\-base.\-h$>$}
+
+
+
+Inheritance diagram for numerical\-\_\-algos\-:\-:lin\-\_\-solvers\-:\-:iter\-\_\-solver\-\_\-base$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for numerical\-\_\-algos\-:\-:lin\-\_\-solvers\-:\-:iter\-\_\-solver\-\_\-base$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base__coll__graph}
+\end{center}
+\end{figure}
+\subsection*{Public Types}
+\begin{DoxyCompactItemize}
+\item 
+typedef \\*
+Vector\-Operations\-::scalar\-\_\-type \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a64c84955e85f9cc556fa8628edc8f7c8}{scalar\-\_\-type}
+\item 
+typedef \\*
+Vector\-Operations\-::vector\-\_\-type \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a474414aa5d9e2b387f48a6bf182c47eb}{vector\-\_\-type}
+\item 
+typedef Linear\-Operator \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a547488978437ea7057c7fb113261407d}{linear\-\_\-operator\-\_\-type}
+\item 
+typedef Preconditioner \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a0746ff1186cb6e8e5648b16065c9cdd2}{preconditioner\-\_\-type}
+\item 
+typedef Vector\-Operations \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a1c0c7f5af3b439d5a53ce2433d6acb79}{vector\-\_\-operations\-\_\-type}
+\item 
+typedef Monitor \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a942121df2f8589f8c93aee94e0d23930}{monitor\-\_\-type}
+\item 
+typedef Log \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ae5dde4a29dad1ba2bf67932b70d22b4c}{log\-\_\-type}
+\end{DoxyCompactItemize}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a6121eb6bb270322bdb94ad7b164a1d26}{iter\-\_\-solver\-\_\-base} (const \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a1c0c7f5af3b439d5a53ce2433d6acb79}{vector\-\_\-operations\-\_\-type} $\ast$vec\-\_\-ops, Log $\ast$log, \hyperlink{classint}{int} obj\-\_\-log\-\_\-lev, const std\-::string \&log\-\_\-msg\-\_\-prefix)
+\item 
+Monitor \& \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ac9787d0c84372ae0caf668a9e15ad09d}{monitor} ()
+\item 
+const Monitor \& \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_aae9e818b6539192e92dd772da5de2519}{monitor} () const 
+\item 
+void \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ab08c622103b3fcd60e698867f2a2bc38}{set\-\_\-preconditioner} (\hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a0746ff1186cb6e8e5648b16065c9cdd2}{preconditioner\-\_\-type} $\ast$prec, bool own\-\_\-prec=false)
+\item 
+virtual bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ac21be1f601f4937a97c0d3df3182a2af}{solve} (const \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a547488978437ea7057c7fb113261407d}{linear\-\_\-operator\-\_\-type} \&A, const \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a474414aa5d9e2b387f48a6bf182c47eb}{vector\-\_\-type} \&b, \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a474414aa5d9e2b387f48a6bf182c47eb}{vector\-\_\-type} \&x) const =0
+\item 
+virtual \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a0935ffc2a6d2cbafac016adb334437b1}{$\sim$iter\-\_\-solver\-\_\-base} ()
+\end{DoxyCompactItemize}
+\subsection*{Protected Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a942121df2f8589f8c93aee94e0d23930}{monitor\-\_\-type} \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a8e3bc9cf6c62760a22ec74d2c671ab1d}{monitor\-\_\-}
+\item 
+const \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a1c0c7f5af3b439d5a53ce2433d6acb79}{vector\-\_\-operations\-\_\-type} $\ast$ \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a405ac817de5aecac284e0d80e0ecdd19}{vec\-\_\-ops\-\_\-}
+\item 
+\hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a0746ff1186cb6e8e5648b16065c9cdd2}{preconditioner\-\_\-type} $\ast$ \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ab04244972dffaf21d2c6229f7d1255c6}{prec\-\_\-}
+\item 
+bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a2632bf297a6c7e50eb7047bc3a1c744c}{own\-\_\-prec\-\_\-}
+\end{DoxyCompactItemize}
+
+
+\subsection{Member Typedef Documentation}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a547488978437ea7057c7fb113261407d}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!linear\-\_\-operator\-\_\-type@{linear\-\_\-operator\-\_\-type}}
+\index{linear\-\_\-operator\-\_\-type@{linear\-\_\-operator\-\_\-type}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{linear\-\_\-operator\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Linear\-Operator {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf linear\-\_\-operator\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a547488978437ea7057c7fb113261407d}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ae5dde4a29dad1ba2bf67932b70d22b4c}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!log\-\_\-type@{log\-\_\-type}}
+\index{log\-\_\-type@{log\-\_\-type}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{log\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Log {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf log\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ae5dde4a29dad1ba2bf67932b70d22b4c}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a942121df2f8589f8c93aee94e0d23930}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!monitor\-\_\-type@{monitor\-\_\-type}}
+\index{monitor\-\_\-type@{monitor\-\_\-type}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{monitor\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Monitor {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf monitor\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a942121df2f8589f8c93aee94e0d23930}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a0746ff1186cb6e8e5648b16065c9cdd2}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!preconditioner\-\_\-type@{preconditioner\-\_\-type}}
+\index{preconditioner\-\_\-type@{preconditioner\-\_\-type}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{preconditioner\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Preconditioner {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf preconditioner\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a0746ff1186cb6e8e5648b16065c9cdd2}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a64c84955e85f9cc556fa8628edc8f7c8}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!scalar\-\_\-type@{scalar\-\_\-type}}
+\index{scalar\-\_\-type@{scalar\-\_\-type}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{scalar\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Vector\-Operations\-::scalar\-\_\-type {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf scalar\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a64c84955e85f9cc556fa8628edc8f7c8}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a1c0c7f5af3b439d5a53ce2433d6acb79}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!vector\-\_\-operations\-\_\-type@{vector\-\_\-operations\-\_\-type}}
+\index{vector\-\_\-operations\-\_\-type@{vector\-\_\-operations\-\_\-type}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{vector\-\_\-operations\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Vector\-Operations {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf vector\-\_\-operations\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a1c0c7f5af3b439d5a53ce2433d6acb79}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a474414aa5d9e2b387f48a6bf182c47eb}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!vector\-\_\-type@{vector\-\_\-type}}
+\index{vector\-\_\-type@{vector\-\_\-type}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{vector\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Vector\-Operations\-::vector\-\_\-type {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf vector\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a474414aa5d9e2b387f48a6bf182c47eb}
+
+
+\subsection{Constructor \& Destructor Documentation}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a6121eb6bb270322bdb94ad7b164a1d26}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!iter\-\_\-solver\-\_\-base@{iter\-\_\-solver\-\_\-base}}
+\index{iter\-\_\-solver\-\_\-base@{iter\-\_\-solver\-\_\-base}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{iter\-\_\-solver\-\_\-base}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf iter\-\_\-solver\-\_\-base} (
+\begin{DoxyParamCaption}
+\item[{const {\bf vector\-\_\-operations\-\_\-type} $\ast$}]{vec\-\_\-ops, }
+\item[{Log $\ast$}]{log, }
+\item[{{\bf int}}]{obj\-\_\-log\-\_\-lev, }
+\item[{const std\-::string \&}]{log\-\_\-msg\-\_\-prefix}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a6121eb6bb270322bdb94ad7b164a1d26}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a0935ffc2a6d2cbafac016adb334437b1}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!$\sim$iter\-\_\-solver\-\_\-base@{$\sim$iter\-\_\-solver\-\_\-base}}
+\index{$\sim$iter\-\_\-solver\-\_\-base@{$\sim$iter\-\_\-solver\-\_\-base}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{$\sim$iter\-\_\-solver\-\_\-base}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ virtual {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::$\sim${\bf iter\-\_\-solver\-\_\-base} (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}, {\ttfamily [virtual]}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a0935ffc2a6d2cbafac016adb334437b1}
+
+
+\subsection{Member Function Documentation}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ac9787d0c84372ae0caf668a9e15ad09d}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!monitor@{monitor}}
+\index{monitor@{monitor}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{monitor}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ Monitor\& {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::monitor (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ac9787d0c84372ae0caf668a9e15ad09d}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=258pt]{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ac9787d0c84372ae0caf668a9e15ad09d_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_aae9e818b6539192e92dd772da5de2519}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!monitor@{monitor}}
+\index{monitor@{monitor}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{monitor}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ const Monitor\& {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::monitor (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_aae9e818b6539192e92dd772da5de2519}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ab08c622103b3fcd60e698867f2a2bc38}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!set\-\_\-preconditioner@{set\-\_\-preconditioner}}
+\index{set\-\_\-preconditioner@{set\-\_\-preconditioner}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{set\-\_\-preconditioner}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ void {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::set\-\_\-preconditioner (
+\begin{DoxyParamCaption}
+\item[{{\bf preconditioner\-\_\-type} $\ast$}]{prec, }
+\item[{bool}]{own\-\_\-prec = {\ttfamily false}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ab08c622103b3fcd60e698867f2a2bc38}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=282pt]{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ab08c622103b3fcd60e698867f2a2bc38_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ac21be1f601f4937a97c0d3df3182a2af}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!solve@{solve}}
+\index{solve@{solve}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{solve}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ virtual bool {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::solve (
+\begin{DoxyParamCaption}
+\item[{const {\bf linear\-\_\-operator\-\_\-type} \&}]{A, }
+\item[{const {\bf vector\-\_\-type} \&}]{b, }
+\item[{{\bf vector\-\_\-type} \&}]{x}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [pure virtual]}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ac21be1f601f4937a97c0d3df3182a2af}
+
+
+Implemented in \hyperlink{classnumerical__algos_1_1lin__solvers_1_1bicgstabl_a2dd4f6cdd207b1a77aa94831fbdf9839}{numerical\-\_\-algos\-::lin\-\_\-solvers\-::bicgstabl$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$}, \hyperlink{classnumerical__algos_1_1lin__solvers_1_1bicgstabl_a2dd4f6cdd207b1a77aa94831fbdf9839}{numerical\-\_\-algos\-::lin\-\_\-solvers\-::bicgstabl$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$}, \hyperlink{classnumerical__algos_1_1lin__solvers_1_1bicgstab_ac3df95058825e4a8a1ed6bf838f10669}{numerical\-\_\-algos\-::lin\-\_\-solvers\-::bicgstab$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$}, \hyperlink{classnumerical__algos_1_1lin__solvers_1_1bicgstab_ac3df95058825e4a8a1ed6bf838f10669}{numerical\-\_\-algos\-::lin\-\_\-solvers\-::bicgstab$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$}, \hyperlink{classnumerical__algos_1_1lin__solvers_1_1cgs_a76503cf7b66739a4fa4571f034aa960e}{numerical\-\_\-algos\-::lin\-\_\-solvers\-::cgs$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$}, and \hyperlink{classnumerical__algos_1_1lin__solvers_1_1jacobi_aebc8f746eb9b5f412c6ea79a4149621f}{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$}.
+
+
+
+\subsection{Member Data Documentation}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a8e3bc9cf6c62760a22ec74d2c671ab1d}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!monitor\-\_\-@{monitor\-\_\-}}
+\index{monitor\-\_\-@{monitor\-\_\-}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{monitor\-\_\-}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ {\bf monitor\-\_\-type} {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::monitor\-\_\-\hspace{0.3cm}{\ttfamily [mutable]}, {\ttfamily [protected]}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a8e3bc9cf6c62760a22ec74d2c671ab1d}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a2632bf297a6c7e50eb7047bc3a1c744c}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!own\-\_\-prec\-\_\-@{own\-\_\-prec\-\_\-}}
+\index{own\-\_\-prec\-\_\-@{own\-\_\-prec\-\_\-}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{own\-\_\-prec\-\_\-}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ bool {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::own\-\_\-prec\-\_\-\hspace{0.3cm}{\ttfamily [protected]}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a2632bf297a6c7e50eb7047bc3a1c744c}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ab04244972dffaf21d2c6229f7d1255c6}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!prec\-\_\-@{prec\-\_\-}}
+\index{prec\-\_\-@{prec\-\_\-}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{prec\-\_\-}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ {\bf preconditioner\-\_\-type}$\ast$ {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::prec\-\_\-\hspace{0.3cm}{\ttfamily [protected]}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ab04244972dffaf21d2c6229f7d1255c6}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a405ac817de5aecac284e0d80e0ecdd19}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}!vec\-\_\-ops\-\_\-@{vec\-\_\-ops\-\_\-}}
+\index{vec\-\_\-ops\-\_\-@{vec\-\_\-ops\-\_\-}!numerical_algos::lin_solvers::iter_solver_base@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}}
+\subsubsection[{vec\-\_\-ops\-\_\-}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ const {\bf vector\-\_\-operations\-\_\-type}$\ast$ {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::vec\-\_\-ops\-\_\-\hspace{0.3cm}{\ttfamily [protected]}}}\label{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a405ac817de5aecac284e0d80e0ecdd19}
+
+
+The documentation for this class was generated from the following file\-:\begin{DoxyCompactItemize}
+\item 
+source/numerical\-\_\-algos/lin\-\_\-solvers/\hyperlink{iter__solver__base_8h}{iter\-\_\-solver\-\_\-base.\-h}\end{DoxyCompactItemize}

@@ -4,21 +4,24 @@
 namespace continuation
 {
 
-template<class VectorOperations>
+template<class VectorOperations, class Logging>
 class predictor_adaptive
 {
 public:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
 
-    predictor_adaptive(VectorOperations* vec_ops_, T ds_0_, T step_ds_ = 0.25, unsigned int attempts_0_ = 4):
+    predictor_adaptive(VectorOperations* vec_ops_, Logging* log_, T ds_0_, T step_ds_ = 0.25, unsigned int attempts_0_ = 4):
     vec_ops(vec_ops_),
+    log(log_),
     ds_0(ds_0_),
     step_ds(step_ds_),
     attempts_0(attempts_0_)
     {
         attempts = 0;
         ds = ds_0;
+        ds_p = ds;
+        ds_m = ds;
 
     }
     ~predictor_adaptive()
@@ -29,7 +32,10 @@ public:
     void reset()
     {
         ds = ds_0;
+        ds_p = ds;
+        ds_m = ds;        
         attempts = 0;
+        log->info_f("predictor::arclength step dS = %le", (double)ds);
     }
 
     void set_tangent_space(const T_vec& x_0_, const T& lambda_0_, const T_vec& x_s_, const T& lambda_s_)
@@ -57,18 +63,18 @@ public:
 //      x0_guess = x0+delta_s1.*x0_s;   
 //      lambda0_guess = lambda0+delta_s1.*lambda0_s;        
 /*
-    //cublas axpy: y=y+mul_x*x;
+//  cublas axpy: y=y+mul_x*x;
     void add_mul(scalar_type mul_x, const vector_type& x, vector_type& y)const
-*/    
+*/
         vec_ops->assign(x_0, x_0_p);
         vec_ops->add_mul(ds, x_s, x_0_p);
         lambda_0_p=lambda_0 + ds*lambda_s;
 /*
     //calc: y := mul_x*x
     void assign_mul(const scalar_type mul_x, const vector_type& x, vector_type& y)const;
-*/      
+*/
         vec_ops->assign_mul(T(1.0001), x_0_p, x_1_g);
-        lambda_1_g = T(0.999)*lambda_0_p;
+        lambda_1_g = T(1.0001)*lambda_0_p;
 
     }
 
@@ -76,24 +82,26 @@ public:
     {
         if(attempts<2*attempts_0)
         {        
-            if(attempts<attempts_0)
+
+            if(attempts%2==0)
             {
-                ds = ds*T(1+step_ds);
-            }
-            else if(attempts==attempts_0)
-            {
-                ds = ds_0*T(1-step_ds);
+                ds_p = ds_p*T(1+step_ds);
+                ds = ds_p;
             }
             else
             {
-                ds = ds*T(1-step_ds);
+                ds_m = ds_m*T(1-step_ds);            
+                ds = ds_m;
             }
+
         }
+        log->info_f("predictor::ds_modified to %le", (double)ds);
         attempts++;
         
         if(attempts>2*attempts_0)
         {
             return true;
+
         }
         else
         {
@@ -101,13 +109,18 @@ public:
         }
     }
 
+    T get_ds()
+    {
+        return ds;    
+    }
 
 private:
-    T ds_0, ds, step_ds;
+    T ds_0, ds, step_ds, ds_p, ds_m;
     unsigned int attempts_0, attempts;
     VectorOperations* vec_ops;
     T_vec x_s, x_0;
     T lambda_s, lambda_0;
+    Logging* log;
     
 };
 

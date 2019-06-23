@@ -1,0 +1,74 @@
+\hypertarget{cufft__safe__call_8h}{\section{source/utils/cufft\-\_\-safe\-\_\-call.h File Reference}
+\label{cufft__safe__call_8h}\index{source/utils/cufft\-\_\-safe\-\_\-call.\-h@{source/utils/cufft\-\_\-safe\-\_\-call.\-h}}
+}
+{\ttfamily \#include $<$cuda\-\_\-runtime.\-h$>$}\\*
+{\ttfamily \#include $<$cufft.\-h$>$}\\*
+{\ttfamily \#include $<$stdexcept$>$}\\*
+{\ttfamily \#include $<$string$>$}\\*
+{\ttfamily \#include $<$sstream$>$}\\*
+Include dependency graph for cufft\-\_\-safe\-\_\-call.\-h\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{cufft__safe__call_8h__incl}
+\end{center}
+\end{figure}
+This graph shows which files directly or indirectly include this file\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{cufft__safe__call_8h__dep__incl}
+\end{center}
+\end{figure}
+\subsection*{Macros}
+\begin{DoxyCompactItemize}
+\item 
+\#define \hyperlink{cufft__safe__call_8h_a345e42bfce47ec192e3b7cac1ee3aec9}{\-\_\-\-\_\-\-S\-T\-R\-\_\-\-H\-E\-L\-P\-E\-R}(x)~\#x
+\item 
+\#define \hyperlink{cufft__safe__call_8h_af3192660ce6b091819a6f5db69b8d54f}{\-\_\-\-\_\-\-S\-T\-R}(x)~\hyperlink{cusparse__safe__call_8h_a345e42bfce47ec192e3b7cac1ee3aec9}{\-\_\-\-\_\-\-S\-T\-R\-\_\-\-H\-E\-L\-P\-E\-R}(x)
+\item 
+\#define \hyperlink{cufft__safe__call_8h_a4605bfd74943524a0bb53d1e4c78a153}{C\-U\-F\-F\-T\-\_\-\-S\-A\-F\-E\-\_\-\-C\-A\-L\-L}(X)
+\end{DoxyCompactItemize}
+
+
+\subsection{Macro Definition Documentation}
+\hypertarget{cufft__safe__call_8h_af3192660ce6b091819a6f5db69b8d54f}{\index{cufft\-\_\-safe\-\_\-call.\-h@{cufft\-\_\-safe\-\_\-call.\-h}!\-\_\-\-\_\-\-S\-T\-R@{\-\_\-\-\_\-\-S\-T\-R}}
+\index{\-\_\-\-\_\-\-S\-T\-R@{\-\_\-\-\_\-\-S\-T\-R}!cufft_safe_call.h@{cufft\-\_\-safe\-\_\-call.\-h}}
+\subsubsection[{\-\_\-\-\_\-\-S\-T\-R}]{\setlength{\rightskip}{0pt plus 5cm}\#define \-\_\-\-\_\-\-S\-T\-R(
+\begin{DoxyParamCaption}
+\item[{}]{x}
+\end{DoxyParamCaption}
+)~{\bf \-\_\-\-\_\-\-S\-T\-R\-\_\-\-H\-E\-L\-P\-E\-R}(x)}}\label{cufft__safe__call_8h_af3192660ce6b091819a6f5db69b8d54f}
+\hypertarget{cufft__safe__call_8h_a345e42bfce47ec192e3b7cac1ee3aec9}{\index{cufft\-\_\-safe\-\_\-call.\-h@{cufft\-\_\-safe\-\_\-call.\-h}!\-\_\-\-\_\-\-S\-T\-R\-\_\-\-H\-E\-L\-P\-E\-R@{\-\_\-\-\_\-\-S\-T\-R\-\_\-\-H\-E\-L\-P\-E\-R}}
+\index{\-\_\-\-\_\-\-S\-T\-R\-\_\-\-H\-E\-L\-P\-E\-R@{\-\_\-\-\_\-\-S\-T\-R\-\_\-\-H\-E\-L\-P\-E\-R}!cufft_safe_call.h@{cufft\-\_\-safe\-\_\-call.\-h}}
+\subsubsection[{\-\_\-\-\_\-\-S\-T\-R\-\_\-\-H\-E\-L\-P\-E\-R}]{\setlength{\rightskip}{0pt plus 5cm}\#define \-\_\-\-\_\-\-S\-T\-R\-\_\-\-H\-E\-L\-P\-E\-R(
+\begin{DoxyParamCaption}
+\item[{}]{x}
+\end{DoxyParamCaption}
+)~\#x}}\label{cufft__safe__call_8h_a345e42bfce47ec192e3b7cac1ee3aec9}
+\hypertarget{cufft__safe__call_8h_a4605bfd74943524a0bb53d1e4c78a153}{\index{cufft\-\_\-safe\-\_\-call.\-h@{cufft\-\_\-safe\-\_\-call.\-h}!C\-U\-F\-F\-T\-\_\-\-S\-A\-F\-E\-\_\-\-C\-A\-L\-L@{C\-U\-F\-F\-T\-\_\-\-S\-A\-F\-E\-\_\-\-C\-A\-L\-L}}
+\index{C\-U\-F\-F\-T\-\_\-\-S\-A\-F\-E\-\_\-\-C\-A\-L\-L@{C\-U\-F\-F\-T\-\_\-\-S\-A\-F\-E\-\_\-\-C\-A\-L\-L}!cufft_safe_call.h@{cufft\-\_\-safe\-\_\-call.\-h}}
+\subsubsection[{C\-U\-F\-F\-T\-\_\-\-S\-A\-F\-E\-\_\-\-C\-A\-L\-L}]{\setlength{\rightskip}{0pt plus 5cm}\#define C\-U\-F\-F\-T\-\_\-\-S\-A\-F\-E\-\_\-\-C\-A\-L\-L(
+\begin{DoxyParamCaption}
+\item[{}]{X}
+\end{DoxyParamCaption}
+)}}\label{cufft__safe__call_8h_a4605bfd74943524a0bb53d1e4c78a153}
+{\bfseries Value\-:}
+\begin{DoxyCode}
+\textcolor{keywordflow}{do} \{   \(\backslash\)
+                cufftResult status = (X);   \(\backslash\)
+                cudaError\_t cuda\_res = cudaDeviceSynchronize(); \(\backslash\)
+                if (status != CUFFT\_SUCCESS) \{ \(\backslash\)
+                        std::stringstream ss;  \(\backslash\)
+                        ss << std::string(\textcolor{stringliteral}{"CUFFT\_SAFE\_CALL "} \_\_FILE\_\_ \textcolor{stringliteral}{" "} \hyperlink{cufft__safe__call_8h_af3192660ce6b091819a6f5db69b8d54f}{\_\_STR}(\_\_LINE\_\_) \textcolor{stringliteral}{" : "} #X \textcolor{stringliteral}{"
+       failed: "}) << std::string(\_cufftGetErrorEnum(status)); \(\backslash\)
+                        std::string str = ss.str();  \(\backslash\)
+                        throw std::runtime\_error(str); \(\backslash\)
+                \}      \(\backslash\)
+                if (cuda\_res != cudaSuccess) throw std::runtime\_error(std::\textcolor{keywordtype}{string}("
+      \hyperlink{cufft__safe__call_8h_a4605bfd74943524a0bb53d1e4c78a153}{CUFFT\_SAFE\_CALL} " \_\_FILE\_\_ " " \hyperlink{cufft__safe__call_8h_af3192660ce6b091819a6f5db69b8d54f}{\_\_STR}(\_\_LINE\_\_) " : " \textcolor{preprocessor}{#X " failed cudaDeviceSynchronize:
+       ") + std::string(cudaGetErrorString(cuda\_res)));   \(\backslash\)}
+\textcolor{preprocessor}{        \} while (0)}
+\end{DoxyCode}

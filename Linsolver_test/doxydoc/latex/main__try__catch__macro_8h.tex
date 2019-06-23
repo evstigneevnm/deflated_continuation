@@ -1,0 +1,76 @@
+\hypertarget{main__try__catch__macro_8h}{\section{source/utils/main\-\_\-try\-\_\-catch\-\_\-macro.h File Reference}
+\label{main__try__catch__macro_8h}\index{source/utils/main\-\_\-try\-\_\-catch\-\_\-macro.\-h@{source/utils/main\-\_\-try\-\_\-catch\-\_\-macro.\-h}}
+}
+{\ttfamily \#include $<$string$>$}\\*
+{\ttfamily \#include $<$exception$>$}\\*
+{\ttfamily \#include \char`\"{}Log.\-h\char`\"{}}\\*
+Include dependency graph for main\-\_\-try\-\_\-catch\-\_\-macro.\-h\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=256pt]{main__try__catch__macro_8h__incl}
+\end{center}
+\end{figure}
+This graph shows which files directly or indirectly include this file\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=186pt]{main__try__catch__macro_8h__dep__incl}
+\end{center}
+\end{figure}
+\subsection*{Macros}
+\begin{DoxyCompactItemize}
+\item 
+\#define \hyperlink{main__try__catch__macro_8h_abfcb11606425e55a41b6d3bd087ae344}{U\-S\-E\-\_\-\-M\-A\-I\-N\-\_\-\-T\-R\-Y\-\_\-\-C\-A\-T\-C\-H}(log\-\_\-obj)
+\item 
+\#define \hyperlink{main__try__catch__macro_8h_a6d9c0af7260b4feb7073b387fe85257e}{M\-A\-I\-N\-\_\-\-T\-R\-Y}(block\-\_\-name)
+\item 
+\#define \hyperlink{main__try__catch__macro_8h_a8f633ce551b91fd877f7837e2c764a95}{M\-A\-I\-N\-\_\-\-C\-A\-T\-C\-H}(error\-\_\-return\-\_\-code)
+\end{DoxyCompactItemize}
+
+
+\subsection{Macro Definition Documentation}
+\hypertarget{main__try__catch__macro_8h_a8f633ce551b91fd877f7837e2c764a95}{\index{main\-\_\-try\-\_\-catch\-\_\-macro.\-h@{main\-\_\-try\-\_\-catch\-\_\-macro.\-h}!M\-A\-I\-N\-\_\-\-C\-A\-T\-C\-H@{M\-A\-I\-N\-\_\-\-C\-A\-T\-C\-H}}
+\index{M\-A\-I\-N\-\_\-\-C\-A\-T\-C\-H@{M\-A\-I\-N\-\_\-\-C\-A\-T\-C\-H}!main_try_catch_macro.h@{main\-\_\-try\-\_\-catch\-\_\-macro.\-h}}
+\subsubsection[{M\-A\-I\-N\-\_\-\-C\-A\-T\-C\-H}]{\setlength{\rightskip}{0pt plus 5cm}\#define M\-A\-I\-N\-\_\-\-C\-A\-T\-C\-H(
+\begin{DoxyParamCaption}
+\item[{}]{error\-\_\-return\-\_\-code}
+\end{DoxyParamCaption}
+)}}\label{main__try__catch__macro_8h_a8f633ce551b91fd877f7837e2c764a95}
+{\bfseries Value\-:}
+\begin{DoxyCode}
+\} \textcolor{keywordflow}{catch} (std::exception &e) \{                                                                              
+             \(\backslash\)
+        MAIN\_TRY\_CATCH\_LOG\_OBJ\_POINTER->error(std::string(\textcolor{stringliteral}{"error during "}) + 
+      MAIN\_TRY\_CATCH\_CURRENT\_BLOCK\_NAME + std::string(\textcolor{stringliteral}{": "}) + e.what());         \(\backslash\)
+        return error\_return\_code;                                                                          
+                                                   \(\backslash\)
+    \}
+\end{DoxyCode}
+\hypertarget{main__try__catch__macro_8h_a6d9c0af7260b4feb7073b387fe85257e}{\index{main\-\_\-try\-\_\-catch\-\_\-macro.\-h@{main\-\_\-try\-\_\-catch\-\_\-macro.\-h}!M\-A\-I\-N\-\_\-\-T\-R\-Y@{M\-A\-I\-N\-\_\-\-T\-R\-Y}}
+\index{M\-A\-I\-N\-\_\-\-T\-R\-Y@{M\-A\-I\-N\-\_\-\-T\-R\-Y}!main_try_catch_macro.h@{main\-\_\-try\-\_\-catch\-\_\-macro.\-h}}
+\subsubsection[{M\-A\-I\-N\-\_\-\-T\-R\-Y}]{\setlength{\rightskip}{0pt plus 5cm}\#define M\-A\-I\-N\-\_\-\-T\-R\-Y(
+\begin{DoxyParamCaption}
+\item[{}]{block\-\_\-name}
+\end{DoxyParamCaption}
+)}}\label{main__try__catch__macro_8h_a6d9c0af7260b4feb7073b387fe85257e}
+{\bfseries Value\-:}
+\begin{DoxyCode}
+\textcolor{keywordflow}{try} \{                                  \(\backslash\)
+    MAIN\_TRY\_CATCH\_CURRENT\_BLOCK\_NAME = block\_name;                 \(\backslash\)
+    MAIN\_TRY\_CATCH\_LOG\_OBJ\_POINTER->info(block\_name);
+\end{DoxyCode}
+\hypertarget{main__try__catch__macro_8h_abfcb11606425e55a41b6d3bd087ae344}{\index{main\-\_\-try\-\_\-catch\-\_\-macro.\-h@{main\-\_\-try\-\_\-catch\-\_\-macro.\-h}!U\-S\-E\-\_\-\-M\-A\-I\-N\-\_\-\-T\-R\-Y\-\_\-\-C\-A\-T\-C\-H@{U\-S\-E\-\_\-\-M\-A\-I\-N\-\_\-\-T\-R\-Y\-\_\-\-C\-A\-T\-C\-H}}
+\index{U\-S\-E\-\_\-\-M\-A\-I\-N\-\_\-\-T\-R\-Y\-\_\-\-C\-A\-T\-C\-H@{U\-S\-E\-\_\-\-M\-A\-I\-N\-\_\-\-T\-R\-Y\-\_\-\-C\-A\-T\-C\-H}!main_try_catch_macro.h@{main\-\_\-try\-\_\-catch\-\_\-macro.\-h}}
+\subsubsection[{U\-S\-E\-\_\-\-M\-A\-I\-N\-\_\-\-T\-R\-Y\-\_\-\-C\-A\-T\-C\-H}]{\setlength{\rightskip}{0pt plus 5cm}\#define U\-S\-E\-\_\-\-M\-A\-I\-N\-\_\-\-T\-R\-Y\-\_\-\-C\-A\-T\-C\-H(
+\begin{DoxyParamCaption}
+\item[{}]{log\-\_\-obj}
+\end{DoxyParamCaption}
+)}}\label{main__try__catch__macro_8h_abfcb11606425e55a41b6d3bd087ae344}
+{\bfseries Value\-:}
+\begin{DoxyCode}
+Log             *MAIN\_TRY\_CATCH\_LOG\_OBJ\_POINTER = &log\_obj;     \(\backslash\)
+    std::string     MAIN\_TRY\_CATCH\_CURRENT\_BLOCK\_NAME;
+\end{DoxyCode}

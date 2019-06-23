@@ -1,0 +1,147 @@
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1jacobi}{\section{numerical\-\_\-algos\-:\-:lin\-\_\-solvers\-:\-:jacobi$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$ Class Template Reference}
+\label{classnumerical__algos_1_1lin__solvers_1_1jacobi}\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$}}
+}
+
+
+{\ttfamily \#include $<$jacobi.\-h$>$}
+
+
+
+Inheritance diagram for numerical\-\_\-algos\-:\-:lin\-\_\-solvers\-:\-:jacobi$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[height=550pt]{classnumerical__algos_1_1lin__solvers_1_1jacobi__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for numerical\-\_\-algos\-:\-:lin\-\_\-solvers\-:\-:jacobi$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1jacobi__coll__graph}
+\end{center}
+\end{figure}
+\subsection*{Public Types}
+\begin{DoxyCompactItemize}
+\item 
+typedef \\*
+Vector\-Operations\-::scalar\-\_\-type \hyperlink{classnumerical__algos_1_1lin__solvers_1_1jacobi_aec612c61c39f98f8ed15c8c047d0ac6f}{scalar\-\_\-type}
+\item 
+typedef \\*
+Vector\-Operations\-::vector\-\_\-type \hyperlink{classnumerical__algos_1_1lin__solvers_1_1jacobi_a4888a70950925266c654b6ec835dee85}{vector\-\_\-type}
+\item 
+typedef Linear\-Operator \hyperlink{classnumerical__algos_1_1lin__solvers_1_1jacobi_adb16ec28c8268884b3649fefc44c4b51}{linear\-\_\-operator\-\_\-type}
+\item 
+typedef Preconditioner \hyperlink{classnumerical__algos_1_1lin__solvers_1_1jacobi_acc0f0bdcc2f122409be20961a7144178}{preconditioner\-\_\-type}
+\item 
+typedef Vector\-Operations \hyperlink{classnumerical__algos_1_1lin__solvers_1_1jacobi_ab8b9ebf933c4357daf0f00205decc710}{vector\-\_\-operations\-\_\-type}
+\item 
+typedef Monitor \hyperlink{classnumerical__algos_1_1lin__solvers_1_1jacobi_a62ed1ba2b2ed62bbe1fc38911770d59a}{monitor\-\_\-type}
+\item 
+typedef Log \hyperlink{classnumerical__algos_1_1lin__solvers_1_1jacobi_ab93ff757d620bff642b65e8cc7e4b4e5}{log\-\_\-type}
+\end{DoxyCompactItemize}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classnumerical__algos_1_1lin__solvers_1_1jacobi_a9b43a2c22a3920cc57f9fd03fe2051fc}{jacobi} (const \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a1c0c7f5af3b439d5a53ce2433d6acb79}{vector\-\_\-operations\-\_\-type} $\ast$vec\-\_\-ops, Log $\ast$log=N\-U\-L\-L, \hyperlink{classint}{int} obj\-\_\-log\-\_\-lev=0)
+\item 
+virtual bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1jacobi_aebc8f746eb9b5f412c6ea79a4149621f}{solve} (const \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_a547488978437ea7057c7fb113261407d}{linear\-\_\-operator\-\_\-type} \&A, const \hyperlink{classnumerical__algos_1_1lin__solvers_1_1jacobi_a4888a70950925266c654b6ec835dee85}{vector\-\_\-type} \&b, \hyperlink{classnumerical__algos_1_1lin__solvers_1_1jacobi_a4888a70950925266c654b6ec835dee85}{vector\-\_\-type} \&x) const 
+\end{DoxyCompactItemize}
+\subsection*{Additional Inherited Members}
+
+
+\subsection{Member Typedef Documentation}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1jacobi_adb16ec28c8268884b3649fefc44c4b51}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}!linear\-\_\-operator\-\_\-type@{linear\-\_\-operator\-\_\-type}}
+\index{linear\-\_\-operator\-\_\-type@{linear\-\_\-operator\-\_\-type}!numerical_algos::lin_solvers::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}}
+\subsubsection[{linear\-\_\-operator\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Linear\-Operator {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf linear\-\_\-operator\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1jacobi_adb16ec28c8268884b3649fefc44c4b51}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1jacobi_ab93ff757d620bff642b65e8cc7e4b4e5}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}!log\-\_\-type@{log\-\_\-type}}
+\index{log\-\_\-type@{log\-\_\-type}!numerical_algos::lin_solvers::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}}
+\subsubsection[{log\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Log {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf log\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1jacobi_ab93ff757d620bff642b65e8cc7e4b4e5}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1jacobi_a62ed1ba2b2ed62bbe1fc38911770d59a}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}!monitor\-\_\-type@{monitor\-\_\-type}}
+\index{monitor\-\_\-type@{monitor\-\_\-type}!numerical_algos::lin_solvers::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}}
+\subsubsection[{monitor\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Monitor {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf monitor\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1jacobi_a62ed1ba2b2ed62bbe1fc38911770d59a}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1jacobi_acc0f0bdcc2f122409be20961a7144178}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}!preconditioner\-\_\-type@{preconditioner\-\_\-type}}
+\index{preconditioner\-\_\-type@{preconditioner\-\_\-type}!numerical_algos::lin_solvers::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}}
+\subsubsection[{preconditioner\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Preconditioner {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf preconditioner\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1jacobi_acc0f0bdcc2f122409be20961a7144178}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1jacobi_aec612c61c39f98f8ed15c8c047d0ac6f}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}!scalar\-\_\-type@{scalar\-\_\-type}}
+\index{scalar\-\_\-type@{scalar\-\_\-type}!numerical_algos::lin_solvers::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}}
+\subsubsection[{scalar\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Vector\-Operations\-::scalar\-\_\-type {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf scalar\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1jacobi_aec612c61c39f98f8ed15c8c047d0ac6f}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1jacobi_ab8b9ebf933c4357daf0f00205decc710}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}!vector\-\_\-operations\-\_\-type@{vector\-\_\-operations\-\_\-type}}
+\index{vector\-\_\-operations\-\_\-type@{vector\-\_\-operations\-\_\-type}!numerical_algos::lin_solvers::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}}
+\subsubsection[{vector\-\_\-operations\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Vector\-Operations {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf vector\-\_\-operations\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1jacobi_ab8b9ebf933c4357daf0f00205decc710}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1jacobi_a4888a70950925266c654b6ec835dee85}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}!vector\-\_\-type@{vector\-\_\-type}}
+\index{vector\-\_\-type@{vector\-\_\-type}!numerical_algos::lin_solvers::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}}
+\subsubsection[{vector\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ typedef Vector\-Operations\-::vector\-\_\-type {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf vector\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1jacobi_a4888a70950925266c654b6ec835dee85}
+
+
+\subsection{Constructor \& Destructor Documentation}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1jacobi_a9b43a2c22a3920cc57f9fd03fe2051fc}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}!jacobi@{jacobi}}
+\index{jacobi@{jacobi}!numerical_algos::lin_solvers::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}}
+\subsubsection[{jacobi}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::{\bf jacobi} (
+\begin{DoxyParamCaption}
+\item[{const {\bf vector\-\_\-operations\-\_\-type} $\ast$}]{vec\-\_\-ops, }
+\item[{Log $\ast$}]{log = {\ttfamily NULL}, }
+\item[{{\bf int}}]{obj\-\_\-log\-\_\-lev = {\ttfamily 0}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1jacobi_a9b43a2c22a3920cc57f9fd03fe2051fc}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1jacobi_a9b43a2c22a3920cc57f9fd03fe2051fc_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+\subsection{Member Function Documentation}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1jacobi_aebc8f746eb9b5f412c6ea79a4149621f}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}!solve@{solve}}
+\index{solve@{solve}!numerical_algos::lin_solvers::jacobi@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}}
+\subsubsection[{solve}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Linear\-Operator , class Preconditioner , class Vector\-Operations , class Monitor , class Log $>$ virtual bool {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::jacobi}$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$\-::solve (
+\begin{DoxyParamCaption}
+\item[{const {\bf linear\-\_\-operator\-\_\-type} \&}]{A, }
+\item[{const {\bf vector\-\_\-type} \&}]{b, }
+\item[{{\bf vector\-\_\-type} \&}]{x}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}, {\ttfamily [virtual]}}}\label{classnumerical__algos_1_1lin__solvers_1_1jacobi_aebc8f746eb9b5f412c6ea79a4149621f}
+
+
+Implements \hyperlink{classnumerical__algos_1_1lin__solvers_1_1iter__solver__base_ac21be1f601f4937a97c0d3df3182a2af}{numerical\-\_\-algos\-::lin\-\_\-solvers\-::iter\-\_\-solver\-\_\-base$<$ Linear\-Operator, Preconditioner, Vector\-Operations, Monitor, Log $>$}.
+
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1jacobi_aebc8f746eb9b5f412c6ea79a4149621f_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=268pt]{classnumerical__algos_1_1lin__solvers_1_1jacobi_aebc8f746eb9b5f412c6ea79a4149621f_icgraph}
+\end{center}
+\end{figure}
+
+
+
+
+The documentation for this class was generated from the following file\-:\begin{DoxyCompactItemize}
+\item 
+source/numerical\-\_\-algos/lin\-\_\-solvers/\hyperlink{jacobi_8h}{jacobi.\-h}\end{DoxyCompactItemize}

@@ -1,0 +1,11 @@
+<map id="main" name="main">
+<area shape="rect" id="node2" href="$structcpu__vector__operations.html#a8e3da0067d3368df889f4559ca5df94c" title="cpu_vector_operations\l::init_vector" alt="" coords="115,5,269,46"/>
+<area shape="rect" id="node3" href="$structcpu__vector__operations.html#a36ce15d54cfb2b08aeeb25d7e601e342" title="cpu_vector_operations\l::start_use_vector" alt="" coords="115,70,269,111"/>
+<area shape="rect" id="node4" href="$container__test_8cpp.html#a463d42869ed73a961ea49be2f255a610" title="init_vec" alt="" coords="159,136,225,163"/>
+<area shape="rect" id="node5" href="$classsolution__storage.html#aafb4b98b6213118b0abd0b8720e02cac" title="solution_storage::push" alt="" coords="115,187,269,213"/>
+<area shape="rect" id="node6" href="$classsolution__storage.html#addf1e8fb5492d79481bcbb847567dbce" title="solution_storage::get_size" alt="" coords="105,237,279,264"/>
+<area shape="rect" id="node7" href="$classsolution__storage.html#ac5956d5c2edd78e8fe314451f05d52f6" title="solution_storage::calc\l_distance" alt="" coords="117,289,267,330"/>
+<area shape="rect" id="node8" href="$structcpu__vector__operations.html#abb4a0ddd5d65ef1ae8c979e71da96ba8" title="cpu_vector_operations\l::norm" alt="" coords="115,354,269,395"/>
+<area shape="rect" id="node9" href="$structcpu__vector__operations.html#ab611343789ba4dab20b9d162b4963789" title="cpu_vector_operations\l::free_vector" alt="" coords="115,419,269,461"/>
+<area shape="rect" id="node10" href="$structcpu__vector__operations.html#ab79fb826fdea7cc2a301e9db9bdc705e" title="cpu_vector_operations\l::stop_use_vector" alt="" coords="115,485,269,526"/>
+</map>

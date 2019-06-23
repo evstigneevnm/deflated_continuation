@@ -12,7 +12,7 @@
 namespace file_operations
 {
 template <class T>
-void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec=16)
+void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec=17)
 {
         std::ofstream f(f_name.c_str(), std::ofstream::out);
         if (!f) throw std::runtime_error("print_vector: error while opening file " + f_name);
@@ -30,7 +30,7 @@ void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec
 
 
 template <class T>
-void write_matrix(const std::string &f_name, size_t Row, size_t Col, T *matrix, unsigned int prec=16)
+void write_matrix(const std::string &f_name, size_t Row, size_t Col, T *matrix, unsigned int prec=17)
 {
     size_t N=Col;
     std::ofstream f(f_name.c_str(), std::ofstream::out);

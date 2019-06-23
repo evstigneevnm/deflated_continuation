@@ -44,9 +44,10 @@ public:
         if(linear_system_converged)
         {
 	    T z_sq = vec_ops->scalar_prod(x_s, x_s); //(dx,x_0_s)
-            lambda_s = sign/std::sqrt(z_sq+T(1));
-            vec_ops->add_mul_scalar(T(0), lambda_s, x_s); 
-	    //TODO: do smth with the norm
+        lambda_s = sign/std::sqrt(z_sq+T(1));
+        vec_ops->add_mul_scalar(T(0), lambda_s, x_s); 
+	    
+        //TODO: do smth with the norm
 	    //norm differs greatly for large
 	    //and small systems
 

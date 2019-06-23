@@ -65,7 +65,7 @@ public:
             nonlin_op->F(x, lambda, f);            
             
             vec_ops->add_mul_scalar(T(0), T(-1), f); //f=-F(x,lambda)
-            T beta =  - orthgonal_projection(x, lambda); //beta = -orth_proj
+            T beta =  - orthogonal_projection(x, lambda); //beta = -orth_proj
             T alpha = lambda_0_s;
 
             flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, d_x, d_lambda);
@@ -90,7 +90,7 @@ private:
     T lambda_0, lambda_0_s;
     T_vec dx, f, Jlambda;
     
-    T orthgonal_projection(const T_vec& x_1, const T& lambda_1)
+    T orthogonal_projection(const T_vec& x_1, const T& lambda_1)
     {
 /*
     //calc: z := mul_x*x + mul_y*y

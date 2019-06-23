@@ -42,7 +42,7 @@ int main(int argc, char const *argv[])
     if(argc!=6)
     {
         printf("Usage: %s Nx Ny lambda_0 dS S\n   lambda_0 - starting parameter\n   dS - continuation step\n   S - number of continuation steps\n",argv[0]);
-    	return 0;
+        return 0;
     }
     size_t Nx = atoi(argv[1]);
     size_t Ny = atoi(argv[2]);
@@ -50,19 +50,23 @@ int main(int argc, char const *argv[])
     real dS = atof(argv[4]);
     unsigned int S = atoi(argv[5]);
 
+
+
+
+
+    init_cuda(6);
+    real norm_wight = std::sqrt(real(Nx*Ny));
+   
     //linsolver control
     unsigned int lin_solver_max_it = 1500;
-    real lin_solver_tol = 5.0e-10;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;
+    real lin_solver_tol = 5.0e-8*norm_wight;
+    
     //newton deflation control
     unsigned int newton_def_max_it = 350;
-    real newton_def_tol = 5.0e-8;
-
-
-    init_cuda(4);
-    real norm_wight = std::sqrt(real(Nx*Ny));
+    real newton_def_tol = 5.0e-8*norm_wight;
 
 
     real a_val = real(2);
@@ -94,6 +98,7 @@ int main(int argc, char const *argv[])
     mon->init(lin_solver_tol, real(0), lin_solver_max_it);
     mon->set_save_convergence_history(true);
     mon->set_divide_out_norms_by_rel_base(true);
+    mon->out_min_resid_norm();
     SM->get_linsolver_handle()->set_use_precond_resid(use_precond_resid);
     SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle()->set_basis_size(basis_sz);
@@ -109,6 +114,7 @@ int main(int argc, char const *argv[])
     mon_orig->init(lin_solver_tol/100, real(0), lin_solver_max_it);
     mon_orig->set_save_convergence_history(true);
     mon_orig->set_divide_out_norms_by_rel_base(false);
+    mon_orig->out_min_resid_norm();
     SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
     SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle_original()->set_basis_size(basis_sz);    
@@ -117,10 +123,10 @@ int main(int argc, char const *argv[])
     newton_t *newton = new newton_t(vec_ops_R_im, system_operator, conv_newton);
 
     //setup continuation system:
-    predictor_cont_t* predict = new predictor_cont_t(vec_ops_R_im, dS, 0.33);
+    predictor_cont_t* predict = new predictor_cont_t(vec_ops_R_im, log, dS, 0.25, 20);
     system_operator_cont_t* system_operator_cont = new system_operator_cont_t(vec_ops_R_im, Ax, SM);
     newton_cont_t* newton_cont = new newton_cont_t(vec_ops_R_im, system_operator_cont, conv_newton_def);
-    advance_step_cont_t* continuation_step = new advance_step_cont_t(vec_ops_R_im, system_operator_cont, newton_cont, predict);
+    advance_step_cont_t* continuation_step = new advance_step_cont_t(vec_ops_R_im, log, system_operator_cont, newton_cont, predict);
     tangent_0_cont_t* init_tangent = new tangent_0_cont_t(vec_ops_R_im, Ax, SM);
 
 
@@ -128,7 +134,7 @@ int main(int argc, char const *argv[])
     vec_ops_R->init_vector(u_out_ph); vec_ops_R->start_use_vector(u_out_ph);
 
 
-    deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R_im, newton_def, 5);
+    deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R_im, log, newton_def, 5);
 
     
     //deflation_op->execute_all(lambda0, KS2D, sol_storage_def);
@@ -166,7 +172,7 @@ int main(int argc, char const *argv[])
     real lambda1;
     real d_lambda;
     
-    init_tangent->execute(KS2D, 1, x0, lambda0, x0_s, lambda0_s);
+    init_tangent->execute(KS2D, -1, x0, lambda0, x0_s, lambda0_s);
     real norm = 1;
 
 /*
@@ -206,16 +212,16 @@ int main(int argc, char const *argv[])
         printf("||x0_s||=%le\n", vec_ops_R_im->norm(x0_s));
 
         SM->solve((*Ax), x0_s, xxx, lambda0_s, f, proj, d_x, d_lambda);
-	//insert residual estimation
+    //insert residual estimation
         Ax->apply(d_x,xxx1);
-	vec_ops_R_im->add_mul(d_lambda, xxx, xxx1);
-	vec_ops_R_im->add_mul(real(-1), f, xxx1);
-	norm = vec_ops_R_im->norm(xxx1);
-	real norm1 = vec_ops_R_im->scalar_prod(x0_s,d_x)+lambda0_s*d_lambda-proj;
-	printf("===lin_system_norm=%le,%le====\n",(double)norm, (double)norm1);
+    vec_ops_R_im->add_mul(d_lambda, xxx, xxx1);
+    vec_ops_R_im->add_mul(real(-1), f, xxx1);
+    norm = vec_ops_R_im->norm(xxx1);
+    real norm1 = vec_ops_R_im->scalar_prod(x0_s,d_x)+lambda0_s*d_lambda-proj;
+    printf("===lin_system_norm=%le,%le====\n",(double)norm, (double)norm1);
 
 
-	//ends
+    //ends
         lambda1+=d_lambda;
         vec_ops_R_im->add_mul(real(1), d_x, x1);
 
@@ -225,7 +231,21 @@ int main(int argc, char const *argv[])
 
     }
 //*/
-    continuation_step->solve(KS2D, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
+    std::ofstream file_diag("diagram.dat", std::ofstream::out);
+    
+    file_diag << lambda0 << " " << vec_ops_R_im->norm(x0) << std::endl;
+    for(unsigned int s=0;s<S;s++)
+    {
+        continuation_step->solve(KS2D, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
+        vec_ops_R_im->assign(x1,x0);
+        vec_ops_R_im->assign(x1_s,x0_s);
+        lambda0 = lambda1;
+        lambda0_s = lambda1_s;
+        file_diag << lambda1 << " " << vec_ops_R_im->norm(x1) << std::endl;
+        std::flush(file_diag);
+    }
+    file_diag.close();
+
     KS2D->F(x1, lambda1, f);
     norm = vec_ops_R_im->norm(f);
     printf("\n===(%le, %le)===", lambda1, norm);

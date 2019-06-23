@@ -1,0 +1,690 @@
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor}{\section{numerical\-\_\-algos\-:\-:lin\-\_\-solvers\-:\-:default\-\_\-monitor$<$ Vector\-Operations, Log $>$ Class Template Reference}
+\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor}\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor$<$ Vector\-Operations, Log $>$@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor$<$ Vector\-Operations, Log $>$}}
+}
+
+
+{\ttfamily \#include $<$default\-\_\-monitor.\-h$>$}
+
+
+
+Inheritance diagram for numerical\-\_\-algos\-:\-:lin\-\_\-solvers\-:\-:default\-\_\-monitor$<$ Vector\-Operations, Log $>$\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=212pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for numerical\-\_\-algos\-:\-:lin\-\_\-solvers\-:\-:default\-\_\-monitor$<$ Vector\-Operations, Log $>$\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[height=550pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor__coll__graph}
+\end{center}
+\end{figure}
+\subsection*{Public Types}
+\begin{DoxyCompactItemize}
+\item 
+typedef \\*
+Vector\-Operations\-::scalar\-\_\-type \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a9c025ecb40da565f0f1584cbf2b10999}{scalar\-\_\-type}
+\item 
+typedef \\*
+Vector\-Operations\-::vector\-\_\-type \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_afe4ad299b536cf5df8efbd2c08b619f5}{vector\-\_\-type}
+\item 
+typedef Vector\-Operations \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a1353cb66ac3391ffaba236b3a860dc8e}{vector\-\_\-operations\-\_\-type}
+\end{DoxyCompactItemize}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_adff676b99030bc92c310106c5c9acadb}{default\-\_\-monitor} (const \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a1353cb66ac3391ffaba236b3a860dc8e}{vector\-\_\-operations\-\_\-type} \&vec\-\_\-ops, Log $\ast$log=N\-U\-L\-L, \hyperlink{classint}{int} obj\-\_\-log\-\_\-lev=0)
+\item 
+void \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a63f9d87378092ebb0877c099166b9c64}{init} (T \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_ada85d0e3f07a8a4ef176a8c6ca090329}{rel\-\_\-tol}, T \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a28c4268cf6cc7058a351083a6b6272d1}{abs\-\_\-tol}=T(0.f), \hyperlink{classint}{int} \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_afcb878caf8bc1c3f816896df59689c78}{max\-\_\-iters\-\_\-num}=100, \hyperlink{classint}{int} \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a4cbfc2ff13dde5cff2d65267bb86398f}{min\-\_\-iters\-\_\-num}=0, bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a91011d0a20628ed3488009180dadd15c}{out\-\_\-min\-\_\-resid\-\_\-norm}=false, bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a397c2b87b68d1f24c24645c06b2550c8}{save\-\_\-convergence\-\_\-history}=false, bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a23c2f5d0d37b20c027dc6890ae649c2e}{divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base}=false)
+\item 
+void \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a394d0837e6ac1e01413f5026646b3d7e}{set\-\_\-save\-\_\-convergence\-\_\-history} (bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a397c2b87b68d1f24c24645c06b2550c8}{save\-\_\-convergence\-\_\-history})
+\item 
+void \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_af9ef0caa9961a54a7f12a6f9947faaf9}{set\-\_\-divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base} (bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a23c2f5d0d37b20c027dc6890ae649c2e}{divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base})
+\item 
+void \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_ae1f0235658ea84218cfb29a312c6ffc0}{start} (const \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_afe4ad299b536cf5df8efbd2c08b619f5}{vector\-\_\-type} \&rhs)
+\item 
+void \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a78ca19b3ecf48d67cb245af417fdb97a}{stop} ()
+\item 
+T \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_ada85d0e3f07a8a4ef176a8c6ca090329}{rel\-\_\-tol} () const 
+\item 
+T \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a28c4268cf6cc7058a351083a6b6272d1}{abs\-\_\-tol} () const 
+\item 
+T \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aef01dc1870d93ff92c604c6ff618b206}{rel\-\_\-tol\-\_\-base} () const 
+\item 
+T \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aa554224a075325c4c537ade783a0e833}{tol} () const 
+\item 
+\hyperlink{classint}{int} \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_afcb878caf8bc1c3f816896df59689c78}{max\-\_\-iters\-\_\-num} () const 
+\item 
+\hyperlink{classint}{int} \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a4cbfc2ff13dde5cff2d65267bb86398f}{min\-\_\-iters\-\_\-num} () const 
+\item 
+bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a91011d0a20628ed3488009180dadd15c}{out\-\_\-min\-\_\-resid\-\_\-norm} () const 
+\item 
+bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a397c2b87b68d1f24c24645c06b2550c8}{save\-\_\-convergence\-\_\-history} () const 
+\item 
+bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a23c2f5d0d37b20c027dc6890ae649c2e}{divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base} () const 
+\item 
+\hyperlink{classint}{int} \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aa6a060394887505a0490b03b36475483}{iters\-\_\-performed} () const 
+\item 
+bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a94135959ebff236eef6e2b5d3e0fe29b}{is\-\_\-valid\-\_\-number} () const 
+\item 
+T \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a4cf95e3009bbef39997466dc9d54fea7}{rhs\-\_\-norm} () const 
+\item 
+T \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a247797a025a93a380a5df85d5e6eabc3}{resid\-\_\-norm} () const 
+\item 
+T \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_abda2cef74d67817ef555a54c4ced13de}{resid\-\_\-norm\-\_\-out} () const 
+\item 
+T \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a9345483feeea9990d1fcb4433fa175cd}{tol\-\_\-out} () const 
+\item 
+const \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_afe4ad299b536cf5df8efbd2c08b619f5}{vector\-\_\-type} \& \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a4578e1951c8ba1bc2728a94073bab85a}{min\-\_\-resid\-\_\-norm\-\_\-x} () const 
+\item 
+const std\-::vector$<$ std\-::pair\\*
+$<$ \hyperlink{classint}{int}, T $>$ $>$ \& \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a027b3789b9e082c400249ec35420b43a}{convergence\-\_\-history} () const 
+\item 
+\hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor}{default\-\_\-monitor} \& \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a682eddef15a08a2b11c1e20891f3d0d9}{operator++} ()
+\item 
+\hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor}{default\-\_\-monitor} \& \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_ac795e6b86cff023fbe843b386a224743}{operator+=} (\hyperlink{classint}{int} n)
+\item 
+bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a3fb05af4ef8ea15d1f78691f378fd3fa}{converged} () const 
+\item 
+bool \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a334fb238ad97fdde376eee7c3715b80d}{check\-\_\-finished} (const \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_afe4ad299b536cf5df8efbd2c08b619f5}{vector\-\_\-type} \&x, const \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor_afe4ad299b536cf5df8efbd2c08b619f5}{vector\-\_\-type} \&r)
+\end{DoxyCompactItemize}
+\subsection*{Additional Inherited Members}
+
+
+\subsection{Member Typedef Documentation}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a9c025ecb40da565f0f1584cbf2b10999}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!scalar\-\_\-type@{scalar\-\_\-type}}
+\index{scalar\-\_\-type@{scalar\-\_\-type}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{scalar\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ typedef Vector\-Operations\-::scalar\-\_\-type {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::{\bf scalar\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a9c025ecb40da565f0f1584cbf2b10999}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a1353cb66ac3391ffaba236b3a860dc8e}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!vector\-\_\-operations\-\_\-type@{vector\-\_\-operations\-\_\-type}}
+\index{vector\-\_\-operations\-\_\-type@{vector\-\_\-operations\-\_\-type}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{vector\-\_\-operations\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ typedef Vector\-Operations {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::{\bf vector\-\_\-operations\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a1353cb66ac3391ffaba236b3a860dc8e}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_afe4ad299b536cf5df8efbd2c08b619f5}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!vector\-\_\-type@{vector\-\_\-type}}
+\index{vector\-\_\-type@{vector\-\_\-type}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{vector\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ typedef Vector\-Operations\-::vector\-\_\-type {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::{\bf vector\-\_\-type}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_afe4ad299b536cf5df8efbd2c08b619f5}
+
+
+\subsection{Constructor \& Destructor Documentation}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_adff676b99030bc92c310106c5c9acadb}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!default\-\_\-monitor@{default\-\_\-monitor}}
+\index{default\-\_\-monitor@{default\-\_\-monitor}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{default\-\_\-monitor}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::{\bf default\-\_\-monitor} (
+\begin{DoxyParamCaption}
+\item[{const {\bf vector\-\_\-operations\-\_\-type} \&}]{vec\-\_\-ops, }
+\item[{Log $\ast$}]{log = {\ttfamily NULL}, }
+\item[{{\bf int}}]{obj\-\_\-log\-\_\-lev = {\ttfamily 0}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_adff676b99030bc92c310106c5c9acadb}
+
+
+\subsection{Member Function Documentation}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a28c4268cf6cc7058a351083a6b6272d1}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!abs\-\_\-tol@{abs\-\_\-tol}}
+\index{abs\-\_\-tol@{abs\-\_\-tol}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{abs\-\_\-tol}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ T {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::abs\-\_\-tol (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a28c4268cf6cc7058a351083a6b6272d1}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a28c4268cf6cc7058a351083a6b6272d1_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a334fb238ad97fdde376eee7c3715b80d}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!check\-\_\-finished@{check\-\_\-finished}}
+\index{check\-\_\-finished@{check\-\_\-finished}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{check\-\_\-finished}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ bool {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::check\-\_\-finished (
+\begin{DoxyParamCaption}
+\item[{const {\bf vector\-\_\-type} \&}]{x, }
+\item[{const {\bf vector\-\_\-type} \&}]{r}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a334fb238ad97fdde376eee7c3715b80d}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a334fb238ad97fdde376eee7c3715b80d_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a3fb05af4ef8ea15d1f78691f378fd3fa}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!converged@{converged}}
+\index{converged@{converged}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{converged}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ bool {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::converged (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a3fb05af4ef8ea15d1f78691f378fd3fa}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a3fb05af4ef8ea15d1f78691f378fd3fa_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a3fb05af4ef8ea15d1f78691f378fd3fa_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a027b3789b9e082c400249ec35420b43a}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!convergence\-\_\-history@{convergence\-\_\-history}}
+\index{convergence\-\_\-history@{convergence\-\_\-history}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{convergence\-\_\-history}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ const std\-::vector$<$std\-::pair$<${\bf int},T$>$ $>$\& {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::convergence\-\_\-history (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a027b3789b9e082c400249ec35420b43a}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=280pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a027b3789b9e082c400249ec35420b43a_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a23c2f5d0d37b20c027dc6890ae649c2e}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base@{divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base}}
+\index{divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base@{divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ bool {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a23c2f5d0d37b20c027dc6890ae649c2e}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a23c2f5d0d37b20c027dc6890ae649c2e_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a63f9d87378092ebb0877c099166b9c64}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!init@{init}}
+\index{init@{init}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{init}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ void {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::init (
+\begin{DoxyParamCaption}
+\item[{T}]{rel\-\_\-tol, }
+\item[{T}]{abs\-\_\-tol = {\ttfamily T(0.f)}, }
+\item[{{\bf int}}]{max\-\_\-iters\-\_\-num = {\ttfamily 100}, }
+\item[{{\bf int}}]{min\-\_\-iters\-\_\-num = {\ttfamily 0}, }
+\item[{bool}]{out\-\_\-min\-\_\-resid\-\_\-norm = {\ttfamily false}, }
+\item[{bool}]{save\-\_\-convergence\-\_\-history = {\ttfamily false}, }
+\item[{bool}]{divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base = {\ttfamily false}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a63f9d87378092ebb0877c099166b9c64}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a63f9d87378092ebb0877c099166b9c64_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=300pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a63f9d87378092ebb0877c099166b9c64_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a94135959ebff236eef6e2b5d3e0fe29b}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!is\-\_\-valid\-\_\-number@{is\-\_\-valid\-\_\-number}}
+\index{is\-\_\-valid\-\_\-number@{is\-\_\-valid\-\_\-number}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{is\-\_\-valid\-\_\-number}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ bool {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::is\-\_\-valid\-\_\-number (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a94135959ebff236eef6e2b5d3e0fe29b}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a94135959ebff236eef6e2b5d3e0fe29b_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aa6a060394887505a0490b03b36475483}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!iters\-\_\-performed@{iters\-\_\-performed}}
+\index{iters\-\_\-performed@{iters\-\_\-performed}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{iters\-\_\-performed}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ {\bf int} {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::iters\-\_\-performed (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aa6a060394887505a0490b03b36475483}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aa6a060394887505a0490b03b36475483_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_afcb878caf8bc1c3f816896df59689c78}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!max\-\_\-iters\-\_\-num@{max\-\_\-iters\-\_\-num}}
+\index{max\-\_\-iters\-\_\-num@{max\-\_\-iters\-\_\-num}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{max\-\_\-iters\-\_\-num}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ {\bf int} {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::max\-\_\-iters\-\_\-num (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_afcb878caf8bc1c3f816896df59689c78}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_afcb878caf8bc1c3f816896df59689c78_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a4cbfc2ff13dde5cff2d65267bb86398f}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!min\-\_\-iters\-\_\-num@{min\-\_\-iters\-\_\-num}}
+\index{min\-\_\-iters\-\_\-num@{min\-\_\-iters\-\_\-num}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{min\-\_\-iters\-\_\-num}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ {\bf int} {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::min\-\_\-iters\-\_\-num (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a4cbfc2ff13dde5cff2d65267bb86398f}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a4cbfc2ff13dde5cff2d65267bb86398f_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a4578e1951c8ba1bc2728a94073bab85a}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!min\-\_\-resid\-\_\-norm\-\_\-x@{min\-\_\-resid\-\_\-norm\-\_\-x}}
+\index{min\-\_\-resid\-\_\-norm\-\_\-x@{min\-\_\-resid\-\_\-norm\-\_\-x}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{min\-\_\-resid\-\_\-norm\-\_\-x}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ const {\bf vector\-\_\-type}\& {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::min\-\_\-resid\-\_\-norm\-\_\-x (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a4578e1951c8ba1bc2728a94073bab85a}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a682eddef15a08a2b11c1e20891f3d0d9}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!operator++@{operator++}}
+\index{operator++@{operator++}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{operator++}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ {\bf default\-\_\-monitor}\& {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::operator++ (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a682eddef15a08a2b11c1e20891f3d0d9}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_ac795e6b86cff023fbe843b386a224743}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!operator+=@{operator+=}}
+\index{operator+=@{operator+=}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{operator+=}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ {\bf default\-\_\-monitor}\& {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::operator+= (
+\begin{DoxyParamCaption}
+\item[{{\bf int}}]{n}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_ac795e6b86cff023fbe843b386a224743}
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a91011d0a20628ed3488009180dadd15c}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!out\-\_\-min\-\_\-resid\-\_\-norm@{out\-\_\-min\-\_\-resid\-\_\-norm}}
+\index{out\-\_\-min\-\_\-resid\-\_\-norm@{out\-\_\-min\-\_\-resid\-\_\-norm}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{out\-\_\-min\-\_\-resid\-\_\-norm}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ bool {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::out\-\_\-min\-\_\-resid\-\_\-norm (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a91011d0a20628ed3488009180dadd15c}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a91011d0a20628ed3488009180dadd15c_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_ada85d0e3f07a8a4ef176a8c6ca090329}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!rel\-\_\-tol@{rel\-\_\-tol}}
+\index{rel\-\_\-tol@{rel\-\_\-tol}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{rel\-\_\-tol}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ T {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::rel\-\_\-tol (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_ada85d0e3f07a8a4ef176a8c6ca090329}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_ada85d0e3f07a8a4ef176a8c6ca090329_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aef01dc1870d93ff92c604c6ff618b206}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!rel\-\_\-tol\-\_\-base@{rel\-\_\-tol\-\_\-base}}
+\index{rel\-\_\-tol\-\_\-base@{rel\-\_\-tol\-\_\-base}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{rel\-\_\-tol\-\_\-base}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ T {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::rel\-\_\-tol\-\_\-base (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aef01dc1870d93ff92c604c6ff618b206}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aef01dc1870d93ff92c604c6ff618b206_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aef01dc1870d93ff92c604c6ff618b206_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a247797a025a93a380a5df85d5e6eabc3}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!resid\-\_\-norm@{resid\-\_\-norm}}
+\index{resid\-\_\-norm@{resid\-\_\-norm}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{resid\-\_\-norm}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ T {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::resid\-\_\-norm (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a247797a025a93a380a5df85d5e6eabc3}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a247797a025a93a380a5df85d5e6eabc3_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_abda2cef74d67817ef555a54c4ced13de}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!resid\-\_\-norm\-\_\-out@{resid\-\_\-norm\-\_\-out}}
+\index{resid\-\_\-norm\-\_\-out@{resid\-\_\-norm\-\_\-out}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{resid\-\_\-norm\-\_\-out}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ T {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::resid\-\_\-norm\-\_\-out (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_abda2cef74d67817ef555a54c4ced13de}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_abda2cef74d67817ef555a54c4ced13de_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_abda2cef74d67817ef555a54c4ced13de_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a4cf95e3009bbef39997466dc9d54fea7}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!rhs\-\_\-norm@{rhs\-\_\-norm}}
+\index{rhs\-\_\-norm@{rhs\-\_\-norm}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{rhs\-\_\-norm}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ T {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::rhs\-\_\-norm (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a4cf95e3009bbef39997466dc9d54fea7}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a4cf95e3009bbef39997466dc9d54fea7_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a397c2b87b68d1f24c24645c06b2550c8}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!save\-\_\-convergence\-\_\-history@{save\-\_\-convergence\-\_\-history}}
+\index{save\-\_\-convergence\-\_\-history@{save\-\_\-convergence\-\_\-history}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{save\-\_\-convergence\-\_\-history}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ bool {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::save\-\_\-convergence\-\_\-history (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a397c2b87b68d1f24c24645c06b2550c8}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a397c2b87b68d1f24c24645c06b2550c8_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_af9ef0caa9961a54a7f12a6f9947faaf9}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!set\-\_\-divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base@{set\-\_\-divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base}}
+\index{set\-\_\-divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base@{set\-\_\-divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{set\-\_\-divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ void {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::set\-\_\-divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base (
+\begin{DoxyParamCaption}
+\item[{bool}]{divide\-\_\-out\-\_\-norms\-\_\-by\-\_\-rel\-\_\-base}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_af9ef0caa9961a54a7f12a6f9947faaf9}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_af9ef0caa9961a54a7f12a6f9947faaf9_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=288pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_af9ef0caa9961a54a7f12a6f9947faaf9_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a394d0837e6ac1e01413f5026646b3d7e}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!set\-\_\-save\-\_\-convergence\-\_\-history@{set\-\_\-save\-\_\-convergence\-\_\-history}}
+\index{set\-\_\-save\-\_\-convergence\-\_\-history@{set\-\_\-save\-\_\-convergence\-\_\-history}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{set\-\_\-save\-\_\-convergence\-\_\-history}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ void {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::set\-\_\-save\-\_\-convergence\-\_\-history (
+\begin{DoxyParamCaption}
+\item[{bool}]{save\-\_\-convergence\-\_\-history}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a394d0837e6ac1e01413f5026646b3d7e}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a394d0837e6ac1e01413f5026646b3d7e_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=312pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a394d0837e6ac1e01413f5026646b3d7e_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_ae1f0235658ea84218cfb29a312c6ffc0}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!start@{start}}
+\index{start@{start}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{start}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ void {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::start (
+\begin{DoxyParamCaption}
+\item[{const {\bf vector\-\_\-type} \&}]{rhs}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_ae1f0235658ea84218cfb29a312c6ffc0}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_ae1f0235658ea84218cfb29a312c6ffc0_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a78ca19b3ecf48d67cb245af417fdb97a}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!stop@{stop}}
+\index{stop@{stop}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{stop}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ void {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::stop (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a78ca19b3ecf48d67cb245af417fdb97a}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a78ca19b3ecf48d67cb245af417fdb97a_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aa554224a075325c4c537ade783a0e833}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!tol@{tol}}
+\index{tol@{tol}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{tol}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ T {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::tol (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aa554224a075325c4c537ade783a0e833}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aa554224a075325c4c537ade783a0e833_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_aa554224a075325c4c537ade783a0e833_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a9345483feeea9990d1fcb4433fa175cd}{\index{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}!tol\-\_\-out@{tol\-\_\-out}}
+\index{tol\-\_\-out@{tol\-\_\-out}!numerical_algos::lin_solvers::default_monitor@{numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}}
+\subsubsection[{tol\-\_\-out}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Log $>$ T {\bf numerical\-\_\-algos\-::lin\-\_\-solvers\-::default\-\_\-monitor}$<$ Vector\-Operations, Log $>$\-::tol\-\_\-out (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+) const\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a9345483feeea9990d1fcb4433fa175cd}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a9345483feeea9990d1fcb4433fa175cd_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnumerical__algos_1_1lin__solvers_1_1default__monitor_a9345483feeea9990d1fcb4433fa175cd_icgraph}
+\end{center}
+\end{figure}
+
+
+
+
+The documentation for this class was generated from the following file\-:\begin{DoxyCompactItemize}
+\item 
+source/numerical\-\_\-algos/lin\-\_\-solvers/\hyperlink{default__monitor_8h}{default\-\_\-monitor.\-h}\end{DoxyCompactItemize}

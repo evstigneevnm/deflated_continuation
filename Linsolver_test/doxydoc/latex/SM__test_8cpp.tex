@@ -1,0 +1,100 @@
+\hypertarget{SM__test_8cpp}{\section{source/\-S\-M\-\_\-test.cpp File Reference}
+\label{SM__test_8cpp}\index{source/\-S\-M\-\_\-test.\-cpp@{source/\-S\-M\-\_\-test.\-cpp}}
+}
+{\ttfamily \#include $<$cstdlib$>$}\\*
+{\ttfamily \#include $<$cmath$>$}\\*
+{\ttfamily \#include $<$iostream$>$}\\*
+{\ttfamily \#include $<$fstream$>$}\\*
+{\ttfamily \#include $<$utils/log.\-h$>$}\\*
+{\ttfamily \#include $<$numerical\-\_\-algos/lin\-\_\-solvers/default\-\_\-monitor.\-h$>$}\\*
+{\ttfamily \#include $<$numerical\-\_\-algos/lin\-\_\-solvers/bicgstabl.\-h$>$}\\*
+{\ttfamily \#include $<$file\-\_\-operations.\-h$>$}\\*
+{\ttfamily \#include $<$cpu\-\_\-vector\-\_\-operations.\-h$>$}\\*
+{\ttfamily \#include $<$numerical\-\_\-algos/lin\-\_\-solvers/sherman\-\_\-morrison\-\_\-linear\-\_\-system\-\_\-solve.\-h$>$}\\*
+Include dependency graph for S\-M\-\_\-test.\-cpp\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{SM__test_8cpp__incl}
+\end{center}
+\end{figure}
+\subsection*{Classes}
+\begin{DoxyCompactItemize}
+\item 
+struct \hyperlink{structsystem__operator}{system\-\_\-operator}
+\item 
+struct \hyperlink{structprec__operator}{prec\-\_\-operator}
+\end{DoxyCompactItemize}
+\subsection*{Typedefs}
+\begin{DoxyCompactItemize}
+\item 
+typedef S\-C\-A\-L\-A\-R\-\_\-\-T\-Y\-P\-E \hyperlink{SM__test_8cpp_a16870095f424ead722dee97d866cc328}{real}
+\item 
+typedef \hyperlink{linear__solvers__test_8cpp_a16870095f424ead722dee97d866cc328}{real} $\ast$ \hyperlink{SM__test_8cpp_a8d0acf9490f363fba134e7c88d751014}{vector\-\_\-t}
+\item 
+typedef \hyperlink{structcpu__vector__operations}{cpu\-\_\-vector\-\_\-operations}\\*
+$<$ \hyperlink{linear__solvers__test_8cpp_a16870095f424ead722dee97d866cc328}{real} $>$ \hyperlink{SM__test_8cpp_aaebf7bd665889594489c21e0c61ec90d}{cpu\-\_\-vector\-\_\-operations\-\_\-real}
+\item 
+typedef \hyperlink{classutils_1_1log__std}{utils\-::log\-\_\-std} \hyperlink{SM__test_8cpp_adeada72128ce2fd7dbd15454c076a5cb}{log\-\_\-t}
+\item 
+typedef \hyperlink{classnumerical__algos_1_1lin__solvers_1_1default__monitor}{default\-\_\-monitor}\\*
+$<$ \hyperlink{linear__solvers__test_8cpp_aaebf7bd665889594489c21e0c61ec90d}{cpu\-\_\-vector\-\_\-operations\-\_\-real}, \\*
+\hyperlink{linear__solvers__test_8cpp_adeada72128ce2fd7dbd15454c076a5cb}{log\-\_\-t} $>$ \hyperlink{SM__test_8cpp_a155c4fd39b63002a9e7a20aa8d77f52f}{monitor\-\_\-t}
+\item 
+typedef \\*
+\hyperlink{classnumerical__algos_1_1sherman__morrison__linear__system_1_1sherman__morrison__linear__system__solve}{sherman\-\_\-morrison\-\_\-linear\-\_\-system\-\_\-solve}\\*
+$<$ \hyperlink{structsystem__operator}{system\-\_\-operator}, \\*
+\hyperlink{structprec__operator}{prec\-\_\-operator}, \\*
+\hyperlink{linear__solvers__test_8cpp_aaebf7bd665889594489c21e0c61ec90d}{cpu\-\_\-vector\-\_\-operations\-\_\-real}, \\*
+\hyperlink{linear__solvers__test_8cpp_a155c4fd39b63002a9e7a20aa8d77f52f}{monitor\-\_\-t}, \hyperlink{linear__solvers__test_8cpp_adeada72128ce2fd7dbd15454c076a5cb}{log\-\_\-t}, \hyperlink{classnumerical__algos_1_1lin__solvers_1_1bicgstabl}{bicgstabl} $>$ \hyperlink{SM__test_8cpp_a73a0cee84b123387645a36ed99b75245}{sherman\-\_\-morrison\-\_\-linear\-\_\-system\-\_\-solve\-\_\-t}
+\end{DoxyCompactItemize}
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classint}{int} \hyperlink{SM__test_8cpp_a7a29781a20c5dd4153c3c1cecf0ff328}{main} (\hyperlink{classint}{int} argc, char $\ast$$\ast$args)
+\end{DoxyCompactItemize}
+
+
+\subsection{Typedef Documentation}
+\hypertarget{SM__test_8cpp_aaebf7bd665889594489c21e0c61ec90d}{\index{S\-M\-\_\-test.\-cpp@{S\-M\-\_\-test.\-cpp}!cpu\-\_\-vector\-\_\-operations\-\_\-real@{cpu\-\_\-vector\-\_\-operations\-\_\-real}}
+\index{cpu\-\_\-vector\-\_\-operations\-\_\-real@{cpu\-\_\-vector\-\_\-operations\-\_\-real}!SM_test.cpp@{S\-M\-\_\-test.\-cpp}}
+\subsubsection[{cpu\-\_\-vector\-\_\-operations\-\_\-real}]{\setlength{\rightskip}{0pt plus 5cm}typedef {\bf cpu\-\_\-vector\-\_\-operations}$<${\bf real}$>$ {\bf cpu\-\_\-vector\-\_\-operations\-\_\-real}}}\label{SM__test_8cpp_aaebf7bd665889594489c21e0c61ec90d}
+\hypertarget{SM__test_8cpp_adeada72128ce2fd7dbd15454c076a5cb}{\index{S\-M\-\_\-test.\-cpp@{S\-M\-\_\-test.\-cpp}!log\-\_\-t@{log\-\_\-t}}
+\index{log\-\_\-t@{log\-\_\-t}!SM_test.cpp@{S\-M\-\_\-test.\-cpp}}
+\subsubsection[{log\-\_\-t}]{\setlength{\rightskip}{0pt plus 5cm}typedef {\bf utils\-::log\-\_\-std} {\bf log\-\_\-t}}}\label{SM__test_8cpp_adeada72128ce2fd7dbd15454c076a5cb}
+\hypertarget{SM__test_8cpp_a155c4fd39b63002a9e7a20aa8d77f52f}{\index{S\-M\-\_\-test.\-cpp@{S\-M\-\_\-test.\-cpp}!monitor\-\_\-t@{monitor\-\_\-t}}
+\index{monitor\-\_\-t@{monitor\-\_\-t}!SM_test.cpp@{S\-M\-\_\-test.\-cpp}}
+\subsubsection[{monitor\-\_\-t}]{\setlength{\rightskip}{0pt plus 5cm}typedef {\bf default\-\_\-monitor}$<${\bf cpu\-\_\-vector\-\_\-operations\-\_\-real},{\bf log\-\_\-t}$>$ {\bf monitor\-\_\-t}}}\label{SM__test_8cpp_a155c4fd39b63002a9e7a20aa8d77f52f}
+\hypertarget{SM__test_8cpp_a16870095f424ead722dee97d866cc328}{\index{S\-M\-\_\-test.\-cpp@{S\-M\-\_\-test.\-cpp}!real@{real}}
+\index{real@{real}!SM_test.cpp@{S\-M\-\_\-test.\-cpp}}
+\subsubsection[{real}]{\setlength{\rightskip}{0pt plus 5cm}typedef S\-C\-A\-L\-A\-R\-\_\-\-T\-Y\-P\-E {\bf real}}}\label{SM__test_8cpp_a16870095f424ead722dee97d866cc328}
+\hypertarget{SM__test_8cpp_a73a0cee84b123387645a36ed99b75245}{\index{S\-M\-\_\-test.\-cpp@{S\-M\-\_\-test.\-cpp}!sherman\-\_\-morrison\-\_\-linear\-\_\-system\-\_\-solve\-\_\-t@{sherman\-\_\-morrison\-\_\-linear\-\_\-system\-\_\-solve\-\_\-t}}
+\index{sherman\-\_\-morrison\-\_\-linear\-\_\-system\-\_\-solve\-\_\-t@{sherman\-\_\-morrison\-\_\-linear\-\_\-system\-\_\-solve\-\_\-t}!SM_test.cpp@{S\-M\-\_\-test.\-cpp}}
+\subsubsection[{sherman\-\_\-morrison\-\_\-linear\-\_\-system\-\_\-solve\-\_\-t}]{\setlength{\rightskip}{0pt plus 5cm}typedef {\bf sherman\-\_\-morrison\-\_\-linear\-\_\-system\-\_\-solve}$<${\bf system\-\_\-operator},{\bf prec\-\_\-operator},{\bf cpu\-\_\-vector\-\_\-operations\-\_\-real},{\bf monitor\-\_\-t},{\bf log\-\_\-t},{\bf bicgstabl}$>$ {\bf sherman\-\_\-morrison\-\_\-linear\-\_\-system\-\_\-solve\-\_\-t}}}\label{SM__test_8cpp_a73a0cee84b123387645a36ed99b75245}
+\hypertarget{SM__test_8cpp_a8d0acf9490f363fba134e7c88d751014}{\index{S\-M\-\_\-test.\-cpp@{S\-M\-\_\-test.\-cpp}!vector\-\_\-t@{vector\-\_\-t}}
+\index{vector\-\_\-t@{vector\-\_\-t}!SM_test.cpp@{S\-M\-\_\-test.\-cpp}}
+\subsubsection[{vector\-\_\-t}]{\setlength{\rightskip}{0pt plus 5cm}typedef {\bf real}$\ast$ {\bf vector\-\_\-t}}}\label{SM__test_8cpp_a8d0acf9490f363fba134e7c88d751014}
+
+
+\subsection{Function Documentation}
+\hypertarget{SM__test_8cpp_a7a29781a20c5dd4153c3c1cecf0ff328}{\index{S\-M\-\_\-test.\-cpp@{S\-M\-\_\-test.\-cpp}!main@{main}}
+\index{main@{main}!SM_test.cpp@{S\-M\-\_\-test.\-cpp}}
+\subsubsection[{main}]{\setlength{\rightskip}{0pt plus 5cm}{\bf int} main (
+\begin{DoxyParamCaption}
+\item[{{\bf int}}]{argc, }
+\item[{char $\ast$$\ast$}]{args}
+\end{DoxyParamCaption}
+)}}\label{SM__test_8cpp_a7a29781a20c5dd4153c3c1cecf0ff328}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{SM__test_8cpp_a7a29781a20c5dd4153c3c1cecf0ff328_cgraph}
+\end{center}
+\end{figure}
+
+

@@ -1,0 +1,78 @@
+\hypertarget{namespacefile__operations}{\section{file\-\_\-operations Namespace Reference}
+\label{namespacefile__operations}\index{file\-\_\-operations@{file\-\_\-operations}}
+}
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+{\footnotesize template$<$class T $>$ }\\void \hyperlink{namespacefile__operations_ad47b52441906a522136b4747fb171c98}{write\-\_\-vector} (const std\-::string \&f\-\_\-name, size\-\_\-t N, T $\ast$\hyperlink{classvec}{vec}, unsigned \hyperlink{classint}{int} prec=17)
+\item 
+{\footnotesize template$<$class T $>$ }\\void \hyperlink{namespacefile__operations_a97599bb490f136dfc7a7acada893e864}{write\-\_\-matrix} (const std\-::string \&f\-\_\-name, size\-\_\-t Row, size\-\_\-t Col, T $\ast$matrix, unsigned \hyperlink{classint}{int} prec=17)
+\item 
+\hyperlink{classint}{int} \hyperlink{namespacefile__operations_aaf70668c562b4de63d013559c973421b}{read\-\_\-matrix\-\_\-size} (const std\-::string \&f\-\_\-name)
+\item 
+{\footnotesize template$<$class T $>$ }\\void \hyperlink{namespacefile__operations_ab172154a56e387286e268908708af0b5}{read\-\_\-matrix} (const std\-::string \&f\-\_\-name, size\-\_\-t Row, size\-\_\-t Col, T $\ast$matrix)
+\item 
+{\footnotesize template$<$class T $>$ }\\\hyperlink{classint}{int} \hyperlink{namespacefile__operations_a51aa2a1be8873c4f64256b06bf1ac578}{read\-\_\-vector} (const std\-::string \&f\-\_\-name, size\-\_\-t N, T $\ast$\hyperlink{classvec}{vec})
+\end{DoxyCompactItemize}
+
+
+\subsection{Function Documentation}
+\hypertarget{namespacefile__operations_ab172154a56e387286e268908708af0b5}{\index{file\-\_\-operations@{file\-\_\-operations}!read\-\_\-matrix@{read\-\_\-matrix}}
+\index{read\-\_\-matrix@{read\-\_\-matrix}!file_operations@{file\-\_\-operations}}
+\subsubsection[{read\-\_\-matrix}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class T $>$ void file\-\_\-operations\-::read\-\_\-matrix (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{f\-\_\-name, }
+\item[{size\-\_\-t}]{Row, }
+\item[{size\-\_\-t}]{Col, }
+\item[{T $\ast$}]{matrix}
+\end{DoxyParamCaption}
+)}}\label{namespacefile__operations_ab172154a56e387286e268908708af0b5}
+\hypertarget{namespacefile__operations_aaf70668c562b4de63d013559c973421b}{\index{file\-\_\-operations@{file\-\_\-operations}!read\-\_\-matrix\-\_\-size@{read\-\_\-matrix\-\_\-size}}
+\index{read\-\_\-matrix\-\_\-size@{read\-\_\-matrix\-\_\-size}!file_operations@{file\-\_\-operations}}
+\subsubsection[{read\-\_\-matrix\-\_\-size}]{\setlength{\rightskip}{0pt plus 5cm}{\bf int} file\-\_\-operations\-::read\-\_\-matrix\-\_\-size (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{f\-\_\-name}
+\end{DoxyParamCaption}
+)}}\label{namespacefile__operations_aaf70668c562b4de63d013559c973421b}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=258pt]{namespacefile__operations_aaf70668c562b4de63d013559c973421b_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{namespacefile__operations_a51aa2a1be8873c4f64256b06bf1ac578}{\index{file\-\_\-operations@{file\-\_\-operations}!read\-\_\-vector@{read\-\_\-vector}}
+\index{read\-\_\-vector@{read\-\_\-vector}!file_operations@{file\-\_\-operations}}
+\subsubsection[{read\-\_\-vector}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class T $>$ {\bf int} file\-\_\-operations\-::read\-\_\-vector (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{f\-\_\-name, }
+\item[{size\-\_\-t}]{N, }
+\item[{T $\ast$}]{vec}
+\end{DoxyParamCaption}
+)}}\label{namespacefile__operations_a51aa2a1be8873c4f64256b06bf1ac578}
+\hypertarget{namespacefile__operations_a97599bb490f136dfc7a7acada893e864}{\index{file\-\_\-operations@{file\-\_\-operations}!write\-\_\-matrix@{write\-\_\-matrix}}
+\index{write\-\_\-matrix@{write\-\_\-matrix}!file_operations@{file\-\_\-operations}}
+\subsubsection[{write\-\_\-matrix}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class T $>$ void file\-\_\-operations\-::write\-\_\-matrix (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{f\-\_\-name, }
+\item[{size\-\_\-t}]{Row, }
+\item[{size\-\_\-t}]{Col, }
+\item[{T $\ast$}]{matrix, }
+\item[{unsigned {\bf int}}]{prec = {\ttfamily 17}}
+\end{DoxyParamCaption}
+)}}\label{namespacefile__operations_a97599bb490f136dfc7a7acada893e864}
+\hypertarget{namespacefile__operations_ad47b52441906a522136b4747fb171c98}{\index{file\-\_\-operations@{file\-\_\-operations}!write\-\_\-vector@{write\-\_\-vector}}
+\index{write\-\_\-vector@{write\-\_\-vector}!file_operations@{file\-\_\-operations}}
+\subsubsection[{write\-\_\-vector}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class T $>$ void file\-\_\-operations\-::write\-\_\-vector (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{f\-\_\-name, }
+\item[{size\-\_\-t}]{N, }
+\item[{T $\ast$}]{vec, }
+\item[{unsigned {\bf int}}]{prec = {\ttfamily 17}}
+\end{DoxyParamCaption}
+)}}\label{namespacefile__operations_ad47b52441906a522136b4747fb171c98}

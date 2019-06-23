@@ -1,0 +1,170 @@
+\hypertarget{classcontinuation_1_1predictor__adaptive}{\section{continuation\-:\-:predictor\-\_\-adaptive$<$ Vector\-Operations, Logging $>$ Class Template Reference}
+\label{classcontinuation_1_1predictor__adaptive}\index{continuation\-::predictor\-\_\-adaptive$<$ Vector\-Operations, Logging $>$@{continuation\-::predictor\-\_\-adaptive$<$ Vector\-Operations, Logging $>$}}
+}
+
+
+{\ttfamily \#include $<$predictor\-\_\-adaptive.\-h$>$}
+
+
+
+Collaboration diagram for continuation\-:\-:predictor\-\_\-adaptive$<$ Vector\-Operations, Logging $>$\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=226pt]{classcontinuation_1_1predictor__adaptive__coll__graph}
+\end{center}
+\end{figure}
+\subsection*{Public Types}
+\begin{DoxyCompactItemize}
+\item 
+typedef \\*
+Vector\-Operations\-::scalar\-\_\-type \hyperlink{classcontinuation_1_1predictor__adaptive_add46ad992055f6fad831be827ae49ddb}{T}
+\item 
+typedef \\*
+Vector\-Operations\-::vector\-\_\-type \hyperlink{classcontinuation_1_1predictor__adaptive_ae84bcc7dd9cf2c85cd18bbb0de1c42b2}{T\-\_\-vec}
+\end{DoxyCompactItemize}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classcontinuation_1_1predictor__adaptive_a7d48f716ecd9b2b78d415d63c1b93e7b}{predictor\-\_\-adaptive} (Vector\-Operations $\ast$vec\-\_\-ops\-\_\-, Logging $\ast$log\-\_\-, \hyperlink{classcontinuation_1_1predictor__adaptive_add46ad992055f6fad831be827ae49ddb}{T} ds\-\_\-0\-\_\-, \hyperlink{classcontinuation_1_1predictor__adaptive_add46ad992055f6fad831be827ae49ddb}{T} step\-\_\-ds\-\_\-=0.\-25, unsigned \hyperlink{classint}{int} attempts\-\_\-0\-\_\-=4)
+\item 
+\hyperlink{classcontinuation_1_1predictor__adaptive_ac802d98184a468c60ad897cd4bcf88ea}{$\sim$predictor\-\_\-adaptive} ()
+\item 
+void \hyperlink{classcontinuation_1_1predictor__adaptive_ac8df32b6ab749bc81d4152e90d384e0d}{reset} ()
+\item 
+void \hyperlink{classcontinuation_1_1predictor__adaptive_abbaa2df573af877477af91066b5fd0a1}{set\-\_\-tangent\-\_\-space} (const \hyperlink{classcontinuation_1_1predictor__adaptive_ae84bcc7dd9cf2c85cd18bbb0de1c42b2}{T\-\_\-vec} \&x\-\_\-0\-\_\-, const \hyperlink{classcontinuation_1_1predictor__adaptive_add46ad992055f6fad831be827ae49ddb}{T} \&lambda\-\_\-0\-\_\-, const \hyperlink{classcontinuation_1_1predictor__adaptive_ae84bcc7dd9cf2c85cd18bbb0de1c42b2}{T\-\_\-vec} \&x\-\_\-s\-\_\-, const \hyperlink{classcontinuation_1_1predictor__adaptive_add46ad992055f6fad831be827ae49ddb}{T} \&lambda\-\_\-s\-\_\-)
+\item 
+void \hyperlink{classcontinuation_1_1predictor__adaptive_a08df60dddbb96717993212a5ffa767fa}{reset\-\_\-tangent\-\_\-space} (const \hyperlink{classcontinuation_1_1predictor__adaptive_ae84bcc7dd9cf2c85cd18bbb0de1c42b2}{T\-\_\-vec} \&x\-\_\-0\-\_\-, const \hyperlink{classcontinuation_1_1predictor__adaptive_add46ad992055f6fad831be827ae49ddb}{T} \&lambda\-\_\-0\-\_\-, const \hyperlink{classcontinuation_1_1predictor__adaptive_ae84bcc7dd9cf2c85cd18bbb0de1c42b2}{T\-\_\-vec} \&x\-\_\-s\-\_\-, const \hyperlink{classcontinuation_1_1predictor__adaptive_add46ad992055f6fad831be827ae49ddb}{T} \&lambda\-\_\-s\-\_\-)
+\item 
+void \hyperlink{classcontinuation_1_1predictor__adaptive_a25dd64f793f353653a37af8ba753338a}{apply} (\hyperlink{classcontinuation_1_1predictor__adaptive_ae84bcc7dd9cf2c85cd18bbb0de1c42b2}{T\-\_\-vec} \&x\-\_\-0\-\_\-p, \hyperlink{classcontinuation_1_1predictor__adaptive_add46ad992055f6fad831be827ae49ddb}{T} \&lambda\-\_\-0\-\_\-p, \hyperlink{classcontinuation_1_1predictor__adaptive_ae84bcc7dd9cf2c85cd18bbb0de1c42b2}{T\-\_\-vec} \&x\-\_\-1\-\_\-g, \hyperlink{classcontinuation_1_1predictor__adaptive_add46ad992055f6fad831be827ae49ddb}{T} \&lambda\-\_\-1\-\_\-g)
+\item 
+bool \hyperlink{classcontinuation_1_1predictor__adaptive_aafc990e5ecaf56de9769e12dd0b23a0a}{modify\-\_\-ds} ()
+\item 
+\hyperlink{classcontinuation_1_1predictor__adaptive_add46ad992055f6fad831be827ae49ddb}{T} \hyperlink{classcontinuation_1_1predictor__adaptive_a228c5f1d3043154a10acc4bf697bbddf}{get\-\_\-ds} ()
+\end{DoxyCompactItemize}
+
+
+\subsection{Member Typedef Documentation}
+\hypertarget{classcontinuation_1_1predictor__adaptive_add46ad992055f6fad831be827ae49ddb}{\index{continuation\-::predictor\-\_\-adaptive@{continuation\-::predictor\-\_\-adaptive}!T@{T}}
+\index{T@{T}!continuation::predictor_adaptive@{continuation\-::predictor\-\_\-adaptive}}
+\subsubsection[{T}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Logging $>$ typedef Vector\-Operations\-::scalar\-\_\-type {\bf continuation\-::predictor\-\_\-adaptive}$<$ Vector\-Operations, Logging $>$\-::{\bf T}}}\label{classcontinuation_1_1predictor__adaptive_add46ad992055f6fad831be827ae49ddb}
+\hypertarget{classcontinuation_1_1predictor__adaptive_ae84bcc7dd9cf2c85cd18bbb0de1c42b2}{\index{continuation\-::predictor\-\_\-adaptive@{continuation\-::predictor\-\_\-adaptive}!T\-\_\-vec@{T\-\_\-vec}}
+\index{T\-\_\-vec@{T\-\_\-vec}!continuation::predictor_adaptive@{continuation\-::predictor\-\_\-adaptive}}
+\subsubsection[{T\-\_\-vec}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Logging $>$ typedef Vector\-Operations\-::vector\-\_\-type {\bf continuation\-::predictor\-\_\-adaptive}$<$ Vector\-Operations, Logging $>$\-::{\bf T\-\_\-vec}}}\label{classcontinuation_1_1predictor__adaptive_ae84bcc7dd9cf2c85cd18bbb0de1c42b2}
+
+
+\subsection{Constructor \& Destructor Documentation}
+\hypertarget{classcontinuation_1_1predictor__adaptive_a7d48f716ecd9b2b78d415d63c1b93e7b}{\index{continuation\-::predictor\-\_\-adaptive@{continuation\-::predictor\-\_\-adaptive}!predictor\-\_\-adaptive@{predictor\-\_\-adaptive}}
+\index{predictor\-\_\-adaptive@{predictor\-\_\-adaptive}!continuation::predictor_adaptive@{continuation\-::predictor\-\_\-adaptive}}
+\subsubsection[{predictor\-\_\-adaptive}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Logging $>$ {\bf continuation\-::predictor\-\_\-adaptive}$<$ Vector\-Operations, Logging $>$\-::{\bf predictor\-\_\-adaptive} (
+\begin{DoxyParamCaption}
+\item[{Vector\-Operations $\ast$}]{vec\-\_\-ops\-\_\-, }
+\item[{Logging $\ast$}]{log\-\_\-, }
+\item[{{\bf T}}]{ds\-\_\-0\-\_\-, }
+\item[{{\bf T}}]{step\-\_\-ds\-\_\- = {\ttfamily 0.25}, }
+\item[{unsigned {\bf int}}]{attempts\-\_\-0\-\_\- = {\ttfamily 4}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classcontinuation_1_1predictor__adaptive_a7d48f716ecd9b2b78d415d63c1b93e7b}
+\hypertarget{classcontinuation_1_1predictor__adaptive_ac802d98184a468c60ad897cd4bcf88ea}{\index{continuation\-::predictor\-\_\-adaptive@{continuation\-::predictor\-\_\-adaptive}!$\sim$predictor\-\_\-adaptive@{$\sim$predictor\-\_\-adaptive}}
+\index{$\sim$predictor\-\_\-adaptive@{$\sim$predictor\-\_\-adaptive}!continuation::predictor_adaptive@{continuation\-::predictor\-\_\-adaptive}}
+\subsubsection[{$\sim$predictor\-\_\-adaptive}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Logging $>$ {\bf continuation\-::predictor\-\_\-adaptive}$<$ Vector\-Operations, Logging $>$\-::$\sim${\bf predictor\-\_\-adaptive} (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classcontinuation_1_1predictor__adaptive_ac802d98184a468c60ad897cd4bcf88ea}
+
+
+\subsection{Member Function Documentation}
+\hypertarget{classcontinuation_1_1predictor__adaptive_a25dd64f793f353653a37af8ba753338a}{\index{continuation\-::predictor\-\_\-adaptive@{continuation\-::predictor\-\_\-adaptive}!apply@{apply}}
+\index{apply@{apply}!continuation::predictor_adaptive@{continuation\-::predictor\-\_\-adaptive}}
+\subsubsection[{apply}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Logging $>$ void {\bf continuation\-::predictor\-\_\-adaptive}$<$ Vector\-Operations, Logging $>$\-::apply (
+\begin{DoxyParamCaption}
+\item[{{\bf T\-\_\-vec} \&}]{x\-\_\-0\-\_\-p, }
+\item[{{\bf T} \&}]{lambda\-\_\-0\-\_\-p, }
+\item[{{\bf T\-\_\-vec} \&}]{x\-\_\-1\-\_\-g, }
+\item[{{\bf T} \&}]{lambda\-\_\-1\-\_\-g}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classcontinuation_1_1predictor__adaptive_a25dd64f793f353653a37af8ba753338a}
+\hypertarget{classcontinuation_1_1predictor__adaptive_a228c5f1d3043154a10acc4bf697bbddf}{\index{continuation\-::predictor\-\_\-adaptive@{continuation\-::predictor\-\_\-adaptive}!get\-\_\-ds@{get\-\_\-ds}}
+\index{get\-\_\-ds@{get\-\_\-ds}!continuation::predictor_adaptive@{continuation\-::predictor\-\_\-adaptive}}
+\subsubsection[{get\-\_\-ds}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Logging $>$ {\bf T} {\bf continuation\-::predictor\-\_\-adaptive}$<$ Vector\-Operations, Logging $>$\-::get\-\_\-ds (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classcontinuation_1_1predictor__adaptive_a228c5f1d3043154a10acc4bf697bbddf}
+\hypertarget{classcontinuation_1_1predictor__adaptive_aafc990e5ecaf56de9769e12dd0b23a0a}{\index{continuation\-::predictor\-\_\-adaptive@{continuation\-::predictor\-\_\-adaptive}!modify\-\_\-ds@{modify\-\_\-ds}}
+\index{modify\-\_\-ds@{modify\-\_\-ds}!continuation::predictor_adaptive@{continuation\-::predictor\-\_\-adaptive}}
+\subsubsection[{modify\-\_\-ds}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Logging $>$ bool {\bf continuation\-::predictor\-\_\-adaptive}$<$ Vector\-Operations, Logging $>$\-::modify\-\_\-ds (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classcontinuation_1_1predictor__adaptive_aafc990e5ecaf56de9769e12dd0b23a0a}
+\hypertarget{classcontinuation_1_1predictor__adaptive_ac8df32b6ab749bc81d4152e90d384e0d}{\index{continuation\-::predictor\-\_\-adaptive@{continuation\-::predictor\-\_\-adaptive}!reset@{reset}}
+\index{reset@{reset}!continuation::predictor_adaptive@{continuation\-::predictor\-\_\-adaptive}}
+\subsubsection[{reset}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Logging $>$ void {\bf continuation\-::predictor\-\_\-adaptive}$<$ Vector\-Operations, Logging $>$\-::reset (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classcontinuation_1_1predictor__adaptive_ac8df32b6ab749bc81d4152e90d384e0d}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classcontinuation_1_1predictor__adaptive_ac8df32b6ab749bc81d4152e90d384e0d_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classcontinuation_1_1predictor__adaptive_a08df60dddbb96717993212a5ffa767fa}{\index{continuation\-::predictor\-\_\-adaptive@{continuation\-::predictor\-\_\-adaptive}!reset\-\_\-tangent\-\_\-space@{reset\-\_\-tangent\-\_\-space}}
+\index{reset\-\_\-tangent\-\_\-space@{reset\-\_\-tangent\-\_\-space}!continuation::predictor_adaptive@{continuation\-::predictor\-\_\-adaptive}}
+\subsubsection[{reset\-\_\-tangent\-\_\-space}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Logging $>$ void {\bf continuation\-::predictor\-\_\-adaptive}$<$ Vector\-Operations, Logging $>$\-::reset\-\_\-tangent\-\_\-space (
+\begin{DoxyParamCaption}
+\item[{const {\bf T\-\_\-vec} \&}]{x\-\_\-0\-\_\-, }
+\item[{const {\bf T} \&}]{lambda\-\_\-0\-\_\-, }
+\item[{const {\bf T\-\_\-vec} \&}]{x\-\_\-s\-\_\-, }
+\item[{const {\bf T} \&}]{lambda\-\_\-s\-\_\-}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classcontinuation_1_1predictor__adaptive_a08df60dddbb96717993212a5ffa767fa}
+
+
+Here is the call graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classcontinuation_1_1predictor__adaptive_a08df60dddbb96717993212a5ffa767fa_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classcontinuation_1_1predictor__adaptive_abbaa2df573af877477af91066b5fd0a1}{\index{continuation\-::predictor\-\_\-adaptive@{continuation\-::predictor\-\_\-adaptive}!set\-\_\-tangent\-\_\-space@{set\-\_\-tangent\-\_\-space}}
+\index{set\-\_\-tangent\-\_\-space@{set\-\_\-tangent\-\_\-space}!continuation::predictor_adaptive@{continuation\-::predictor\-\_\-adaptive}}
+\subsubsection[{set\-\_\-tangent\-\_\-space}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Logging $>$ void {\bf continuation\-::predictor\-\_\-adaptive}$<$ Vector\-Operations, Logging $>$\-::set\-\_\-tangent\-\_\-space (
+\begin{DoxyParamCaption}
+\item[{const {\bf T\-\_\-vec} \&}]{x\-\_\-0\-\_\-, }
+\item[{const {\bf T} \&}]{lambda\-\_\-0\-\_\-, }
+\item[{const {\bf T\-\_\-vec} \&}]{x\-\_\-s\-\_\-, }
+\item[{const {\bf T} \&}]{lambda\-\_\-s\-\_\-}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classcontinuation_1_1predictor__adaptive_abbaa2df573af877477af91066b5fd0a1}
+
+
+Here is the caller graph for this function\-:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classcontinuation_1_1predictor__adaptive_abbaa2df573af877477af91066b5fd0a1_icgraph}
+\end{center}
+\end{figure}
+
+
+
+
+The documentation for this class was generated from the following file\-:\begin{DoxyCompactItemize}
+\item 
+source/continuation/\hyperlink{predictor__adaptive_8h}{predictor\-\_\-adaptive.\-h}\end{DoxyCompactItemize}

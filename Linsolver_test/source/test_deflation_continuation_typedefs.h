@@ -83,8 +83,8 @@
         vec_ops_real_im,
         newton_def_t,
         KS_2D,
-        sol_storage_def_t
-        >deflation_operator_t;
+        sol_storage_def_t,
+        log_t>deflation_operator_t;
 
     typedef continuation::system_operator_continuation<
         vec_ops_real_im, 
@@ -102,10 +102,13 @@
         > newton_cont_t;
 
     typedef continuation::predictor_adaptive<
-        vec_ops_real_im> predictor_cont_t;
+        vec_ops_real_im,
+        log_t
+        > predictor_cont_t;
 
     typedef continuation::advance_solution<
         vec_ops_real_im,
+        log_t,
         newton_cont_t,
         KS_2D,
         system_operator_cont_t,
