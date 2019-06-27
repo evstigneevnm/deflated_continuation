@@ -1,6 +1,13 @@
 #ifndef __LINEAR_OPERATOR_KS_2D_H__
 #define __LINEAR_OPERATOR_KS_2D_H__
 
+/**
+*   Helper class for iterative linear solver
+*   It is calling a method defined in nonlinear_operator
+*
+*/
+
+
 namespace nonlinear_operators
 {
 

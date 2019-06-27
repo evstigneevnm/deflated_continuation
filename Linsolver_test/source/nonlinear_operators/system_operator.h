@@ -1,8 +1,18 @@
 #ifndef __SYSTEM_OPERATOR_H__
 #define __SYSTEM_OPERATOR_H__
 
+
+/**
+*   System operator class used to solve the linear system
+*   Executed in the Newton's method
+*
+*
+*/
+
+
 namespace nonlinear_operators
 {
+
 
 template<class vector_operations, class nonlinear_operator, class linear_operator, class linear_solver>
 class system_operator

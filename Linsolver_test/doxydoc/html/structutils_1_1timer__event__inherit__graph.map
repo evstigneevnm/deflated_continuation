@@ -1,5 +1,0 @@
-<map id="utils::timer_event" name="utils::timer_event">
-<area shape="rect" id="node2" href="$structutils_1_1cuda__timer__event.html" title="{utils::cuda_timer_event\n|+ e\l|+ cuda_timer_event()\l+ ~cuda_timer_event()\l+ init()\l+ record()\l+ elapsed_time()\l+ release()\l}" alt="" coords="5,183,163,334"/>
-<area shape="rect" id="node3" href="$structutils_1_1mpi__timer__event.html" title="{utils::mpi_timer_event\n|+ time\l|+ mpi_timer_event()\l+ ~mpi_timer_event()\l+ init()\l+ record()\l+ elapsed_time()\l+ release()\l}" alt="" coords="187,183,337,334"/>
-<area shape="rect" id="node4" href="$structutils_1_1system__timer__event.html" title="{utils::system_timer\l_event\n|+ tv\l|+ system_timer_event()\l+ ~system_timer_event()\l+ init()\l+ record()\l+ elapsed_time()\l+ release()\l}" alt="" coords="363,176,531,341"/>
-</map>

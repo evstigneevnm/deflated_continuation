@@ -1,7 +1,0 @@
-<map id="cpu_vector_operations::assign" name="cpu_vector_operations::assign">
-<area shape="rect" id="node2" href="$classcontinuation_1_1newton__method__extended_1_1convergence__strategy.html#a054b5c56e77943cedf093b6e6513cb64" title="continuation::newton\l_method_extended::convergence\l_strategy::check_convergence" alt="" coords="209,5,423,61"/>
-<area shape="rect" id="node3" href="$classnonlinear__operators_1_1newton__method_1_1convergence__strategy.html#af14415fad7e86ef9c2bf3da72745f685" title="nonlinear_operators\l::newton_method::convergence\l_strategy::check_convergence" alt="" coords="214,85,418,141"/>
-<area shape="rect" id="node4" href="$classdeflation_1_1system__operator__deflation.html#aae79ccde9c028f86471180deb6ef5e6f" title="deflation::system_operator\l_deflation::solve" alt="" coords="228,165,404,206"/>
-<area shape="rect" id="node5" href="$classnumerical__algos_1_1newton__method_1_1newton__solver.html#a824a046e3d48548a799b140c5c97b015" title="numerical_algos::newton\l_method::newton_solver\l::solve" alt="" coords="233,229,399,285"/>
-<area shape="rect" id="node6" href="$classnumerical__algos_1_1newton__method__extended_1_1newton__solver__extended.html#addb6f412050b9e268306890464471d10" title="numerical_algos::newton\l_method_extended::newton\l_solver_extended::solve" alt="" coords="225,309,407,365"/>
-</map>

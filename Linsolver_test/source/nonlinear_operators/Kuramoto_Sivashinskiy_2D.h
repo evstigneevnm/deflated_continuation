@@ -2,23 +2,23 @@
 #define __KURAMOTO_SIVASHINSKIY_2D__
 
 
-/*
-Problem class for:
-(1)    lambda*(a_val*(uu_x+uu_y)+L(u))+b_val*B(u)
-
-solves using Fourier method via FFT
-Constructor sets up constant scalars "a_val" and "b_val"
-includes the following methods:
-- F(x,lambda) solves (1) for given (x,lambda)
-- set_linearization_point(x0, lambda0) sets point of linearization for calculation of Jacobians
-- jacobian_u(x) solves Jacobian F_x at (x0, lambda0) for given x using variational formulation
-- jacobian_lambda(x) solves Jacobian F_lambda at (x0, lambda0) for given x using variational formulation
-- preconditioner_jacobian_u(dr) applies Jacobi preconditioner for the Jacobian F_x at given (x0, lambda0)
-axillary:
-- set_cuda_grid calculates CUDA grid
-- get_cuda_grid returns calculated grid
-
-
+/**
+*    Problem class for:
+*    (1)    lambda*(a_val*(uu_x+uu_y)+L(u))+b_val*B(u)
+*
+*    solves using Fourier method via FFT
+*    Constructor sets up constant scalars "a_val" and "b_val"
+*    includes the following methods:
+*    - F(x,lambda) solves (1) for given (x,lambda)
+*    - set_linearization_point(x0, lambda0) sets point of linearization for calculation of Jacobians
+*    - jacobian_u(x) solves Jacobian F_x at (x0, lambda0) for given x using variational formulation
+*    - jacobian_lambda(x) solves Jacobian F_lambda at (x0, lambda0) for given x using variational formulation
+*    - preconditioner_jacobian_u(dr) applies Jacobi preconditioner for the Jacobian F_x at given (x0, lambda0)
+*    axillary:
+*    - set_cuda_grid calculates CUDA grid
+*    - get_cuda_grid returns calculated grid
+*
+*
 */
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D_ker.h>
 
@@ -112,7 +112,7 @@ public:
     //   F(u,alpha)=v
     void F(const TC_vec& u, const T alpha, TC_vec& v)
     {
-
+        
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_x, u_x_hat);
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_y, u_y_hat);
         
@@ -469,7 +469,7 @@ private:
     {
         FFT->fft(u_, u_hat_);
         // TC scale = TC((1.0)/(Nx*Ny), 0);
-        // vec_ops_C->scale(scale, u_hat_);        
+        // vec_ops_C->scale(scale, u_hat_);
     }
 
 

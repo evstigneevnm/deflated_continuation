@@ -70,7 +70,7 @@ __global__ void C2R_kernel(size_t N, TC_vec arrayC, T_vec_im arrayR_im)
     
     if(j>=N) return;
 
-    arrayR_im[j] = arrayC[j+1].imag();
+    arrayR_im[j] = arrayC[j+1].imag();//(1.0*N);
 
 }
 
@@ -84,7 +84,7 @@ __global__ void R2C_kernel(size_t N, T_vec_im arrayR_im, TC_vec arrayC)
     
     if(j>=N) return;
     
-    TC val = TC(0, arrayR_im[j]);
+    TC val = TC(0, arrayR_im[j]);//*(1.0*N));
     arrayC[j+1] = val;
 
     arrayC[0]=TC(0,0);

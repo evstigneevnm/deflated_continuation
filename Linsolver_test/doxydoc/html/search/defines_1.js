@@ -1,6 +1,0 @@
-var searchData=
-[
-  ['blocks_5fx_5f',['Blocks_x_',['../test__deflation__continuation__typedefs_8h.html#ab3a0153fcf227b1e9023c29175eb20f3',1,'Blocks_x_():&#160;test_deflation_continuation_typedefs.h'],['../test__deflation__typedefs_8h.html#ab3a0153fcf227b1e9023c29175eb20f3',1,'Blocks_x_():&#160;test_deflation_typedefs.h'],['../test__Kuramoto__Sivashinskiy__2D__RHS_8cpp.html#ab3a0153fcf227b1e9023c29175eb20f3',1,'Blocks_x_():&#160;test_Kuramoto_Sivashinskiy_2D_RHS.cpp'],['../test__Kuramoto__Sivashinskiy__2D__RHS__C_8cpp.html#ab3a0153fcf227b1e9023c29175eb20f3',1,'Blocks_x_():&#160;test_Kuramoto_Sivashinskiy_2D_RHS_C.cpp']]],
-  ['blocks_5fy_5f',['Blocks_y_',['../test__deflation__continuation__typedefs_8h.html#a9fef500876100abdf8e6eecf62f03703',1,'Blocks_y_():&#160;test_deflation_continuation_typedefs.h'],['../test__deflation__typedefs_8h.html#a9fef500876100abdf8e6eecf62f03703',1,'Blocks_y_():&#160;test_deflation_typedefs.h'],['../test__Kuramoto__Sivashinskiy__2D__RHS_8cpp.html#a9fef500876100abdf8e6eecf62f03703',1,'Blocks_y_():&#160;test_Kuramoto_Sivashinskiy_2D_RHS.cpp'],['../test__Kuramoto__Sivashinskiy__2D__RHS__C_8cpp.html#a9fef500876100abdf8e6eecf62f03703',1,'Blocks_y_():&#160;test_Kuramoto_Sivashinskiy_2D_RHS_C.cpp']]],
-  ['blocksize',['BLOCKSIZE',['../cufft__test__kernels_8h.html#afcf795f5a96fd55561abe69f56224630',1,'cufft_test_kernels.h']]]
-];

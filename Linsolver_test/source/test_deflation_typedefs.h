@@ -84,7 +84,8 @@
         vec_ops_real_im,
         newton_def_t,
         KS_2D,
-        sol_storage_def_t
+        sol_storage_def_t,
+        log_t
         >deflation_operator_t;
 
     typedef typename vec_ops_real::vector_type real_vec; 

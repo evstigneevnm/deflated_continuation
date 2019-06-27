@@ -31,6 +31,7 @@
 #include <continuation/system_operator_continuation.h>
 #include <continuation/advance_solution.h>
 #include <continuation/initial_tangent.h>
+#include <continuation/convergence_strategy.h>
 
 #include "gpu_file_operations.h"
 #include "gpu_vector_operations.h"
@@ -56,18 +57,20 @@ int main(int argc, char const *argv[])
 
     init_cuda(6);
     real norm_wight = std::sqrt(real(Nx*Ny));
-   
+    real size_problem = std::sqrt(real(Nx*Ny));
+
     //linsolver control
     unsigned int lin_solver_max_it = 1500;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;
-    real lin_solver_tol = 5.0e-8*norm_wight;
+    real lin_solver_tol = 5.0e-8*size_problem;
     
-    //newton deflation control
+    //newton control
     unsigned int newton_def_max_it = 350;
-    real newton_def_tol = 5.0e-8*norm_wight;
-
+    unsigned int newton_def_cont_it = 100;
+    real newton_def_tol = 5.0e-8*size_problem;
+    real newton_cont_tol = 5.0e-8*size_problem;
 
     real a_val = real(2);
     real b_val = real(4);
@@ -125,7 +128,8 @@ int main(int argc, char const *argv[])
     //setup continuation system:
     predictor_cont_t* predict = new predictor_cont_t(vec_ops_R_im, log, dS, 0.25, 20);
     system_operator_cont_t* system_operator_cont = new system_operator_cont_t(vec_ops_R_im, Ax, SM);
-    newton_cont_t* newton_cont = new newton_cont_t(vec_ops_R_im, system_operator_cont, conv_newton_def);
+    convergence_newton_cont_t *conv_newton_cont = new convergence_newton_cont_t(vec_ops_R_im, log, newton_cont_tol, newton_def_cont_it, real(1), true);
+    newton_cont_t* newton_cont = new newton_cont_t(vec_ops_R_im, system_operator_cont, conv_newton_cont);
     advance_step_cont_t* continuation_step = new advance_step_cont_t(vec_ops_R_im, log, system_operator_cont, newton_cont, predict);
     tangent_0_cont_t* init_tangent = new tangent_0_cont_t(vec_ops_R_im, Ax, SM);
 
@@ -281,6 +285,7 @@ int main(int argc, char const *argv[])
     delete system_operator_def;
     delete newton_def;
 
+    delete conv_newton_cont;
     delete conv_newton;
     delete system_operator;
     delete newton;

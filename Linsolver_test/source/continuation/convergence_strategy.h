@@ -1,7 +1,7 @@
 #ifndef __CONVERGENCE_STRATEGY_CONTINUATION_H__
 #define __CONVERGENCE_STRATEGY_CONTINUATION_H__
 /*
-converhence rules for Newton iterator for deflation process
+convergence rules for Newton iterator for continuation process
 */
 #include <cmath>
 #include <vector>
@@ -57,15 +57,36 @@ public:
         T lambda1 = lambda + newton_wight*delta_lambda;
         nonlin_op->F(x1, lambda1, Fx);
         T normFx1 = vec_ops->norm(Fx);
-        if(store_norms_history)
-        {
-            norms_evolution.push_back(normFx1);
-        }
 
         iterations++;
-        log->info_f("iteration %i, previous residual %le, current residual %le",iterations, (double)normFx, (double)normFx1);
-        
-
+        log->info_f("iteration %i, previous residual %le, current residual %le ",iterations, (double)normFx, (double)normFx1);
+        if(normFx1>10.0*normFx) //cancel update and decrease the nonlinear update wight if the norm is growing
+        {   
+            iterations--;
+            newton_wight*=T(0.75);
+            lambda1 = lambda;
+            vec_ops->assign(x, x1);
+            log->info_f("step is cancelled, Newton wight updated to (%le).", double(newton_wight) );
+        }
+        else
+        {
+            //store norm only if the step is seccessfull
+            if(store_norms_history)
+            {
+                norms_evolution.push_back(normFx1);
+            }
+        }
+        if(normFx1<10.0*normFx)
+        {
+            reset_wight();
+            log->info_f("fast descent, Newton wight updated to (%le).", double(newton_wight) );
+        }
+        if(newton_wight<T(1.0e-6))
+        {
+            log->info_f("Newton wight is too small (%le).", double(newton_wight));   
+            finish = true;
+            result_status = 4;
+        }
         if(std::isnan(normFx))
         {
             log->info("Newton initial vector caused nan.");

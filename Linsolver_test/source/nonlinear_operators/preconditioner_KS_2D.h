@@ -1,6 +1,14 @@
 #ifndef __PRECONDITIONER_KS_2D_H__
 #define __PRECONDITIONER_KS_2D_H__
 
+
+/**
+*   Helper preconditioner class for iterative linear solver
+*   It is calling a method defined in nonlinear_operator
+*   Also requires linear operator while using iterative Krylov solver
+*/
+
+
 namespace nonlinear_operators
 {
 

@@ -1,6 +1,14 @@
 #ifndef __CONTINUATION__PREDICTOR_ADAPTIVE_H__
 #define __CONTINUATION__PREDICTOR_ADAPTIVE_H__
 
+/**
+    predictor class for continuation.
+    performs linear prediction of the trjectory in extended (x,\lambda) space
+    original point and tangent is set by calling set_tangent_space; reset_tangent_space is used to reset dt and set tangent space
+    main apply method sets the linear extrapolated value 
+    modify_ds modifies ds either increases or dereases step, thus using a swinging tries.
+*/
+
 namespace continuation
 {
 
@@ -73,7 +81,7 @@ public:
     //calc: y := mul_x*x
     void assign_mul(const scalar_type mul_x, const vector_type& x, vector_type& y)const;
 */
-        vec_ops->assign_mul(T(1.0001), x_0_p, x_1_g);
+        vec_ops->assign_mul(T(1.000), x_0_p, x_1_g);
         lambda_1_g = T(1.0001)*lambda_0_p;
 
     }

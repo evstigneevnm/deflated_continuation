@@ -94,13 +94,13 @@ public:
         }
         if(normFx1<tolerance)
         {
-            log->info_f("convergence_strategy::Newton converged with %le.", (double)normFx1);
+            log->info_f("convergence_strategy::Newton converged with %le for %i iterations.", (double)normFx1, iterations);
             result_status = 0;
             finish = true;
         }
         else if(iterations>=maximum_iterations)
         {
-            log->info("convergence_strategy::Newton max iterations (%i) reached.", iterations);
+            log->info_f("convergence_strategy::Newton max iterations (%i) reached with norm %le", iterations, (double)normFx1);
             result_status = 1;
             finish = true;
         }

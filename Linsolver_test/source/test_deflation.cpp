@@ -27,7 +27,6 @@
 #include <numerical_algos/newton_solvers/newton_solver.h>
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
-#include <continuation/predictor_adaptive.h>
 
 #include <gpu_file_operations.h>
 #include <gpu_vector_operations.h>
@@ -36,21 +35,21 @@
 int main(int argc, char const *argv[])
 {
     
+    init_cuda(4);
+    size_t Nx=1024;
+    size_t Ny=1024;
+    real norm_wight = real(1);//std::sqrt(real(Nx*Ny));
+    real size_problem = std::sqrt(real(Nx*Ny));
+
     //linsolver control
     unsigned int lin_solver_max_it = 1300;
-    real lin_solver_tol = 5.0e-10;
+    real lin_solver_tol = 5.0e-10*size_problem;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;
     //newton deflation control
     unsigned int newton_def_max_it = 350;
-    real newton_def_tol = 5.0e-8;
-
-
-    init_cuda(4);
-    size_t Nx=1024;
-    size_t Ny=1024;
-    real norm_wight = std::sqrt(real(Nx*Ny));
+    real newton_def_tol = 5.0e-10*size_problem;
 
     real lambda_0 = 7.3;
     real a_val = 2.0;
@@ -109,31 +108,33 @@ int main(int argc, char const *argv[])
     vec_ops_R->init_vector(u_out_ph); vec_ops_R->start_use_vector(u_out_ph);
 
 
-    deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R_im, newton_def, 5);
+    deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R_im, log, newton_def, 5);
 
     
-    //deflation_op->execute_all(lambda_0, KS2D, sol_storage_def);
-    deflation_op->find_solution(lambda_0, KS2D, sol_storage_def);
+    deflation_op->execute_all(lambda_0, KS2D, sol_storage_def);
+    //deflation_op->find_solution(lambda_0, KS2D, sol_storage_def);
     
 
     unsigned int p=0;
     for(auto &x: *sol_storage_def)
     {        
+        
         KS2D->physical_solution((real_im_vec&)x, u_out_ph);
+        
         std::ostringstream stringStream;
-        stringStream << "u_out_" << (p++) << ".dat";
+        stringStream << "u_out_" << (p) << ".dat";
         gpu_file_operations::write_matrix<real>(stringStream.str(), Nx, Ny, u_out_ph);
+        std::ostringstream stringStream_vec;
+        stringStream_vec << "u_im_out_" << (p) << ".dat";
+        gpu_file_operations::write_vector<real>(stringStream_vec.str(), Nx*My-1, (real_im_vec&)x, 3);
+        p++;
     }
-    
-    typedef continuation::predictor_adaptive<vec_ops_real_im> predictor_t;
-    predictor_t* predict = new predictor_t(vec_ops_R_im, 4.0, 0.33);
-    
+   
 
 
     vec_ops_R->stop_use_vector(u_out_ph); vec_ops_R->free_vector(u_out_ph);
 
     
-    delete predict;
     delete deflation_op;
     delete KS2D;
     delete prec;

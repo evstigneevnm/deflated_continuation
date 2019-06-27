@@ -1,15 +1,16 @@
 #ifndef __CONVERGENCE_STRATEGY_H__
 #define __CONVERGENCE_STRATEGY_H__
-/*
-convergence rules for Newton iterator
-
-return status:
-    0 - ok
-    1 - max iterations exceeded
-    2 - inf update
-    3 - nan update
-    4 - wight update is too small
-
+/**
+*
+*convergence rules for Newton iterator
+*
+*return status:
+*    0 - ok
+*    1 - max iterations exceeded
+*    2 - inf update
+*    3 - nan update
+*    4 - wight update is too small
+*
 */
 
 #include <cmath>

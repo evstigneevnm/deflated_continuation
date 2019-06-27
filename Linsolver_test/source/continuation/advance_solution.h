@@ -4,6 +4,11 @@
 #include <string>
 #include <stdexcept>
 
+/**
+  continuation of a single solution forward or backward on a single step
+  execute SOLVE method to continue solution in one step
+*/
+
 namespace continuation
 {
 
@@ -40,7 +45,7 @@ public:
         bool converged = false;
         bool failed = false;
         T lambda_p;
-        log->info_f("\n||x0|| = %le, ||x0_s|| = %le", (double)vec_ops->norm(x0), (double)vec_ops->norm(x0_s));
+        log->info_f("advance_solution::starting point: ||x0|| = %le, lambda0 = %le, ||x0_s|| = %le, lambda0_s = %le", (double)vec_ops->norm(x0), (double)lambda0, (double)vec_ops->norm(x0_s), (double)lambda0_s);
         predictor->reset_tangent_space(x0, lambda0, x0_s, lambda0_s);
         while((!converged)&&(!failed))
         {
@@ -51,6 +56,7 @@ public:
             if(!converged)
             {
                 failed = predictor->modify_ds();
+
                 log->info("advance_solution::failed to converged. Modifiying dS.");
             }
         }

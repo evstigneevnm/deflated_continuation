@@ -46,7 +46,7 @@ public:
             retries++;
             if(!found_solution)
             {
-                log->info("deflation::retrying, attempt %i\n", retries);
+                log->info_f("deflation::retrying, attempt %i\n", retries);
             }
         }
         if(found_solution)
@@ -77,7 +77,7 @@ public:
             if(found_solution)
             {
                 number_of_solutions++;
-                log->info("deflation::========== found %i solutions ==========", number_of_solutions);
+                log->info_f("deflation::========== found %i solutions ==========", number_of_solutions);
             }
             
         }

@@ -93,11 +93,16 @@
         sherman_morrison_linear_system_solve_t
         > system_operator_cont_t;
 
+    typedef continuation::newton_method_extended::convergence_strategy<
+        vec_ops_real_im, 
+        KS_2D, 
+        log_t> convergence_newton_cont_t;
+
     typedef numerical_algos::newton_method_extended::newton_solver_extended<
         vec_ops_real_im, 
         KS_2D,
         system_operator_cont_t, 
-        convergence_newton_def_t, 
+        convergence_newton_cont_t, 
         real /* point solution class here instead of real!*/ 
         > newton_cont_t;
 
