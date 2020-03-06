@@ -1,5 +1,5 @@
-#ifndef __SPHERE_TEST_ND__
-#define __SPHERE_TEST_ND__
+#ifndef __CIRCLE_TEST_ND__
+#define __CIRCLE_TEST_ND__
 
 
 /**
@@ -34,7 +34,6 @@ public:
     {
         common_constructor_operation();
         calculate_cuda_grid();
-        init_all_derivatives();
     }
 
     circle(T R_, dim3 dimGrid_, dim3 dimBlock_, vector_operations_real *vec_ops_R_): 
@@ -43,13 +42,13 @@ public:
     vec_ops_R(vec_ops_R_)
     {
         common_constructor_operation();
-        init_all_derivatives();
+
     }
 
     ~circle()
     {
 
-        vec_ops_R->stop_use_vector(w1_ext); vec_ops_R->free_vector(w1_ext);
+        vec_ops_R->stop_use_vector(u_0); vec_ops_R->free_vector(u_0);
 
     }
 
@@ -58,12 +57,12 @@ public:
     void F(const T_vec& u, const T alpha, T_vec& v)
     {
         
+
+
+
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_x, u_x_hat);
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_y, u_y_hat);
-        
-        ifft(u_x_hat, u_x_ext);
-        ifft(u_y_hat, u_y_ext);
-        ifft((TC_vec&)u, u_ext);
+
 
         //z=x*y;
         vec_ops_R->mul_pointwise(1.0, u_x_ext, 1.0, u_ext, w1_ext);
@@ -114,11 +113,7 @@ public:
  
 
     }
-    void jacobian_u(const T_vec_im& du, T_vec_im& dv)
-    {
 
-
-    }
 
     //variational jacobian for 2D KS equations J=dF/dalpha
     void jacobian_alpha(TC_vec& dv)
@@ -138,14 +133,14 @@ public:
     }    
     void jacobian_alpha(const TC_vec& x0, const T& alpha, TC_vec& dv)
     {
-            
+           
 
     }
 
 
     void preconditioner_jacobian_u(TC_vec& dr)
     {
-
+        //void function cos there's no need for a preconditioner.
 
     }
 
@@ -187,68 +182,27 @@ private:
     T a_val,b_val;
     dim3 dimGrid;
     dim3 dimBlock;
-    dim3 dimGrid_F;
+
     vector_operations_real *vec_ops_R;
-    vector_operations_complex *vec_ops_C;
-    vector_operations_real_im *vec_ops_R_im;
-
-    size_t Nx, Ny, My; //size in physical space Nx*Ny
-                       //size in Fourier space Nx*My
-                       //size in reduced Fourier space Nx*My-1
-    FFT_type *FFT;
-    TC_vec gradient_x=nullptr;
-    TC_vec gradient_y=nullptr;
-    TC_vec Laplace=nullptr;
-    TC_vec biharmonic=nullptr;
-    TC_vec u_x_hat=nullptr;
-    TC_vec u_y_hat=nullptr;
-    TC_vec b_hat=nullptr;
-    TC_vec u_0=nullptr; // linearization point solution
-    TC_vec u_x_hat0=nullptr;
-    TC_vec u_y_hat0=nullptr;
     
-    TC_vec u_helper_in = nullptr;  //vector for using only R outside
-    TC_vec u_helper_out = nullptr;  //vector for using only R outside
-
-
+ 
+    T_vec u_0=nullptr; // linearization point solution
     T alpha_0=0.0;   // linearization point parameter
-
-    T_vec w1_ext=nullptr;
-    T_vec w2_ext=nullptr;
-    T_vec w1_ext_0=nullptr;
-    T_vec w2_ext_0=nullptr;
-    T_vec u_ext=nullptr;
-    T_vec u_x_ext=nullptr;
-    T_vec u_y_ext=nullptr;
-
-    T_vec u_ext_0=nullptr;
-    T_vec u_x_ext_0=nullptr;
-    T_vec u_y_ext_0=nullptr;
-    T_vec du_ext=nullptr;
-    T_vec du_x_ext=nullptr;
-    T_vec du_y_ext=nullptr;
-
 
 
     void common_constructor_operation()
     {  
-        vec_ops_R->init_vector(w1_ext); vec_ops_R->start_use_vector(w1_ext); 
+        vec_ops_R->init_vector(u_0); vec_ops_R->start_use_vector(u_0); 
 
     }
 
-    void init_all_derivatives()
-    {
-        set_gradient_coefficients();
-        set_Laplace_coefficients();
-        set_biharmonic_coefficients();
-    }
 
     void calculate_cuda_grid()
     {
         dim3 s_dimBlock( BLOCK_SIZE_x );
         dimBlock=s_dimBlock;
         unsigned int blocks_x=floor(Nx/( BLOCK_SIZE_x ))+1;
-        dim3 s_dimGrid( blocks_x, blocks_y);
+        dim3 s_dimGrid(blocks_x);
         dimGrid=s_dimGrid;
     }
 
