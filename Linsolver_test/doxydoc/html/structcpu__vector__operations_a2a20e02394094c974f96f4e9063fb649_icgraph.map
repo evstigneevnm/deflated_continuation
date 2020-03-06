@@ -1,5 +1,0 @@
-<map id="cpu_vector_operations::add_mul_scalar" name="cpu_vector_operations::add_mul_scalar">
-<area shape="rect" id="node2" href="$structcpu__vector__operations.html#a5b482595642484b8c2d9311705645e1a" title="cpu_vector_operations\l::scale" alt="" coords="219,5,373,46"/>
-<area shape="rect" id="node3" href="$classdeflation_1_1system__operator__deflation.html#aae79ccde9c028f86471180deb6ef5e6f" title="deflation::system_operator\l_deflation::solve" alt="" coords="208,70,384,111"/>
-<area shape="rect" id="node4" href="$classnonlinear__operators_1_1system__operator.html#a37c7e565a4f696b0df71c8257a92c49a" title="nonlinear_operators\l::system_operator::solve" alt="" coords="213,135,379,177"/>
-</map>

@@ -245,15 +245,11 @@ private:
 
     void calculate_cuda_grid()
     {
-        dim3 s_dimBlock( BLOCK_SIZE_x, BLOCK_SIZE_y );
+        dim3 s_dimBlock( BLOCK_SIZE_x );
         dimBlock=s_dimBlock;
         unsigned int blocks_x=floor(Nx/( BLOCK_SIZE_x ))+1;
-        unsigned int blocks_y=floor(Ny/( BLOCK_SIZE_y ))+1;
-        unsigned int blocks_y_F=floor(My/( BLOCK_SIZE_y ))+1;
         dim3 s_dimGrid( blocks_x, blocks_y);
         dimGrid=s_dimGrid;
-        dim3 s_dimGrid_F( blocks_x, blocks_y_F);
-        dimGrid_F=s_dimGrid_F;
     }
 
 
