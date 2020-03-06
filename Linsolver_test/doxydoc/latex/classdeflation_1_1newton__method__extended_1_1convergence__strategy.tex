@@ -1,0 +1,126 @@
+\hypertarget{classdeflation_1_1newton__method__extended_1_1convergence__strategy}{\section{deflation\-:\-:newton\-\_\-method\-\_\-extended\-:\-:convergence\-\_\-strategy$<$ Vector\-Operations, Nonlinear\-Operator, Logging $>$ Class Template Reference}
+\label{classdeflation_1_1newton__method__extended_1_1convergence__strategy}\index{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy$<$ Vector\-Operations, Nonlinear\-Operator, Logging $>$@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy$<$ Vector\-Operations, Nonlinear\-Operator, Logging $>$}}
+}
+
+
+{\ttfamily \#include $<$convergence\-\_\-strategy.\-h$>$}
+
+
+
+Collaboration diagram for deflation\-:\-:newton\-\_\-method\-\_\-extended\-:\-:convergence\-\_\-strategy$<$ Vector\-Operations, Nonlinear\-Operator, Logging $>$\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=226pt]{classdeflation_1_1newton__method__extended_1_1convergence__strategy__coll__graph}
+\end{center}
+\end{figure}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a9ca9cf9f688586ed07f00395bae6e668}{convergence\-\_\-strategy} (Vector\-Operations $\ast$\&vec\-\_\-ops\-\_\-, Logging $\ast$\&log\-\_\-, T tolerance\-\_\-, unsigned \hyperlink{classint}{int} maximum\-\_\-iterations\-\_\-, T newton\-\_\-wight\-\_\-, bool store\-\_\-norms\-\_\-history\-\_\-=false, bool verbose\-\_\-=true)
+\item 
+\hyperlink{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a34c8b595e91495861191123ef90d0d4b}{$\sim$convergence\-\_\-strategy} ()
+\item 
+bool \hyperlink{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a537bfe541b97eb6810d9f72a951d44cc}{check\-\_\-convergence} (Nonlinear\-Operator $\ast$nonlin\-\_\-op, T\-\_\-vec \&x, T \&lambda, T\-\_\-vec \&delta\-\_\-x, T \&delta\-\_\-lambda, \hyperlink{classint}{int} \&result\-\_\-status)
+\item 
+unsigned \hyperlink{classint}{int} \hyperlink{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a9d9ce3025cff7f1aec33e44da85f1526}{get\-\_\-number\-\_\-of\-\_\-iterations} ()
+\item 
+void \hyperlink{classdeflation_1_1newton__method__extended_1_1convergence__strategy_ac7a2306183d029d7c865a49d55e01425}{reset\-\_\-iterations} ()
+\item 
+void \hyperlink{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a7dc80cfafdb7057cc10b5f05bb1e287a}{reset\-\_\-wight} ()
+\item 
+std\-::vector$<$ T $>$ $\ast$ \hyperlink{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a325a124ea85d1ae522d3d1fe24c28b9c}{get\-\_\-norms\-\_\-history\-\_\-handle} ()
+\end{DoxyCompactItemize}
+
+
+\subsection{Constructor \& Destructor Documentation}
+\hypertarget{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a9ca9cf9f688586ed07f00395bae6e668}{\index{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}!convergence\-\_\-strategy@{convergence\-\_\-strategy}}
+\index{convergence\-\_\-strategy@{convergence\-\_\-strategy}!deflation::newton_method_extended::convergence_strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}}
+\subsubsection[{convergence\-\_\-strategy}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Nonlinear\-Operator , class Logging $>$ {\bf deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}$<$ Vector\-Operations, Nonlinear\-Operator, Logging $>$\-::{\bf convergence\-\_\-strategy} (
+\begin{DoxyParamCaption}
+\item[{Vector\-Operations $\ast$\&}]{vec\-\_\-ops\-\_\-, }
+\item[{Logging $\ast$\&}]{log\-\_\-, }
+\item[{T}]{tolerance\-\_\-, }
+\item[{unsigned {\bf int}}]{maximum\-\_\-iterations\-\_\-, }
+\item[{T}]{newton\-\_\-wight\-\_\-, }
+\item[{bool}]{store\-\_\-norms\-\_\-history\-\_\- = {\ttfamily false}, }
+\item[{bool}]{verbose\-\_\- = {\ttfamily true}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a9ca9cf9f688586ed07f00395bae6e668}
+\hypertarget{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a34c8b595e91495861191123ef90d0d4b}{\index{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}!$\sim$convergence\-\_\-strategy@{$\sim$convergence\-\_\-strategy}}
+\index{$\sim$convergence\-\_\-strategy@{$\sim$convergence\-\_\-strategy}!deflation::newton_method_extended::convergence_strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}}
+\subsubsection[{$\sim$convergence\-\_\-strategy}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Nonlinear\-Operator , class Logging $>$ {\bf deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}$<$ Vector\-Operations, Nonlinear\-Operator, Logging $>$\-::$\sim${\bf convergence\-\_\-strategy} (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a34c8b595e91495861191123ef90d0d4b}
+
+
+\subsection{Member Function Documentation}
+\hypertarget{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a537bfe541b97eb6810d9f72a951d44cc}{\index{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}!check\-\_\-convergence@{check\-\_\-convergence}}
+\index{check\-\_\-convergence@{check\-\_\-convergence}!deflation::newton_method_extended::convergence_strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}}
+\subsubsection[{check\-\_\-convergence}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Nonlinear\-Operator , class Logging $>$ bool {\bf deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}$<$ Vector\-Operations, Nonlinear\-Operator, Logging $>$\-::check\-\_\-convergence (
+\begin{DoxyParamCaption}
+\item[{Nonlinear\-Operator $\ast$}]{nonlin\-\_\-op, }
+\item[{T\-\_\-vec \&}]{x, }
+\item[{T \&}]{lambda, }
+\item[{T\-\_\-vec \&}]{delta\-\_\-x, }
+\item[{T \&}]{delta\-\_\-lambda, }
+\item[{{\bf int} \&}]{result\-\_\-status}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a537bfe541b97eb6810d9f72a951d44cc}
+\hypertarget{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a325a124ea85d1ae522d3d1fe24c28b9c}{\index{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}!get\-\_\-norms\-\_\-history\-\_\-handle@{get\-\_\-norms\-\_\-history\-\_\-handle}}
+\index{get\-\_\-norms\-\_\-history\-\_\-handle@{get\-\_\-norms\-\_\-history\-\_\-handle}!deflation::newton_method_extended::convergence_strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}}
+\subsubsection[{get\-\_\-norms\-\_\-history\-\_\-handle}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Nonlinear\-Operator , class Logging $>$ std\-::vector$<$T$>$$\ast$ {\bf deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}$<$ Vector\-Operations, Nonlinear\-Operator, Logging $>$\-::get\-\_\-norms\-\_\-history\-\_\-handle (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a325a124ea85d1ae522d3d1fe24c28b9c}
+\hypertarget{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a9d9ce3025cff7f1aec33e44da85f1526}{\index{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}!get\-\_\-number\-\_\-of\-\_\-iterations@{get\-\_\-number\-\_\-of\-\_\-iterations}}
+\index{get\-\_\-number\-\_\-of\-\_\-iterations@{get\-\_\-number\-\_\-of\-\_\-iterations}!deflation::newton_method_extended::convergence_strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}}
+\subsubsection[{get\-\_\-number\-\_\-of\-\_\-iterations}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Nonlinear\-Operator , class Logging $>$ unsigned {\bf int} {\bf deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}$<$ Vector\-Operations, Nonlinear\-Operator, Logging $>$\-::get\-\_\-number\-\_\-of\-\_\-iterations (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a9d9ce3025cff7f1aec33e44da85f1526}
+\hypertarget{classdeflation_1_1newton__method__extended_1_1convergence__strategy_ac7a2306183d029d7c865a49d55e01425}{\index{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}!reset\-\_\-iterations@{reset\-\_\-iterations}}
+\index{reset\-\_\-iterations@{reset\-\_\-iterations}!deflation::newton_method_extended::convergence_strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}}
+\subsubsection[{reset\-\_\-iterations}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Nonlinear\-Operator , class Logging $>$ void {\bf deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}$<$ Vector\-Operations, Nonlinear\-Operator, Logging $>$\-::reset\-\_\-iterations (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classdeflation_1_1newton__method__extended_1_1convergence__strategy_ac7a2306183d029d7c865a49d55e01425}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classdeflation_1_1newton__method__extended_1_1convergence__strategy_ac7a2306183d029d7c865a49d55e01425_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a7dc80cfafdb7057cc10b5f05bb1e287a}{\index{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}!reset\-\_\-wight@{reset\-\_\-wight}}
+\index{reset\-\_\-wight@{reset\-\_\-wight}!deflation::newton_method_extended::convergence_strategy@{deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}}
+\subsubsection[{reset\-\_\-wight}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Nonlinear\-Operator , class Logging $>$ void {\bf deflation\-::newton\-\_\-method\-\_\-extended\-::convergence\-\_\-strategy}$<$ Vector\-Operations, Nonlinear\-Operator, Logging $>$\-::reset\-\_\-wight (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a7dc80cfafdb7057cc10b5f05bb1e287a}
+
+
+Here is the caller graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classdeflation_1_1newton__method__extended_1_1convergence__strategy_a7dc80cfafdb7057cc10b5f05bb1e287a_icgraph}
+\end{center}
+\end{figure}
+
+
+
+
+The documentation for this class was generated from the following file\-:\begin{DoxyCompactItemize}
+\item 
+source/deflation/\hyperlink{deflation_2convergence__strategy_8h}{convergence\-\_\-strategy.\-h}\end{DoxyCompactItemize}

@@ -1,0 +1,12 @@
+var searchData=
+[
+  ['v_5ferror_5ff',['v_error_f',['../classutils_1_1log.html#ac4a667e66cb61462031fd700b3251112',1,'utils::log::v_error_f(int _log_lev, const std::string &amp;s, va_list arguments)'],['../classutils_1_1log.html#aec43923f837343690dac8f19d8d6d283',1,'utils::log::v_error_f(const std::string &amp;s, va_list arguments)']]],
+  ['v_5finfo_5fall_5ff',['v_info_all_f',['../classutils_1_1log.html#a30221b6f6f69e9482c24b0c7a426aef0',1,'utils::log::v_info_all_f(int _log_lev, const std::string &amp;s, va_list arguments)'],['../classutils_1_1log.html#a908102971081fce062f52d1ebf8fb981',1,'utils::log::v_info_all_f(const std::string &amp;s, va_list arguments)']]],
+  ['v_5finfo_5ff',['v_info_f',['../classutils_1_1log.html#ac68c612eca6fd3723263ef226596da55',1,'utils::log::v_info_f(int _log_lev, const std::string &amp;s, va_list arguments)'],['../classutils_1_1log.html#abdde95f78e1a816a591de7ba52b4f1ce',1,'utils::log::v_info_f(const std::string &amp;s, va_list arguments)']]],
+  ['v_5fwarning_5ff',['v_warning_f',['../classutils_1_1log.html#ad762145ed51776aac2c492325e84fa63',1,'utils::log::v_warning_f(int _log_lev, const std::string &amp;s, va_list arguments)'],['../classutils_1_1log.html#abd427658297adae865c16adac9805e09',1,'utils::log::v_warning_f(const std::string &amp;s, va_list arguments)']]],
+  ['vector',['vector',['../structnumerical__algos_1_1detail_1_1vector__wrap.html#ae2766762eb55c4ca127025cf6697ac00',1,'numerical_algos::detail::vector_wrap::vector()'],['../structnumerical__algos_1_1detail_1_1vector__wrap.html#a3c6e221436d91e003bdf2d00ad276c0f',1,'numerical_algos::detail::vector_wrap::vector() const ']]],
+  ['vector_5fwrap',['vector_wrap',['../structnumerical__algos_1_1detail_1_1vector__wrap.html#a950c09e9822e14203df43cfa5b4b0286',1,'numerical_algos::detail::vector_wrap']]],
+  ['vectors_5farr_5fuse_5fwrap_5ftype',['vectors_arr_use_wrap_type',['../structnumerical__algos_1_1detail_1_1vectors__arr__wrap__static_1_1vectors__arr__use__wrap__type.html#ae05fa3796de83f0077404718ee4418cd',1,'numerical_algos::detail::vectors_arr_wrap_static::vectors_arr_use_wrap_type']]],
+  ['vectors_5farr_5fwrap_5fstatic',['vectors_arr_wrap_static',['../structnumerical__algos_1_1detail_1_1vectors__arr__wrap__static.html#a0a9c2f99487deb5f49f25ca0b8159f38',1,'numerical_algos::detail::vectors_arr_wrap_static']]],
+  ['verify_5fsize',['verify_size',['../classvec__ops__t.html#af17df64c2856fc437fb91d306cfdf715',1,'vec_ops_t']]]
+];

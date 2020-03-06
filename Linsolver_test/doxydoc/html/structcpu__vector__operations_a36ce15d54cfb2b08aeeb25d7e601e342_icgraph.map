@@ -1,0 +1,11 @@
+<map id="cpu_vector_operations::start_use_vector" name="cpu_vector_operations::start_use_vector">
+<area shape="rect" id="node2" href="$classcontinuation_1_1newton__method__extended_1_1convergence__strategy.html#a445baea2c85ff055bd56cf759137b348" title="continuation::newton\l_method_extended::convergence\l_strategy::convergence_strategy" alt="" coords="209,5,423,61"/>
+<area shape="rect" id="node3" href="$classnonlinear__operators_1_1newton__method_1_1convergence__strategy.html#a00e18a10009c673718f85720cfd37f53" title="nonlinear_operators\l::newton_method::convergence\l_strategy::convergence_strategy" alt="" coords="210,85,422,141"/>
+<area shape="rect" id="node4" href="$classdeflation_1_1solution__storage.html#adecce4c3d4218f300d37868788c8e3a3" title="deflation::solution\l_storage::solution_storage" alt="" coords="229,165,403,206"/>
+<area shape="rect" id="node5" href="$classdeflation_1_1system__operator__deflation.html#a7af35084cc9d1f839a96a002899dfd58" title="deflation::system_operator\l_deflation::system_operator\l_deflation" alt="" coords="225,229,407,285"/>
+<area shape="rect" id="node6" href="$classnonlinear__operators_1_1system__operator.html#a4793286722aae7ed522ae58239753a74" title="nonlinear_operators\l::system_operator::system\l_operator" alt="" coords="227,309,405,365"/>
+<area shape="rect" id="node7" href="$classnumerical__algos_1_1newton__method_1_1newton__solver.html#a13fe3a3fd96e29a74aeefc03206721bb" title="numerical_algos::newton\l_method::newton_solver\l::newton_solver" alt="" coords="233,389,399,445"/>
+<area shape="rect" id="node8" href="$classnumerical__algos_1_1newton__method__extended_1_1newton__solver__extended.html#a51a5362d96e3f54cc36347fe8cbd047d" title="numerical_algos::newton\l_method_extended::newton\l_solver_extended::newton\l_solver_extended" alt="" coords="225,470,407,541"/>
+<area shape="rect" id="node9" href="$container__test_8cpp.html#abf9e6b7e6f15df4b525a2e7705ba3089" title="main" alt="" coords="291,565,341,592"/>
+<area shape="rect" id="node10" href="$classsolution__storage.html#ab0be980cd42394b17ac947838ae38993" title="solution_storage::solution\l_storage" alt="" coords="231,617,401,658"/>
+</map>

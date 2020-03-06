@@ -51,12 +51,12 @@ public:
     {
         bool finish = false;
         nonlin_op->F(x, lambda, Fx);
-        T normFx = vec_ops->norm(Fx);
+        T normFx = vec_ops->norm_l2(Fx);
         //update solution
         vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
         T lambda1 = lambda + newton_wight*delta_lambda;
         nonlin_op->F(x1, lambda1, Fx);
-        T normFx1 = vec_ops->norm(Fx);
+        T normFx1 = vec_ops->norm_l2(Fx);
         if(store_norms_history)
         {
             norms_evolution.push_back(normFx1);

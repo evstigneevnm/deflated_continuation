@@ -1,0 +1,113 @@
+\hypertarget{classdeflation_1_1deflation__operator}{\section{deflation\-:\-:deflation\-\_\-operator$<$ Vector\-Operations, Newton\-Method, Nonlinear\-Operator, Solution\-Storage, Logging $>$ Class Template Reference}
+\label{classdeflation_1_1deflation__operator}\index{deflation\-::deflation\-\_\-operator$<$ Vector\-Operations, Newton\-Method, Nonlinear\-Operator, Solution\-Storage, Logging $>$@{deflation\-::deflation\-\_\-operator$<$ Vector\-Operations, Newton\-Method, Nonlinear\-Operator, Solution\-Storage, Logging $>$}}
+}
+
+
+{\ttfamily \#include $<$deflation\-\_\-operator.\-h$>$}
+
+
+
+Collaboration diagram for deflation\-:\-:deflation\-\_\-operator$<$ Vector\-Operations, Newton\-Method, Nonlinear\-Operator, Solution\-Storage, Logging $>$\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=252pt]{classdeflation_1_1deflation__operator__coll__graph}
+\end{center}
+\end{figure}
+\subsection*{Public Types}
+\begin{DoxyCompactItemize}
+\item 
+typedef \\*
+Vector\-Operations\-::scalar\-\_\-type \hyperlink{classdeflation_1_1deflation__operator_a16b4c1329afeb50d9477f1094df943b9}{T}
+\item 
+typedef \\*
+Vector\-Operations\-::vector\-\_\-type \hyperlink{classdeflation_1_1deflation__operator_ac7800761f41ffb590968f434afd25985}{T\-\_\-vec}
+\end{DoxyCompactItemize}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classdeflation_1_1deflation__operator_a5b2e753f49c15be40463b2e4d6e517cb}{deflation\-\_\-operator} (Vector\-Operations $\ast$vec\-\_\-ops\-\_\-, Logging $\ast$log\-\_\-, Newton\-Method $\ast$newton\-\_\-, unsigned \hyperlink{classint}{int} max\-\_\-retries\-\_\-)
+\item 
+\hyperlink{classdeflation_1_1deflation__operator_af5d9863c70c4b5fdef6076055ffa8693}{$\sim$deflation\-\_\-operator} ()
+\item 
+bool \hyperlink{classdeflation_1_1deflation__operator_abd4952c8eea335ff08790245e7bbde9d}{find\-\_\-solution} (\hyperlink{classdeflation_1_1deflation__operator_a16b4c1329afeb50d9477f1094df943b9}{T} lambda\-\_\-0, Nonlinear\-Operator $\ast$nonlin\-\_\-op, Solution\-Storage $\ast$sol\-\_\-storage)
+\item 
+void \hyperlink{classdeflation_1_1deflation__operator_a35208c148ef288abd8b2191ee5731581}{execute\-\_\-all} (\hyperlink{classdeflation_1_1deflation__operator_a16b4c1329afeb50d9477f1094df943b9}{T} lambda\-\_\-0, Nonlinear\-Operator $\ast$nonlin\-\_\-op, Solution\-Storage $\ast$sol\-\_\-storage)
+\end{DoxyCompactItemize}
+
+
+\subsection{Member Typedef Documentation}
+\hypertarget{classdeflation_1_1deflation__operator_a16b4c1329afeb50d9477f1094df943b9}{\index{deflation\-::deflation\-\_\-operator@{deflation\-::deflation\-\_\-operator}!T@{T}}
+\index{T@{T}!deflation::deflation_operator@{deflation\-::deflation\-\_\-operator}}
+\subsubsection[{T}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Newton\-Method , class Nonlinear\-Operator , class Solution\-Storage , class Logging $>$ typedef Vector\-Operations\-::scalar\-\_\-type {\bf deflation\-::deflation\-\_\-operator}$<$ Vector\-Operations, Newton\-Method, Nonlinear\-Operator, Solution\-Storage, Logging $>$\-::{\bf T}}}\label{classdeflation_1_1deflation__operator_a16b4c1329afeb50d9477f1094df943b9}
+\hypertarget{classdeflation_1_1deflation__operator_ac7800761f41ffb590968f434afd25985}{\index{deflation\-::deflation\-\_\-operator@{deflation\-::deflation\-\_\-operator}!T\-\_\-vec@{T\-\_\-vec}}
+\index{T\-\_\-vec@{T\-\_\-vec}!deflation::deflation_operator@{deflation\-::deflation\-\_\-operator}}
+\subsubsection[{T\-\_\-vec}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Newton\-Method , class Nonlinear\-Operator , class Solution\-Storage , class Logging $>$ typedef Vector\-Operations\-::vector\-\_\-type {\bf deflation\-::deflation\-\_\-operator}$<$ Vector\-Operations, Newton\-Method, Nonlinear\-Operator, Solution\-Storage, Logging $>$\-::{\bf T\-\_\-vec}}}\label{classdeflation_1_1deflation__operator_ac7800761f41ffb590968f434afd25985}
+
+
+\subsection{Constructor \& Destructor Documentation}
+\hypertarget{classdeflation_1_1deflation__operator_a5b2e753f49c15be40463b2e4d6e517cb}{\index{deflation\-::deflation\-\_\-operator@{deflation\-::deflation\-\_\-operator}!deflation\-\_\-operator@{deflation\-\_\-operator}}
+\index{deflation\-\_\-operator@{deflation\-\_\-operator}!deflation::deflation_operator@{deflation\-::deflation\-\_\-operator}}
+\subsubsection[{deflation\-\_\-operator}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Newton\-Method , class Nonlinear\-Operator , class Solution\-Storage , class Logging $>$ {\bf deflation\-::deflation\-\_\-operator}$<$ Vector\-Operations, Newton\-Method, Nonlinear\-Operator, Solution\-Storage, Logging $>$\-::{\bf deflation\-\_\-operator} (
+\begin{DoxyParamCaption}
+\item[{Vector\-Operations $\ast$}]{vec\-\_\-ops\-\_\-, }
+\item[{Logging $\ast$}]{log\-\_\-, }
+\item[{Newton\-Method $\ast$}]{newton\-\_\-, }
+\item[{unsigned {\bf int}}]{max\-\_\-retries\-\_\-}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classdeflation_1_1deflation__operator_a5b2e753f49c15be40463b2e4d6e517cb}
+
+
+\subsection{Member Function Documentation}
+\hypertarget{classdeflation_1_1deflation__operator_a35208c148ef288abd8b2191ee5731581}{\index{deflation\-::deflation\-\_\-operator@{deflation\-::deflation\-\_\-operator}!execute\-\_\-all@{execute\-\_\-all}}
+\index{execute\-\_\-all@{execute\-\_\-all}!deflation::deflation_operator@{deflation\-::deflation\-\_\-operator}}
+\subsubsection[{execute\-\_\-all}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Newton\-Method , class Nonlinear\-Operator , class Solution\-Storage , class Logging $>$ void {\bf deflation\-::deflation\-\_\-operator}$<$ Vector\-Operations, Newton\-Method, Nonlinear\-Operator, Solution\-Storage, Logging $>$\-::execute\-\_\-all (
+\begin{DoxyParamCaption}
+\item[{{\bf T}}]{lambda\-\_\-0, }
+\item[{Nonlinear\-Operator $\ast$}]{nonlin\-\_\-op, }
+\item[{Solution\-Storage $\ast$}]{sol\-\_\-storage}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classdeflation_1_1deflation__operator_a35208c148ef288abd8b2191ee5731581}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=348pt]{classdeflation_1_1deflation__operator_a35208c148ef288abd8b2191ee5731581_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classdeflation_1_1deflation__operator_abd4952c8eea335ff08790245e7bbde9d}{\index{deflation\-::deflation\-\_\-operator@{deflation\-::deflation\-\_\-operator}!find\-\_\-solution@{find\-\_\-solution}}
+\index{find\-\_\-solution@{find\-\_\-solution}!deflation::deflation_operator@{deflation\-::deflation\-\_\-operator}}
+\subsubsection[{find\-\_\-solution}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Newton\-Method , class Nonlinear\-Operator , class Solution\-Storage , class Logging $>$ bool {\bf deflation\-::deflation\-\_\-operator}$<$ Vector\-Operations, Newton\-Method, Nonlinear\-Operator, Solution\-Storage, Logging $>$\-::find\-\_\-solution (
+\begin{DoxyParamCaption}
+\item[{{\bf T}}]{lambda\-\_\-0, }
+\item[{Nonlinear\-Operator $\ast$}]{nonlin\-\_\-op, }
+\item[{Solution\-Storage $\ast$}]{sol\-\_\-storage}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classdeflation_1_1deflation__operator_abd4952c8eea335ff08790245e7bbde9d}
+
+
+Here is the caller graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=348pt]{classdeflation_1_1deflation__operator_abd4952c8eea335ff08790245e7bbde9d_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classdeflation_1_1deflation__operator_af5d9863c70c4b5fdef6076055ffa8693}{\index{deflation\-::deflation\-\_\-operator@{deflation\-::deflation\-\_\-operator}!$\sim$deflation\-\_\-operator@{$\sim$deflation\-\_\-operator}}
+\index{$\sim$deflation\-\_\-operator@{$\sim$deflation\-\_\-operator}!deflation::deflation_operator@{deflation\-::deflation\-\_\-operator}}
+\subsubsection[{$\sim$deflation\-\_\-operator}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Newton\-Method , class Nonlinear\-Operator , class Solution\-Storage , class Logging $>$ {\bf deflation\-::deflation\-\_\-operator}$<$ Vector\-Operations, Newton\-Method, Nonlinear\-Operator, Solution\-Storage, Logging $>$\-::$\sim${\bf deflation\-\_\-operator} (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classdeflation_1_1deflation__operator_af5d9863c70c4b5fdef6076055ffa8693}
+
+
+The documentation for this class was generated from the following file\-:\begin{DoxyCompactItemize}
+\item 
+source/deflation/\hyperlink{deflation__operator_8h}{deflation\-\_\-operator.\-h}\end{DoxyCompactItemize}

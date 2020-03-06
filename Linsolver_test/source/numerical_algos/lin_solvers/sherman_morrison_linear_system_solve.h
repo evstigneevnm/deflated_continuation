@@ -1,4 +1,4 @@
-/*
+/**
 General solver for the block linear system of size (n+1 \times n+1) (rank one update):
     
     GAX=GB

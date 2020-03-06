@@ -19,7 +19,7 @@ public:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
 
-    predictor_adaptive(VectorOperations* vec_ops_, Logging* log_, T ds_0_, T step_ds_ = 0.25, unsigned int attempts_0_ = 4):
+    predictor_adaptive(VectorOperations* vec_ops_, Logging* log_, T ds_0_, T step_ds_ = 0.01, unsigned int attempts_0_ = 4):
     vec_ops(vec_ops_),
     log(log_),
     ds_0(ds_0_),
@@ -34,7 +34,7 @@ public:
     }
     ~predictor_adaptive()
     {
-
+        
 
     }
     void reset()
@@ -81,8 +81,8 @@ public:
     //calc: y := mul_x*x
     void assign_mul(const scalar_type mul_x, const vector_type& x, vector_type& y)const;
 */
-        vec_ops->assign_mul(T(1.000), x_0_p, x_1_g);
-        lambda_1_g = T(1.0001)*lambda_0_p;
+        vec_ops->assign_mul(T(1), x_0_p, x_1_g);
+        lambda_1_g = lambda_0_p;
 
     }
 

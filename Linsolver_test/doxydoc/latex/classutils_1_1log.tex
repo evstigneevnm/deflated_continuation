@@ -1,0 +1,575 @@
+\hypertarget{classutils_1_1log}{\section{utils\-:\-:log Class Reference}
+\label{classutils_1_1log}\index{utils\-::log@{utils\-::log}}
+}
+
+
+{\ttfamily \#include $<$log.\-h$>$}
+
+
+
+Inheritance diagram for utils\-:\-:log\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=278pt]{classutils_1_1log__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for utils\-:\-:log\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=162pt]{classutils_1_1log__coll__graph}
+\end{center}
+\end{figure}
+\subsection*{Public Types}
+\begin{DoxyCompactItemize}
+\item 
+enum \hyperlink{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983}{t\-\_\-msg\-\_\-type} \{ \hyperlink{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983a34a1a7830fae0bde90731e751a1ed9c0}{I\-N\-F\-O}, 
+\hyperlink{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983a20deb43be52ea36f5d4e2840aaad0521}{I\-N\-F\-O\-\_\-\-A\-L\-L}, 
+\hyperlink{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983ac21363ceebe4047f94229711d3cbd248}{W\-A\-R\-N\-I\-N\-G}, 
+\hyperlink{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983a677ee9e2002b4189a6843ebe193d0de6}{E\-R\-R\-O\-R}
+ \}
+\end{DoxyCompactItemize}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+virtual void \hyperlink{classutils_1_1log_a29247cbe7898720893bf29947ff61c16}{msg} (const std\-::string \&s, \hyperlink{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983}{t\-\_\-msg\-\_\-type} mt=\hyperlink{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983a34a1a7830fae0bde90731e751a1ed9c0}{I\-N\-F\-O}, \hyperlink{classint}{int} \-\_\-log\-\_\-lev=1)=0
+\item 
+void \hyperlink{classutils_1_1log_a340f8d583ca25d4fa4aa8bbac4619779}{info} (const std\-::string \&s, \hyperlink{classint}{int} \-\_\-log\-\_\-lev=1)
+\item 
+void \hyperlink{classutils_1_1log_a619cda7c5f2a34f6760968307a9f1bf2}{info\-\_\-all} (const std\-::string \&s, \hyperlink{classint}{int} \-\_\-log\-\_\-lev=1)
+\item 
+void \hyperlink{classutils_1_1log_aabbb5fa0d3ead48cbb6fac3aff7249ca}{warning} (const std\-::string \&s, \hyperlink{classint}{int} \-\_\-log\-\_\-lev=1)
+\item 
+void \hyperlink{classutils_1_1log_ae74653936018ff3d4a226f66cbab10a3}{error} (const std\-::string \&s, \hyperlink{classint}{int} \-\_\-log\-\_\-lev=1)
+\item 
+void \hyperlink{classutils_1_1log_ac68c612eca6fd3723263ef226596da55}{v\-\_\-info\-\_\-f} (\hyperlink{classint}{int} \-\_\-log\-\_\-lev, const std\-::string \&s, va\-\_\-list arguments)
+\item 
+void \hyperlink{classutils_1_1log_a30221b6f6f69e9482c24b0c7a426aef0}{v\-\_\-info\-\_\-all\-\_\-f} (\hyperlink{classint}{int} \-\_\-log\-\_\-lev, const std\-::string \&s, va\-\_\-list arguments)
+\item 
+void \hyperlink{classutils_1_1log_ad762145ed51776aac2c492325e84fa63}{v\-\_\-warning\-\_\-f} (\hyperlink{classint}{int} \-\_\-log\-\_\-lev, const std\-::string \&s, va\-\_\-list arguments)
+\item 
+void \hyperlink{classutils_1_1log_ac4a667e66cb61462031fd700b3251112}{v\-\_\-error\-\_\-f} (\hyperlink{classint}{int} \-\_\-log\-\_\-lev, const std\-::string \&s, va\-\_\-list arguments)
+\item 
+void \hyperlink{classutils_1_1log_abdde95f78e1a816a591de7ba52b4f1ce}{v\-\_\-info\-\_\-f} (const std\-::string \&s, va\-\_\-list arguments)
+\item 
+void \hyperlink{classutils_1_1log_a908102971081fce062f52d1ebf8fb981}{v\-\_\-info\-\_\-all\-\_\-f} (const std\-::string \&s, va\-\_\-list arguments)
+\item 
+void \hyperlink{classutils_1_1log_abd427658297adae865c16adac9805e09}{v\-\_\-warning\-\_\-f} (const std\-::string \&s, va\-\_\-list arguments)
+\item 
+void \hyperlink{classutils_1_1log_aec43923f837343690dac8f19d8d6d283}{v\-\_\-error\-\_\-f} (const std\-::string \&s, va\-\_\-list arguments)
+\item 
+void \hyperlink{classutils_1_1log_a97344afe2171d9313e66fa3fd5126dbb}{info\-\_\-f} (\hyperlink{classint}{int} \-\_\-log\-\_\-lev, const std\-::string \&s,...)
+\item 
+void \hyperlink{classutils_1_1log_a6668474285440f7cb89cd013e7394aed}{info\-\_\-all\-\_\-f} (\hyperlink{classint}{int} \-\_\-log\-\_\-lev, const std\-::string \&s,...)
+\item 
+void \hyperlink{classutils_1_1log_a6f459ff550313048cae141dc07166a79}{warning\-\_\-f} (\hyperlink{classint}{int} \-\_\-log\-\_\-lev, const std\-::string \&s,...)
+\item 
+void \hyperlink{classutils_1_1log_ab0893a6983709de84a36c4531d91288f}{error\-\_\-f} (\hyperlink{classint}{int} \-\_\-log\-\_\-lev, const std\-::string \&s,...)
+\item 
+void \hyperlink{classutils_1_1log_aeeaf8a422c9774495e864f596ce6ce78}{info\-\_\-f} (const std\-::string \&s,...)
+\item 
+void \hyperlink{classutils_1_1log_af3bb68d31472695e6465236248c47079}{info\-\_\-all\-\_\-f} (const std\-::string \&s,...)
+\item 
+void \hyperlink{classutils_1_1log_ac07b5007d7071f1352246b62c5ac4aaf}{warning\-\_\-f} (const std\-::string \&s,...)
+\item 
+void \hyperlink{classutils_1_1log_ac2bc117516abba07b99cdd2c7ccb91f2}{error\-\_\-f} (const std\-::string \&s,...)
+\item 
+virtual void \hyperlink{classutils_1_1log_a3b35495ffd0a90f7be31bc54cb5c5f1e}{set\-\_\-verbosity} (\hyperlink{classint}{int} \-\_\-log\-\_\-lev=1)=0
+\end{DoxyCompactItemize}
+
+
+\subsection{Member Enumeration Documentation}
+\hypertarget{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983}{\index{utils\-::log@{utils\-::log}!t\-\_\-msg\-\_\-type@{t\-\_\-msg\-\_\-type}}
+\index{t\-\_\-msg\-\_\-type@{t\-\_\-msg\-\_\-type}!utils::log@{utils\-::log}}
+\subsubsection[{t\-\_\-msg\-\_\-type}]{\setlength{\rightskip}{0pt plus 5cm}enum {\bf utils\-::log\-::t\-\_\-msg\-\_\-type}}}\label{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983}
+\begin{Desc}
+\item[Enumerator]\par
+\begin{description}
+\index{I\-N\-F\-O@{I\-N\-F\-O}!utils\-::log@{utils\-::log}}\index{utils\-::log@{utils\-::log}!I\-N\-F\-O@{I\-N\-F\-O}}\item[{\em 
+\hypertarget{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983a34a1a7830fae0bde90731e751a1ed9c0}{I\-N\-F\-O}\label{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983a34a1a7830fae0bde90731e751a1ed9c0}
+}]\index{I\-N\-F\-O\-\_\-\-A\-L\-L@{I\-N\-F\-O\-\_\-\-A\-L\-L}!utils\-::log@{utils\-::log}}\index{utils\-::log@{utils\-::log}!I\-N\-F\-O\-\_\-\-A\-L\-L@{I\-N\-F\-O\-\_\-\-A\-L\-L}}\item[{\em 
+\hypertarget{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983a20deb43be52ea36f5d4e2840aaad0521}{I\-N\-F\-O\-\_\-\-A\-L\-L}\label{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983a20deb43be52ea36f5d4e2840aaad0521}
+}]\index{W\-A\-R\-N\-I\-N\-G@{W\-A\-R\-N\-I\-N\-G}!utils\-::log@{utils\-::log}}\index{utils\-::log@{utils\-::log}!W\-A\-R\-N\-I\-N\-G@{W\-A\-R\-N\-I\-N\-G}}\item[{\em 
+\hypertarget{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983ac21363ceebe4047f94229711d3cbd248}{W\-A\-R\-N\-I\-N\-G}\label{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983ac21363ceebe4047f94229711d3cbd248}
+}]\index{E\-R\-R\-O\-R@{E\-R\-R\-O\-R}!utils\-::log@{utils\-::log}}\index{utils\-::log@{utils\-::log}!E\-R\-R\-O\-R@{E\-R\-R\-O\-R}}\item[{\em 
+\hypertarget{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983a677ee9e2002b4189a6843ebe193d0de6}{E\-R\-R\-O\-R}\label{classutils_1_1log_a295e2ee43d4e5ade12dd5de546cb1983a677ee9e2002b4189a6843ebe193d0de6}
+}]\end{description}
+\end{Desc}
+
+
+\subsection{Member Function Documentation}
+\hypertarget{classutils_1_1log_ae74653936018ff3d4a226f66cbab10a3}{\index{utils\-::log@{utils\-::log}!error@{error}}
+\index{error@{error}!utils::log@{utils\-::log}}
+\subsubsection[{error}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::error (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev = {\ttfamily 1}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_ae74653936018ff3d4a226f66cbab10a3}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=274pt]{classutils_1_1log_ae74653936018ff3d4a226f66cbab10a3_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=294pt]{classutils_1_1log_ae74653936018ff3d4a226f66cbab10a3_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_ab0893a6983709de84a36c4531d91288f}{\index{utils\-::log@{utils\-::log}!error\-\_\-f@{error\-\_\-f}}
+\index{error\-\_\-f@{error\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{error\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::error\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev, }
+\item[{const std\-::string \&}]{s, }
+\item[{}]{...}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_ab0893a6983709de84a36c4531d91288f}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_ab0893a6983709de84a36c4531d91288f_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_ac2bc117516abba07b99cdd2c7ccb91f2}{\index{utils\-::log@{utils\-::log}!error\-\_\-f@{error\-\_\-f}}
+\index{error\-\_\-f@{error\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{error\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::error\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{}]{...}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_ac2bc117516abba07b99cdd2c7ccb91f2}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_ac2bc117516abba07b99cdd2c7ccb91f2_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_a340f8d583ca25d4fa4aa8bbac4619779}{\index{utils\-::log@{utils\-::log}!info@{info}}
+\index{info@{info}!utils::log@{utils\-::log}}
+\subsubsection[{info}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::info (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev = {\ttfamily 1}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_a340f8d583ca25d4fa4aa8bbac4619779}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=270pt]{classutils_1_1log_a340f8d583ca25d4fa4aa8bbac4619779_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=286pt]{classutils_1_1log_a340f8d583ca25d4fa4aa8bbac4619779_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_a619cda7c5f2a34f6760968307a9f1bf2}{\index{utils\-::log@{utils\-::log}!info\-\_\-all@{info\-\_\-all}}
+\index{info\-\_\-all@{info\-\_\-all}!utils::log@{utils\-::log}}
+\subsubsection[{info\-\_\-all}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::info\-\_\-all (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev = {\ttfamily 1}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_a619cda7c5f2a34f6760968307a9f1bf2}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=284pt]{classutils_1_1log_a619cda7c5f2a34f6760968307a9f1bf2_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=304pt]{classutils_1_1log_a619cda7c5f2a34f6760968307a9f1bf2_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_a6668474285440f7cb89cd013e7394aed}{\index{utils\-::log@{utils\-::log}!info\-\_\-all\-\_\-f@{info\-\_\-all\-\_\-f}}
+\index{info\-\_\-all\-\_\-f@{info\-\_\-all\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{info\-\_\-all\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::info\-\_\-all\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev, }
+\item[{const std\-::string \&}]{s, }
+\item[{}]{...}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_a6668474285440f7cb89cd013e7394aed}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_a6668474285440f7cb89cd013e7394aed_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_af3bb68d31472695e6465236248c47079}{\index{utils\-::log@{utils\-::log}!info\-\_\-all\-\_\-f@{info\-\_\-all\-\_\-f}}
+\index{info\-\_\-all\-\_\-f@{info\-\_\-all\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{info\-\_\-all\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::info\-\_\-all\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{}]{...}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_af3bb68d31472695e6465236248c47079}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_af3bb68d31472695e6465236248c47079_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_a97344afe2171d9313e66fa3fd5126dbb}{\index{utils\-::log@{utils\-::log}!info\-\_\-f@{info\-\_\-f}}
+\index{info\-\_\-f@{info\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{info\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::info\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev, }
+\item[{const std\-::string \&}]{s, }
+\item[{}]{...}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_a97344afe2171d9313e66fa3fd5126dbb}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_a97344afe2171d9313e66fa3fd5126dbb_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_aeeaf8a422c9774495e864f596ce6ce78}{\index{utils\-::log@{utils\-::log}!info\-\_\-f@{info\-\_\-f}}
+\index{info\-\_\-f@{info\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{info\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::info\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{}]{...}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_aeeaf8a422c9774495e864f596ce6ce78}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_aeeaf8a422c9774495e864f596ce6ce78_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_a29247cbe7898720893bf29947ff61c16}{\index{utils\-::log@{utils\-::log}!msg@{msg}}
+\index{msg@{msg}!utils::log@{utils\-::log}}
+\subsubsection[{msg}]{\setlength{\rightskip}{0pt plus 5cm}virtual void utils\-::log\-::msg (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{{\bf t\-\_\-msg\-\_\-type}}]{mt = {\ttfamily {\bf I\-N\-F\-O}}, }
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev = {\ttfamily 1}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [pure virtual]}}}\label{classutils_1_1log_a29247cbe7898720893bf29947ff61c16}
+
+
+Implemented in \hyperlink{classutils_1_1log__std_ac33e014ef7475b4ba4103561570dba5e}{utils\-::log\-\_\-std}, and \hyperlink{classutils_1_1log__mpi_a28c8d59f3d1a9082e774915c0885a4e2}{utils\-::log\-\_\-mpi}.
+
+
+
+Here is the caller graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_a29247cbe7898720893bf29947ff61c16_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_a3b35495ffd0a90f7be31bc54cb5c5f1e}{\index{utils\-::log@{utils\-::log}!set\-\_\-verbosity@{set\-\_\-verbosity}}
+\index{set\-\_\-verbosity@{set\-\_\-verbosity}!utils::log@{utils\-::log}}
+\subsubsection[{set\-\_\-verbosity}]{\setlength{\rightskip}{0pt plus 5cm}virtual void utils\-::log\-::set\-\_\-verbosity (
+\begin{DoxyParamCaption}
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev = {\ttfamily 1}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [pure virtual]}}}\label{classutils_1_1log_a3b35495ffd0a90f7be31bc54cb5c5f1e}
+
+
+Implemented in \hyperlink{classutils_1_1log__std_a8b7dc418de81361650e4033eaa98a476}{utils\-::log\-\_\-std}, and \hyperlink{classutils_1_1log__mpi_aa0577a73c96f3b9f2b64ce4387e0d749}{utils\-::log\-\_\-mpi}.
+
+\hypertarget{classutils_1_1log_ac4a667e66cb61462031fd700b3251112}{\index{utils\-::log@{utils\-::log}!v\-\_\-error\-\_\-f@{v\-\_\-error\-\_\-f}}
+\index{v\-\_\-error\-\_\-f@{v\-\_\-error\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{v\-\_\-error\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::v\-\_\-error\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev, }
+\item[{const std\-::string \&}]{s, }
+\item[{va\-\_\-list}]{arguments}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_ac4a667e66cb61462031fd700b3251112}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_ac4a667e66cb61462031fd700b3251112_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_aec43923f837343690dac8f19d8d6d283}{\index{utils\-::log@{utils\-::log}!v\-\_\-error\-\_\-f@{v\-\_\-error\-\_\-f}}
+\index{v\-\_\-error\-\_\-f@{v\-\_\-error\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{v\-\_\-error\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::v\-\_\-error\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{va\-\_\-list}]{arguments}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_aec43923f837343690dac8f19d8d6d283}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_aec43923f837343690dac8f19d8d6d283_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_a30221b6f6f69e9482c24b0c7a426aef0}{\index{utils\-::log@{utils\-::log}!v\-\_\-info\-\_\-all\-\_\-f@{v\-\_\-info\-\_\-all\-\_\-f}}
+\index{v\-\_\-info\-\_\-all\-\_\-f@{v\-\_\-info\-\_\-all\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{v\-\_\-info\-\_\-all\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::v\-\_\-info\-\_\-all\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev, }
+\item[{const std\-::string \&}]{s, }
+\item[{va\-\_\-list}]{arguments}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_a30221b6f6f69e9482c24b0c7a426aef0}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_a30221b6f6f69e9482c24b0c7a426aef0_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_a908102971081fce062f52d1ebf8fb981}{\index{utils\-::log@{utils\-::log}!v\-\_\-info\-\_\-all\-\_\-f@{v\-\_\-info\-\_\-all\-\_\-f}}
+\index{v\-\_\-info\-\_\-all\-\_\-f@{v\-\_\-info\-\_\-all\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{v\-\_\-info\-\_\-all\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::v\-\_\-info\-\_\-all\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{va\-\_\-list}]{arguments}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_a908102971081fce062f52d1ebf8fb981}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_a908102971081fce062f52d1ebf8fb981_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_ac68c612eca6fd3723263ef226596da55}{\index{utils\-::log@{utils\-::log}!v\-\_\-info\-\_\-f@{v\-\_\-info\-\_\-f}}
+\index{v\-\_\-info\-\_\-f@{v\-\_\-info\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{v\-\_\-info\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::v\-\_\-info\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev, }
+\item[{const std\-::string \&}]{s, }
+\item[{va\-\_\-list}]{arguments}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_ac68c612eca6fd3723263ef226596da55}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_ac68c612eca6fd3723263ef226596da55_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_abdde95f78e1a816a591de7ba52b4f1ce}{\index{utils\-::log@{utils\-::log}!v\-\_\-info\-\_\-f@{v\-\_\-info\-\_\-f}}
+\index{v\-\_\-info\-\_\-f@{v\-\_\-info\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{v\-\_\-info\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::v\-\_\-info\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{va\-\_\-list}]{arguments}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_abdde95f78e1a816a591de7ba52b4f1ce}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_abdde95f78e1a816a591de7ba52b4f1ce_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_ad762145ed51776aac2c492325e84fa63}{\index{utils\-::log@{utils\-::log}!v\-\_\-warning\-\_\-f@{v\-\_\-warning\-\_\-f}}
+\index{v\-\_\-warning\-\_\-f@{v\-\_\-warning\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{v\-\_\-warning\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::v\-\_\-warning\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev, }
+\item[{const std\-::string \&}]{s, }
+\item[{va\-\_\-list}]{arguments}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_ad762145ed51776aac2c492325e84fa63}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_ad762145ed51776aac2c492325e84fa63_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_abd427658297adae865c16adac9805e09}{\index{utils\-::log@{utils\-::log}!v\-\_\-warning\-\_\-f@{v\-\_\-warning\-\_\-f}}
+\index{v\-\_\-warning\-\_\-f@{v\-\_\-warning\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{v\-\_\-warning\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::v\-\_\-warning\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{va\-\_\-list}]{arguments}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_abd427658297adae865c16adac9805e09}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_abd427658297adae865c16adac9805e09_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_aabbb5fa0d3ead48cbb6fac3aff7249ca}{\index{utils\-::log@{utils\-::log}!warning@{warning}}
+\index{warning@{warning}!utils::log@{utils\-::log}}
+\subsubsection[{warning}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::warning (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev = {\ttfamily 1}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_aabbb5fa0d3ead48cbb6fac3aff7249ca}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=288pt]{classutils_1_1log_aabbb5fa0d3ead48cbb6fac3aff7249ca_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+Here is the caller graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=322pt]{classutils_1_1log_aabbb5fa0d3ead48cbb6fac3aff7249ca_icgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_a6f459ff550313048cae141dc07166a79}{\index{utils\-::log@{utils\-::log}!warning\-\_\-f@{warning\-\_\-f}}
+\index{warning\-\_\-f@{warning\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{warning\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::warning\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{{\bf int}}]{\-\_\-log\-\_\-lev, }
+\item[{const std\-::string \&}]{s, }
+\item[{}]{...}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_a6f459ff550313048cae141dc07166a79}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_a6f459ff550313048cae141dc07166a79_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classutils_1_1log_ac07b5007d7071f1352246b62c5ac4aaf}{\index{utils\-::log@{utils\-::log}!warning\-\_\-f@{warning\-\_\-f}}
+\index{warning\-\_\-f@{warning\-\_\-f}!utils::log@{utils\-::log}}
+\subsubsection[{warning\-\_\-f}]{\setlength{\rightskip}{0pt plus 5cm}void utils\-::log\-::warning\-\_\-f (
+\begin{DoxyParamCaption}
+\item[{const std\-::string \&}]{s, }
+\item[{}]{...}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classutils_1_1log_ac07b5007d7071f1352246b62c5ac4aaf}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classutils_1_1log_ac07b5007d7071f1352246b62c5ac4aaf_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+The documentation for this class was generated from the following file\-:\begin{DoxyCompactItemize}
+\item 
+source/utils/\hyperlink{log_8h}{log.\-h}\end{DoxyCompactItemize}

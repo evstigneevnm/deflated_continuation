@@ -1,0 +1,4 @@
+var searchData=
+[
+  ['kuramoto_5fsivashinskiy_5f2d',['Kuramoto_Sivashinskiy_2D',['../classnonlinear__operators_1_1Kuramoto__Sivashinskiy__2D.html#aaf3584292096247bff98efd0979c1287',1,'nonlinear_operators::Kuramoto_Sivashinskiy_2D::Kuramoto_Sivashinskiy_2D(T a_val_, T b_val_, size_t Nx_, size_t Ny_, vector_operations_real *vec_ops_R_, vector_operations_complex *vec_ops_C_, vector_operations_real *vec_ops_R_im_, FFT_type *FFT_)'],['../classnonlinear__operators_1_1Kuramoto__Sivashinskiy__2D.html#a39df5ca99d9ef92ecb3cd60785527d1d',1,'nonlinear_operators::Kuramoto_Sivashinskiy_2D::Kuramoto_Sivashinskiy_2D(T a_val_, T b_val_, size_t Nx_, size_t Ny_, dim3 dimGrid_, dim3 dimGrid_F_, dim3 dimBlock_, vector_operations_real *vec_ops_R_, vector_operations_complex *vec_ops_C_, vector_operations_real *vec_ops_R_im_, FFT_type &amp;FFT_)']]]
+];

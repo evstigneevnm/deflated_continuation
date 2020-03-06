@@ -50,8 +50,9 @@ public:
         while((!converged)&&(!failed))
         {
             predictor->apply(x_p, lambda_p, x1, lambda1);
+            T ds_l = predictor->get_ds();
             log->info_f("predict: ||x_p|| = %le, lambda_p = %le, ||x1|| = %le, lambda1 = %le", (double)vec_ops->norm(x0), (double)lambda_p, (double)vec_ops->norm(x1), (double)lambda1);
-            sys_op->set_tangent_space(x_p, lambda_p,(T_vec&)x0_s, (T&)lambda0_s);
+            sys_op->set_tangent_space(x_p, lambda_p,(T_vec&)x0_s, (T&)lambda0_s, ds_l);
             converged = newton->solve(nonlin_op, x1, lambda1);
             if(!converged)
             {
@@ -88,7 +89,7 @@ public:
            vec_ops->assign_mul(T(1)+d_ds, x1, x1_l);
            T lambda1_l = lambda1*(T(1)+d_ds);
            bool converged_l;
-           sys_op->set_tangent_space(x1, lambda1,(T_vec&)x0_s, (T&)lambda0_s);
+           sys_op->set_tangent_space(x1, lambda1,(T_vec&)x0_s, (T&)lambda0_s, ds_l);
            converged_l = newton->solve(nonlin_op, x1_l, lambda1_l);
            if(!converged_l)
            {

@@ -1,0 +1,7 @@
+<map id="nonlinear_operators::Kuramoto_Sivashinskiy_2D::C2R" name="nonlinear_operators::Kuramoto_Sivashinskiy_2D::C2R">
+<area shape="rect" id="node2" href="$classnonlinear__operators_1_1Kuramoto__Sivashinskiy__2D.html#a48119eaea33031301348d7e0c68cead9" title="nonlinear_operators\l::Kuramoto_Sivashinskiy_2D::F" alt="" coords="222,5,429,46"/>
+<area shape="rect" id="node3" href="$classnonlinear__operators_1_1Kuramoto__Sivashinskiy__2D.html#a780a9558ac3cc32b69655eec7ae442d4" title="nonlinear_operators\l::Kuramoto_Sivashinskiy\l_2D::jacobian_u" alt="" coords="242,69,409,125"/>
+<area shape="rect" id="node4" href="$classnonlinear__operators_1_1Kuramoto__Sivashinskiy__2D.html#a85c0cfab8c61d9b4b47082d12c75d74a" title="nonlinear_operators\l::Kuramoto_Sivashinskiy\l_2D::jacobian_alpha" alt="" coords="242,149,409,205"/>
+<area shape="rect" id="node5" href="$classnonlinear__operators_1_1Kuramoto__Sivashinskiy__2D.html#aeb5410171a948911e6670b67145de52f" title="nonlinear_operators\l::Kuramoto_Sivashinskiy\l_2D::preconditioner_jacobian_u" alt="" coords="223,229,427,285"/>
+<area shape="rect" id="node6" href="$classnonlinear__operators_1_1Kuramoto__Sivashinskiy__2D.html#a0c859a8fee9c4f84bdbe91defde92cd7" title="nonlinear_operators\l::Kuramoto_Sivashinskiy\l_2D::fourier_solution" alt="" coords="242,309,409,365"/>
+</map>

@@ -340,7 +340,14 @@ void gpu_vector_operations<T, BLOCK_SIZE>::set_value_at_point(scalar_type val_x,
 {
     set_value_at_point_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, val_x, at, x);
 }
+
+template <typename T, int BLOCK_SIZE>
+void gpu_vector_operations<T, BLOCK_SIZE>::set_value_at_point(scalar_type val_x, size_t at, vector_type& x, size_t sz_l)
+{
+    set_value_at_point_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz_l, val_x, at, x);
+}
 //===
+
 
 template <typename T, int BLOCK_SIZE>
 void gpu_vector_operations<T, BLOCK_SIZE>::calculate_cuda_grid()

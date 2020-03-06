@@ -1,0 +1,5 @@
+<map id="gpu_vector_operations::normalize" name="gpu_vector_operations::normalize">
+<area shape="rect" id="node2" href="$structgpu__vector__operations.html#a187c29c17f590d11a2d0ab6470b4d435" title="gpu_vector_operations\l::norm" alt="" coords="211,5,365,46"/>
+<area shape="rect" id="node4" href="$classcublas__wrap.html#a6d4d2cd327b9c455e372046ea6a50e9d" title="cublas_wrap::normalize" alt="" coords="209,71,367,97"/>
+<area shape="rect" id="node3" href="$classcublas__wrap.html#a810186a2de795b165d32da3145338584" title="cublas_wrap::norm2" alt="" coords="416,12,555,39"/>
+</map>

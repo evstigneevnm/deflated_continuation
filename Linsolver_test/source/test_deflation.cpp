@@ -9,11 +9,11 @@
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
 
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D.h>
-#include <nonlinear_operators/linear_operator_KS_2D.h>
-#include <nonlinear_operators/preconditioner_KS_2D.h>
-#include <nonlinear_operators/convergence_strategy.h>
-#include <nonlinear_operators/system_operator.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/linear_operator_KS_2D.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/preconditioner_KS_2D.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/convergence_strategy.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/system_operator.h>
 
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
@@ -35,21 +35,21 @@
 int main(int argc, char const *argv[])
 {
     
-    init_cuda(4);
+    init_cuda(5);
     size_t Nx=1024;
     size_t Ny=1024;
-    real norm_wight = real(1);//std::sqrt(real(Nx*Ny));
-    real size_problem = std::sqrt(real(Nx*Ny));
+    real norm_wight = std::sqrt(real(Nx*Ny));
+    real size_problem = real(1);//std::sqrt(real(Nx*Ny));
 
     //linsolver control
-    unsigned int lin_solver_max_it = 1300;
-    real lin_solver_tol = 5.0e-10*size_problem;
+    unsigned int lin_solver_max_it = 1000;
+    real lin_solver_tol = 1.0e-3;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;
     //newton deflation control
     unsigned int newton_def_max_it = 350;
-    real newton_def_tol = 5.0e-10*size_problem;
+    real newton_def_tol = 5.0e-10;
 
     real lambda_0 = 7.3;
     real a_val = 2.0;

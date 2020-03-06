@@ -1,6 +1,6 @@
 #ifndef __CONVERGENCE_STRATEGY_CONTINUATION_H__
 #define __CONVERGENCE_STRATEGY_CONTINUATION_H__
-/*
+/**
 convergence rules for Newton iterator for continuation process
 */
 #include <cmath>
@@ -51,61 +51,61 @@ public:
     {
         bool finish = false;
         nonlin_op->F(x, lambda, Fx);
-        T normFx = vec_ops->norm(Fx);
+        T normFx = vec_ops->norm_l2(Fx);
         //update solution
         vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
         T lambda1 = lambda + newton_wight*delta_lambda;
         nonlin_op->F(x1, lambda1, Fx);
-        T normFx1 = vec_ops->norm(Fx);
+        T normFx1 = vec_ops->norm_l2(Fx);
 
         iterations++;
-        log->info_f("iteration %i, previous residual %le, current residual %le ",iterations, (double)normFx, (double)normFx1);
-        if(normFx1>10.0*normFx) //cancel update and decrease the nonlinear update wight if the norm is growing
-        {   
-            iterations--;
-            newton_wight*=T(0.75);
-            lambda1 = lambda;
-            vec_ops->assign(x, x1);
-            log->info_f("step is cancelled, Newton wight updated to (%le).", double(newton_wight) );
-        }
-        else
-        {
+        log->info_f("convergence_strategy::iteration %i, previous residual %le, current residual %le ",iterations, (double)normFx, (double)normFx1);
+        // if(normFx1>10.0*normFx) //cancel update and decrease the nonlinear update wight if the norm is growing
+        // {   
+        //     iterations--;
+        //     newton_wight*=T(0.75);
+        //     lambda1 = lambda;
+        //     vec_ops->assign(x, x1);
+        //     log->info_f("convergence_strategy::step is cancelled, Newton wight updated to (%le).", double(newton_wight) );
+        // }
+        // else
+        // {
             //store norm only if the step is seccessfull
             if(store_norms_history)
             {
                 norms_evolution.push_back(normFx1);
             }
-        }
+        //}
         if(normFx1<10.0*normFx)
         {
             reset_wight();
-            log->info_f("fast descent, Newton wight updated to (%le).", double(newton_wight) );
+            log->info_f("convergence_strategy::fast descent, Newton wight updated to (%le).", double(newton_wight) );
         }
         if(newton_wight<T(1.0e-6))
         {
-            log->info_f("Newton wight is too small (%le).", double(newton_wight));   
+            log->info_f("convergence_strategy::Newton wight is too small (%le).", double(newton_wight));   
             finish = true;
             result_status = 4;
         }
         if(std::isnan(normFx))
         {
-            log->info("Newton initial vector caused nan.");
+            log->info("convergence_strategy::Newton initial vector caused nan.");
             finish = true;
             result_status = 3;
         }
         else if(std::isnan(normFx1))
         {
-            log->info("Newton updated vector caused nan.");
+            log->info("convergence_strategy::Newton updated vector caused nan.");
             finish = true;
             result_status = 3;
         }else if(std::isinf(normFx))
         {
-            log->info("Newton initial vector caused inf.");
+            log->info("convergence_strategy::Newton initial vector caused inf.");
             finish = true;
             result_status = 2;            
         }else if(std::isinf(normFx1))
         {
-            log->info("Newton update caused inf.");
+            log->info("convergence_strategy::Newton update caused inf.");
             finish = true;
             result_status = 2;            
         }else
@@ -116,13 +116,13 @@ public:
         }
         if(normFx1<tolerance)
         {
-            log->info_f("Newton converged with %le.", (double)normFx1);
+            log->info_f("convergence_strategy::Newton converged with %le.", (double)normFx1);
             result_status = 0;
             finish = true;
         }
         else if(iterations>=maximum_iterations)
         {
-            log->info("Newton max iterations (%i) reached.", iterations);
+            log->info("convergence_strategy::Newton max iterations (%i) reached.", iterations);
             result_status = 1;
             finish = true;
         }

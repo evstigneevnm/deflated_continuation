@@ -81,6 +81,11 @@ struct gpu_vector_operations
         //x = NULL;
         x = device_allocate<T>(sz);
     }
+    void init_vector_rank1(vector_type& x)const 
+    {
+        //x = NULL;
+        x = device_allocate<T>(sz+1);
+    }    
     void free_vector(vector_type& x)const 
     {
         if (x != NULL) 
@@ -117,7 +122,7 @@ struct gpu_vector_operations
     {
         cuBLAS->dot<scalar_type>(sz, x, y, result);
     }
-     //Observe, that for complex type we need template spetialization! vector type is compelx, but norm type is real!
+    //Observe, that for complex type we need template spetialization! vector type is compelx, but norm type is real!
     //for *PU pointer storage with call from *PU
     Tsc norm(const vector_type &x)const
     {
@@ -125,6 +130,28 @@ struct gpu_vector_operations
         cuBLAS->norm2<T>(sz, x, &result);
         return result;
     }
+    Tsc norm_l2(const vector_type &x)const
+    {
+        Tsc result;
+        cuBLAS->norm2<T>(sz, x, &result);
+        return result/std::sqrt(Tsc(sz)); //implements l2 norm as sqrt(sum_j (x_j^2) * (1/x_size))
+    }
+    //norm for a rank 1 updated vector
+    Tsc norm_rank1(const vector_type &x, const scalar_type val_x)
+    {
+        vector_type y;
+        init_vector_rank1(y); start_use_vector(y); //this is not good, but it will do for now.
+
+        assign(x, y);
+        set_value_at_point(val_x, sz, y, sz+1);
+        Tsc result;
+        cuBLAS->norm2<T>(sz+1, y, &result);
+
+        stop_use_vector(y); free_vector(y);
+        return result;
+
+    }
+
     //for GPU pointer storage with call from CPU
     void norm(const vector_type &x, Tsc* result)
     {
@@ -195,6 +222,8 @@ struct gpu_vector_operations
                                         scalar_type mul_v, const vector_type& v, const scalar_type mul_w, const vector_type& w, vector_type& z)const;
     //calc: x[at]=val_x
     void set_value_at_point(scalar_type val_x, size_t at, vector_type& x);
+    //calc: x[at]=val_x for modified size
+    void set_value_at_point(scalar_type val_x, size_t at, vector_type& x, size_t sz_l);
 
     //calc: x := <pseudo random vector with values in [0,1] > 
     void assign_random(vector_type& vec)

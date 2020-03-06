@@ -1,0 +1,11 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classutils_1_1logged__obj__base.html" title="utils::logged_obj_base\l\&lt; Log \&gt;" alt="" coords="6,125,157,166"/>
+<area shape="rect" id="node2" href="$classlogged__obj__template.html" title="logged_obj_template\l\&lt; Log \&gt;" alt="" coords="247,5,388,46"/>
+<area shape="rect" id="node3" href="$classnumerical__algos_1_1lin__solvers_1_1default__monitor.html" title="numerical_algos::lin\l_solvers::default_monitor\l\&lt; VectorOperations, Log \&gt;" alt="" coords="229,69,405,125"/>
+<area shape="rect" id="node4" href="$classnumerical__algos_1_1lin__solvers_1_1iter__solver__base.html" title="numerical_algos::lin\l_solvers::iter_solver\l_base\&lt; LinearOperator,\l Preconditioner, VectorOperations,\l Monitor, Log \&gt;" alt="" coords="206,149,429,235"/>
+<area shape="rect" id="node9" href="$classnumerical__algos_1_1lin__solvers_1_1lu__sgs.html" title="numerical_algos::lin\l_solvers::lu_sgs\&lt; LinearOperator,\l VectorOperations, Log \&gt;" alt="" coords="208,259,427,315"/>
+<area shape="rect" id="node5" href="$classnumerical__algos_1_1lin__solvers_1_1bicgstab.html" title="numerical_algos::lin\l_solvers::bicgstab\&lt; LinearOperator,\l Preconditioner, VectorOperations,\l Monitor, Log \&gt;" alt="" coords="477,14,707,85"/>
+<area shape="rect" id="node6" href="$classnumerical__algos_1_1lin__solvers_1_1bicgstabl.html" title="numerical_algos::lin\l_solvers::bicgstabl\&lt;\l LinearOperator, Preconditioner,\l VectorOperations, Monitor, Log \&gt;" alt="" coords="483,109,701,179"/>
+<area shape="rect" id="node7" href="$classnumerical__algos_1_1lin__solvers_1_1cgs.html" title="numerical_algos::lin\l_solvers::cgs\&lt; LinearOperator,\l Preconditioner, VectorOperations,\l Monitor, Log \&gt;" alt="" coords="481,203,703,274"/>
+<area shape="rect" id="node8" href="$classnumerical__algos_1_1lin__solvers_1_1jacobi.html" title="numerical_algos::lin\l_solvers::jacobi\&lt; LinearOperator,\l Preconditioner, VectorOperations,\l Monitor, Log \&gt;" alt="" coords="481,298,703,369"/>
+</map>

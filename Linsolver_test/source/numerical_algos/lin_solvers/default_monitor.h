@@ -43,6 +43,7 @@ private:
     const vector_operations_type &vec_ops_;
 
     T           rel_tol_, abs_tol_;
+    T           rel_tol_save_;
     int         max_iters_num_, min_iters_num_;
     bool        out_min_resid_norm_;
     bool        save_convergence_history_;
@@ -80,6 +81,7 @@ public:
         if (out_min_resid_norm_) buf_.init();
         save_convergence_history_ = save_convergence_history;
         divide_out_norms_by_rel_base_ = divide_out_norms_by_rel_base;
+        rel_tol_save_ = rel_tol_;
     }
     void                    set_save_convergence_history(bool save_convergence_history)
     {
@@ -91,6 +93,15 @@ public:
     }
     //TODO init with config
     //TODO add separate function to control tolerances and behaviour
+    void set_temp_tolerance(T rel_tol)
+    {
+        rel_tol_save_ = rel_tol_;
+        rel_tol_ = rel_tol;   
+    }
+    void restore_tolerance()
+    {
+        rel_tol_ = rel_tol_save_;
+    }
 
     void                    start(const vector_type& rhs)
     {

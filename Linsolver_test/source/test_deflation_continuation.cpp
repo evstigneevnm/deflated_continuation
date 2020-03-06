@@ -56,21 +56,20 @@ int main(int argc, char const *argv[])
 
 
     init_cuda(6);
-    real norm_wight = std::sqrt(real(Nx*Ny));
-    real size_problem = std::sqrt(real(Nx*Ny));
+    real norm_wight = 1.0;//std::sqrt(real(Nx*Ny));
 
     //linsolver control
     unsigned int lin_solver_max_it = 1500;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;
-    real lin_solver_tol = 5.0e-8*size_problem;
+    real lin_solver_tol = 5.0e-3;
     
     //newton control
     unsigned int newton_def_max_it = 350;
     unsigned int newton_def_cont_it = 100;
-    real newton_def_tol = 5.0e-8*size_problem;
-    real newton_cont_tol = 5.0e-8*size_problem;
+    real newton_def_tol = 1.0e-9;
+    real newton_cont_tol = 1.0e-9;
 
     real a_val = real(2);
     real b_val = real(4);
@@ -114,14 +113,14 @@ int main(int argc, char const *argv[])
 
     //setup linear system:
     mon_orig = &SM->get_linsolver_handle_original()->monitor();
-    mon_orig->init(lin_solver_tol/100, real(0), lin_solver_max_it);
+    mon_orig->init(lin_solver_tol, real(0), lin_solver_max_it);
     mon_orig->set_save_convergence_history(true);
-    mon_orig->set_divide_out_norms_by_rel_base(false);
+    mon_orig->set_divide_out_norms_by_rel_base(true);
     mon_orig->out_min_resid_norm();
     SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
     SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle_original()->set_basis_size(basis_sz);    
-    convergence_newton_t *conv_newton = new convergence_newton_t(vec_ops_R_im, log, real(1.0e-11), newton_def_max_it, real(1) );
+    convergence_newton_t *conv_newton = new convergence_newton_t(vec_ops_R_im, log, newton_cont_tol, newton_def_max_it, real(1) );
     system_operator_t *system_operator = new system_operator_t(vec_ops_R_im, Ax, SM);
     newton_t *newton = new newton_t(vec_ops_R_im, system_operator, conv_newton);
 
@@ -136,7 +135,7 @@ int main(int argc, char const *argv[])
 
     real_vec u_out_ph;
     vec_ops_R->init_vector(u_out_ph); vec_ops_R->start_use_vector(u_out_ph);
-
+    
 
     deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R_im, log, newton_def, 5);
 
@@ -237,7 +236,7 @@ int main(int argc, char const *argv[])
 //*/
     std::ofstream file_diag("diagram.dat", std::ofstream::out);
     
-    file_diag << lambda0 << " " << vec_ops_R_im->norm(x0) << std::endl;
+    file_diag << lambda0 << " " << vec_ops_R_im->norm_l2(x0) << std::endl;
     for(unsigned int s=0;s<S;s++)
     {
         continuation_step->solve(KS2D, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
@@ -245,13 +244,13 @@ int main(int argc, char const *argv[])
         vec_ops_R_im->assign(x1_s,x0_s);
         lambda0 = lambda1;
         lambda0_s = lambda1_s;
-        file_diag << lambda1 << " " << vec_ops_R_im->norm(x1) << std::endl;
+        file_diag << lambda1 << " " << vec_ops_R_im->norm_l2(x1) << std::endl;
         std::flush(file_diag);
     }
     file_diag.close();
 
     KS2D->F(x1, lambda1, f);
-    norm = vec_ops_R_im->norm(f);
+    norm = vec_ops_R_im->norm_l2(f);
     printf("\n===(%le, %le)===", lambda1, norm);
 
     KS2D->physical_solution((real_im_vec&)x1, u_out_ph);

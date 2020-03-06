@@ -1,0 +1,675 @@
+1000
+
+ ========= 
+testing: rank1_update(A)u = b; v=f(u,b) 
+
+==============SMALL ALPHA===========
+INFO:    bicgstabl::default_monitor: iter = 0
+INFO:    bicgstabl::default_monitor: resid norm = 2.749930e+01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 0 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 3
+INFO:    bicgstabl::default_monitor: resid norm = 1.228169e+01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 3 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 6
+INFO:    bicgstabl::default_monitor: resid norm = 7.505727e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 6 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 9
+INFO:    bicgstabl::default_monitor: resid norm = 5.408238e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 9 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 12
+INFO:    bicgstabl::default_monitor: resid norm = 1.725413e+01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 12 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 15
+INFO:    bicgstabl::default_monitor: resid norm = 6.840162e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 15 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 18
+INFO:    bicgstabl::default_monitor: resid norm = 4.709908e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 18 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 21
+INFO:    bicgstabl::default_monitor: resid norm = 1.340417e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 21 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 24
+INFO:    bicgstabl::default_monitor: resid norm = 1.530389e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 24 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 27
+INFO:    bicgstabl::default_monitor: resid norm = 2.082980e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 27 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 30
+INFO:    bicgstabl::default_monitor: resid norm = 2.652409e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 30 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 33
+INFO:    bicgstabl::default_monitor: resid norm = 2.577098e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 33 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 36
+INFO:    bicgstabl::default_monitor: resid norm = 2.609623e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 36 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 39
+INFO:    bicgstabl::default_monitor: resid norm = 1.479186e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 39 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 42
+INFO:    bicgstabl::default_monitor: resid norm = 1.598078e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 42 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 45
+INFO:    bicgstabl::default_monitor: resid norm = 1.270024e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 45 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 48
+INFO:    bicgstabl::default_monitor: resid norm = 8.946307e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 48 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 51
+INFO:    bicgstabl::default_monitor: resid norm = 4.636274e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 51 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 54
+INFO:    bicgstabl::default_monitor: resid norm = 2.451095e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 54 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 57
+INFO:    bicgstabl::default_monitor: resid norm = 1.384789e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 57 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 60
+INFO:    bicgstabl::default_monitor: resid norm = 2.392242e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 60 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 63
+INFO:    bicgstabl::default_monitor: resid norm = 2.832568e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 63 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 66
+INFO:    bicgstabl::default_monitor: resid norm = 8.082190e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 66 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 69
+INFO:    bicgstabl::default_monitor: resid norm = 8.619685e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 69 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 72
+INFO:    bicgstabl::default_monitor: resid norm = 2.231210e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 72 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 75
+INFO:    bicgstabl::default_monitor: resid norm = 3.096497e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 75 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 78
+INFO:    bicgstabl::default_monitor: resid norm = 3.374895e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 78 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 81
+INFO:    bicgstabl::default_monitor: resid norm = 3.268675e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 81 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 84
+INFO:    bicgstabl::default_monitor: resid norm = 2.415481e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 84 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 87
+INFO:    bicgstabl::default_monitor: resid norm = 2.989337e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 87 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 90
+INFO:    bicgstabl::default_monitor: resid norm = 9.688096e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 90 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 93
+INFO:    bicgstabl::default_monitor: resid norm = 1.206571e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 93 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 96
+INFO:    bicgstabl::default_monitor: resid norm = 2.171353e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 96 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 99
+INFO:    bicgstabl::default_monitor: resid norm = 3.398669e-03 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 99 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 102
+INFO:    bicgstabl::default_monitor: resid norm = 1.251466e-03 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 102 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 105
+INFO:    bicgstabl::default_monitor: resid norm = 5.070441e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 105 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 108
+INFO:    bicgstabl::default_monitor: resid norm = 1.655477e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 108 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 111
+INFO:    bicgstabl::default_monitor: resid norm = 2.374036e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 111 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 114
+INFO:    bicgstabl::default_monitor: resid norm = 2.329623e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 114 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 117
+INFO:    bicgstabl::default_monitor: resid norm = 1.711650e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 117 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 120
+INFO:    bicgstabl::default_monitor: resid norm = 8.342643e-05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 120 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 123
+INFO:    bicgstabl::default_monitor: resid norm = 5.544536e-05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 123 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 126
+INFO:    bicgstabl::default_monitor: resid norm = 8.786850e-05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 126 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 129
+INFO:    bicgstabl::default_monitor: resid norm = 2.273460e-05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 129 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 132
+INFO:    bicgstabl::default_monitor: resid norm = 1.040501e-05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 132 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 135
+INFO:    bicgstabl::default_monitor: resid norm = 4.875820e-06 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 135 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 138
+INFO:    bicgstabl::default_monitor: resid norm = 1.666448e-06 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 138 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 141
+INFO:    bicgstabl::default_monitor: resid norm = 1.870840e-06 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 141 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 144
+INFO:    bicgstabl::default_monitor: resid norm = 1.621283e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 144 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 147
+INFO:    bicgstabl::default_monitor: resid norm = 2.673526e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 147 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 150
+INFO:    bicgstabl::default_monitor: resid norm = 1.343870e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 150 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 153
+INFO:    bicgstabl::default_monitor: resid norm = 2.051249e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 153 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 156
+INFO:    bicgstabl::default_monitor: resid norm = 5.952784e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 156 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 159
+INFO:    bicgstabl::default_monitor: resid norm = 5.672617e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 159 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 162
+INFO:    bicgstabl::default_monitor: resid norm = 5.298484e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 162 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 165
+INFO:    bicgstabl::default_monitor: resid norm = 3.779999e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 165 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 168
+INFO:    bicgstabl::default_monitor: resid norm = 3.446057e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 168 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 171
+INFO:    bicgstabl::default_monitor: resid norm = 2.393540e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 171 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 174
+INFO:    bicgstabl::default_monitor: resid norm = 2.415439e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 174 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 177
+INFO:    bicgstabl::default_monitor: resid norm = 2.421708e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 177 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 180
+INFO:    bicgstabl::default_monitor: resid norm = 2.174730e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 180 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 183
+INFO:    bicgstabl::default_monitor: resid norm = 2.523998e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 183 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 186
+INFO:    bicgstabl::default_monitor: resid norm = 5.924511e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 186 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 189
+INFO:    bicgstabl::default_monitor: resid norm = 2.451924e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 189 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 192
+INFO:    bicgstabl::default_monitor: resid norm = 2.185792e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 192 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 195
+INFO:    bicgstabl::default_monitor: resid norm = 2.206122e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 195 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 198
+INFO:    bicgstabl::default_monitor: resid norm = 2.198755e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 198 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 201
+INFO:    bicgstabl::default_monitor: resid norm = 2.271527e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 201 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 204
+INFO:    bicgstabl::default_monitor: resid norm = 4.168515e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 204 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 207
+INFO:    bicgstabl::default_monitor: resid norm = 1.700520e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 207 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 210
+INFO:    bicgstabl::default_monitor: resid norm = 2.496844e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 210 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 213
+INFO:    bicgstabl::default_monitor: resid norm = 1.426136e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 213 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 216
+INFO:    bicgstabl::default_monitor: resid norm = 2.907439e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 216 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 219
+INFO:    bicgstabl::default_monitor: resid norm = 3.018611e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 219 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 222
+INFO:    bicgstabl::default_monitor: resid norm = 6.386986e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 222 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 225
+INFO:    bicgstabl::default_monitor: resid norm = 5.981350e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 225 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 228
+INFO:    bicgstabl::default_monitor: resid norm = 2.426300e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 228 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 231
+INFO:    bicgstabl::default_monitor: resid norm = 1.458247e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 231 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 234
+INFO:    bicgstabl::default_monitor: resid norm = 1.855089e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 234 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 237
+INFO:    bicgstabl::default_monitor: resid norm = 1.515233e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 237 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 240
+INFO:    bicgstabl::default_monitor: resid norm = 2.036584e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 240 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 243
+INFO:    bicgstabl::default_monitor: resid norm = 6.447958e-10 tol = 1.000000e-09
+INFO:    lin_solver returned success result
+ v = -0.388692
+
+ ========= 
+testing: (beta A - 1/alpha d c^T) u = b 
+
+==============SMALL ALPHA===========
+INFO:    bicgstabl::default_monitor: iter = 0
+INFO:    bicgstabl::default_monitor: resid norm = 9.999686e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 0 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 3
+INFO:    bicgstabl::default_monitor: resid norm = 2.456860e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 3 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 6
+INFO:    bicgstabl::default_monitor: resid norm = 4.990369e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 6 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 9
+INFO:    bicgstabl::default_monitor: resid norm = 4.630498e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 9 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 12
+INFO:    bicgstabl::default_monitor: resid norm = 5.584801e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 12 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 15
+INFO:    bicgstabl::default_monitor: resid norm = 4.878986e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 15 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 18
+INFO:    bicgstabl::default_monitor: resid norm = 5.006606e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 18 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 21
+INFO:    bicgstabl::default_monitor: resid norm = 5.241631e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 21 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 24
+INFO:    bicgstabl::default_monitor: resid norm = 3.759045e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 24 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 27
+INFO:    bicgstabl::default_monitor: resid norm = 5.103311e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 27 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 30
+INFO:    bicgstabl::default_monitor: resid norm = 1.264543e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 30 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 33
+INFO:    bicgstabl::default_monitor: resid norm = 4.893199e+01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 33 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 36
+INFO:    bicgstabl::default_monitor: resid norm = 3.803454e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 36 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 39
+INFO:    bicgstabl::default_monitor: resid norm = 2.074770e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 39 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 42
+INFO:    bicgstabl::default_monitor: resid norm = 3.792793e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 42 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 45
+INFO:    bicgstabl::default_monitor: resid norm = 2.495609e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 45 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 48
+INFO:    bicgstabl::default_monitor: resid norm = 1.529142e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 48 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 51
+INFO:    bicgstabl::default_monitor: resid norm = 9.546039e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 51 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 54
+INFO:    bicgstabl::default_monitor: resid norm = 7.125612e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 54 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 57
+INFO:    bicgstabl::default_monitor: resid norm = 4.862054e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 57 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 60
+INFO:    bicgstabl::default_monitor: resid norm = 3.516622e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 60 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 63
+INFO:    bicgstabl::default_monitor: resid norm = 6.086463e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 63 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 66
+INFO:    bicgstabl::default_monitor: resid norm = 3.746274e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 66 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 69
+INFO:    bicgstabl::default_monitor: resid norm = 4.361209e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 69 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 72
+INFO:    bicgstabl::default_monitor: resid norm = 1.949155e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 72 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 75
+INFO:    bicgstabl::default_monitor: resid norm = 1.318345e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 75 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 78
+INFO:    bicgstabl::default_monitor: resid norm = 2.363739e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 78 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 81
+INFO:    bicgstabl::default_monitor: resid norm = 9.797494e-03 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 81 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 84
+INFO:    bicgstabl::default_monitor: resid norm = 1.112230e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 84 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 87
+INFO:    bicgstabl::default_monitor: resid norm = 2.541402e-03 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 87 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 90
+INFO:    bicgstabl::default_monitor: resid norm = 1.991146e-03 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 90 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 93
+INFO:    bicgstabl::default_monitor: resid norm = 2.441785e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 93 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 96
+INFO:    bicgstabl::default_monitor: resid norm = 2.606449e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 96 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 99
+INFO:    bicgstabl::default_monitor: resid norm = 2.871072e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 99 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 102
+INFO:    bicgstabl::default_monitor: resid norm = 1.959369e-03 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 102 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 105
+INFO:    bicgstabl::default_monitor: resid norm = 1.672974e-03 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 105 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 108
+INFO:    bicgstabl::default_monitor: resid norm = 3.557677e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 108 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 111
+INFO:    bicgstabl::default_monitor: resid norm = 1.804420e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 111 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 114
+INFO:    bicgstabl::default_monitor: resid norm = 4.105685e-05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 114 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 117
+INFO:    bicgstabl::default_monitor: resid norm = 3.099488e-05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 117 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 120
+INFO:    bicgstabl::default_monitor: resid norm = 1.773095e-05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 120 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 123
+INFO:    bicgstabl::default_monitor: resid norm = 8.845708e-05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 123 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 126
+INFO:    bicgstabl::default_monitor: resid norm = 8.845505e-06 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 126 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 129
+INFO:    bicgstabl::default_monitor: resid norm = 4.243254e-06 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 129 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 132
+INFO:    bicgstabl::default_monitor: resid norm = 3.610935e-06 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 132 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 135
+INFO:    bicgstabl::default_monitor: resid norm = 1.295779e-06 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 135 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 138
+INFO:    bicgstabl::default_monitor: resid norm = 5.692393e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 138 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 141
+INFO:    bicgstabl::default_monitor: resid norm = 7.210782e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 141 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 144
+INFO:    bicgstabl::default_monitor: resid norm = 3.380794e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 144 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 147
+INFO:    bicgstabl::default_monitor: resid norm = 2.973749e-06 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 147 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 150
+INFO:    bicgstabl::default_monitor: resid norm = 4.740543e-06 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 150 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 153
+INFO:    bicgstabl::default_monitor: resid norm = 1.343598e-06 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 153 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 156
+INFO:    bicgstabl::default_monitor: resid norm = 3.937859e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 156 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 159
+INFO:    bicgstabl::default_monitor: resid norm = 3.115704e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 159 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 162
+INFO:    bicgstabl::default_monitor: resid norm = 1.899299e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 162 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 165
+INFO:    bicgstabl::default_monitor: resid norm = 3.300498e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 165 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 168
+INFO:    bicgstabl::default_monitor: resid norm = 3.722766e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 168 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 171
+INFO:    bicgstabl::default_monitor: resid norm = 2.551784e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 171 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 174
+INFO:    bicgstabl::default_monitor: resid norm = 9.504284e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 174 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 177
+INFO:    bicgstabl::default_monitor: resid norm = 2.320150e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 177 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 180
+INFO:    bicgstabl::default_monitor: resid norm = 1.107013e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 180 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 183
+INFO:    bicgstabl::default_monitor: resid norm = 1.529941e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 183 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 186
+INFO:    bicgstabl::default_monitor: resid norm = 1.803502e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 186 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 189
+INFO:    bicgstabl::default_monitor: resid norm = 3.584919e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 189 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 192
+INFO:    bicgstabl::default_monitor: resid norm = 2.436407e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 192 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 195
+INFO:    bicgstabl::default_monitor: resid norm = 4.557306e-10 tol = 1.000000e-09
+INFO:    lin_solver returned success result
+
+ ========= 
+testing: A u = b 
+INFO:    bicgstabl::default_monitor: iter = 0
+INFO:    bicgstabl::default_monitor: resid norm = 7.193823e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 0 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 3
+INFO:    bicgstabl::default_monitor: resid norm = 5.429169e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 3 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 6
+INFO:    bicgstabl::default_monitor: resid norm = 1.203029e+05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 6 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 9
+INFO:    bicgstabl::default_monitor: resid norm = 1.201059e+05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 9 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 12
+INFO:    bicgstabl::default_monitor: resid norm = 1.853310e+05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 12 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 15
+INFO:    bicgstabl::default_monitor: resid norm = 4.080469e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 15 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 18
+INFO:    bicgstabl::default_monitor: resid norm = 6.371125e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 18 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 21
+INFO:    bicgstabl::default_monitor: resid norm = 7.105558e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 21 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 24
+INFO:    bicgstabl::default_monitor: resid norm = 2.174423e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 24 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 27
+INFO:    bicgstabl::default_monitor: resid norm = 3.036649e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 27 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 30
+INFO:    bicgstabl::default_monitor: resid norm = 1.179215e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 30 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 33
+INFO:    bicgstabl::default_monitor: resid norm = 8.335775e+03 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 33 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 36
+INFO:    bicgstabl::default_monitor: resid norm = 2.381376e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 36 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 39
+INFO:    bicgstabl::default_monitor: resid norm = 8.367690e+03 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 39 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 42
+INFO:    bicgstabl::default_monitor: resid norm = 6.981024e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 42 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 45
+INFO:    bicgstabl::default_monitor: resid norm = 1.141707e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 45 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 48
+INFO:    bicgstabl::default_monitor: resid norm = 2.563846e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 48 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 51
+INFO:    bicgstabl::default_monitor: resid norm = 3.274728e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 51 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 54
+INFO:    bicgstabl::default_monitor: resid norm = 3.073709e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 54 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 57
+INFO:    bicgstabl::default_monitor: resid norm = 2.300698e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 57 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 60
+INFO:    bicgstabl::default_monitor: resid norm = 2.057008e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 60 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 63
+INFO:    bicgstabl::default_monitor: resid norm = 2.119214e+04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 63 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 66
+INFO:    bicgstabl::default_monitor: resid norm = 3.726217e+03 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 66 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 69
+INFO:    bicgstabl::default_monitor: resid norm = 1.216536e+05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 69 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 72
+INFO:    bicgstabl::default_monitor: resid norm = 1.843863e+05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 72 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 75
+INFO:    bicgstabl::default_monitor: resid norm = 4.856098e+02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 75 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 78
+INFO:    bicgstabl::default_monitor: resid norm = 3.646097e+02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 78 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 81
+INFO:    bicgstabl::default_monitor: resid norm = 1.708723e+02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 81 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 84
+INFO:    bicgstabl::default_monitor: resid norm = 3.647097e+02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 84 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 87
+INFO:    bicgstabl::default_monitor: resid norm = 1.591489e+01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 87 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 90
+INFO:    bicgstabl::default_monitor: resid norm = 1.537920e+01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 90 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 93
+INFO:    bicgstabl::default_monitor: resid norm = 4.771105e+01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 93 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 96
+INFO:    bicgstabl::default_monitor: resid norm = 4.679775e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 96 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 99
+INFO:    bicgstabl::default_monitor: resid norm = 1.845930e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 99 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 102
+INFO:    bicgstabl::default_monitor: resid norm = 6.173434e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 102 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 105
+INFO:    bicgstabl::default_monitor: resid norm = 1.516665e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 105 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 108
+INFO:    bicgstabl::default_monitor: resid norm = 4.378825e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 108 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 111
+INFO:    bicgstabl::default_monitor: resid norm = 3.685486e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 111 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 114
+INFO:    bicgstabl::default_monitor: resid norm = 3.979934e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 114 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 117
+INFO:    bicgstabl::default_monitor: resid norm = 1.151877e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 117 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 120
+INFO:    bicgstabl::default_monitor: resid norm = 2.080236e+00 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 120 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 123
+INFO:    bicgstabl::default_monitor: resid norm = 5.748807e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 123 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 126
+INFO:    bicgstabl::default_monitor: resid norm = 5.000260e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 126 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 129
+INFO:    bicgstabl::default_monitor: resid norm = 1.382292e-01 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 129 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 132
+INFO:    bicgstabl::default_monitor: resid norm = 2.048969e-02 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 132 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 135
+INFO:    bicgstabl::default_monitor: resid norm = 3.280590e-03 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 135 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 138
+INFO:    bicgstabl::default_monitor: resid norm = 8.801412e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 138 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 141
+INFO:    bicgstabl::default_monitor: resid norm = 3.781305e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 141 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 144
+INFO:    bicgstabl::default_monitor: resid norm = 4.511941e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 144 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 147
+INFO:    bicgstabl::default_monitor: resid norm = 6.078679e-05 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 147 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 150
+INFO:    bicgstabl::default_monitor: resid norm = 1.450252e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 150 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 153
+INFO:    bicgstabl::default_monitor: resid norm = 4.855824e-04 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 153 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 156
+INFO:    bicgstabl::default_monitor: resid norm = 1.517603e-03 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 156 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 159
+INFO:    bicgstabl::default_monitor: resid norm = 7.340355e-06 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 159 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 162
+INFO:    bicgstabl::default_monitor: resid norm = 1.014107e-06 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 162 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 165
+INFO:    bicgstabl::default_monitor: resid norm = 8.778444e-07 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 165 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 168
+INFO:    bicgstabl::default_monitor: resid norm = 6.174188e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 168 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 171
+INFO:    bicgstabl::default_monitor: resid norm = 3.204839e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 171 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 174
+INFO:    bicgstabl::default_monitor: resid norm = 4.788415e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 174 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 177
+INFO:    bicgstabl::default_monitor: resid norm = 1.688925e-08 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 177 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 180
+INFO:    bicgstabl::default_monitor: resid norm = 4.326786e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 180 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 183
+INFO:    bicgstabl::default_monitor: resid norm = 3.024652e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 183 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 186
+INFO:    bicgstabl::default_monitor: resid norm = 4.944660e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 186 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 189
+INFO:    bicgstabl::default_monitor: resid norm = 2.337807e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 189 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 192
+INFO:    bicgstabl::default_monitor: resid norm = 2.288187e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 192 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 195
+INFO:    bicgstabl::default_monitor: resid norm = 1.920327e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 195 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 198
+INFO:    bicgstabl::default_monitor: resid norm = 1.926349e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 198 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 201
+INFO:    bicgstabl::default_monitor: resid norm = 2.463261e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 201 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 204
+INFO:    bicgstabl::default_monitor: resid norm = 2.125805e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 204 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 207
+INFO:    bicgstabl::default_monitor: resid norm = 2.996949e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 207 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 210
+INFO:    bicgstabl::default_monitor: resid norm = 4.735614e-09 tol = 1.000000e-09
+INFO:    bicgstabl::solve: iter = 210 recalc real residual
+INFO:    bicgstabl::default_monitor: iter = 213
+INFO:    bicgstabl::default_monitor: resid norm = 6.356844e-10 tol = 1.000000e-09
+INFO:    lin_solver returned success result

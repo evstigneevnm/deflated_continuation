@@ -1,0 +1,73 @@
+\hypertarget{log_8h}{\section{source/utils/log.h File Reference}
+\label{log_8h}\index{source/utils/log.\-h@{source/utils/log.\-h}}
+}
+{\ttfamily \#include $<$string$>$}\\*
+{\ttfamily \#include $<$exception$>$}\\*
+{\ttfamily \#include $<$stdexcept$>$}\\*
+{\ttfamily \#include $<$cstdarg$>$}\\*
+{\ttfamily \#include $<$cstdio$>$}\\*
+Include dependency graph for log.\-h\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{log_8h__incl}
+\end{center}
+\end{figure}
+This graph shows which files directly or indirectly include this file\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{log_8h__dep__incl}
+\end{center}
+\end{figure}
+\subsection*{Classes}
+\begin{DoxyCompactItemize}
+\item 
+class \hyperlink{classutils_1_1log}{utils\-::log}
+\item 
+class \hyperlink{classutils_1_1log__std}{utils\-::log\-\_\-std}
+\end{DoxyCompactItemize}
+\subsection*{Namespaces}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{namespaceutils}{utils}
+\end{DoxyCompactItemize}
+\subsection*{Macros}
+\begin{DoxyCompactItemize}
+\item 
+\#define \hyperlink{log_8h_aeedb639703e515e4ccbcf958b1455fbc}{L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-V\-\_\-\-\_\-}(M\-E\-T\-H\-O\-D\-\_\-\-N\-A\-M\-E, L\-O\-G\-\_\-\-L\-E\-V)
+\item 
+\#define \hyperlink{log_8h_a3365d3378ed2d99ef4eca321199e865e}{L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-\_\-}(M\-E\-T\-H\-O\-D\-\_\-\-N\-A\-M\-E, L\-O\-G\-\_\-\-L\-E\-V)
+\end{DoxyCompactItemize}
+
+
+\subsection{Macro Definition Documentation}
+\hypertarget{log_8h_a3365d3378ed2d99ef4eca321199e865e}{\index{log.\-h@{log.\-h}!L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-\_\-@{L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-\_\-}}
+\index{L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-\_\-@{L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-\_\-}!log.h@{log.\-h}}
+\subsubsection[{L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-\_\-}]{\setlength{\rightskip}{0pt plus 5cm}\#define L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-\_\-(
+\begin{DoxyParamCaption}
+\item[{}]{M\-E\-T\-H\-O\-D\-\_\-\-N\-A\-M\-E, }
+\item[{}]{L\-O\-G\-\_\-\-L\-E\-V}
+\end{DoxyParamCaption}
+)}}\label{log_8h_a3365d3378ed2d99ef4eca321199e865e}
+{\bfseries Value\-:}
+\begin{DoxyCode}
+va\_list arguments;                              \(\backslash\)
+        va\_start ( arguments, s );                      \(\backslash\)
+        vsprintf(buf, s.c\_str(), arguments);            \(\backslash\)
+        METHOD\_NAME(std::string(buf), LOG\_LEV);         \(\backslash\)
+        va\_end ( arguments );
+\end{DoxyCode}
+\hypertarget{log_8h_aeedb639703e515e4ccbcf958b1455fbc}{\index{log.\-h@{log.\-h}!L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-V\-\_\-\-\_\-@{L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-V\-\_\-\-\_\-}}
+\index{L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-V\-\_\-\-\_\-@{L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-V\-\_\-\-\_\-}!log.h@{log.\-h}}
+\subsubsection[{L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-V\-\_\-\-\_\-}]{\setlength{\rightskip}{0pt plus 5cm}\#define L\-O\-G\-\_\-\-\_\-\-F\-O\-R\-M\-A\-T\-T\-E\-D\-\_\-\-O\-U\-T\-\_\-\-V\-\_\-\-\_\-(
+\begin{DoxyParamCaption}
+\item[{}]{M\-E\-T\-H\-O\-D\-\_\-\-N\-A\-M\-E, }
+\item[{}]{L\-O\-G\-\_\-\-L\-E\-V}
+\end{DoxyParamCaption}
+)}}\label{log_8h_aeedb639703e515e4ccbcf958b1455fbc}
+{\bfseries Value\-:}
+\begin{DoxyCode}
+vsprintf(buf, s.c\_str(), arguments);              \(\backslash\)
+        METHOD\_NAME(std::string(buf), LOG\_LEV);
+\end{DoxyCode}

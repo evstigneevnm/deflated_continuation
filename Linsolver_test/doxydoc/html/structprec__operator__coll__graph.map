@@ -1,0 +1,5 @@
+<map id="prec_operator" name="prec_operator">
+<area shape="rect" id="node2" href="$structcpu__vector__operations.html" title="{cpu_vector_operations_real\n||+ cpu_vector_operations()\l+ get_vector_size()\l+ device_location()\l+ init_vector()\l+ free_vector()\l+ start_use_vector()\l+ stop_use_vector()\l+ check_is_valid_number()\l+ norm()\l+ norm_sq()\land 39 more...\l}" alt="" coords="21,147,203,371"/>
+<area shape="rect" id="node7" href="$structsystem__operator.html" title="{system_operator\n||+ system_operator()\l+ apply()\l+ system_operator()\l+ apply()\l+ system_operator()\l+ apply()\l+ system_operator()\l+ apply()\l}" alt="" coords="181,465,320,645"/>
+<area shape="rect" id="node4" href="$classint.html" title="{int\n||}" alt="" coords="231,5,269,83"/>
+</map>

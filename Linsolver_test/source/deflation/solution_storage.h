@@ -25,7 +25,7 @@ public:
         //each is of size about 60 bytes => can reserve more =)
         container.reserve(number_of_solutions_);
         vec_ops->init_vector(distance_help); vec_ops->start_use_vector(distance_help);
-
+        //norm_weight = T(1); //overide norm weight due to norm_l2 operator in vector operations.
     }
     ~solution_storage()
     {
@@ -69,8 +69,8 @@ private:
     {
         T distance_der;
 
-        distance = T(1)/(std::pow(vec_ops->norm(x)/norm_weight,p)*(elements_number+1));
-        distance_der = T(p)/(std::pow(vec_ops->norm(x)/norm_weight,p+2)*(elements_number+1));
+        distance = T(1)/(std::pow(vec_ops->norm_l2(x),p)*(elements_number+1));
+        distance_der = T(p)/(std::pow(vec_ops->norm_l2(x), p+2)*(elements_number+1));
         //calc: y := mul_x*x
         // c = distance_der*(x-0)
         vec_ops->assign_mul(distance_der/norm_weight, x, c);
@@ -81,8 +81,8 @@ private:
             //distance_help := x - container[j].get_ref()
             vec_ops->assign_mul(T(1), x, T(-1), container[j].get_ref(), distance_help);
 
-            distance += T(1)/(std::pow(vec_ops->norm(distance_help)/norm_weight,p)*(elements_number+1));
-            distance_der = T(p)/(std::pow(vec_ops->norm(distance_help)/norm_weight,p+2)*(elements_number+1));
+            distance += T(1)/(std::pow(vec_ops->norm_l2(distance_help),p)*(elements_number+1));
+            distance_der = T(p)/(std::pow(vec_ops->norm_l2(distance_help),p+2)*(elements_number+1));
             //calc: y := mul_x*x + mul_y*y
             //c := c + distance_der*distance_help
             vec_ops->add_mul(distance_der/norm_weight, distance_help, T(1), c);

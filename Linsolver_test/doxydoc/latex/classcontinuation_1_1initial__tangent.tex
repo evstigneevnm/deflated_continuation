@@ -1,0 +1,94 @@
+\hypertarget{classcontinuation_1_1initial__tangent}{\section{continuation\-:\-:initial\-\_\-tangent$<$ Vector\-Operations, Nonlinear\-Operator, Linear\-Operator, Linear\-System\-Solver $>$ Class Template Reference}
+\label{classcontinuation_1_1initial__tangent}\index{continuation\-::initial\-\_\-tangent$<$ Vector\-Operations, Nonlinear\-Operator, Linear\-Operator, Linear\-System\-Solver $>$@{continuation\-::initial\-\_\-tangent$<$ Vector\-Operations, Nonlinear\-Operator, Linear\-Operator, Linear\-System\-Solver $>$}}
+}
+
+
+{\ttfamily \#include $<$initial\-\_\-tangent.\-h$>$}
+
+
+
+Collaboration diagram for continuation\-:\-:initial\-\_\-tangent$<$ Vector\-Operations, Nonlinear\-Operator, Linear\-Operator, Linear\-System\-Solver $>$\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=250pt]{classcontinuation_1_1initial__tangent__coll__graph}
+\end{center}
+\end{figure}
+\subsection*{Public Types}
+\begin{DoxyCompactItemize}
+\item 
+typedef \\*
+Vector\-Operations\-::scalar\-\_\-type \hyperlink{classcontinuation_1_1initial__tangent_a39f8fc77c4f6d3de481cd8550bb3e768}{T}
+\item 
+typedef \\*
+Vector\-Operations\-::vector\-\_\-type \hyperlink{classcontinuation_1_1initial__tangent_ad348e9e404ffd58ae936cfae5cddc928}{T\-\_\-vec}
+\end{DoxyCompactItemize}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classcontinuation_1_1initial__tangent_a01a0a498b5240579756f64bd88ab7b6a}{initial\-\_\-tangent} (Vector\-Operations $\ast$vec\-\_\-ops\-\_\-, Linear\-Operator $\ast$lin\-\_\-op\-\_\-, Linear\-System\-Solver $\ast$lin\-\_\-solv\-\_\-, bool verbose\-\_\-=true)
+\item 
+\hyperlink{classcontinuation_1_1initial__tangent_a1ee52c77551530dd5379165b8b181dbf}{$\sim$initial\-\_\-tangent} ()
+\item 
+bool \hyperlink{classcontinuation_1_1initial__tangent_a5b6636a85799a215769ec5a047278f80}{execute} (Nonlinear\-Operator $\ast$nonlin\-\_\-op, const \hyperlink{classcontinuation_1_1initial__tangent_a39f8fc77c4f6d3de481cd8550bb3e768}{T} sign, const \hyperlink{classcontinuation_1_1initial__tangent_ad348e9e404ffd58ae936cfae5cddc928}{T\-\_\-vec} \&x, const \hyperlink{classcontinuation_1_1initial__tangent_a39f8fc77c4f6d3de481cd8550bb3e768}{T} \&lambda, \hyperlink{classcontinuation_1_1initial__tangent_ad348e9e404ffd58ae936cfae5cddc928}{T\-\_\-vec} \&x\-\_\-s, \hyperlink{classcontinuation_1_1initial__tangent_a39f8fc77c4f6d3de481cd8550bb3e768}{T} \&lambda\-\_\-s)
+\end{DoxyCompactItemize}
+
+
+\subsection{Member Typedef Documentation}
+\hypertarget{classcontinuation_1_1initial__tangent_a39f8fc77c4f6d3de481cd8550bb3e768}{\index{continuation\-::initial\-\_\-tangent@{continuation\-::initial\-\_\-tangent}!T@{T}}
+\index{T@{T}!continuation::initial_tangent@{continuation\-::initial\-\_\-tangent}}
+\subsubsection[{T}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Nonlinear\-Operator , class Linear\-Operator , class Linear\-System\-Solver $>$ typedef Vector\-Operations\-::scalar\-\_\-type {\bf continuation\-::initial\-\_\-tangent}$<$ Vector\-Operations, Nonlinear\-Operator, Linear\-Operator, Linear\-System\-Solver $>$\-::{\bf T}}}\label{classcontinuation_1_1initial__tangent_a39f8fc77c4f6d3de481cd8550bb3e768}
+\hypertarget{classcontinuation_1_1initial__tangent_ad348e9e404ffd58ae936cfae5cddc928}{\index{continuation\-::initial\-\_\-tangent@{continuation\-::initial\-\_\-tangent}!T\-\_\-vec@{T\-\_\-vec}}
+\index{T\-\_\-vec@{T\-\_\-vec}!continuation::initial_tangent@{continuation\-::initial\-\_\-tangent}}
+\subsubsection[{T\-\_\-vec}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Nonlinear\-Operator , class Linear\-Operator , class Linear\-System\-Solver $>$ typedef Vector\-Operations\-::vector\-\_\-type {\bf continuation\-::initial\-\_\-tangent}$<$ Vector\-Operations, Nonlinear\-Operator, Linear\-Operator, Linear\-System\-Solver $>$\-::{\bf T\-\_\-vec}}}\label{classcontinuation_1_1initial__tangent_ad348e9e404ffd58ae936cfae5cddc928}
+
+
+\subsection{Constructor \& Destructor Documentation}
+\hypertarget{classcontinuation_1_1initial__tangent_a01a0a498b5240579756f64bd88ab7b6a}{\index{continuation\-::initial\-\_\-tangent@{continuation\-::initial\-\_\-tangent}!initial\-\_\-tangent@{initial\-\_\-tangent}}
+\index{initial\-\_\-tangent@{initial\-\_\-tangent}!continuation::initial_tangent@{continuation\-::initial\-\_\-tangent}}
+\subsubsection[{initial\-\_\-tangent}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Nonlinear\-Operator , class Linear\-Operator , class Linear\-System\-Solver $>$ {\bf continuation\-::initial\-\_\-tangent}$<$ Vector\-Operations, Nonlinear\-Operator, Linear\-Operator, Linear\-System\-Solver $>$\-::{\bf initial\-\_\-tangent} (
+\begin{DoxyParamCaption}
+\item[{Vector\-Operations $\ast$}]{vec\-\_\-ops\-\_\-, }
+\item[{Linear\-Operator $\ast$}]{lin\-\_\-op\-\_\-, }
+\item[{Linear\-System\-Solver $\ast$}]{lin\-\_\-solv\-\_\-, }
+\item[{bool}]{verbose\-\_\- = {\ttfamily true}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classcontinuation_1_1initial__tangent_a01a0a498b5240579756f64bd88ab7b6a}
+\hypertarget{classcontinuation_1_1initial__tangent_a1ee52c77551530dd5379165b8b181dbf}{\index{continuation\-::initial\-\_\-tangent@{continuation\-::initial\-\_\-tangent}!$\sim$initial\-\_\-tangent@{$\sim$initial\-\_\-tangent}}
+\index{$\sim$initial\-\_\-tangent@{$\sim$initial\-\_\-tangent}!continuation::initial_tangent@{continuation\-::initial\-\_\-tangent}}
+\subsubsection[{$\sim$initial\-\_\-tangent}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Nonlinear\-Operator , class Linear\-Operator , class Linear\-System\-Solver $>$ {\bf continuation\-::initial\-\_\-tangent}$<$ Vector\-Operations, Nonlinear\-Operator, Linear\-Operator, Linear\-System\-Solver $>$\-::$\sim${\bf initial\-\_\-tangent} (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classcontinuation_1_1initial__tangent_a1ee52c77551530dd5379165b8b181dbf}
+
+
+\subsection{Member Function Documentation}
+\hypertarget{classcontinuation_1_1initial__tangent_a5b6636a85799a215769ec5a047278f80}{\index{continuation\-::initial\-\_\-tangent@{continuation\-::initial\-\_\-tangent}!execute@{execute}}
+\index{execute@{execute}!continuation::initial_tangent@{continuation\-::initial\-\_\-tangent}}
+\subsubsection[{execute}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class Vector\-Operations , class Nonlinear\-Operator , class Linear\-Operator , class Linear\-System\-Solver $>$ bool {\bf continuation\-::initial\-\_\-tangent}$<$ Vector\-Operations, Nonlinear\-Operator, Linear\-Operator, Linear\-System\-Solver $>$\-::execute (
+\begin{DoxyParamCaption}
+\item[{Nonlinear\-Operator $\ast$}]{nonlin\-\_\-op, }
+\item[{const {\bf T}}]{sign, }
+\item[{const {\bf T\-\_\-vec} \&}]{x, }
+\item[{const {\bf T} \&}]{lambda, }
+\item[{{\bf T\-\_\-vec} \&}]{x\-\_\-s, }
+\item[{{\bf T} \&}]{lambda\-\_\-s}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classcontinuation_1_1initial__tangent_a5b6636a85799a215769ec5a047278f80}
+
+
+Here is the caller graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=252pt]{classcontinuation_1_1initial__tangent_a5b6636a85799a215769ec5a047278f80_icgraph}
+\end{center}
+\end{figure}
+
+
+
+
+The documentation for this class was generated from the following file\-:\begin{DoxyCompactItemize}
+\item 
+source/continuation/\hyperlink{initial__tangent_8h}{initial\-\_\-tangent.\-h}\end{DoxyCompactItemize}

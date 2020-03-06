@@ -1,0 +1,158 @@
+\hypertarget{classnonlinear__operators_1_1newton__method_1_1convergence__strategy}{\section{nonlinear\-\_\-operators\-:\-:newton\-\_\-method\-:\-:convergence\-\_\-strategy$<$ vector\-\_\-operations, nonlinear\-\_\-operator, logging $>$ Class Template Reference}
+\label{classnonlinear__operators_1_1newton__method_1_1convergence__strategy}\index{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy$<$ vector\-\_\-operations, nonlinear\-\_\-operator, logging $>$@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy$<$ vector\-\_\-operations, nonlinear\-\_\-operator, logging $>$}}
+}
+
+
+{\ttfamily \#include $<$convergence\-\_\-strategy.\-h$>$}
+
+
+
+Collaboration diagram for nonlinear\-\_\-operators\-:\-:newton\-\_\-method\-:\-:convergence\-\_\-strategy$<$ vector\-\_\-operations, nonlinear\-\_\-operator, logging $>$\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=232pt]{classnonlinear__operators_1_1newton__method_1_1convergence__strategy__coll__graph}
+\end{center}
+\end{figure}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a00e18a10009c673718f85720cfd37f53}{convergence\-\_\-strategy} (\hyperlink{container__test_8cpp_aca3cc0310428d338f3a165c7823d6499}{vector\-\_\-operations} $\ast$\&vec\-\_\-ops\-\_\-, logging $\ast$\&log\-\_\-, T tolerance\-\_\-, unsigned \hyperlink{classint}{int} maximum\-\_\-iterations\-\_\-, T newton\-\_\-wight\-\_\-, bool store\-\_\-norms\-\_\-history\-\_\-=false, bool verbose\-\_\-=true)
+\item 
+\hyperlink{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a8c43cb374b68b7edaf5e9570beacde60}{$\sim$convergence\-\_\-strategy} ()
+\item 
+bool \hyperlink{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_af14415fad7e86ef9c2bf3da72745f685}{check\-\_\-convergence} (nonlinear\-\_\-operator$\ast$nonlin\-\_\-op, T\-\_\-vec \&x, T lambda, T\-\_\-vec \&delta\-\_\-x, \hyperlink{classint}{int} \&result\-\_\-status)
+\item 
+unsigned \hyperlink{classint}{int} \hyperlink{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a4ffd50fbf3c7b4d624b217e854e51e3a}{get\-\_\-number\-\_\-of\-\_\-iterations} ()
+\item 
+void \hyperlink{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a5c24a88352363a49d2f93b74f41f5ba3}{reset\-\_\-iterations} ()
+\item 
+void \hyperlink{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a207705b48cf5c002f33f0bc6e4f2cdf2}{reset\-\_\-wight} ()
+\item 
+std\-::vector$<$ T $>$ $\ast$ \hyperlink{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a6e7c6939333bc5e34db93075f90f5944}{get\-\_\-norms\-\_\-history\-\_\-handle} ()
+\end{DoxyCompactItemize}
+
+
+\subsection{Constructor \& Destructor Documentation}
+\hypertarget{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a00e18a10009c673718f85720cfd37f53}{\index{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}!convergence\-\_\-strategy@{convergence\-\_\-strategy}}
+\index{convergence\-\_\-strategy@{convergence\-\_\-strategy}!nonlinear_operators::newton_method::convergence_strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}}
+\subsubsection[{convergence\-\_\-strategy}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class vector\-\_\-operations , class nonlinear\-\_\-operator , class logging $>$ {\bf nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}$<$ {\bf vector\-\_\-operations}, nonlinear\-\_\-operator, logging $>$\-::{\bf convergence\-\_\-strategy} (
+\begin{DoxyParamCaption}
+\item[{{\bf vector\-\_\-operations} $\ast$\&}]{vec\-\_\-ops\-\_\-, }
+\item[{logging $\ast$\&}]{log\-\_\-, }
+\item[{T}]{tolerance\-\_\-, }
+\item[{unsigned {\bf int}}]{maximum\-\_\-iterations\-\_\-, }
+\item[{T}]{newton\-\_\-wight\-\_\-, }
+\item[{bool}]{store\-\_\-norms\-\_\-history\-\_\- = {\ttfamily false}, }
+\item[{bool}]{verbose\-\_\- = {\ttfamily true}}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a00e18a10009c673718f85720cfd37f53}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a00e18a10009c673718f85720cfd37f53_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a8c43cb374b68b7edaf5e9570beacde60}{\index{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}!$\sim$convergence\-\_\-strategy@{$\sim$convergence\-\_\-strategy}}
+\index{$\sim$convergence\-\_\-strategy@{$\sim$convergence\-\_\-strategy}!nonlinear_operators::newton_method::convergence_strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}}
+\subsubsection[{$\sim$convergence\-\_\-strategy}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class vector\-\_\-operations , class nonlinear\-\_\-operator , class logging $>$ {\bf nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}$<$ {\bf vector\-\_\-operations}, nonlinear\-\_\-operator, logging $>$\-::$\sim${\bf convergence\-\_\-strategy} (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a8c43cb374b68b7edaf5e9570beacde60}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a8c43cb374b68b7edaf5e9570beacde60_cgraph}
+\end{center}
+\end{figure}
+
+
+
+
+\subsection{Member Function Documentation}
+\hypertarget{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_af14415fad7e86ef9c2bf3da72745f685}{\index{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}!check\-\_\-convergence@{check\-\_\-convergence}}
+\index{check\-\_\-convergence@{check\-\_\-convergence}!nonlinear_operators::newton_method::convergence_strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}}
+\subsubsection[{check\-\_\-convergence}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class vector\-\_\-operations , class nonlinear\-\_\-operator , class logging $>$ bool {\bf nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}$<$ {\bf vector\-\_\-operations}, nonlinear\-\_\-operator, logging $>$\-::check\-\_\-convergence (
+\begin{DoxyParamCaption}
+\item[{nonlinear\-\_\-operator$\ast$}]{nonlin\-\_\-op, }
+\item[{T\-\_\-vec \&}]{x, }
+\item[{T}]{lambda, }
+\item[{T\-\_\-vec \&}]{delta\-\_\-x, }
+\item[{{\bf int} \&}]{result\-\_\-status}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_af14415fad7e86ef9c2bf3da72745f685}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_af14415fad7e86ef9c2bf3da72745f685_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a6e7c6939333bc5e34db93075f90f5944}{\index{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}!get\-\_\-norms\-\_\-history\-\_\-handle@{get\-\_\-norms\-\_\-history\-\_\-handle}}
+\index{get\-\_\-norms\-\_\-history\-\_\-handle@{get\-\_\-norms\-\_\-history\-\_\-handle}!nonlinear_operators::newton_method::convergence_strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}}
+\subsubsection[{get\-\_\-norms\-\_\-history\-\_\-handle}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class vector\-\_\-operations , class nonlinear\-\_\-operator , class logging $>$ std\-::vector$<$T$>$$\ast$ {\bf nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}$<$ {\bf vector\-\_\-operations}, nonlinear\-\_\-operator, logging $>$\-::get\-\_\-norms\-\_\-history\-\_\-handle (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a6e7c6939333bc5e34db93075f90f5944}
+\hypertarget{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a4ffd50fbf3c7b4d624b217e854e51e3a}{\index{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}!get\-\_\-number\-\_\-of\-\_\-iterations@{get\-\_\-number\-\_\-of\-\_\-iterations}}
+\index{get\-\_\-number\-\_\-of\-\_\-iterations@{get\-\_\-number\-\_\-of\-\_\-iterations}!nonlinear_operators::newton_method::convergence_strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}}
+\subsubsection[{get\-\_\-number\-\_\-of\-\_\-iterations}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class vector\-\_\-operations , class nonlinear\-\_\-operator , class logging $>$ unsigned {\bf int} {\bf nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}$<$ {\bf vector\-\_\-operations}, nonlinear\-\_\-operator, logging $>$\-::get\-\_\-number\-\_\-of\-\_\-iterations (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a4ffd50fbf3c7b4d624b217e854e51e3a}
+\hypertarget{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a5c24a88352363a49d2f93b74f41f5ba3}{\index{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}!reset\-\_\-iterations@{reset\-\_\-iterations}}
+\index{reset\-\_\-iterations@{reset\-\_\-iterations}!nonlinear_operators::newton_method::convergence_strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}}
+\subsubsection[{reset\-\_\-iterations}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class vector\-\_\-operations , class nonlinear\-\_\-operator , class logging $>$ void {\bf nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}$<$ {\bf vector\-\_\-operations}, nonlinear\-\_\-operator, logging $>$\-::reset\-\_\-iterations (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a5c24a88352363a49d2f93b74f41f5ba3}
+
+
+Here is the call graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a5c24a88352363a49d2f93b74f41f5ba3_cgraph}
+\end{center}
+\end{figure}
+
+
+\hypertarget{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a207705b48cf5c002f33f0bc6e4f2cdf2}{\index{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}!reset\-\_\-wight@{reset\-\_\-wight}}
+\index{reset\-\_\-wight@{reset\-\_\-wight}!nonlinear_operators::newton_method::convergence_strategy@{nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}}
+\subsubsection[{reset\-\_\-wight}]{\setlength{\rightskip}{0pt plus 5cm}template$<$class vector\-\_\-operations , class nonlinear\-\_\-operator , class logging $>$ void {\bf nonlinear\-\_\-operators\-::newton\-\_\-method\-::convergence\-\_\-strategy}$<$ {\bf vector\-\_\-operations}, nonlinear\-\_\-operator, logging $>$\-::reset\-\_\-wight (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [inline]}}}\label{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a207705b48cf5c002f33f0bc6e4f2cdf2}
+
+
+Here is the caller graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classnonlinear__operators_1_1newton__method_1_1convergence__strategy_a207705b48cf5c002f33f0bc6e4f2cdf2_icgraph}
+\end{center}
+\end{figure}
+
+
+
+
+The documentation for this class was generated from the following file\-:\begin{DoxyCompactItemize}
+\item 
+source/nonlinear\-\_\-operators/\hyperlink{nonlinear__operators_2convergence__strategy_8h}{convergence\-\_\-strategy.\-h}\end{DoxyCompactItemize}

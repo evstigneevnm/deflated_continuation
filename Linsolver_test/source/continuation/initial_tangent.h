@@ -5,6 +5,10 @@
 #include <stdexcept>
 #include <cmath>
 
+/**
+    Class to get the initial tangent space
+
+*/
 
 namespace continuation
 {
@@ -40,21 +44,22 @@ public:
         nonlin_op->jacobian_alpha(f);
         
         vec_ops->add_mul_scalar(T(0), T(-1), f);
+        lin_solv->get_linsolver_handle()->monitor().set_temp_tolerance(T(1.0e-8));
         linear_system_converged = lin_solv->solve((*lin_op), f, x_s);
+        lin_solv->get_linsolver_handle()->monitor().restore_tolerance();
         if(linear_system_converged)
         {
-	    T z_sq = vec_ops->scalar_prod(x_s, x_s); //(dx,x_0_s)
-        lambda_s = sign/std::sqrt(z_sq+T(1));
-        vec_ops->add_mul_scalar(T(0), lambda_s, x_s); 
+    	    T z_sq = vec_ops->scalar_prod(x_s, x_s); //(dx,x_0_s)
+            lambda_s = sign/std::sqrt(z_sq+T(1));
+            vec_ops->add_mul_scalar(T(0), lambda_s, x_s); 
 	    
         //TODO: do smth with the norm
 	    //norm differs greatly for large
 	    //and small systems
 
-
-            //T norm = vec_ops->norm(x_s)+std::abs(lambda_s);
-            //lambda_s/=norm;
-            //vec_ops->scale(norm, x_s);
+            T norm = vec_ops->norm_rank1(x_s,lambda_s);
+            lambda_s/=norm;
+            vec_ops->scale(norm, x_s);
         }
         else
         {

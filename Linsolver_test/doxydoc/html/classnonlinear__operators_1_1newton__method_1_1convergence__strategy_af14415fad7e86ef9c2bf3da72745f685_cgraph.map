@@ -1,0 +1,5 @@
+<map id="nonlinear_operators::newton_method::convergence_strategy::check_convergence" name="nonlinear_operators::newton_method::convergence_strategy::check_convergence">
+<area shape="rect" id="node2" href="$structcpu__vector__operations.html#abb4a0ddd5d65ef1ae8c979e71da96ba8" title="cpu_vector_operations\l::norm" alt="" coords="259,5,413,46"/>
+<area shape="rect" id="node3" href="$structcpu__vector__operations.html#aa8a06e53a83c6b3b3e3efddcd75065da" title="cpu_vector_operations\l::assign_mul" alt="" coords="259,70,413,111"/>
+<area shape="rect" id="node4" href="$structcpu__vector__operations.html#aee016bc7ac6cc3a7149d3444e5b0ac57" title="cpu_vector_operations\l::assign" alt="" coords="259,135,413,177"/>
+</map>
