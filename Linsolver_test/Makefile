@@ -55,3 +55,18 @@ cont_def_KS_2D_float_rel: source/test_deflation_continuation.cpp
 	nvcc -I source/ -DSCALAR_TYPE=float -std=c++11 -O3 source/test_deflation_continuation.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o -lcufft -lcublas -lcurand -o test_deflation_continuation.bin 2>results_make.txt
 cont_def_KS_2D_double_rel: source/test_deflation_continuation.cpp
 	nvcc -I source/ -DSCALAR_TYPE=double -std=c++11 -O3 source/test_deflation_continuation.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o -lcufft -lcublas -lcurand -o test_deflation_continuation.bin 2>results_make.txt	
+
+circle_ker_deb:
+	nvcc -I source/ -std=c++11 -g -G source/nonlinear_operators/circle/circle_ker.cu -c -o O/circle_ker.o 2>results_make.txt
+circle_ker:
+	nvcc -I source/ -std=c++11 -O3 source/nonlinear_operators/circle/circle_ker.cu -c -o O/circle_ker.o 2>results_make.txt
+
+cont_def_circle_float: source/circle_test_deflation_continuation.cpp
+	nvcc -Wno-deprecated-gpu-targets -I source/ -DSCALAR_TYPE=float -std=c++11 -g  source/circle_test_deflation_continuation.cpp O/circle_ker.o O/gpu_vector_operations_kernels.o -lcublas -lcurand -o circle_test_deflation_continuation.bin 2>results_make.txt
+cont_def_circle_double: source/circle_test_deflation_continuation.cpp
+	nvcc -Wno-deprecated-gpu-targets -I source/ -DSCALAR_TYPE=double -std=c++11 -g source/circle_test_deflation_continuation.cpp O/circle_ker.o O/gpu_vector_operations_kernels.o -lcublas -lcurand -o circle_test_deflation_continuation.bin 2>results_make.txt	
+
+cont_def_circle_float_rel: source/circle_test_deflation_continuation.cpp
+	nvcc -Wno-deprecated-gpu-targets -I source/ -DSCALAR_TYPE=float -std=c++11 -O3 source/circle_test_deflation_continuation.cpp O/circle_ker.o O/gpu_vector_operations_kernels.o -lcublas -lcurand -o circle_test_deflation_continuation.bin 2>results_make.txt
+cont_def_circle_double_rel: source/circle_test_deflation_continuation.cpp
+	nvcc -Wno-deprecated-gpu-targets -I source/ -DSCALAR_TYPE=double -std=c++11 -O3 source/circle_test_deflation_continuation.cpp O/circle_ker.o O/gpu_vector_operations_kernels.o -lcublas -lcurand -o circle_test_deflation_continuation.bin 2>results_make.txt	

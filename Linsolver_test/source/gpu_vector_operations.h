@@ -104,6 +104,10 @@ struct gpu_vector_operations
     {
         return sz;
     }
+    size_t get_l2_size()
+    {
+        return std::sqrt(Tsc(sz));
+    }    
     bool device_location()
     {
         return location;
@@ -150,6 +154,10 @@ struct gpu_vector_operations
         stop_use_vector(y); free_vector(y);
         return result;
 
+    }
+    Tsc norm_rank1_l2(const vector_type &x, const scalar_type val_x)
+    {
+        return( norm_rank1(x, val_x)/std::sqrt(Tsc(sz)) );
     }
 
     //for GPU pointer storage with call from CPU

@@ -9,11 +9,11 @@
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
 
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D.h>
-#include <nonlinear_operators/linear_operator_KS_2D.h>
-#include <nonlinear_operators/preconditioner_KS_2D.h>
-#include <nonlinear_operators/convergence_strategy.h>
-#include <nonlinear_operators/system_operator.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/linear_operator_KS_2D.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/preconditioner_KS_2D.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/convergence_strategy.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/system_operator.h>
 
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
@@ -56,14 +56,14 @@ int main(int argc, char const *argv[])
 
 
     init_cuda(6);
-    real norm_wight = 1.0;//std::sqrt(real(Nx*Ny));
+    real norm_wight = std::sqrt(real(Nx*Ny));
 
     //linsolver control
     unsigned int lin_solver_max_it = 1500;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 3;
-    real lin_solver_tol = 5.0e-3;
+    unsigned int basis_sz = 4;
+    real lin_solver_tol = 5.0e-2;
     
     //newton control
     unsigned int newton_def_max_it = 350;
@@ -125,11 +125,11 @@ int main(int argc, char const *argv[])
     newton_t *newton = new newton_t(vec_ops_R_im, system_operator, conv_newton);
 
     //setup continuation system:
-    predictor_cont_t* predict = new predictor_cont_t(vec_ops_R_im, log, dS, 0.25, 20);
+    predictor_cont_t* predict = new predictor_cont_t(vec_ops_R_im, log, dS, 0.0765, 0.1, 30);
     system_operator_cont_t* system_operator_cont = new system_operator_cont_t(vec_ops_R_im, Ax, SM);
     convergence_newton_cont_t *conv_newton_cont = new convergence_newton_cont_t(vec_ops_R_im, log, newton_cont_tol, newton_def_cont_it, real(1), true);
     newton_cont_t* newton_cont = new newton_cont_t(vec_ops_R_im, system_operator_cont, conv_newton_cont);
-    advance_step_cont_t* continuation_step = new advance_step_cont_t(vec_ops_R_im, log, system_operator_cont, newton_cont, predict);
+    advance_step_cont_t* continuation_step = new advance_step_cont_t(vec_ops_R_im, log, system_operator_cont, newton_cont, predict, 'S');
     tangent_0_cont_t* init_tangent = new tangent_0_cont_t(vec_ops_R_im, Ax, SM);
 
 
@@ -154,6 +154,7 @@ int main(int argc, char const *argv[])
     }
 
     real_im_vec x0, x0_s, x1, x1_s, x1_p, d_x, f, xxx, xxx1;
+    real_im_vec x0p, x_1_g;
     vec_ops_R_im->init_vector(x0); vec_ops_R_im->start_use_vector(x0);
     vec_ops_R_im->init_vector(x1_p); vec_ops_R_im->start_use_vector(x1_p);
     vec_ops_R_im->init_vector(x0_s); vec_ops_R_im->start_use_vector(x0_s);
@@ -163,7 +164,9 @@ int main(int argc, char const *argv[])
     vec_ops_R_im->init_vector(f); vec_ops_R_im->start_use_vector(f);
     vec_ops_R_im->init_vector(xxx); vec_ops_R_im->start_use_vector(xxx);
     vec_ops_R_im->init_vector(xxx1); vec_ops_R_im->start_use_vector(xxx1);
-    
+    vec_ops_R_im->init_vector(x0p); vec_ops_R_im->start_use_vector(x0p);
+    vec_ops_R_im->init_vector(x_1_g); vec_ops_R_im->start_use_vector(x_1_g);
+
 
     x0 = (*sol_storage_def)[0].get_ref();
     printf("solutions in container = %i\n",sol_storage_def->get_size());
@@ -174,7 +177,8 @@ int main(int argc, char const *argv[])
     real lambda0_s, lambda1_s, lambda1_p;
     real lambda1;
     real d_lambda;
-    
+    real lambda_0p, lambda_1_g;
+
     init_tangent->execute(KS2D, -1, x0, lambda0, x0_s, lambda0_s);
     real norm = 1;
 
@@ -236,15 +240,17 @@ int main(int argc, char const *argv[])
 //*/
     std::ofstream file_diag("diagram.dat", std::ofstream::out);
     
-    file_diag << lambda0 << " " << vec_ops_R_im->norm_l2(x0) << std::endl;
+    file_diag << std::setprecision(10) << lambda0 << " " << vec_ops_R_im->norm_l2(x0) << " " << lambda0 << " " << vec_ops_R_im->norm_l2(x0) << std::endl;
     for(unsigned int s=0;s<S;s++)
     {
         continuation_step->solve(KS2D, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
+        predict->apply(x0p, lambda_0p, x_1_g, lambda_1_g);
         vec_ops_R_im->assign(x1,x0);
         vec_ops_R_im->assign(x1_s,x0_s);
         lambda0 = lambda1;
         lambda0_s = lambda1_s;
-        file_diag << lambda1 << " " << vec_ops_R_im->norm_l2(x1) << std::endl;
+        
+        file_diag << lambda1 << " " << vec_ops_R_im->norm_l2(x0p) << " " << lambda1 << " " << vec_ops_R_im->norm_l2(x1) << std::endl;
         std::flush(file_diag);
     }
     file_diag.close();
@@ -266,8 +272,10 @@ int main(int argc, char const *argv[])
     vec_ops_R_im->stop_use_vector(f); vec_ops_R_im->free_vector(f);
     vec_ops_R_im->stop_use_vector(xxx); vec_ops_R_im->free_vector(xxx);
     vec_ops_R_im->stop_use_vector(xxx1); vec_ops_R_im->free_vector(xxx1);
-
-
+    vec_ops_R_im->stop_use_vector(x0p); vec_ops_R_im->free_vector(x0p);
+    vec_ops_R_im->stop_use_vector(x_1_g); vec_ops_R_im->free_vector(x_1_g);
+    
+    
     vec_ops_R->stop_use_vector(u_out_ph); vec_ops_R->free_vector(u_out_ph);
 
     delete init_tangent;

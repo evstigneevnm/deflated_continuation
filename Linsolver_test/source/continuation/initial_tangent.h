@@ -44,7 +44,8 @@ public:
         nonlin_op->jacobian_alpha(f);
         
         vec_ops->add_mul_scalar(T(0), T(-1), f);
-        lin_solv->get_linsolver_handle()->monitor().set_temp_tolerance(T(1.0e-8));
+
+        lin_solv->get_linsolver_handle()->monitor().set_temp_tolerance(T(1.0e-10)*vec_ops->get_l2_size());
         linear_system_converged = lin_solv->solve((*lin_op), f, x_s);
         lin_solv->get_linsolver_handle()->monitor().restore_tolerance();
         if(linear_system_converged)
@@ -59,7 +60,7 @@ public:
 
             T norm = vec_ops->norm_rank1(x_s,lambda_s);
             lambda_s/=norm;
-            vec_ops->scale(norm, x_s);
+            vec_ops->scale(T(1)/norm, x_s);
         }
         else
         {

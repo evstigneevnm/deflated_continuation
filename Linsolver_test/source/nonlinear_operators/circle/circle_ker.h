@@ -1,16 +1,16 @@
-#ifndef __KURAMOTO_SIVASHINSKIY_2D_KER_H__
-#define __KURAMOTO_SIVASHINSKIY_2D_KER_H__
+#ifndef __CIRCLE_TEST_KER_H__
+#define __CIRCLE_TEST_KER_H__
 
 
 
 template<typename T>
-extern void function(dim3 dimGrid, dim3 dimBlock, size_t Nx, T R_, T *x, T lambda, T *f);
+extern void function(dim3 dimGrid, dim3 dimBlock, size_t Nx, const T R_, const T*& x, const T lambda, T*& f);
 
 template<typename T>
-extern void jacobian_x_kernel(dim3 dimGrid, dim3 dimBlock, size_t Nx,  T R_, T *x0, T lambda0, T* dx, T *df);
+extern void jacobian_x(dim3 dimGrid, dim3 dimBlock, size_t Nx,  const T R_, const T*& x0, const T lambda0, const T*& dx, T*& df);
 
-template<typename T_C>
-extern void jacobian_lambda(dim3 dimGrid, dim3 dimBlock, size_t Nx, T R_, T *x0, T lambda0, T *dlambda);
+template<typename T>
+extern void jacobian_lambda(dim3 dimGrid, dim3 dimBlock, size_t Nx, const T R_, const T*& x0, const T lambda0, T*& dlambda);
 
 
 #endif

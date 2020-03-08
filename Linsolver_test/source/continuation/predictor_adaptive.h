@@ -19,11 +19,12 @@ public:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
 
-    predictor_adaptive(VectorOperations* vec_ops_, Logging* log_, T ds_0_, T step_ds_ = 0.01, unsigned int attempts_0_ = 4):
+    predictor_adaptive(VectorOperations* vec_ops_, Logging* log_, T ds_0_, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4):
     vec_ops(vec_ops_),
     log(log_),
     ds_0(ds_0_),
-    step_ds(step_ds_),
+    step_ds_p(step_ds_p_),
+    step_ds_m(step_ds_m_),
     attempts_0(attempts_0_)
     {
         attempts = 0;
@@ -86,6 +87,20 @@ public:
 
     }
 
+    void apply(T_vec& x_0_p, T& lambda_0_p)
+    {
+//      x0_guess = x0+delta_s1.*x0_s;   
+//      lambda0_guess = lambda0+delta_s1.*lambda0_s;        
+/*
+//  cublas axpy: y=y+mul_x*x;
+    void add_mul(scalar_type mul_x, const vector_type& x, vector_type& y)const
+*/
+        vec_ops->assign(x_0, x_0_p);
+        vec_ops->add_mul(ds, x_s, x_0_p);
+        
+        lambda_0_p=lambda_0 + ds*lambda_s;
+    }
+
     bool modify_ds()
     {
         if(attempts<2*attempts_0)
@@ -93,12 +108,12 @@ public:
 
             if(attempts%2==0)
             {
-                ds_p = ds_p*T(1+step_ds);
+                ds_p = ds_p*T(1+step_ds_p);
                 ds = ds_p;
             }
             else
             {
-                ds_m = ds_m*T(1-step_ds);            
+                ds_m = ds_m*T(1-step_ds_m);            
                 ds = ds_m;
             }
 
@@ -123,7 +138,7 @@ public:
     }
 
 private:
-    T ds_0, ds, step_ds, ds_p, ds_m;
+    T ds_0, ds, step_ds_p, step_ds_m, ds_p, ds_m;
     unsigned int attempts_0, attempts;
     VectorOperations* vec_ops;
     T_vec x_s, x_0;

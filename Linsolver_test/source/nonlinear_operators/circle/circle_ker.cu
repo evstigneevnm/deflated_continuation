@@ -39,31 +39,31 @@ __global__ void jacobian_lambda_kernel(int Nx, T R_, T *x0, T lambda0, T *dlambd
 }
 
 template<typename T>
-void function(dim3 dimGrid, dim3 dimBlock, size_t Nx, T R_, T *x, T lambda, T *f)
+void function(dim3 dimGrid, dim3 dimBlock, size_t Nx, const T R_, const T*& x, const T lambda, T* &f)
 {
-    function_kernel<T><<<dimGrid, dimBlock>>>(Nx, R_,  x, lambda, f);
+    function_kernel<T><<<dimGrid, dimBlock>>>(Nx, (T)R_,  (T*&)x, (T)lambda, f);
 }
 
 
 template<typename T>
-void jacobian_x_kernel(dim3 dimGrid, dim3 dimBlock, size_t Nx,  T R_, T *x0, T lambda0, T* dx, T *df)
+void jacobian_x(dim3 dimGrid, dim3 dimBlock, size_t Nx,  const T R_, const T*& x0, const T lambda0, const T*& dx, T*& df)
 {
-    jacobian_x_kernel<T><<<dimGrid, dimBlock>>>(Nx, R_, x0, lambda0, dx, df);
+    jacobian_x_kernel<T><<<dimGrid, dimBlock>>>(Nx, R_, (T*&) x0, (T) lambda0, (T*&) dx, (T*) df);
 }
 
 template<typename T>
-void jacobian_lambda(dim3 dimGrid, dim3 dimBlock, size_t Nx, T R_, T *x0, T lambda0, T *dlambda)
+void jacobian_lambda(dim3 dimGrid, dim3 dimBlock, size_t Nx, const T R_, const T*& x0, const T lambda0, T*& dlambda)
 {
-    jacobian_lambda_kernel<T><<<dimGrid, dimBlock>>>(Nx, R_, x0, lambda0, dx, df);
+    jacobian_lambda_kernel<T><<<dimGrid, dimBlock>>>(Nx, R_, (T*&) x0, lambda0, dlambda);
 }
 
 
 
 //explicit instantiation
-template void function<float>(dim3 dimGrid, dim3 dimBlock, size_t Nx, float R_, float*& x, float lambda, float*& f);
-template void jacobian_x<float>(dim3 dimGrid, dim3 dimBlock, size_t Nx, float R_, float*& x0, float lambda0, float*& dx, float*& df);
-template void jacobian_lambda<float>(dim3 dimGrid, dim3 dimBlock, size_t Nx, float R_, float*& x0, float lambda0, float*& dlambda);
+template void function<float>(dim3 dimGrid, dim3 dimBlock, size_t Nx, const float R_, const float*& x, const float lambda, float*& f);
+template void jacobian_x<float>(dim3 dimGrid, dim3 dimBlock, size_t Nx, const float R_, const float*& x0, const float lambda0, const float*& dx, float*& df);
+template void jacobian_lambda<float>(dim3 dimGrid, dim3 dimBlock, size_t Nx, const float R_, const float*& x0, const float lambda0, float*& dlambda);
 
-template void function<double>(dim3 dimGrid, dim3 dimBlock, size_t Nx, double R_, double*& x, double lambda, double*& f);
-template void jacobian_x<double>(dim3 dimGrid, dim3 dimBlock, size_t Nx, double R_, double*& x0, double lambda0, double*& dx, double*& df);
-template void jacobian_lambda<double>(dim3 dimGrid, dim3 dimBlock, size_t Nx, double R_, double*& x0, double lambda0, double*& dlambda);
+template void function<double>(dim3 dimGrid, dim3 dimBlock, size_t Nx, const double R_, const double*& x, const double lambda, double*& f);
+template void jacobian_x<double>(dim3 dimGrid, dim3 dimBlock, size_t Nx, const double R_, const double*& x0, const double lambda0, const double*& dx, double*& df);
+template void jacobian_lambda<double>(dim3 dimGrid, dim3 dimBlock, size_t Nx, const double R_, const double*& x0, const double lambda0, double*& dlambda);

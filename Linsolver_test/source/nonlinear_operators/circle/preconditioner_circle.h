@@ -1,11 +1,12 @@
-#ifndef __PRECONDITIONER_KS_2D_H__
-#define __PRECONDITIONER_KS_2D_H__
+#ifndef __PRECONDITIONER_CIRCLE_H__
+#define __PRECONDITIONER_CIRCLE_H__
 
 
 /**
 *   Helper preconditioner class for iterative linear solver
 *   It is calling a method defined in nonlinear_operator
 *   Also requires linear operator while using iterative Krylov solver
+*   Can be made arbitrarry, e.g. using AMG, LU-SGS or ILU
 */
 
 
@@ -13,19 +14,19 @@ namespace nonlinear_operators
 {
 
 template<class vector_operations, class nonlinear_operator, class linear_operator> 
-class preconditioner_KS_2D
+class preconditioner_circle
 {
 public:
     typedef typename vector_operations::scalar_type  T;
     typedef typename vector_operations::vector_type  T_vec;
 
-    preconditioner_KS_2D(nonlinear_operator*& nonlin_op_):
+    preconditioner_circle(nonlinear_operator*& nonlin_op_):
     nonlin_op(nonlin_op_)
     {
 
     }
 
-    ~preconditioner_KS_2D()
+    ~preconditioner_circle()
     {
 
     }
