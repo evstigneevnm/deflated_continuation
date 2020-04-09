@@ -166,6 +166,23 @@ public:
     {
         return container.at(i);
     }    
+    //begin, end fr c++11 iterator like auto &x: internal_container
+    inline iterator_t begin() noexcept 
+    { 
+        return container.begin(); 
+    }
+    inline const_iterator_t cbegin() const noexcept 
+    { 
+        return container.cbegin(); 
+    }
+    inline iterator_t end() noexcept 
+    { 
+        return container.end(); 
+    }
+    inline const_iterator_t cend() const noexcept 
+    { 
+        return container.cend(); 
+    }
 
 
 private:    
