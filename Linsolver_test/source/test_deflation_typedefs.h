@@ -37,7 +37,6 @@
         log_t,
         numerical_algos::lin_solvers::bicgstabl> sherman_morrison_linear_system_solve_t;
 
-
     typedef deflation::newton_method_extended::convergence_strategy<
         vec_ops_real_im, 
         KS_2D, 

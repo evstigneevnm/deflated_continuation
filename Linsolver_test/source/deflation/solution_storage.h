@@ -9,15 +9,15 @@
 namespace deflation
 {
 
-template<class vector_operations>
+template<class VectorOperations>
 class solution_storage
 {
 public:    
-    typedef typename vector_operations::scalar_type  T;
-    typedef typename vector_operations::vector_type  T_vec;
+    typedef typename VectorOperations::scalar_type  T;
+    typedef typename VectorOperations::vector_type  T_vec;
 
     
-    solution_storage(vector_operations*& vec_ops_, int number_of_solutions_, T norm_weight_):
+    solution_storage(VectorOperations*& vec_ops_, int number_of_solutions_, T norm_weight_):
     vec_ops(vec_ops_),
     norm_weight(norm_weight_)
     {
@@ -31,17 +31,22 @@ public:
     {
         
         container.clear();
-        elements_number=0;
+        elements_number = 0;
         vec_ops->stop_use_vector(distance_help); vec_ops->free_vector(distance_help);
 
     }
 
-    void push(const T_vec& vect)
+    void push_back(const T_vec& vect)
     {
     
         container.emplace_back( internal_container(vec_ops, vect) );
         elements_number++;
     
+    }
+    void clear()
+    {
+        container.clear();
+        elements_number = 0;
     }
 
     unsigned int get_size()
@@ -63,7 +68,7 @@ private:
     T norm_weight;
 
     unsigned int elements_number = 0;
-    vector_operations* vec_ops;
+    VectorOperations* vec_ops;
     
     void calc_distance_norms(const T_vec& x, T_vec& c, int p)
     {
@@ -96,7 +101,7 @@ private:
         class internal_container
         {
         public:
-            internal_container(vector_operations* vec_ops_, const T_vec& vec_):
+            internal_container(VectorOperations* vec_ops_, const T_vec& vec_):
             vec_ops(vec_ops_)
             {
                 vec_size = vec_ops->get_vector_size();
@@ -126,9 +131,10 @@ private:
             {
                 if((allocated)&&(owned))
                 {
+                    
                     vec_ops->stop_use_vector(array_); vec_ops->free_vector(array_);
+                    std::cout << "removed from container" << std::endl;
                 }
-
             }
             // operator overloading and references
             // if located on GPU, then this can be accessed only in a kernel!
@@ -158,7 +164,7 @@ private:
         
         private:
             T_vec array_;
-            vector_operations* vec_ops;
+            VectorOperations* vec_ops;
             size_t vec_size;
             bool allocated = false;
             bool owned = false;

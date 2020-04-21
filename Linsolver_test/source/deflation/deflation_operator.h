@@ -2,6 +2,13 @@
 #define __DEFLATION_OPERATOR_H__
 
 
+/**
+*  main deflation operator that implements basic routines to find and deflate solutions:
+*  -- find solution - finds a solution using solution storage container to deflate;
+*  -- find and strore - calls find solution and adds it to the storage container;
+*  -- execute all - calls find and store untill all solutions are found.
+*/
+
 namespace deflation
 {
 
@@ -34,7 +41,7 @@ public:
     }
     
 
-    bool find_solution(T lambda_0, NonlinearOperator* nonlin_op, SolutionStorage* sol_storage)
+    bool find_solution(T lambda_0, NonlinearOperator* nonlin_op)
     {
         T lambda = lambda_0;
         bool found_solution = false;
@@ -51,16 +58,23 @@ public:
         }
         if(found_solution)
         {
-            sol_storage->push(u_out);
-
             log->info("deflation::convergence_norms:");
             for(auto& x: *newton->get_convergence_strategy_handle()->get_norms_history_handle())
             {
-                
                 log->info_f("%le", x);
-            }
-            // if(verbose) printf("solving with simple Newton solver to increase accuracy\n");
-            // newton->solve(nonlin_op, u_out, lambda_0, u_out_1);
+            }            
+        }
+        return(found_solution);      
+    }
+
+
+    bool find_add_solution(T lambda_0, NonlinearOperator* nonlin_op, SolutionStorage* sol_storage)
+    {
+        bool found_solution = find_solution(lambda_0, nonlin_op);
+        if(found_solution)
+        {
+            sol_storage->push_back(u_out);
+
         }        
 
         return found_solution;
@@ -73,7 +87,7 @@ public:
         number_of_solutions = 0;
         while(found_solution)
         {
-            found_solution = find_solution(lambda_0, nonlin_op, sol_storage);
+            found_solution = find_add_solution(lambda_0, nonlin_op, sol_storage);
             if(found_solution)
             {
                 number_of_solutions++;

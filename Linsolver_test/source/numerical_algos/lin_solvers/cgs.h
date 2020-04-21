@@ -114,8 +114,8 @@ public:
                 vec_ops_->assign(ui, pi);
             } else {
                 T   beta_i_1 = rho_i_1/rho_i_2;
-                if (isnan(beta_i_1)) { logged_obj_t::info("solve: stop iterations because beta_i_1 is nan"); not_valid_coeff_faced = true; break; }
-                if (isinf(beta_i_1)) { logged_obj_t::info("solve: stop iterations because beta_i_1 is inf"); not_valid_coeff_faced = true; break; }
+                if (std::isnan(beta_i_1)) { logged_obj_t::info("solve: stop iterations because beta_i_1 is nan"); not_valid_coeff_faced = true; break; }
+                if (std::isinf(beta_i_1)) { logged_obj_t::info("solve: stop iterations because beta_i_1 is inf"); not_valid_coeff_faced = true; break; }
                 //ui := ri + beta_i_1 * qi
                 vec_ops_->assign_mul(T(1.f), ri, beta_i_1, qi, ui);
                 //pi := beta_i_1*beta_i_1 * p{i-1} + ui + beta_i_1 * qi
@@ -125,8 +125,8 @@ public:
             A.apply(pi, theta); 
             if (prec_ != NULL) prec_->apply(theta);
             T   alpha_i = rho_i_1/vec_ops_->scalar_prod(theta, r0);
-            if (isnan(alpha_i)) { logged_obj_t::info("solve: stop iterations because alpha_i is nan"); not_valid_coeff_faced = true; break; }
-            if (isinf(alpha_i)) { logged_obj_t::info("solve: stop iterations because alpha_i is inf"); not_valid_coeff_faced = true; break; }
+            if (std::isnan(alpha_i)) { logged_obj_t::info("solve: stop iterations because alpha_i is nan"); not_valid_coeff_faced = true; break; }
+            if (std::isinf(alpha_i)) { logged_obj_t::info("solve: stop iterations because alpha_i is inf"); not_valid_coeff_faced = true; break; }
             //qi := ui - alpha_i*theta
             vec_ops_->assign_mul(T(1.f), ui, -alpha_i, theta, qi);
             //theta := ui + qi;

@@ -6,8 +6,8 @@
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
 #include "cufft_test_kernels.h"
-#include "macros.h"
-#include "file_operations.h"
+#include <common/macros.h>
+#include <common/file_operations.h>
 
 int main(int argc, char const *argv[])
 {

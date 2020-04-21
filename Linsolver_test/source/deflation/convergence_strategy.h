@@ -22,7 +22,7 @@ private:
 //    typedef utils::logged_obj_base<Logging> logged_obj_t;
 
 public:    
-    convergence_strategy(VectorOperations*& vec_ops_, Logging*& log_, T tolerance_, unsigned int maximum_iterations_, T newton_wight_, bool store_norms_history_ = false, bool verbose_ = true):
+    convergence_strategy(VectorOperations*& vec_ops_, Logging*& log_, T tolerance_ = 1.0e-6, unsigned int maximum_iterations_ =100, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true):
     vec_ops(vec_ops_),
     log(log_),
     iterations(0),
@@ -46,6 +46,18 @@ public:
         vec_ops->stop_use_vector(Fx); vec_ops->free_vector(Fx);
     }
 
+    void set_convergence_constants(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true)
+    {
+        tolerance = tolerance_;
+        maximum_iterations = maximum_iterations_;
+        newton_wight = newton_wight_;
+        store_norms_history = store_norms_history_;
+        verbose = verbose_;
+        if(store_norms_history)
+        {
+            norms_evolution.reserve(maximum_iterations);
+        }        
+    }
 
     bool check_convergence(NonlinearOperator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status)
     {

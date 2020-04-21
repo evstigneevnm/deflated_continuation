@@ -33,8 +33,8 @@
 #include <continuation/convergence_strategy.h>
 
 //problem dependant
-#include <gpu_file_operations.h>
-#include <gpu_vector_operations.h>
+#include <common/gpu_file_operations_functions.h>
+#include <common/gpu_vector_operations.h>
 #include "circle_test_deflation_continuation_typedefs.h"
 //problem dependant ends
 
@@ -134,8 +134,8 @@ int main(int argc, char const *argv[])
     deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R, log, newton_def, 5);
 
     
-    //deflation_op->execute_all(lambda0, CIRCLE, sol_storage_def);
-    //deflation_op->find_solution(lambda0, CIRCLE, sol_storage_def);
+    // deflation_op->execute_all(lambda0, CIRCLE, sol_storage_def);
+    // //deflation_op->find_solution(lambda0, CIRCLE, sol_storage_def);
     
 
     // unsigned int p=0;

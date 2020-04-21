@@ -19,7 +19,7 @@ public:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
 
-    predictor_adaptive(VectorOperations* vec_ops_, Logging* log_, T ds_0_, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4):
+    predictor_adaptive(VectorOperations* vec_ops_, Logging* log_, T ds_0_ = 0.1, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4):
     vec_ops(vec_ops_),
     log(log_),
     ds_0(ds_0_),
@@ -36,6 +36,19 @@ public:
     ~predictor_adaptive()
     {
         
+
+    }
+    void set_steps(T ds_0_, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4)
+    {
+        ds_0 = ds_0_;
+        step_ds_p = step_ds_p_;
+        step_ds_m = step_ds_m_;
+        attempts_0 = attempts_0_; 
+
+        attempts = 0;
+        ds = ds_0;
+        ds_p = ds;
+        ds_m = ds;
 
     }
     void reset()

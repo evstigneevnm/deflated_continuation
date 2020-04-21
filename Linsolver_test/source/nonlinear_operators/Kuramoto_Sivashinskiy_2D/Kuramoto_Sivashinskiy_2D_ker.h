@@ -2,7 +2,7 @@
 #define __KURAMOTO_SIVASHINSKIY_2D_KER_H__
 
 #include <thrust/complex.h>
-#include <macros.h>
+#include <common/macros.h>
 
 
 template<typename T_C>

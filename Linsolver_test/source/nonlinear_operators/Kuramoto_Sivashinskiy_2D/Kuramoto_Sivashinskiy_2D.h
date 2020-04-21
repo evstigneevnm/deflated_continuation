@@ -21,13 +21,13 @@
 *
 */
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D_ker.h>
+#include <vector>
 
 namespace nonlinear_operators
 {
 
 
-template<class FFT_type, 
-class VectorOperations_R, class VectorOperations_C, class VectorOperations_RC_reduced, 
+template<class FFT_type, class VectorOperations_R, class VectorOperations_C, class VectorOperations_RC_reduced, 
 unsigned int BLOCK_SIZE_x=64, unsigned int BLOCK_SIZE_y=16>
 class Kuramoto_Sivashinskiy_2D
 {
@@ -326,6 +326,23 @@ public:
        physical_solution(u_helper_in, u_out);
     }
     
+    void norm_bifurcation_diagram(const T_vec_im& u_in, std::vector<T>& res) const
+    {
+        physical_solution(u_in, du_y_ext); //should i use another array??!?? du_y_ext can be bad! Check it!
+        T val1 = du_y_ext[I2(int(Nx/3.0), int(Ny/3.0), Nx)];
+        T val2 = du_y_ext[I2(int(Nx/5.0), int(2.0*Ny/3.0), Nx)];
+        T val3 = du_y_ext[I2(int(Nx/4.0), int(Ny/4.0), Nx)];
+        T val4 = vec_ops_R_im->norm_l2(u_in);
+        
+        res.clear();
+        res.reserve(4);
+        res.push_back(val1);
+        res.push_back(val2);
+        res.push_back(val3);
+        res.push_back(val4);
+
+    }
+
     void fourier_solution(T_vec& u_in, TC_vec& u_out)
     {
        fft(u_in, u_out); 

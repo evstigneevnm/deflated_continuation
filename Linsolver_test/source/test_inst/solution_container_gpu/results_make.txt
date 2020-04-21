@@ -10,9 +10,9 @@
 
 ../../../source/external_libraries/cublas_wrap.h(634): warning: type qualifier is meaningless on cast type
 
-../../../source/file_operations.h(35): warning: variable "N" was declared but never referenced
-          detected during instantiation of "void gpu_file_operations::write_matrix(const std::string &, size_t, size_t, T *&, unsigned int) [with T=double]" 
-test_container.cu(50): here
+test_container.cu(36): warning: variable "x1" was declared but never referenced
+
+test_container.cu(36): warning: variable "x1o" was declared but never referenced
 
 ../../../source/external_libraries/cublas_wrap.h(562): warning: type qualifier is meaningless on cast type
 
@@ -26,5 +26,9 @@ test_container.cu(50): here
 
 ../../../source/external_libraries/cublas_wrap.h(634): warning: type qualifier is meaningless on cast type
 
-../../../source/file_operations.h(35): warning: variable "N" was declared but never referenced
+../../../source/common/file_operations.h(35): warning: variable "N" was declared but never referenced
+
+test_container.cu(36): warning: variable "x1" was declared but never referenced
+
+test_container.cu(36): warning: variable "x1o" was declared but never referenced
 

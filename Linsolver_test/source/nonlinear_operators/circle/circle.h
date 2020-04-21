@@ -13,7 +13,9 @@
 *
 *
 */
+
 #include <nonlinear_operators/circle/circle_ker.h>
+#include <vector>
 
 namespace nonlinear_operators
 {
@@ -51,7 +53,7 @@ public:
     {
 
         vec_ops_R->stop_use_vector(u_0); vec_ops_R->free_vector(u_0);
-
+        free(xp_host);
     }
 
     //nonlinear operator:
@@ -108,12 +110,20 @@ public:
         dimBlock_=dimBlock;
 
     }
-    
-
-    
+        
     void physical_solution(T_vec& u_in, T_vec& u_out)
     {
         //void funciton that should return a physical solution
+    }
+
+    void norm_bifurcation_diagram(const T_vec& u_in, std::vector<T>& res) const
+    {
+        device_2_host_cpy(xp_host, u_in, Nx);
+        T val = xp_host[0];   
+        res.clear();
+        res.reserve(2);
+        res.push_back(val);
+        res.push_back(std::abs(val));
     }
 
     void randomize_vector(T_vec& u_out)
@@ -128,14 +138,17 @@ private:
     dim3 dimBlock;
     vector_operations_real *vec_ops_R;
     size_t Nx;
+    T* xp_host; //for bifurcation diagram plotting
 
     T_vec u_0=nullptr; // linearization point solution
     T alpha_0=0.0;   // linearization point parameter
 
 
+
     void common_constructor_operation()
     {  
         vec_ops_R->init_vector(u_0); vec_ops_R->start_use_vector(u_0); 
+        xp_host = (T*)malloc(Nx*sizeof(T));
     }
 
 

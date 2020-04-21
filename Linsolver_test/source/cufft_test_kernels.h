@@ -1,6 +1,6 @@
 #include <cuda_runtime.h>
 #include <cufft.h>
-#include "macros.h"
+#include <common/macros.h>
 #include <thrust/complex.h>
 
 #ifndef __CUFFT_TEST_KERNELS_H__

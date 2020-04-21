@@ -5,6 +5,7 @@
 
     typedef SCALAR_TYPE real;
 
+
     typedef utils::log_std log_t;
     typedef gpu_vector_operations<real> vec_ops_real;
     

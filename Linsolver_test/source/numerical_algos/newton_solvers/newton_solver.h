@@ -35,7 +35,7 @@ public:
     }
 
     //solve inplace
-    void solve(nonlinear_operator* nonlin_op, T_vec& x, const T& lambda)
+    bool solve(nonlinear_operator* nonlin_op, T_vec& x, const T& lambda)
     {
         
         int result_status = 1;

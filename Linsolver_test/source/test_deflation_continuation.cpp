@@ -55,7 +55,7 @@ int main(int argc, char const *argv[])
 
 
 
-    init_cuda(6);
+    init_cuda(1);
     real norm_wight = std::sqrt(real(Nx*Ny));
 
     //linsolver control

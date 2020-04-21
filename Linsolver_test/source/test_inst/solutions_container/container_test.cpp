@@ -1,6 +1,6 @@
 #include <iostream>
 #include "solutions_container.h"
-#include <cpu_vector_operations.h>
+#include <common/cpu_vector_operations.h>
 
 typedef SFLOATTYPE real;
 typedef cpu_vector_operations<real> vector_operations;

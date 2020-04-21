@@ -66,7 +66,6 @@ public:
             }
             else
             {
-                
                 throw std::runtime_error(std::string("continuation::advance_solution (corrector) " __FILE__ " " __STR(__LINE__) " incorrect continuation_type parameter. Only 'S'pherical or 'O'rthogonal can be used") );
             }
             converged = newton->solve(nonlin_op, x1, lambda1);

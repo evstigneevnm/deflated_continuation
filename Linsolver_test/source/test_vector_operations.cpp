@@ -8,23 +8,29 @@
 #include <utils/cuda_support.h>
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
-#include <gpu_vector_operations.h>
-#include "macros.h"
-#include <file_operations.h>
+#include <common/gpu_vector_operations.h>
+#include <common/gpu_file_operations.h>
+
 
 
 int main(int argc, char const *argv[])
 {
-    int N=1;//25600;
+    int N=10;//25600;
     typedef SCALAR_TYPE real;
     typedef thrust::complex<real> complex;
     typedef gpu_vector_operations<real> gpu_vector_operations_real;
     typedef gpu_vector_operations<complex> gpu_vector_operations_complex;
+
+    typedef gpu_file_operations<gpu_vector_operations_real> files_real_t;
+    typedef gpu_file_operations<gpu_vector_operations_complex> files_complex_t;
     init_cuda(5);
 
     cublas_wrap *CUBLAS = new cublas_wrap(true);
     gpu_vector_operations_real *vec_ops_R = new gpu_vector_operations_real(N, CUBLAS);
     gpu_vector_operations_complex *vec_ops_C = new gpu_vector_operations_complex(N, CUBLAS);
+    files_real_t *files_R = new files_real_t(vec_ops_R);
+    files_complex_t *files_C = new files_complex_t(vec_ops_C);
+
 
     real *u1_d, *u2_d, *u3_d;
     complex *z1_d, *z2_d, *z3_d;
@@ -93,10 +99,19 @@ int main(int argc, char const *argv[])
     printf("R vecs: %s, %s, %s\n",true==vec_ops_R->check_is_valid_number(u1_d)?"T":"F",true==vec_ops_R->check_is_valid_number(u2_d)?"T":"F",true==vec_ops_R->check_is_valid_number(u3_d)?"T":"F");
     printf("C vecs: %s, %s, %s\n",true==vec_ops_C->check_is_valid_number(z1_d)?"T":"F",true==vec_ops_C->check_is_valid_number(z2_d)?"T":"F",true==vec_ops_C->check_is_valid_number(z3_d)?"T":"F");
 
-    vec_ops_R->free_vector(u1_d); vec_ops_R->free_vector(u2_d); vec_ops_R->free_vector(u3_d); 
-    vec_ops_C->free_vector(z1_d); vec_ops_C->free_vector(z2_d); vec_ops_C->free_vector(z3_d); 
+    // files_R->write_vector("real_vector_test.dat", u3_d);
+    files_C->write_vector("complex_vector_test.dat", z2_d);    
 
-    delete CUBLAS;
+    files_R->read_vector("real_vector_test0.dat", u3_d);
+    files_R->write_vector("real_vector_test.dat", u3_d);
+
+    vec_ops_R->free_vector(u1_d); vec_ops_R->free_vector(u2_d); vec_ops_R->free_vector(u3_d); 
+    vec_ops_C->free_vector(z1_d); vec_ops_C->free_vector(z2_d); vec_ops_C->free_vector(z3_d);
+
+    delete files_C;
+    delete files_R;
+    delete vec_ops_C;
     delete vec_ops_R;
+    delete CUBLAS;
     return 0;
 }

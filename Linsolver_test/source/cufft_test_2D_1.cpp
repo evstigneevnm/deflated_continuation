@@ -5,10 +5,10 @@
 #include <utils/cuda_support.h>
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
-#include <gpu_vector_operations.h>
+#include <common/gpu_vector_operations.h>
 #include "cufft_test_kernels.h"
-#include "macros.h"
-#include "file_operations.h"
+#include <common/macros.h>
+#include <common/file_operations.h>
 
 int main(int argc, char const *argv[])
 {

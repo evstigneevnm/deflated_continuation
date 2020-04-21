@@ -2,7 +2,7 @@
 #include <iostream>
 #include <cstdio>
 #include <thrust/complex.h>
-#include "macros.h"
+#include <common/macros.h>
 
 #include <utils/cuda_support.h>
 #include <utils/log.h>
@@ -28,16 +28,16 @@
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
 
-#include <gpu_file_operations.h>
-#include <gpu_vector_operations.h>
+#include <common/gpu_file_operations_functions.h>
+#include <common/gpu_vector_operations.h>
 #include <test_deflation_typedefs.h>
 
 int main(int argc, char const *argv[])
 {
     
-    init_cuda(5);
-    size_t Nx=1024;
-    size_t Ny=1024;
+    init_cuda(1);
+    size_t Nx=128;
+    size_t Ny=128;
     real norm_wight = std::sqrt(real(Nx*Ny));
     real size_problem = real(1);//std::sqrt(real(Nx*Ny));
 
