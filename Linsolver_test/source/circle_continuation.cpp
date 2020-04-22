@@ -20,8 +20,8 @@
 #include <common/gpu_vector_operations.h>
 #include <common/gpu_file_operations.h>
 //problem dependant ends
-#include <containers/knots.hpp>
-#include <continuation/continuation.hpp>
+
+#include <main/deflation_continuation.hpp>
 
 
 #ifndef Blocks_x_
@@ -61,7 +61,6 @@ int main(int argc, char const *argv[])
     typedef nonlinear_operators::preconditioner_circle<
         vec_ops_real, circle_t, lin_op_t> prec_t;
 
-    typedef container::knots<real> knots_t;
 
 
     init_cuda(1); // )(PCI) where PCI is the GPU PCI ID
@@ -90,28 +89,23 @@ int main(int argc, char const *argv[])
 
     circle_t CIRCLE(Rad, Nx, (vec_ops_real*) &vec_ops_R);
     log_t log;
-    knots_t deflation_knots;
-    deflation_knots.add_element({-1.01, -0.98, -0.95, -0.9, -0.5, -0.1, 0.1, 0.5, 0.95, 0.98, 1.01});
+
+    
     
     //test continuaiton process of a single curve
-    typedef continuation::continuation<vec_ops_real, files_ops_t, log_t, monitor_t, circle_t, lin_op_t, prec_t, knots_t, numerical_algos::lin_solvers::cgs, nonlinear_operators::system_operator> cont_t;
+    typedef main_classes::deflation_continuation<vec_ops_real, files_ops_t, log_t, monitor_t, circle_t, lin_op_t, prec_t, numerical_algos::lin_solvers::cgs, nonlinear_operators::system_operator> deflation_continuation_t;
 
-    cont_t cont((vec_ops_real*) &vec_ops_R, (files_ops_t*) &file_ops, (log_t*) &log, (circle_t*) &CIRCLE, (knots_t*) &deflation_knots);
+    deflation_continuation_t DC((vec_ops_real*) &vec_ops_R, (files_ops_t*) &file_ops, (log_t*) &log, (circle_t*) &CIRCLE );
 
-    cont.set_linsolver(lin_solver_tol, lin_solver_max_it);
-    cont.set_extended_linsolver(lin_solver_tol, lin_solver_max_it);
-    cont.set_newton(newton_cont_tol, newton_def_cont_it, real(1.0), true);
-    cont.set_steps(S, dS);
-    cont.update_knots();
+    DC.set_linsolver(lin_solver_tol, lin_solver_max_it);
+    DC.set_extended_linsolver(lin_solver_tol, lin_solver_max_it);
+    DC.set_newton(newton_cont_tol, newton_def_cont_it, real(1.0), true);
+    DC.set_steps(S, dS);
+    DC.set_deflation_knots({-1.01, -0.98, -0.95, -0.9, -0.5, -0.1, 0.1, 0.5, 0.95, 0.98, 1.01});
     
 
-    real_vec x0;
-    vec_ops_R.init_vector(x0); vec_ops_R.start_use_vector(x0);
-    vec_ops_R.assign_scalar(real(1),x0);
+    DC.execute();
 
-    cont.continuate_curve(x0, lambda0);
-
-    vec_ops_R.stop_use_vector(x0); vec_ops_R.free_vector(x0);
 
     //setup container of curves
 //    knots_t deflation_knots;

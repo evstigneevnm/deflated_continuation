@@ -1,5 +1,5 @@
-#ifndef __BIFURCATION_DIAGRAM_H__
-#define __BIFURCATION_DIAGRAM_H__
+#ifndef __BIFURCATION_DIAGRAM_CURVE_H__
+#define __BIFURCATION_DIAGRAM_CURVE_H__
 
 #include <string>
 #include <stdexcept>
@@ -19,31 +19,84 @@ struct complex_values
     uint64_t id_file_name;
 };
 
-template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperator, class Newton, class SolutionStorage>
+template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperator, class Newton, class SolutionStorage, class HelperVectors>
 class bifurcation_diagram_curve
 {
 public:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
 
-    bifurcation_diagram_curve(VectorOperations* vec_ops_, VectorFileOperations* vec_files_, Log* log_, NonlinearOperator* nlin_op_, Newton* newton_):
+    bifurcation_diagram_curve(VectorOperations*& vec_ops_, VectorFileOperations*& vec_files_, Log*& log_, NonlinearOperator*& nlin_op_, Newton*& newton_, int curve_number_, HelperVectors*& helper_vectors_):
     vec_ops(vec_ops_),
     vec_files(vec_files_),
     log(log_),
     nlin_op(nlin_op_),
     newton(newton_)
     {
-        vec_ops->init_vector(x0); vec_ops->start_use_vector(x0);
-        vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
+        std::cout << "constructor of this " << this << " with "; //std::endl;
+//NOTICE:
+//it constructs these helper vectors every time we add this to the container
+        //vec_ops->init_vector(x0); vec_ops->start_use_vector(x0);
+        //vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
+//too much ram will be used!
+//a better solution is to use external vectors for this.
+//but may couse logical problems?
+//assume now that a HelperVectors class contains T_vec x0 and T_vec x1 and  can be accessed via reference.
 
+        helper_vectors_->get_refs(x0, x1);
+        std::cout << "x0 = " << x0 << " x1 = " << x1 << std::endl;
+        set_curve_number(curve_number_);
     }
     
     ~bifurcation_diagram_curve()
     {
-        vec_ops->stop_use_vector(x0); vec_ops->free_vector(x0);
-        vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
+        std::cout << "distructor of this " << this << " with &x0 = " << x0 << " and &x1 = " << x1 << std::endl;
+        //vec_ops->stop_use_vector(x0); vec_ops->free_vector(x0);
+        //vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
+
     }
- 
+
+    // bifurcation_diagram_curve(const bifurcation_diagram_curve& that)
+    // {
+    //     *this = that;
+    //     std::cout << "copy constructor of " << this << std::endl;
+    // }
+    bifurcation_diagram_curve(const bifurcation_diagram_curve&) = delete;
+    bifurcation_diagram_curve operator = (const bifurcation_diagram_curve&) = delete; //don't allow copy! Are we too fat?
+
+    bifurcation_diagram_curve(bifurcation_diagram_curve&& that)
+    {
+        std::cout << "move constructor of that " << &that << " to this " << this << std::endl;
+        *this = std::move(that);
+        
+    }   
+
+    bifurcation_diagram_curve& operator = (bifurcation_diagram_curve&& that)
+    {
+        if(&that == this)
+        {
+            return *this;
+        }
+        else
+        {
+            std::cout << "move assign of that " << &that << " to this " << this << std::endl;
+            std::swap(vec_ops, that.vec_ops);
+            std::swap(vec_files, that.vec_files);
+            std::swap(log, that.log);
+            std::swap(nlin_op, that.nlin_op);
+            std::swap(newton, that.newton);
+            std::swap(data_directory, that.data_directory);
+            std::swap(container, that.container);
+            std::swap(global_id, that.global_id);
+            std::swap(x0, that.x0);
+            std::swap(x1, that.x1);
+            std::swap(lambda0, that.lambda0);
+            std::swap(lambda1, that.lambda1);
+            return *this;
+        }
+    }
+
+
 private:
     VectorOperations* vec_ops;
     VectorFileOperations* vec_files;
@@ -74,7 +127,9 @@ public:
     void set_curve_number(int curve_number_)
     {
         curve_number = curve_number_;
-        if(!fs_object_exsts(data_directory+std::string("/")+std::string(curve_number) ) )
+        std::string full_path = data_directory+std::string("/")+std::to_string(curve_number);
+
+        if(!fs_object_exsts(full_path) )
         {
 //TODO For now. Later this is to be replaced by create directory
             throw std::runtime_error(std::string("container::bifurcation_diagram_curve: provided directory and curve_number doesn't exist") );
@@ -164,8 +219,8 @@ private:
     b_d_container_t container;
     uint64_t global_id = 0; 
 
-    T_vec x0;
-    T_vec x1;
+    T_vec x0 = nullptr;
+    T_vec x1 = nullptr;
     T lambda0, lambda1;
 
     store_t store(const T& lambda_, const T_vec& x_)
@@ -273,4 +328,4 @@ private:
 }
 
 
-#endif // __BIFURCATION_DIAGRAM_H__
+#endif // __BIFURCATION_DIAGRAM_CURVE_H__

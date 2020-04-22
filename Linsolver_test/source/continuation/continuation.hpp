@@ -10,11 +10,7 @@
 */
 
 #include <string>
-#include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
-#include <numerical_algos/newton_solvers/newton_solver.h>
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
-
-
 
 #include <continuation/predictor_adaptive.h>
 #include <continuation/system_operator_continuation.h>
@@ -22,56 +18,27 @@
 #include <continuation/initial_tangent.h>
 #include <continuation/convergence_strategy.h>
 
-#include <containers/bifurcation_diagram_curve.h>
-
 
 
 namespace continuation
 {
 
-template<class VectorOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, class Knots, template<class , class , class , class , class > class LinearSolver, template<class , class , class , class > class SystemOperator>
+template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperations, class LinearOperator,  class Knots, class LinearSolver, class Newton, class Curve>
 class continuation
 {
 public:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
-    typedef Monitor monitor_t;
 
 private:
     typedef std::pair<bool, bool> bools2;
 
-    typedef numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
-        LinearOperator,
-        Preconditioner,
-        VectorOperations,
-        monitor_t,
-        Log,
-        LinearSolver> sherman_morrison_linear_system_solve_t;
-
-    typedef SystemOperator<
-        VectorOperations, 
-        NonlinearOperations,
-        LinearOperator,
-        sherman_morrison_linear_system_solve_t
-        > system_operator_t;
-    
-    typedef nonlinear_operators::newton_method::convergence_strategy<
-        VectorOperations, 
-        NonlinearOperations, 
-        Log> convergence_newton_t;
-
-    typedef numerical_algos::newton_method::newton_solver<
-        VectorOperations, 
-        NonlinearOperations,
-        system_operator_t, 
-        convergence_newton_t
-        > newton_t;
 
     typedef system_operator_continuation<
         VectorOperations, 
         NonlinearOperations,
         LinearOperator,
-        sherman_morrison_linear_system_solve_t
+        LinearSolver
         > system_operator_cont_t;
 
     typedef newton_method_extended::convergence_strategy<
@@ -105,63 +72,41 @@ private:
         VectorOperations,
         NonlinearOperations, 
         LinearOperator,
-        sherman_morrison_linear_system_solve_t
+        LinearSolver
         > tangent_0_cont_t;
 
-    typedef container::bifurcation_diagram_curve<
-        VectorOperations,
-        VectorFileOperations, 
-        Log,
-        NonlinearOperations,
-        newton_t, std::vector<T_vec>> bif_diag_t;
+
 
 
 public:
-    continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, NonlinearOperations* nonlin_op_, Knots* knots_):
+    continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, NonlinearOperations* nonlin_op_, LinearOperator* lin_op_, Knots* knots_, LinearSolver* SM_, Newton* newton_):
     vec_ops(vec_ops_),
     file_ops(file_ops_),
     log(log_),
     nonlin_op(nonlin_op_),
-    knots(knots_)
+    knots(knots_),
+    SM(SM_),
+    newton(newton_)
     {
-        lin_op = new LinearOperator(nonlin_op);
-        precond = new Preconditioner(nonlin_op);
-        
-        SM = new sherman_morrison_linear_system_solve_t(precond, vec_ops, log); //to be inserted into upper level class
-
-        conv_newton = new convergence_newton_t(vec_ops, log);
-        system_operator = new system_operator_t(vec_ops, lin_op, SM);
-        newton = new newton_t(vec_ops, system_operator, conv_newton);
-
         predict = new predictor_cont_t(vec_ops, log);
-
-        system_operator_cont = new system_operator_cont_t(vec_ops, lin_op, SM);
+        system_operator_cont = new system_operator_cont_t(vec_ops, lin_op_, SM);
         conv_newton_cont = new convergence_newton_cont_t(vec_ops, log);
         newton_cont = new newton_cont_t(vec_ops, system_operator_cont, conv_newton_cont);
         continuation_step = new advance_step_cont_t(vec_ops, log, system_operator_cont, newton_cont, predict);
-        init_tangent = new tangent_0_cont_t(vec_ops, lin_op, SM);
+        init_tangent = new tangent_0_cont_t(vec_ops, lin_op_, SM);
         
-        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton);
         max_S = 100;
         set_all_vectors();
-        update_knots();
     }
     ~continuation()
     {
-        
         unset_all_vectors();
-        delete bif_diag;
         delete init_tangent;
         delete continuation_step;
         delete newton_cont;
         delete conv_newton_cont;
         delete system_operator_cont;
         delete predict;
-        delete newton;
-        delete conv_newton;
-        delete SM;
-        delete precond;
-        delete lin_op;
 
     }
 
@@ -175,43 +120,10 @@ public:
 
     void set_newton(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true)
     {
-        conv_newton->set_convergence_constants(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_,  verbose_);
         conv_newton_cont->set_convergence_constants(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_,  verbose_);
-        epsilon = T(5)*tolerance_; //tolerance to check distance between vectors in curves.
+        epsilon = T(5.0)*tolerance_; //tolerance to check distance between vectors in curves.
     }
 
-    //to be inserted into upper level class
-    void set_linsolver(T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = -1, int resid_recalc_freq = -1, int basis_sz = -1)
-    {
-        //setup linear system:
-        mon_orig = &SM->get_linsolver_handle_original()->monitor();
-        mon_orig->init(lin_solver_tol, T(0), lin_solver_max_it);
-        mon_orig->set_save_convergence_history(true);
-        mon_orig->set_divide_out_norms_by_rel_base(true);
-        mon_orig->out_min_resid_norm();
-        // if(use_precond_resid >= 0)
-        //     SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
-        // // if(resid_recalc_freq >= 0)
-        //     SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
-        // if(basis_sz >= 0)
-        //     SM->get_linsolver_handle_original()->set_basis_size(basis_sz);  
-    }//to be inserted into upper level class
-    void set_extended_linsolver(T lin_solver_tol, unsigned int lin_solver_max_it, bool is_small_alpha = false, int use_precond_resid = -1, int resid_recalc_freq = -1, int basis_sz = -1)
-    {
-        mon = &SM->get_linsolver_handle()->monitor();
-        mon->init(lin_solver_tol, T(0), lin_solver_max_it);
-        mon->set_save_convergence_history(true);
-        mon->set_divide_out_norms_by_rel_base(true);
-        mon->out_min_resid_norm();
-        // if(use_precond_resid >= 0)
-        //     SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
-        // if(resid_recalc_freq >= 0)
-        //     SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
-        // if(basis_sz >= 0)
-        //     SM->get_linsolver_handle_original()->set_basis_size(basis_sz); 
-
-        SM->is_small_alpha(is_small_alpha);        
-    }
 
     void update_knots()
     {
@@ -220,8 +132,10 @@ public:
         
     }
 
-    void continuate_curve(const T_vec& x0_, const T& lambda0_)
+    void continuate_curve(Curve*& curve_, const T_vec& x0_, const T& lambda0_)
     {
+        update_knots();
+        bif_diag = curve_;
         direction = initial_direciton;
         
         //make a copy here? or just use the provided reference
@@ -251,23 +165,17 @@ private:
     Log* log;
     NonlinearOperations* nonlin_op;
     Knots* knots;
-
+    LinearSolver* SM;
+    Newton* newton;
+    
     //created localy:
-    LinearOperator* lin_op;
-    Preconditioner* precond;
-    monitor_t *mon;
-    monitor_t *mon_orig; 
-    sherman_morrison_linear_system_solve_t *SM;
-    convergence_newton_t *conv_newton;
-    system_operator_t *system_operator;
-    newton_t *newton;
     predictor_cont_t* predict;
     system_operator_cont_t* system_operator_cont;
     convergence_newton_cont_t *conv_newton_cont;
     newton_cont_t* newton_cont;
     advance_step_cont_t* continuation_step;
     tangent_0_cont_t* init_tangent;
-    bif_diag_t* bif_diag;
+    Curve* bif_diag;
 
     int direction = -1;
     int initial_direciton = 1;
@@ -320,7 +228,6 @@ private:
     }
     
 
-
     bool interpolate_solutions(const T& lambda_star, const T& lambda_0_, const T_vec& x0_,  T& lambda_1_, T_vec& x1_)
     {
         T w = (lambda_star - lambda_0_)/(lambda_1_ - lambda_0_);
@@ -342,7 +249,7 @@ private:
             return(false);
     }
 
-    bools2 check_intersection(T lambda_star) //check interseciton with the parameter value lambda_star
+    bools2 check_intersection(T lambda_star) //check current interseciton with the parameter value lambda_star
     {
         if( (lambda_star - lambda1)*(lambda_star - lambda0)<T(0.0) )
         {
@@ -446,7 +353,7 @@ private:
                 }
 
             }
-            if( (s)==max_S)
+            if(s==max_S)
             {
                 continue_next_step = false;
                 break_semicurve++;

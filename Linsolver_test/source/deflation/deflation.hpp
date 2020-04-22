@@ -3,14 +3,14 @@
 
 
 /**
-*	 main mart of the deflation-continuation process
+*	 main mart of the deflation-continuation process.
+*
 *    Deflation class that utilizes single step deflation to find a solution.
 *    Accepts knots class and performs deflation on the current value of the knots class.
 *	 If no more knots are avaliabe, then the deflation returns false
 */
 
 #include <deflation/system_operator_deflation.h>
-#include <deflation/solution_storage.h>
 #include <deflation/convergence_strategy.h>
 #include <deflation/deflation_operator.h>
 

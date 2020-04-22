@@ -31,8 +31,12 @@ int main(int argc, char const *argv[])
     vec_ops_real *vec_ops = new vec_ops_real(Nx*Ny, CUBLAS);
     file_ops_t *file_ops = new file_ops_t(vec_ops);
 
+
     sol_storage_def_t *sol_storage = new sol_storage_def_t(vec_ops, 100, norm_wight);
     sol_storage_def_t sol_storage_obj(vec_ops, 10, norm_wight);
+
+    std::cout << "\n=== size of pointer to the solution container class = " << sizeof(sol_storage_def_t) << "\n";
+
     T_vec x0, x1, x1o;
     int nnn;
     std::cout << "start here";
