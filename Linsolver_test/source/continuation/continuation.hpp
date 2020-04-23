@@ -139,7 +139,9 @@ public:
         direction = initial_direciton;
         
         //make a copy here? or just use the provided reference
-        x0 = x0_, lambda0 = lambda0_;
+        //x0 = x0_, lambda0 = lambda0_;
+        vec_ops->assign(x0_, x0);
+        lambda0 = lambda0_;
         lambda_start = lambda0_;
         //let's use a copy for start values since we need those to check returning value anyway
         vec_ops->assign(x0_, x_start);
@@ -206,6 +208,7 @@ private:
         
         vec_ops->init_vector(x_check); vec_ops->start_use_vector(x_check);
         vec_ops->init_vector(x_start); vec_ops->start_use_vector(x_start);
+        vec_ops->init_vector(x0); vec_ops->start_use_vector(x0);
         vec_ops->init_vector(x0_s); vec_ops->start_use_vector(x0_s);
         vec_ops->init_vector(x1_s); vec_ops->start_use_vector(x1_s);
         vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
@@ -214,6 +217,7 @@ private:
     {
         vec_ops->stop_use_vector(x_check); vec_ops->free_vector(x_check);
         vec_ops->stop_use_vector(x_start); vec_ops->free_vector(x_start);
+        vec_ops->stop_use_vector(x0); vec_ops->free_vector(x0);
         vec_ops->stop_use_vector(x0_s); vec_ops->free_vector(x0_s);
         vec_ops->stop_use_vector(x1_s); vec_ops->free_vector(x1_s);
         vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);

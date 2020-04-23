@@ -21,6 +21,7 @@
 #include <continuation/continuation.hpp>
 
 #include <deflation/solution_storage.h>
+#include <deflation/deflation.hpp>
 
 namespace main_classes{
 
@@ -107,6 +108,15 @@ private:
         bif_diag_curve_t
         > continuate_t;
 
+    typedef deflation::deflation<
+        VectorOperations,
+        VectorFileOperations,
+        Log,
+        NonlinearOperations,
+        LinearOperator,
+        sherman_morrison_linear_system_solve_t,
+        sol_storage_def_t
+        > deflate_t;
 
 
 public:
@@ -126,11 +136,12 @@ public:
         continuate = new continuate_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
         bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton);
         sol_storage_def = new sol_storage_def_t(vec_ops, 50, T(1.0));  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
-
+        deflate = new deflate_t(vec_ops, file_ops, log, nonlin_op, lin_op, SM, sol_storage_def);
     }
     ~deflation_continuation()
     {
         
+        delete deflate;
         delete sol_storage_def;
         delete bif_diag;
         delete continuate;
@@ -148,7 +159,7 @@ public:
 //TODO: change all this rubbish to a single class that populates the structure. 
 //      It can be populated form anywhere: stdin, file, pipe etc.
 
-    void set_linsolver(T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = -1, int resid_recalc_freq = -1, int basis_sz = -1)
+    void set_linsolver(T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4)
     {
         //setup linear system:
         mon_orig = &SM->get_linsolver_handle_original()->monitor();
@@ -156,39 +167,45 @@ public:
         mon_orig->set_save_convergence_history(true);
         mon_orig->set_divide_out_norms_by_rel_base(true);
         mon_orig->out_min_resid_norm();
-        // if(use_precond_resid >= 0)
-        //     SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
-        // // if(resid_recalc_freq >= 0)
-        //     SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
-        // if(basis_sz >= 0)
-        //     SM->get_linsolver_handle_original()->set_basis_size(basis_sz);  
+//
+        if(use_precond_resid >= 0)
+            SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
+        if(resid_recalc_freq >= 0)
+            SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
+        if(basis_sz >= 0)
+            SM->get_linsolver_handle_original()->set_basis_size(basis_sz);  
+//
     }
-    void set_extended_linsolver(T lin_solver_tol, unsigned int lin_solver_max_it, bool is_small_alpha = false, int use_precond_resid = -1, int resid_recalc_freq = -1, int basis_sz = -1)
+    void set_extended_linsolver(T lin_solver_tol, unsigned int lin_solver_max_it, bool is_small_alpha = false, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4)
     {
         mon = &SM->get_linsolver_handle()->monitor();
         mon->init(lin_solver_tol, T(0), lin_solver_max_it);
         mon->set_save_convergence_history(true);
         mon->set_divide_out_norms_by_rel_base(true);
         mon->out_min_resid_norm();
-        // if(use_precond_resid >= 0)
-        //     SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
-        // if(resid_recalc_freq >= 0)
-        //     SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
-        // if(basis_sz >= 0)
-        //     SM->get_linsolver_handle_original()->set_basis_size(basis_sz); 
-
+//
+        if(use_precond_resid >= 0)
+            SM->get_linsolver_handle()->set_use_precond_resid(use_precond_resid);
+        if(resid_recalc_freq >= 0)
+            SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
+        if(basis_sz >= 0)
+            SM->get_linsolver_handle()->set_basis_size(basis_sz); 
+//
         SM->is_small_alpha(is_small_alpha);        
     }
     void set_newton(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true)
     {
         conv_newton->set_convergence_constants(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_,  verbose_);
         continuate->set_newton(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_, verbose_);
+        deflate->set_newton(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_, verbose_);
 
     }
-    void set_steps(unsigned int max_S_, T ds_0_, int initial_direciton_ = -1, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4)
+    void set_steps(unsigned int max_S_, T ds_0_, unsigned int deflation_attempts_ = 5, int initial_direciton_ = -1, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4)
     {
+        deflate->set_max_retries(deflation_attempts_);
         continuate->set_steps(max_S_, ds_0_, initial_direciton_, step_ds_m_, step_ds_p_, attempts_0_);
     }
+
     void set_deflation_knots(std::vector<T> knots_)
     {
         knots->add_element(knots_);
@@ -198,7 +215,7 @@ public:
     {
         //Algorythm pseudocode:
         //
-        //Set second knit value: knot.next()
+        //Set second knot value: knots.next()
         //while(true)
         //{
         //  knot_value = knot.get_value()
@@ -216,23 +233,41 @@ public:
 
         //sol_storage_def
    
-        bif_diag->init_new_curve();
+        bool is_there_a_next_knot = knots->next();
+        T_vec x_deflation;
+        int number_of_solutions = 0;
+        while(is_there_a_next_knot)
+        {
+            
+            T lambda = knots->get_value();
+            bool is_new_solution = deflate->find_solution(lambda);
+            if(is_new_solution)
+            {
+                number_of_solutions++;
+                log->info_f("MAIN:deflation_continuation: found %i solutions.", number_of_solutions);
+                
+                deflate->get_solution_ref(x_deflation);
+                bif_diag_curve_t* bdf;
+                bif_diag->init_new_curve();
+                bif_diag->get_current_ref(bdf);
+                std::cout << "reference to the curve = " << bdf << std::endl;
+                continuate->continuate_curve(bdf, x_deflation, lambda);
+                bdf->find_intersection(lambda, sol_storage_def);
+            }
+            else
+            {
+                is_there_a_next_knot = knots->next();
+                T lambda = knots->get_value();
+                sol_storage_def->clear();
+                bif_diag->find_intersection(lambda, sol_storage_def);
+            }
 
-        bif_diag_curve_t* bdf;
-        bif_diag->get_current_ref(bdf);
-        std::cout << "reference to the curve = " << bdf << std::endl;
-        T lambda0 = T(0.0);
-        T_vec x0;
-        vec_ops->init_vector(x0); vec_ops->start_use_vector(x0);
-        vec_ops->assign_scalar(T(1.0), x0);
-        //temp ends
-        
-        continuate->continuate_curve(bdf, x0, lambda0);
+        }
 
 
-        //temp starts       
-        vec_ops->stop_use_vector(x0); vec_ops->free_vector(x0);
-        //temp ends     
+    
+
+
 
     }
 
@@ -258,6 +293,7 @@ private:
     knots_t* knots;
     bif_diag_t* bif_diag = nullptr;
     continuate_t* continuate;
+    deflate_t* deflate;
     sol_storage_def_t* sol_storage_def;
 
 };

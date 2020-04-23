@@ -12,7 +12,7 @@ public:
     typedef typename vector_operations::vector_type  T_vec;
     
 
-    system_operator_deflation(vector_operations* vec_ops_, linear_operator* lin_op_, sherman_morrison_linear_system_solver* SM_solver_, solution_storage* sol_storage_):
+    system_operator_deflation(vector_operations*& vec_ops_, linear_operator*& lin_op_, sherman_morrison_linear_system_solver*& SM_solver_, solution_storage*& sol_storage_):
     vec_ops(vec_ops_),
     lin_op(lin_op_),
     SM_solver(SM_solver_),

@@ -1,6 +1,6 @@
 #once i was framed by autoconf (found two different gcc's for different libraries, cost me 2 days), so now i use all by hand
 #set these variables for your local machine
-SCALAR_TYPE = -DSCALAR_TYPE=double
+SCALAR_TYPE =-DSCALAR_TYPE=double
 NVCC = /usr/local/cuda/bin/nvcc
 GCC = /usr/bin/gcc
 
@@ -58,8 +58,8 @@ circle_ker: source/nonlinear_operators/circle/circle_ker.cu
 cont_def_circle: source/circle_test_deflation_continuation.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/circle_test_deflation_continuation.cpp O/circle_ker.o O/gpu_vector_operations_kernels.o $(LIBS1) -o circle_test_deflation_continuation.bin 2>results_make.txt	
 
-circle_continuation: source/circle_continuation.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/circle_continuation.cpp O/circle_ker.o O/gpu_vector_operations_kernels.o $(LIBS1) -o circle_continuation.bin 2>results_make.txt	
+circle_bd: source/circle_bd.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/circle_bd.cpp O/circle_ker.o O/gpu_vector_operations_kernels.o $(LIBS1) -o circle_bd.bin 2>results_make.txt	
 
-KS_continuation: source/KS_continuation.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/KS_continuation.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o $(LIBS2) -o KS_continuation.bin 2>results_make.txt	
+KS_bd: source/KS_bd.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/KS_bd.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o $(LIBS2) -o KS_bd.bin 2>results_make.txt	

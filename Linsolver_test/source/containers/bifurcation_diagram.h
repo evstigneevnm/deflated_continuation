@@ -32,16 +32,19 @@ private:
     NonlinearOperator* nonlin_op;
     Newton* newton;
     cont_help_t* cont_help;
+    unsigned int skip_output;
 
 public:
-    bifurcation_diagram(VectorOperations*& vec_ops_, VectorFileOperations*& vec_files_, Log*& log_, NonlinearOperator*& nlin_op_, Newton*& newton_):
+    bifurcation_diagram(VectorOperations*& vec_ops_, VectorFileOperations*& vec_files_, Log*& log_, NonlinearOperator*& nlin_op_, Newton*& newton_, unsigned int skip_output_ = 10):
     vec_ops(vec_ops_),
     file_ops(vec_files_),
     log(log_),
     nonlin_op(nlin_op_),
-    newton(newton_)
+    newton(newton_),
+    skip_output(skip_output_)
     {
         cont_help = new cont_help_t(vec_ops);
+        curve_number = -1;
 
     }
 
@@ -58,21 +61,20 @@ public:
 
     void init_new_curve()
     {
-        curve_container.emplace_back( Curve(vec_ops, file_ops, log, nonlin_op, newton, curve_number, cont_help) );
         curve_number++;
+        curve_container.emplace_back( Curve(vec_ops, file_ops, log, nonlin_op, newton, curve_number, cont_help, skip_output) );
     }
 
-    void find_intersection(const T& lambda_star, SolutionStorage& solution_vector)
+    void find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)
     {
         for(auto &x: curve_container)
         {
             try
             {
-                x->find_intersection(lambda_star, solution_vector);
+                x.find_intersection(lambda_star, solution_vector);
             }
             catch(const std::exception& e)
             {
-
                 log->info_f("bifurcation_diagram::find_intersection: %s\n", e.what());
             }
         }
@@ -82,7 +84,7 @@ public:
 
 private:
     std::vector<Curve> curve_container;
-    unsigned int curve_number = 0;
+    unsigned int curve_number = -1;
     
 };
 

@@ -34,7 +34,7 @@ public:
     }
 
     //inplace
-    bool solve(nonlinear_operator* nonlin_op, T_vec& x, T& lambda)
+    bool solve(nonlinear_operator*& nonlin_op, T_vec& x, T& lambda)
     {
         int result_status = 1;
         T delta_lambda = T(1);
@@ -67,7 +67,7 @@ public:
         return converged;
     }
 
-    bool solve(nonlinear_operator* nonlin_op, const T_vec& x0, const T& lambda0, T_vec& x, T& lambda)
+    bool solve(nonlinear_operator*& nonlin_op, const T_vec& x0, const T& lambda0, T_vec& x, T& lambda)
     {
         vec_ops->assign(x0, x);
         lambda = lambda0;

@@ -26,12 +26,13 @@ public:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
 
-    bifurcation_diagram_curve(VectorOperations*& vec_ops_, VectorFileOperations*& vec_files_, Log*& log_, NonlinearOperator*& nlin_op_, Newton*& newton_, int curve_number_, HelperVectors*& helper_vectors_):
+    bifurcation_diagram_curve(VectorOperations*& vec_ops_, VectorFileOperations*& vec_files_, Log*& log_, NonlinearOperator*& nlin_op_, Newton*& newton_, int curve_number_, HelperVectors*& helper_vectors_, unsigned int skip_output_):
     vec_ops(vec_ops_),
     vec_files(vec_files_),
     log(log_),
     nlin_op(nlin_op_),
-    newton(newton_)
+    newton(newton_),
+    skip_output(skip_output_)
     {
         std::cout << "constructor of this " << this << " with "; //std::endl;
 //NOTICE:
@@ -86,12 +87,16 @@ public:
             std::swap(nlin_op, that.nlin_op);
             std::swap(newton, that.newton);
             std::swap(data_directory, that.data_directory);
+            std::swap(full_path, that.full_path);
             std::swap(container, that.container);
             std::swap(global_id, that.global_id);
+            std::swap(curve_number,that.curve_number);
             std::swap(x0, that.x0);
             std::swap(x1, that.x1);
             std::swap(lambda0, that.lambda0);
             std::swap(lambda1, that.lambda1);
+            std::swap(skip_output, that.skip_output);
+
             return *this;
         }
     }
@@ -105,7 +110,8 @@ private:
     Newton* newton;
     std::string data_directory = "dat_files";
     int curve_number = 0;
-
+    std::string full_path = ".";
+    unsigned int skip_output;
 
     inline bool fs_object_exsts(const std::string& name) 
     {
@@ -119,15 +125,17 @@ public:
 
     void set_directory(const std::string& data_directory_)
     {
-        data_directory = data_directory_;
+        data_directory.assign(data_directory_);
         if(!fs_object_exsts(data_directory))
             throw std::runtime_error(std::string("container::bifurcation_diagram_curve: provided directory doesn't exist") );
     }
 
+
     void set_curve_number(int curve_number_)
     {
         curve_number = curve_number_;
-        std::string full_path = data_directory+std::string("/")+std::to_string(curve_number);
+        full_path.assign( data_directory+std::string("/")+std::to_string(curve_number) );
+        log->info_f("container::bifurcation_diagram_curve: FULL PATH: %s", full_path.c_str());
 
         if(!fs_object_exsts(full_path) )
         {
@@ -152,7 +160,7 @@ public:
         container.push_back(form_values);
     }
 
-    bool find_intersection(const T& lambda_star, SolutionStorage& solution_vector)
+    bool find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)
     {
         int N = container.size();
         for(int j=0;j<N-1;j++)
@@ -169,7 +177,7 @@ public:
                 {
                     if(interpolate_solutions(lambda_star))
                     {
-                        solution_vector.push_back(x1);
+                        solution_vector->push_back(x1);
                     }
                     else
                     {
@@ -189,7 +197,7 @@ public:
 // Debug print out for gnuplot
     void print_curve()
     {
-        std::string f_name = data_directory+std::string("/")+std::to_string(curve_number) + std::string("/") + std::string("debug_curve.dat");
+        std::string f_name = full_path + std::string("/") + std::string("debug_curve.dat");
         std::ofstream f(f_name.c_str(), std::ofstream::out);
         for(auto &x: container)
         {
@@ -218,6 +226,7 @@ private:
     typedef std::vector<values_t> b_d_container_t;
     b_d_container_t container;
     uint64_t global_id = 0; 
+    uint64_t global_index = 0;
 
     T_vec x0 = nullptr;
     T_vec x1 = nullptr;
@@ -227,13 +236,20 @@ private:
     {
         //TODO: add condition for storing data on the drive
         store_t res;
-        res.first = true;
         
+        if( (global_index++)%skip_output==0)
+        {
+            res.first = true;
+        }
+        else
+            res.first = false;
+        
+
         if(res.first)
         {
             global_id++;
-            
-            std::string f_name = data_directory+std::string("/")+std::to_string(curve_number)+std::string("/")+std::to_string(global_id);
+            std::string f_name = full_path.c_str()+std::string("/")+std::to_string(global_id);
+            log->info_f("container::bifurcation_diagram_curve: FULL PATH: %s", full_path.c_str());
             vec_files->write_vector(f_name, x_);
             res.second = global_id;
         }
@@ -249,7 +265,7 @@ private:
 
         int j = index;
         bool saved_data = false;
-        while(saved_data)
+        while(!saved_data)
         {
             values_t local_data = container[j];
             saved_data = local_data.is_data_avaliable;
@@ -257,12 +273,14 @@ private:
             {
                 lambda0 = local_data.lambda;
                 uint64_t local_id = local_data.id_file_name;
-                vec_files->read_vector(std::string(local_id), x0);
+                std::string f_name = full_path.c_str()+std::string("/")+std::to_string(local_id);
+                vec_files->read_vector(f_name, x0);
                 break;
             }
             j--;
             if(j<0)
                 break;
+
 
         }
         return(saved_data);
@@ -273,19 +291,23 @@ private:
 
         int j = index;
         bool saved_data = false;
-        while(saved_data)
+        while(!saved_data)
         {
+            int container_size = container.size();
+            std::cout << "container_size = " << container_size << std::endl;
+            
             values_t local_data = container[j];
             saved_data = local_data.is_data_avaliable;
             if(saved_data)
             {
                 lambda1 = local_data.lambda;
                 uint64_t local_id = local_data.id_file_name;
-                vec_files->read_vector(std::string(local_id), x1);
+                std::string f_name = full_path+std::string("/")+std::to_string(local_id);
+                vec_files->read_vector(f_name, x1);
                 break;
             }
             j++;
-            if(j>=container.size())
+            if( j >= container_size )
                 break;
         }
         return(saved_data);

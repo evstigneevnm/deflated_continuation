@@ -2,7 +2,7 @@
 #include <iostream>
 #include <cstdio>
 #include <thrust/complex.h>
-#include "macros.h"
+#include <common/macros.h>
 
 #include <utils/cuda_support.h>
 #include <utils/log.h>
@@ -33,8 +33,8 @@
 #include <continuation/initial_tangent.h>
 #include <continuation/convergence_strategy.h>
 
-#include "gpu_file_operations.h"
-#include "gpu_vector_operations.h"
+#include <common/gpu_file_operations.h>
+#include <common/gpu_vector_operations.h>
 #include "test_deflation_continuation_typedefs.h"
 
 int main(int argc, char const *argv[])
@@ -141,7 +141,7 @@ int main(int argc, char const *argv[])
 
     
     //deflation_op->execute_all(lambda0, KS2D, sol_storage_def);
-    deflation_op->find_solution(lambda0, KS2D, sol_storage_def);
+    deflation_op->find_add_solution(lambda0, KS2D, sol_storage_def);
     
 
     unsigned int p=0;
@@ -150,7 +150,7 @@ int main(int argc, char const *argv[])
         KS2D->physical_solution((real_im_vec&)x, u_out_ph);
         std::ostringstream stringStream;
         stringStream << "u_out_" << (p++) << ".dat";
-        gpu_file_operations::write_matrix<real>(stringStream.str(), Nx, Ny, u_out_ph);
+        //gpu_file_operations::write_matrix<real>(stringStream.str(), Nx, Ny, u_out_ph);
     }
 
     real_im_vec x0, x0_s, x1, x1_s, x1_p, d_x, f, xxx, xxx1;
@@ -172,7 +172,7 @@ int main(int argc, char const *argv[])
     printf("solutions in container = %i\n",sol_storage_def->get_size());
     (*sol_storage_def)[0].copy(x0);
     KS2D->physical_solution((real_im_vec&)x0, u_out_ph);
-    gpu_file_operations::write_matrix<real>("u_out_C0.dat", Nx, Ny, u_out_ph);
+    //gpu_file_operations::write_matrix<real>("u_out_C0.dat", Nx, Ny, u_out_ph);
 
     real lambda0_s, lambda1_s, lambda1_p;
     real lambda1;
@@ -260,7 +260,7 @@ int main(int argc, char const *argv[])
     printf("\n===(%le, %le)===", lambda1, norm);
 
     KS2D->physical_solution((real_im_vec&)x1, u_out_ph);
-    gpu_file_operations::write_matrix<real>("u_out_1.dat", Nx, Ny, u_out_ph);
+    //gpu_file_operations::write_matrix<real>("u_out_1.dat", Nx, Ny, u_out_ph);
 
 
     vec_ops_R_im->stop_use_vector(x0); vec_ops_R_im->free_vector(x0);

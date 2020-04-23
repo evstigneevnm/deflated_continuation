@@ -20,7 +20,7 @@ public:
     typedef typename VectorOperations::vector_type  T_vec;
 
 
-    deflation_operator(VectorOperations* vec_ops_, Logging* log_, NewtonMethod* newton_, unsigned int max_retries_):
+    deflation_operator(VectorOperations*& vec_ops_, Logging*& log_, NewtonMethod*& newton_, unsigned int max_retries_ = 5):
     vec_ops(vec_ops_),
     log(log_),
     newton(newton_),
@@ -40,8 +40,17 @@ public:
         //vec_ops->stop_use_vector(u_out_1); vec_ops->free_vector(u_out_1);
     }
     
+    void set_max_retries(unsigned int max_retries_)
+    {
+        max_retries = max_retries_;
+    }
 
-    bool find_solution(T lambda_0, NonlinearOperator* nonlin_op)
+    void get_solution_ref(T_vec& sol_ref_)
+    {
+        sol_ref_ = u_out;
+    }
+
+    bool find_solution(T lambda_0, NonlinearOperator*& nonlin_op)
     {
         T lambda = lambda_0;
         bool found_solution = false;
