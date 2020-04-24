@@ -332,8 +332,9 @@ public:
         T_vec physical_host = vec_ops_R->view(du_y_ext);
         T val1 = physical_host[I2(int(Nx/3.0), int(Ny/3.0), Nx)];
         T val2 = physical_host[I2(int(Nx/5.0), int(2.0*Ny/3.0), Nx)];
-        T val3 = physical_host[I2(int(Nx/4.0), int(Ny/4.0), Nx)];
-        T val4 = vec_ops_R_im->norm_l2(u_in);
+        T val3 = physical_host[I2(int(Nx/4.0), int(Ny/5.0), Nx)];
+        T val4 = physical_host[I2(int(Nx/2.0), int(Ny/3.0), Nx)];
+        T val5 = vec_ops_R_im->norm_l2(u_in);
         
         res.clear();
         res.reserve(4);
@@ -341,6 +342,7 @@ public:
         res.push_back(val2);
         res.push_back(val3);
         res.push_back(val4);
+        res.push_back(val5);
 
     }
 

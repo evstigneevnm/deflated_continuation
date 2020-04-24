@@ -26,7 +26,7 @@ public:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
 
-    bifurcation_diagram_curve(VectorOperations*& vec_ops_, VectorFileOperations*& vec_files_, Log*& log_, NonlinearOperator*& nlin_op_, Newton*& newton_, int curve_number_, HelperVectors*& helper_vectors_, unsigned int skip_output_):
+    bifurcation_diagram_curve(VectorOperations*& vec_ops_, VectorFileOperations*& vec_files_, Log*& log_, NonlinearOperator*& nlin_op_, Newton*& newton_, int curve_number_, const std::string& directory_,  HelperVectors*& helper_vectors_, unsigned int skip_output_):
     vec_ops(vec_ops_),
     vec_files(vec_files_),
     log(log_),
@@ -34,7 +34,7 @@ public:
     newton(newton_),
     skip_output(skip_output_)
     {
-        std::cout << "constructor of this " << this << " with "; //std::endl;
+//        std::cout << "constructor of this " << this << " with "; //std::endl;
 //NOTICE:
 //it constructs these helper vectors every time we add this to the container
         //vec_ops->init_vector(x0); vec_ops->start_use_vector(x0);
@@ -45,13 +45,14 @@ public:
 //assume now that a HelperVectors class contains T_vec x0 and T_vec x1 and  can be accessed via reference.
 
         helper_vectors_->get_refs(x0, x1);
-        std::cout << "x0 = " << x0 << " x1 = " << x1 << std::endl;
+//        std::cout << "x0 = " << x0 << " x1 = " << x1 << std::endl;
+        set_directory(directory_);
         set_curve_number(curve_number_);
     }
     
     ~bifurcation_diagram_curve()
     {
-        std::cout << "distructor of this " << this << " with &x0 = " << x0 << " and &x1 = " << x1 << std::endl;
+//        std::cout << "distructor of this " << this << " with &x0 = " << x0 << " and &x1 = " << x1 << std::endl;
         //vec_ops->stop_use_vector(x0); vec_ops->free_vector(x0);
         //vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
 
@@ -67,7 +68,7 @@ public:
 
     bifurcation_diagram_curve(bifurcation_diagram_curve&& that)
     {
-        std::cout << "move constructor of that " << &that << " to this " << this << std::endl;
+//        std::cout << "move constructor of that " << &that << " to this " << this << std::endl;
         *this = std::move(that);
         
     }   
@@ -80,7 +81,7 @@ public:
         }
         else
         {
-            std::cout << "move assign of that " << &that << " to this " << this << std::endl;
+//            std::cout << "move assign of that " << &that << " to this " << this << std::endl;
             std::swap(vec_ops, that.vec_ops);
             std::swap(vec_files, that.vec_files);
             std::swap(log, that.log);
@@ -134,9 +135,8 @@ public:
     void set_curve_number(int curve_number_)
     {
         curve_number = curve_number_;
-        full_path.assign( data_directory+std::string("/")+std::to_string(curve_number) );
+        full_path.assign( data_directory.c_str()+std::string("/")+std::to_string(curve_number) );
         log->info_f("container::bifurcation_diagram_curve: FULL PATH: %s", full_path.c_str());
-
         if(!fs_object_exsts(full_path) )
         {
 //TODO For now. Later this is to be replaced by create directory
@@ -145,11 +145,11 @@ public:
 
     }
 
-    void add(const T& lambda_, const T_vec& x_)
+    void add(const T& lambda_, const T_vec& x_, bool force_store = false)
     {
         std::vector<T> bif_diag_norms;
         nlin_op->norm_bifurcation_diagram(x_, bif_diag_norms);
-        store_t store_result = store(lambda_, x_);
+        store_t store_result = store(lambda_, x_, force_store);
 
         values_t form_values;
         form_values.lambda = lambda_;
@@ -178,6 +178,7 @@ public:
                     if(interpolate_solutions(lambda_star))
                     {
                         solution_vector->push_back(x1);
+                        log->info_f("container::bifurcation_diagram_curve(%i): added intersectoin solution at %lf", curve_number, lambda_star);
                     }
                     else
                     {
@@ -232,17 +233,19 @@ private:
     T_vec x1 = nullptr;
     T lambda0, lambda1;
 
-    store_t store(const T& lambda_, const T_vec& x_)
+    store_t store(const T& lambda_, const T_vec& x_, bool force_store_)
     {
         //TODO: add condition for storing data on the drive
         store_t res;
         
-        if( (global_index++)%skip_output==0)
+        if( ((global_index++)%skip_output==0)||(force_store_) )
         {
             res.first = true;
         }
         else
+        {
             res.first = false;
+        }
         
 
         if(res.first)
@@ -294,7 +297,7 @@ private:
         while(!saved_data)
         {
             int container_size = container.size();
-            std::cout << "container_size = " << container_size << std::endl;
+            //std::cout << "container_size = " << container_size << std::endl;
             
             values_t local_data = container[j];
             saved_data = local_data.is_data_avaliable;

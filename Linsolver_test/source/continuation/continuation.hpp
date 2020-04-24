@@ -155,6 +155,11 @@ public:
             change_direction(); //if we reached the origin, then this is irrelevant. Else, change direction and do it again
             vec_ops->assign(x_start, x0);
             lambda0 = lambda_start;
+            if(fail_flag)
+            {
+                log->info_f("continuation::continuate_curve: previous semicurve returned with fail flag.");
+                fail_flag = false;
+            }
         }
         bif_diag->print_curve();
     }
@@ -186,11 +191,7 @@ private:
 
     void change_direction()
     {
-        if(direction==-1)
-            direction = 1;
-        else
-            direction = -1;
-
+        direction *= -1;
     }
 
     //vactors and points for continuation
@@ -313,6 +314,30 @@ private:
         }
     }
 
+    bool interpolate_all_knots()
+    {
+        bool res = false;
+        for(auto &x: *knots)
+        {
+            bools2 res_l = check_intersection(x);
+            if(!fail_flag)
+            {
+                if(res_l.first)
+                {
+                    res = res_l.first;
+                    break;
+                }
+            }
+            else
+            {
+                res = false;
+                break;                
+            }
+        }
+        return res;
+    }
+
+
     void start_semicurve()
     {
         //assume that x0 and lambda0 are valid solutions, so that ||F(x_0,lambda_0)||<eps
@@ -322,7 +347,7 @@ private:
         }
         catch(const std::exception& e)
         {
-            log->info_f("%s\n", e.what());
+            log->info_f("continuation::start_semicurve: %s\n", e.what());
             break_semicurve++;
             fail_flag = true;
         }
@@ -337,8 +362,10 @@ private:
                     continuation_step->solve(nonlin_op, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
                     check_returning();
                     check_interval();
+                    bool did_knot_interpolation = interpolate_all_knots();
                     //if try blocks passes, THIS is executed:
-                    bif_diag->add(lambda1, x1);
+                    bif_diag->add(lambda1, x1, did_knot_interpolation);
+                    
                     vec_ops->assign(x1, x0);
                     vec_ops->assign(x1_s, x0_s);
                     lambda0 = lambda1;
@@ -346,7 +373,7 @@ private:
                 }
                 catch(const std::exception& e)
                 {
-                    log->info_f("%s\n", e.what());
+                    log->info_f("continuation::start_semicurve: %s\n", e.what());
                     break_semicurve++;
                     fail_flag = true; 
                     continue_next_step = false;                   

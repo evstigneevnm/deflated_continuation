@@ -1,7 +1,7 @@
 // Example program
 #include <iostream>
 #include <vector>
-#include "../../cpu_vector_operations.h"
+#include <common/cpu_vector_operations.h>
 #include "curve_container.h"
 
 

@@ -33,15 +33,17 @@ private:
     Newton* newton;
     cont_help_t* cont_help;
     unsigned int skip_output;
+    std::string directory;
 
 public:
-    bifurcation_diagram(VectorOperations*& vec_ops_, VectorFileOperations*& vec_files_, Log*& log_, NonlinearOperator*& nlin_op_, Newton*& newton_, unsigned int skip_output_ = 10):
+    bifurcation_diagram(VectorOperations*& vec_ops_, VectorFileOperations*& vec_files_, Log*& log_, NonlinearOperator*& nlin_op_, Newton*& newton_, const std::string& directory_ = "dat_files", unsigned int skip_output_ = 10):
     vec_ops(vec_ops_),
     file_ops(vec_files_),
     log(log_),
     nonlin_op(nlin_op_),
     newton(newton_),
-    skip_output(skip_output_)
+    skip_output(skip_output_),
+    directory(directory_)
     {
         cont_help = new cont_help_t(vec_ops);
         curve_number = -1;
@@ -62,7 +64,7 @@ public:
     void init_new_curve()
     {
         curve_number++;
-        curve_container.emplace_back( Curve(vec_ops, file_ops, log, nonlin_op, newton, curve_number, cont_help, skip_output) );
+        curve_container.emplace_back( Curve(vec_ops, file_ops, log, nonlin_op, newton, curve_number, directory, cont_help, skip_output) );
     }
 
     void find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)

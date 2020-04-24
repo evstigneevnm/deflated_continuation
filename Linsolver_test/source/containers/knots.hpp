@@ -66,7 +66,7 @@ public:
     bool next()
     {
         current_position++;
-        if( current_position >= size())
+        if( current_position >= size() - 1 ) //size - 1 so that the first and the last knots are limiting knots, not deflation knots!
         {
             current_position = 0;
             return(false);

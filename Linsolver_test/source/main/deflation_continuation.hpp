@@ -120,7 +120,7 @@ private:
 
 
 public:
-    deflation_continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, NonlinearOperations* nonlin_op_):
+    deflation_continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, NonlinearOperations* nonlin_op_, const std::string& project_dir_):
     vec_ops(vec_ops_),
     file_ops(file_ops_),
     log(log_),
@@ -134,8 +134,8 @@ public:
         newton = new newton_t(vec_ops, system_operator, conv_newton);
         knots = new knots_t();
         continuate = new continuate_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
-        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton);
-        sol_storage_def = new sol_storage_def_t(vec_ops, 50, T(1.0));  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
+        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir_);
+        sol_storage_def = new sol_storage_def_t(vec_ops, 50, T(1.0) );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
         deflate = new deflate_t(vec_ops, file_ops, log, nonlin_op, lin_op, SM, sol_storage_def);
     }
     ~deflation_continuation()

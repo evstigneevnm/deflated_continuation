@@ -174,8 +174,8 @@ public:
     {
         lambda_min = knots->get_min_value();
         lambda_max = knots->get_max_value();  
-        lambda1 =  lambda_min;
-        lambda0 = lambda_min;
+        // lambda1 =  lambda_min;
+        // lambda0 = lambda_min;
     }
 
     bool interpolate_two_solutions(const T& lambda1, T_vec& x1)

@@ -1,6 +1,7 @@
 #include <cmath>
 #include <iostream>
 #include <cstdio>
+#include <string>
 
 #include <utils/cuda_support.h>
 #include <utils/log.h>
@@ -36,9 +37,9 @@
 int main(int argc, char const *argv[])
 {
     
-    if(argc!=3)
+    if(argc!=4)
     {
-        printf("Usage: %s dS S\n  dS - continuation step\n   S - number of continuation steps\n",argv[0]);
+        printf("Usage: %s path_to_project dS S\n  where: path_to_project is the relative path to the storage of bifurcation diagram data\n  dS - continuation step\n   S - number of continuation steps\n",argv[0]);
         return 0;
     }
     typedef SCALAR_TYPE real;
@@ -48,8 +49,10 @@ int main(int argc, char const *argv[])
     real a_val = real(2.0);
     real b_val = real(4.0);    
 //problem parameters ends
-    real dS = atof(argv[1]);
-    unsigned int S = atoi(argv[2]);
+    
+    std::string path_to_prject_(argv[1]);
+    real dS = atof(argv[2]);
+    unsigned int S = atoi(argv[3]);
 
     typedef thrust::complex<real> complex;
     typedef gpu_vector_operations<real> vec_ops_real;
@@ -97,7 +100,7 @@ int main(int argc, char const *argv[])
     unsigned int newton_def_max_it = 350;
     unsigned int newton_def_cont_it = 100;
     real newton_def_tol = 1.0e-9;
-    real newton_cont_tol = 1.0e-8;
+    real newton_cont_tol = 1.0e-9;
     real newton_interp_tol = 1.0e-9;
 
     fft_t *CUFFT_C2R = new fft_t(Nx, Ny);
@@ -122,17 +125,16 @@ int main(int argc, char const *argv[])
     log_t log;
        
 
-    //test continuaiton process of a single curve
     typedef main_classes::deflation_continuation<vec_ops_real_im, files_real_im_t, log_t, monitor_t, KS_2D_t, lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator> deflation_continuation_t;
 
-    deflation_continuation_t DC( (vec_ops_real_im*) &vec_ops_R_im, (files_real_im_t*) &file_ops_im, (log_t*) &log, (KS_2D_t*) &KS2D );
+    deflation_continuation_t DC( (vec_ops_real_im*) &vec_ops_R_im, (files_real_im_t*) &file_ops_im, (log_t*) &log, (KS_2D_t*) &KS2D, path_to_prject_ );
 
 
     DC.set_linsolver(lin_solver_tol, lin_solver_max_it, use_precond_resid, resid_recalc_freq, basis_sz);
     DC.set_extended_linsolver(lin_solver_tol, lin_solver_max_it, is_small_alpha, use_precond_resid, resid_recalc_freq, basis_sz);
     DC.set_newton(newton_cont_tol, newton_def_cont_it, real(1.0), true);
     DC.set_steps(S, dS);
-    DC.set_deflation_knots({3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5});
+    DC.set_deflation_knots({3.0, 4.5, 5.5, 6.6, 7.7, 8.8, 10.0});
     
     DC.execute();
 
