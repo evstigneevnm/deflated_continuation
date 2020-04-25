@@ -102,6 +102,9 @@ int main(int argc, char const *argv[])
     real newton_def_tol = 1.0e-9;
     real newton_cont_tol = 1.0e-9;
     real newton_interp_tol = 1.0e-9;
+    //skipping files:
+    unsigned int skip_files_ = 100;
+
 
     fft_t *CUFFT_C2R = new fft_t(Nx, Ny);
     size_t My=CUFFT_C2R->get_reduced_size();
@@ -127,14 +130,14 @@ int main(int argc, char const *argv[])
 
     typedef main_classes::deflation_continuation<vec_ops_real_im, files_real_im_t, log_t, monitor_t, KS_2D_t, lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator> deflation_continuation_t;
 
-    deflation_continuation_t DC( (vec_ops_real_im*) &vec_ops_R_im, (files_real_im_t*) &file_ops_im, (log_t*) &log, (KS_2D_t*) &KS2D, path_to_prject_ );
+    deflation_continuation_t DC( (vec_ops_real_im*) &vec_ops_R_im, (files_real_im_t*) &file_ops_im, (log_t*) &log, (KS_2D_t*) &KS2D, path_to_prject_, skip_files_ );
 
 
     DC.set_linsolver(lin_solver_tol, lin_solver_max_it, use_precond_resid, resid_recalc_freq, basis_sz);
     DC.set_extended_linsolver(lin_solver_tol, lin_solver_max_it, is_small_alpha, use_precond_resid, resid_recalc_freq, basis_sz);
     DC.set_newton(newton_cont_tol, newton_def_cont_it, real(1.0), true);
     DC.set_steps(S, dS);
-    DC.set_deflation_knots({3.0, 4.5, 5.5, 6.6, 7.7, 8.8, 10.0});
+    DC.set_deflation_knots({3.0, 4.5, 5.5, 6.0, 7.5, 9.0, 10.5, 12.0, 13.5, 15.0, 16.5, 18.0, 19.5, 21.0, 22.5, 24.0, 25.5, 27.0, 28.5, 30.0});
     
     DC.execute();
 

@@ -63,7 +63,7 @@ public:
         vec_ops->assign_scalar(T(0), f);
         T beta = T(1);
         T alpha = lambda_0_s;
-        SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(T(1.0e-9)*vec_ops->get_l2_size());
+        SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(T(1.0e-8)*vec_ops->get_l2_size());
         flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, x_1_s, lambda_1_s);
         SM_solver->get_linsolver_handle()->monitor().restore_tolerance();
         T norm = vec_ops->norm_rank1(x_1_s, lambda_1_s);

@@ -120,7 +120,7 @@ private:
 
 
 public:
-    deflation_continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, NonlinearOperations* nonlin_op_, const std::string& project_dir_):
+    deflation_continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, NonlinearOperations* nonlin_op_, const std::string& project_dir_, unsigned int skip_files_ = 10):
     vec_ops(vec_ops_),
     file_ops(file_ops_),
     log(log_),
@@ -134,7 +134,7 @@ public:
         newton = new newton_t(vec_ops, system_operator, conv_newton);
         knots = new knots_t();
         continuate = new continuate_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
-        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir_);
+        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir_, skip_files_);
         sol_storage_def = new sol_storage_def_t(vec_ops, 50, T(1.0) );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
         deflate = new deflate_t(vec_ops, file_ops, log, nonlin_op, lin_op, SM, sol_storage_def);
     }
@@ -172,7 +172,7 @@ public:
             SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
         if(resid_recalc_freq >= 0)
             SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
-        if(basis_sz >= 0)
+        if(basis_sz > 0)
             SM->get_linsolver_handle_original()->set_basis_size(basis_sz);  
 //
     }
@@ -188,7 +188,7 @@ public:
             SM->get_linsolver_handle()->set_use_precond_resid(use_precond_resid);
         if(resid_recalc_freq >= 0)
             SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
-        if(basis_sz >= 0)
+        if(basis_sz > 0)
             SM->get_linsolver_handle()->set_basis_size(basis_sz); 
 //
         SM->is_small_alpha(is_small_alpha);        
@@ -233,6 +233,7 @@ public:
 
         //sol_storage_def
    
+
         bool is_there_a_next_knot = knots->next();
         T_vec x_deflation;
         int number_of_solutions = 0;
@@ -247,6 +248,8 @@ public:
                 log->info_f("MAIN:deflation_continuation: found %i solutions.", number_of_solutions);
                 
                 deflate->get_solution_ref(x_deflation);
+                file_ops->write_vector("test_solution_0.dat", x_deflation);
+                std::cout << "Deflation-Continuaiton reference to the initial solution: " << x_deflation << std::endl;
                 bif_diag_curve_t* bdf;
                 bif_diag->init_new_curve();
                 bif_diag->get_current_ref(bdf);

@@ -79,22 +79,24 @@ private:
 
 
 public:
-    continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, NonlinearOperations* nonlin_op_, LinearOperator* lin_op_, Knots* knots_, LinearSolver* SM_, Newton* newton_):
+    continuation(VectorOperations*& vec_ops_, VectorFileOperations*& file_ops_, Log*& log_, NonlinearOperations*& nonlin_op_, LinearOperator*& lin_op_, Knots*& knots_, LinearSolver*& SM_, Newton*& newton_):
     vec_ops(vec_ops_),
     file_ops(file_ops_),
     log(log_),
     nonlin_op(nonlin_op_),
     knots(knots_),
     SM(SM_),
-    newton(newton_)
+    newton(newton_),
+    lin_op(lin_op_)
     {
         predict = new predictor_cont_t(vec_ops, log);
-        system_operator_cont = new system_operator_cont_t(vec_ops, lin_op_, SM);
+        system_operator_cont = new system_operator_cont_t(vec_ops, lin_op, SM);
         conv_newton_cont = new convergence_newton_cont_t(vec_ops, log);
         newton_cont = new newton_cont_t(vec_ops, system_operator_cont, conv_newton_cont);
         continuation_step = new advance_step_cont_t(vec_ops, log, system_operator_cont, newton_cont, predict);
-        init_tangent = new tangent_0_cont_t(vec_ops, lin_op_, SM);
-        
+        init_tangent = new tangent_0_cont_t(vec_ops, lin_op, SM);
+
+
         max_S = 100;
         set_all_vectors();
     }
@@ -144,6 +146,7 @@ public:
         lambda0 = lambda0_;
         lambda_start = lambda0_;
         //let's use a copy for start values since we need those to check returning value anyway
+        
         vec_ops->assign(x0_, x_start);
         
         break_semicurve = 0;
@@ -174,6 +177,7 @@ private:
     Knots* knots;
     LinearSolver* SM;
     Newton* newton;
+    LinearOperator* lin_op;
     
     //created localy:
     predictor_cont_t* predict;
@@ -203,6 +207,7 @@ private:
     char break_semicurve = 0;
     bool fail_flag = false;
     bool continue_next_step = true;
+    bool just_interpolated = false;
 
     void set_all_vectors()
     {
@@ -256,7 +261,7 @@ private:
 
     bools2 check_intersection(T lambda_star) //check current interseciton with the parameter value lambda_star
     {
-        if( (lambda_star - lambda1)*(lambda_star - lambda0)<T(0.0) )
+        if( (lambda_star - lambda1)*(lambda_star - lambda0)<=T(0.0) )
         {
             
 
@@ -319,11 +324,13 @@ private:
         bool res = false;
         for(auto &x: *knots)
         {
+
             bools2 res_l = check_intersection(x);
             if(!fail_flag)
             {
                 if(res_l.first)
                 {
+                    just_interpolated = true;
                     res = res_l.first;
                     break;
                 }
@@ -347,22 +354,31 @@ private:
         }
         catch(const std::exception& e)
         {
-            log->info_f("continuation::start_semicurve: %s\n", e.what());
+            throw std::runtime_error(std::string("continuation::start_semicurve:") + std::string(e.what()) );
+//            log->info_f("continuation::start_semicurve: %s\n", e.what());
             break_semicurve++;
             fail_flag = true;
         }
         if(!fail_flag)
         {        
-            bif_diag->add(lambda0, x0); //add initial knot            
+            bif_diag->add(lambda0, x0, true); //add initial knot, force save data!           
             unsigned int s;
             for(s=0;s<max_S;s++)
             {
                 try
                 {
                     continuation_step->solve(nonlin_op, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
-                    check_returning();
-                    check_interval();
-                    bool did_knot_interpolation = interpolate_all_knots();
+                    bool did_knot_interpolation = false;
+                    if((s>1)&&(!just_interpolated))
+                    {
+                        check_interval();
+                        check_returning();
+                        did_knot_interpolation = interpolate_all_knots();
+                    }
+                    else
+                    {
+                        just_interpolated = false;
+                    }
                     //if try blocks passes, THIS is executed:
                     bif_diag->add(lambda1, x1, did_knot_interpolation);
                     

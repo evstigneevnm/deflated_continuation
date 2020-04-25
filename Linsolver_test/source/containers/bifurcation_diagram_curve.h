@@ -17,6 +17,7 @@ struct complex_values
     bool is_data_avaliable = false;
     std::vector<T> vector_norms;
     uint64_t id_file_name;
+
 };
 
 template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperator, class Newton, class SolutionStorage, class HelperVectors>
@@ -48,6 +49,7 @@ public:
 //        std::cout << "x0 = " << x0 << " x1 = " << x1 << std::endl;
         set_directory(directory_);
         set_curve_number(curve_number_);
+        debug_file.open(debug_f_name.c_str(), std::ofstream::out | std::ofstream::app);
     }
     
     ~bifurcation_diagram_curve()
@@ -55,7 +57,7 @@ public:
 //        std::cout << "distructor of this " << this << " with &x0 = " << x0 << " and &x1 = " << x1 << std::endl;
         //vec_ops->stop_use_vector(x0); vec_ops->free_vector(x0);
         //vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
-
+        debug_file.close();
     }
 
     // bifurcation_diagram_curve(const bifurcation_diagram_curve& that)
@@ -97,7 +99,8 @@ public:
             std::swap(lambda0, that.lambda0);
             std::swap(lambda1, that.lambda1);
             std::swap(skip_output, that.skip_output);
-
+            std::swap(debug_f_name, that.debug_f_name);
+            std::swap(debug_file, that.debug_file);
             return *this;
         }
     }
@@ -113,6 +116,9 @@ private:
     int curve_number = 0;
     std::string full_path = ".";
     unsigned int skip_output;
+    std::string debug_f_name;
+    std::ofstream debug_file;
+
 
     inline bool fs_object_exsts(const std::string& name) 
     {
@@ -136,6 +142,7 @@ public:
     {
         curve_number = curve_number_;
         full_path.assign( data_directory.c_str()+std::string("/")+std::to_string(curve_number) );
+        debug_f_name.assign(full_path.c_str() + std::string("/") + std::string("debug_curve.dat"));
         log->info_f("container::bifurcation_diagram_curve: FULL PATH: %s", full_path.c_str());
         if(!fs_object_exsts(full_path) )
         {
@@ -158,6 +165,9 @@ public:
         form_values.vector_norms = bif_diag_norms;
 
         container.push_back(form_values);
+
+        print_curve_each();
+    
     }
 
     bool find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)
@@ -187,7 +197,9 @@ public:
                 }
                 else
                 {
-                    throw std::runtime_error(std::string("container::bifurcation_diagram_curve: failed to find valid solution") );
+                    std::string fail_find_files = std::string("container::bifurcation_diagram_curve(") + std::to_string(curve_number) + std::string("): failed to find a valid solution for the parameter = ") + std::to_string(lambda_star) + std::string(" with lower flag = ") + std::to_string(stat_l) + std::string(" and upper flag = ") + std::to_string(stat_u) + std::string(", indexing = (") + std::to_string(ind) + std::string(",") + std::to_string(indp) + std::string(").");
+                    
+                    throw std::runtime_error( fail_find_files );
                 }
             }
         }
@@ -195,10 +207,33 @@ public:
     }
 
 
+
+
+
+
 // Debug print out for gnuplot
+    void print_curve_each()
+    {
+        size_t container_size = container.size();
+        if(container_size%skip_output == 0)
+        {
+            b_d_container_t local_container(container.end()-skip_output, container.end());
+
+            for(auto &x: local_container)
+            {
+                debug_file << x.lambda << " ";
+                for(auto &y: x.vector_norms)
+                {
+                    debug_file << y << " ";  //print all avaliable norms!
+                }
+                debug_file << x.id_file_name << std::endl;
+            }
+        }
+    }
+
     void print_curve()
     {
-        std::string f_name = full_path + std::string("/") + std::string("debug_curve.dat");
+        std::string f_name = full_path + std::string("/") + std::string("debug_curve_all.dat");
         std::ofstream f(f_name.c_str(), std::ofstream::out);
         for(auto &x: container)
         {

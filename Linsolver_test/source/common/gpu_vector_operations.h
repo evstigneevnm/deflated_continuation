@@ -7,6 +7,11 @@
 #include <utils/curand_safe_call.h>
 #include <random>
 
+//debug for file output!
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+
 namespace gpu_vector_operations_type{
 
 template<typename T>
@@ -144,7 +149,20 @@ struct gpu_vector_operations
     }
 
 
+    // DEBUG! This plots the vector at request to the file on disk!
+    void debug_view(const vector_type& vec, const std::string& f_name) const
+    {
+        vector_type x_host = view(vec);
+        std::ofstream check_file(f_name);
+        for(int j=0; j<sz-1; j++)
+        {
+            check_file << std::scientific << std::setprecision(16) << x_host[j] << std::endl;
+        }
+        check_file << std::scientific << std::setprecision(16) << x_host[sz-1];
+        check_file.close();
+    }
 
+    //DEBUG!
     bool check_is_valid_number(const vector_type &x)const;
     // dot product of two vectors
     scalar_type scalar_prod(const vector_type &x, const vector_type &y)const
