@@ -213,7 +213,7 @@ public:
 
     void execute()
     {
-        //Algorythm pseudocode:
+        //Algorithm pseudocode:
         //
         //Set second knot value: knots.next()
         //while(true)
@@ -235,7 +235,7 @@ public:
    
 
         bool is_there_a_next_knot = knots->next();
-        T_vec x_deflation;
+        T_vec x_deflation; //pointer to the found deflated solution
         int number_of_solutions = 0;
         while(is_there_a_next_knot)
         {
@@ -248,21 +248,21 @@ public:
                 log->info_f("MAIN:deflation_continuation: found %i solutions.", number_of_solutions);
                 
                 deflate->get_solution_ref(x_deflation);
-                file_ops->write_vector("test_solution_0.dat", x_deflation);
-                std::cout << "Deflation-Continuaiton reference to the initial solution: " << x_deflation << std::endl;
                 bif_diag_curve_t* bdf;
                 bif_diag->init_new_curve();
                 bif_diag->get_current_ref(bdf);
-                std::cout << "reference to the curve = " << bdf << std::endl;
                 continuate->continuate_curve(bdf, x_deflation, lambda);
                 bdf->find_intersection(lambda, sol_storage_def);
             }
             else
             {
                 is_there_a_next_knot = knots->next();
-                T lambda = knots->get_value();
-                sol_storage_def->clear();
-                bif_diag->find_intersection(lambda, sol_storage_def);
+                if(is_there_a_next_knot)
+                {
+                    T lambda = knots->get_value();
+                    sol_storage_def->clear();
+                    bif_diag->find_intersection(lambda, sol_storage_def);
+                }
             }
 
         }

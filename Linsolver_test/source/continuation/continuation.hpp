@@ -374,6 +374,7 @@ private:
                         check_interval();
                         check_returning();
                         did_knot_interpolation = interpolate_all_knots();
+                        //if fail flag after the interpolation, restore (x1, lambda1)?!
                     }
                     else
                     {

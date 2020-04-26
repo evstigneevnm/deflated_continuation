@@ -188,18 +188,20 @@ public:
                     if(interpolate_solutions(lambda_star))
                     {
                         solution_vector->push_back(x1);
-                        log->info_f("container::bifurcation_diagram_curve(%i): added intersectoin solution at %lf", curve_number, lambda_star);
+                        log->info_f("container::bifurcation_diagram_curve(%i): added intersectoin at (%i,%i) for the solution at %lf", curve_number, ind, indp, lambda_star);
                     }
                     else
                     {
-                        throw std::runtime_error(std::string("container::bifurcation_diagram_curve: newton failed in solution section") );
+                        //throw std::runtime_error(std::string("container::bifurcation_diagram_curve: newton failed in solution section") );
+                        log->info_f("container::bifurcation_diagram_curve(%i): !!!newton failed in solution section at (%i(%i), %i(%i)) for the solution at %lf !!!", curve_number, ind, int(stat_l), indp, int(stat_u), lambda_star);
                     }
                 }
                 else
                 {
-                    std::string fail_find_files = std::string("container::bifurcation_diagram_curve(") + std::to_string(curve_number) + std::string("): failed to find a valid solution for the parameter = ") + std::to_string(lambda_star) + std::string(" with lower flag = ") + std::to_string(stat_l) + std::string(" and upper flag = ") + std::to_string(stat_u) + std::string(", indexing = (") + std::to_string(ind) + std::string(",") + std::to_string(indp) + std::string(").");
-                    
-                    throw std::runtime_error( fail_find_files );
+                    //std::string fail_find_files = std::string("container::bifurcation_diagram_curve(") + std::to_string(curve_number) + std::string("): failed to find a valid solution for the parameter = ") + std::to_string(lambda_star) + std::string(" with lower flag = ") + std::to_string(stat_l) + std::string(" and upper flag = ") + std::to_string(stat_u) + std::string(", indexing = (") + std::to_string(ind) + std::string(",") + std::to_string(indp) + std::string(").");
+                    log->info_f("container::bifurcation_diagram_curve(%i): !!!failed to add intersectoin at (%i(%i), %i(%i)) for the solution at %lf !!!", curve_number, ind, int(stat_l), indp, int(stat_u), lambda_star);
+
+                    //throw std::runtime_error( fail_find_files );
                 }
             }
         }
@@ -215,7 +217,7 @@ public:
     void print_curve_each()
     {
         size_t container_size = container.size();
-        if(container_size%skip_output == 0)
+        if(container_size%(skip_output) == 0)
         {
             b_d_container_t local_container(container.end()-skip_output, container.end());
 
