@@ -45,7 +45,7 @@ int main(int argc, char const *argv[])
     typedef SCALAR_TYPE real;
 
 // problem parameters
-    size_t Nx = 128, Ny = 128;
+    size_t Nx = 256, Ny = 256;
     real a_val = real(2.0);
     real b_val = real(4.0);    
 //problem parameters ends
@@ -139,7 +139,7 @@ int main(int argc, char const *argv[])
     DC.set_steps(S, dS);
     DC.set_deflation_knots({3.0, 4.5, 5.5, 6.0, 7.5, 9.0, 10.5, 12.0, 13.5, 15.0, 16.5, 18.0, 19.5, 21.0, 22.5, 24.0, 25.5, 27.0, 28.5, 30.0});
     
-    DC.execute();
+    DC.execute("bifurcation_diagram.dat");
 
     return 0;
 }

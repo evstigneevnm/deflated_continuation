@@ -7,9 +7,17 @@
 *   It uses nonlinear operator and other set options to configure the whole project.
 *   After vector and file operations, the nonlinear operator, log and monitor are configured,
 *   this class is initialized and configured to perform the whole DCP.
+*   data serialization is done using boost archive
 */
 #include <string>
 #include <vector>
+//boost serializatoin
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+// #include <boost/archive/binary_oarchive.hpp>
+// #include <boost/archive/binary_iarchive.hpp>
+
+
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 #include <numerical_algos/newton_solvers/newton_solver.h>
 
@@ -23,19 +31,22 @@
 #include <deflation/solution_storage.h>
 #include <deflation/deflation.hpp>
 
+
+
 namespace main_classes{
 
 
 template<class VectorOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, template<class , class , class , class , class > class LinearSolver, template<class , class , class , class > class SystemOperator>
 class deflation_continuation
 {
-public:
+private:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
     typedef Monitor monitor_t;
 
+    typedef typename boost::archive::text_oarchive data_output;
+    typedef typename boost::archive::text_iarchive data_input;
 
-private:
     //general linear solver used in continuation and deflation
     typedef numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
         LinearOperator,
@@ -124,8 +135,16 @@ public:
     vec_ops(vec_ops_),
     file_ops(file_ops_),
     log(log_),
-    nonlin_op(nonlin_op_)
+    nonlin_op(nonlin_op_),
+    project_dir(project_dir_)
     {
+        
+        //add '/' to the end of the project dir, if needed
+        
+        if(!project_dir.empty() && *project_dir.rbegin() != '/')
+            project_dir += '/';
+
+
         lin_op = new LinearOperator(nonlin_op);
         precond = new Preconditioner(nonlin_op);
         SM = new sherman_morrison_linear_system_solve_t(precond, vec_ops, log);
@@ -134,7 +153,7 @@ public:
         newton = new newton_t(vec_ops, system_operator, conv_newton);
         knots = new knots_t();
         continuate = new continuate_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
-        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir_, skip_files_);
+        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files_);
         sol_storage_def = new sol_storage_def_t(vec_ops, 50, T(1.0) );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
         deflate = new deflate_t(vec_ops, file_ops, log, nonlin_op, lin_op, SM, sol_storage_def);
     }
@@ -211,7 +230,39 @@ public:
         knots->add_element(knots_);
     }
 
-    void execute()
+
+    void load_data(const std::string& file_name_ = {})
+    {
+        if(!file_name_.empty())
+        {
+            std::ifstream load_file( (project_dir + file_name_).c_str() );
+            if(load_file.good())
+            {
+                data_input ia(load_file);
+                ia >> (*bif_diag);
+                load_file.close();
+                log->info_f("MAIN:deflation_continuation: read data for the bifurcaiton diagram from %s", (project_dir + file_name_).c_str() );
+            }
+            else
+            {
+                log->warning_f("MAIN:deflation_continuation: failed to load saved data for the bifurcaiton diagram %s", (project_dir + file_name_).c_str() );
+            }
+        }
+    }
+
+    void save_data(const std::string& file_name_ = {})
+    {
+        if(!file_name_.empty())
+        {
+            std::ofstream save_file( (project_dir + file_name_).c_str() );
+            data_output oa(save_file);
+            oa << (*bif_diag);
+            save_file.close();
+            log->info_f("MAIN:deflation_continuation: saved data for the bifurcaiton diagram in %s", (project_dir + file_name_).c_str() );
+        }        
+    }
+
+    void execute(const std::string& file_name = {})
     {
         //Algorithm pseudocode:
         //
@@ -231,8 +282,7 @@ public:
         //}
         //
 
-        //sol_storage_def
-   
+        load_data(file_name);
 
         bool is_there_a_next_knot = knots->next();
         T_vec x_deflation; //pointer to the found deflated solution
@@ -241,28 +291,32 @@ public:
         {
             
             T lambda = knots->get_value();
+            sol_storage_def->clear();
+            log->info_f("MAIN:deflation_continuation: currently having %i curves.", bif_diag->current_curve() );
+
+            bif_diag->find_intersection(lambda, sol_storage_def);
+
             bool is_new_solution = deflate->find_solution(lambda);
             if(is_new_solution)
             {
                 number_of_solutions++;
-                log->info_f("MAIN:deflation_continuation: found %i solutions.", number_of_solutions);
+                log->info_f("MAIN:deflation_continuation: found %i solutions for lambda = %lf.", number_of_solutions, double(lambda) );
                 
                 deflate->get_solution_ref(x_deflation);
                 bif_diag_curve_t* bdf;
+                
                 bif_diag->init_new_curve();
                 bif_diag->get_current_ref(bdf);
                 continuate->continuate_curve(bdf, x_deflation, lambda);
+                bif_diag->close_curve();
+                
+                save_data(file_name);
+                
                 bdf->find_intersection(lambda, sol_storage_def);
             }
             else
             {
                 is_there_a_next_knot = knots->next();
-                if(is_there_a_next_knot)
-                {
-                    T lambda = knots->get_value();
-                    sol_storage_def->clear();
-                    bif_diag->find_intersection(lambda, sol_storage_def);
-                }
             }
 
         }
@@ -298,6 +352,7 @@ private:
     continuate_t* continuate;
     deflate_t* deflate;
     sol_storage_def_t* sol_storage_def;
+    std::string project_dir;
 
 };
 

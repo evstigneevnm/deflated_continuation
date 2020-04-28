@@ -2,9 +2,15 @@
 #define __BIFURCATION_DIAGRAM_CURVE_H__
 
 #include <string>
+#include <vector>
 #include <stdexcept>
 #include <fstream>
 #include <iostream>
+
+
+//using boost for serialization
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/string.hpp>
 
 
 namespace container
@@ -18,16 +24,46 @@ struct complex_values
     std::vector<T> vector_norms;
     uint64_t id_file_name;
 
+private:
+    friend class boost::serialization::access;
+
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+        ar & lambda;
+        ar & is_data_avaliable;
+        ar & vector_norms;
+        ar & id_file_name;                        
+    }
+
 };
 
 template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperator, class Newton, class SolutionStorage, class HelperVectors>
 class bifurcation_diagram_curve
 {
-public:
+private:
+    friend class boost::serialization::access;
+
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
 
-    bifurcation_diagram_curve(VectorOperations*& vec_ops_, VectorFileOperations*& vec_files_, Log*& log_, NonlinearOperator*& nlin_op_, Newton*& newton_, int curve_number_, const std::string& directory_,  HelperVectors*& helper_vectors_, unsigned int skip_output_):
+public:
+    //for bost serialization!
+    void set_main_refs(VectorOperations* vec_ops_, VectorFileOperations* vec_files_, Log* log_, NonlinearOperator* nlin_op_, Newton* newton_, HelperVectors* helper_vectors_)
+    {
+        if(!refs_set)
+        {
+            vec_ops = vec_ops_;
+            vec_files = vec_files_;
+            log = log_;
+            nlin_op = nlin_op_;
+            newton = newton_;
+            helper_vectors_->get_refs(x0, x1);
+            refs_set = true;
+        }
+    }
+
+    bifurcation_diagram_curve(VectorOperations* vec_ops_, VectorFileOperations* vec_files_, Log* log_, NonlinearOperator* nlin_op_, Newton* newton_, int curve_number_, const std::string& directory_,  HelperVectors* helper_vectors_, unsigned int skip_output_):
     vec_ops(vec_ops_),
     vec_files(vec_files_),
     log(log_),
@@ -35,6 +71,8 @@ public:
     newton(newton_),
     skip_output(skip_output_)
     {
+        refs_set = true;
+        curve_open = true;
 //        std::cout << "constructor of this " << this << " with "; //std::endl;
 //NOTICE:
 //it constructs these helper vectors every time we add this to the container
@@ -49,16 +87,27 @@ public:
 //        std::cout << "x0 = " << x0 << " x1 = " << x1 << std::endl;
         set_directory(directory_);
         set_curve_number(curve_number_);
-        debug_file.open(debug_f_name.c_str(), std::ofstream::out | std::ofstream::app);
+
+        if(!debug_file.is_open())
+            debug_file.open(debug_f_name.c_str(), std::ofstream::out | std::ofstream::app);
+
+        log->info_f("container::bifurcation_diagram_curve(%i) opened.", curve_number);
     }
     
+    bifurcation_diagram_curve()
+    {
+        //void default constructor for boost serialization
+    }
+
     ~bifurcation_diagram_curve()
     {
 //        std::cout << "distructor of this " << this << " with &x0 = " << x0 << " and &x1 = " << x1 << std::endl;
         //vec_ops->stop_use_vector(x0); vec_ops->free_vector(x0);
         //vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
-        debug_file.close();
+        if(debug_file.is_open())
+            debug_file.close();
     }
+
 
     // bifurcation_diagram_curve(const bifurcation_diagram_curve& that)
     // {
@@ -84,24 +133,30 @@ public:
         else
         {
 //            std::cout << "move assign of that " << &that << " to this " << this << std::endl;
-            std::swap(vec_ops, that.vec_ops);
-            std::swap(vec_files, that.vec_files);
-            std::swap(log, that.log);
-            std::swap(nlin_op, that.nlin_op);
-            std::swap(newton, that.newton);
-            std::swap(data_directory, that.data_directory);
-            std::swap(full_path, that.full_path);
-            std::swap(container, that.container);
-            std::swap(global_id, that.global_id);
-            std::swap(curve_number,that.curve_number);
-            std::swap(x0, that.x0);
-            std::swap(x1, that.x1);
-            std::swap(lambda0, that.lambda0);
-            std::swap(lambda1, that.lambda1);
-            std::swap(skip_output, that.skip_output);
-            std::swap(debug_f_name, that.debug_f_name);
-            std::swap(debug_file, that.debug_file);
+            vec_ops = that.vec_ops;
+            vec_files = that.vec_files;
+            log = that.log;
+            nlin_op = that.nlin_op;
+            newton = that.newton;
+            data_directory = std::move(that.data_directory);
+            full_path = std::move(that.full_path);
+            container = std::move(that.container);
+            global_id = that.global_id;
+            curve_number = that.curve_number;
+            x0 = that.x0;
+            x1 = that.x1;
+            lambda0 = that.lambda0;
+            lambda1 = that.lambda1;
+            skip_output = that.skip_output;
+            debug_f_name  = std::move(that.debug_f_name);
+            debug_file = std::move(that.debug_file);
+            curve_open = that.curve_open;
             return *this;
+            
+            //
+            // Judas Priest \m/
+            // One shut at glory? =)
+            //
         }
     }
 
@@ -118,6 +173,7 @@ private:
     unsigned int skip_output;
     std::string debug_f_name;
     std::ofstream debug_file;
+    bool refs_set = false;
 
 
     inline bool fs_object_exsts(const std::string& name) 
@@ -141,7 +197,7 @@ public:
     void set_curve_number(int curve_number_)
     {
         curve_number = curve_number_;
-        full_path.assign( data_directory.c_str()+std::string("/")+std::to_string(curve_number) );
+        full_path.assign( data_directory.c_str()+std::to_string(curve_number) );
         debug_f_name.assign(full_path.c_str() + std::string("/") + std::string("debug_curve.dat"));
         log->info_f("container::bifurcation_diagram_curve: FULL PATH: %s", full_path.c_str());
         if(!fs_object_exsts(full_path) )
@@ -154,20 +210,26 @@ public:
 
     void add(const T& lambda_, const T_vec& x_, bool force_store = false)
     {
-        std::vector<T> bif_diag_norms;
-        nlin_op->norm_bifurcation_diagram(x_, bif_diag_norms);
-        store_t store_result = store(lambda_, x_, force_store);
+        if(curve_open)
+        {
+            std::vector<T> bif_diag_norms;
+            nlin_op->norm_bifurcation_diagram(x_, bif_diag_norms);
+            store_t store_result = store(lambda_, x_, force_store);
 
-        values_t form_values;
-        form_values.lambda = lambda_;
-        form_values.is_data_avaliable = store_result.first;
-        form_values.id_file_name = store_result.second;
-        form_values.vector_norms = bif_diag_norms;
+            values_t form_values;
+            form_values.lambda = lambda_;
+            form_values.is_data_avaliable = store_result.first;
+            form_values.id_file_name = store_result.second;
+            form_values.vector_norms = bif_diag_norms;
 
-        container.push_back(form_values);
+            container.push_back(form_values);
 
-        print_curve_each();
-    
+            print_curve_each();
+        }
+        else
+        {
+            throw std::runtime_error(std::string("container::bifurcation_diagram_curve: trying to add to a closed curve!") );
+        }    
     }
 
     bool find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)
@@ -181,27 +243,47 @@ public:
             auto &p_jp = container[indp];
             if(intersection(p_j, p_jp, lambda_star))
             {
-                bool stat_l = get_lower(ind);
-                bool stat_u = get_upper(indp);
-                if(stat_l&&stat_u)
+                if((p_j.lambda == lambda_star)&&(p_j.is_data_avaliable))
                 {
-                    if(interpolate_solutions(lambda_star))
-                    {
-                        solution_vector->push_back(x1);
-                        log->info_f("container::bifurcation_diagram_curve(%i): added intersectoin at (%i,%i) for the solution at %lf", curve_number, ind, indp, lambda_star);
-                    }
-                    else
-                    {
-                        //throw std::runtime_error(std::string("container::bifurcation_diagram_curve: newton failed in solution section") );
-                        log->info_f("container::bifurcation_diagram_curve(%i): !!!newton failed in solution section at (%i(%i), %i(%i)) for the solution at %lf !!!", curve_number, ind, int(stat_l), indp, int(stat_u), lambda_star);
-                    }
+                    uint64_t local_id = p_j.id_file_name;
+                    std::string f_name = full_path+std::string("/")+std::to_string(local_id);
+                    vec_files->read_vector(f_name, x1); 
+                    solution_vector->push_back(x1); 
+                    log->info_f("container::bifurcation_diagram_curve(%i): added intersectoin at (%i) for the solution at lambda =  %lf", curve_number, ind, lambda_star);               
+                }
+                else if((p_jp.lambda == lambda_star)&&(p_jp.is_data_avaliable))
+                {
+                    uint64_t local_id = p_jp.id_file_name;
+                    std::string f_name = full_path+std::string("/")+std::to_string(local_id);
+                    vec_files->read_vector(f_name, x1); 
+                    solution_vector->push_back(x1); 
+                    log->info_f("container::bifurcation_diagram_curve(%i): added intersectoin at (%i) for the solution at lambda =  %lf", curve_number, indp, lambda_star);               
+
                 }
                 else
                 {
-                    //std::string fail_find_files = std::string("container::bifurcation_diagram_curve(") + std::to_string(curve_number) + std::string("): failed to find a valid solution for the parameter = ") + std::to_string(lambda_star) + std::string(" with lower flag = ") + std::to_string(stat_l) + std::string(" and upper flag = ") + std::to_string(stat_u) + std::string(", indexing = (") + std::to_string(ind) + std::string(",") + std::to_string(indp) + std::string(").");
-                    log->info_f("container::bifurcation_diagram_curve(%i): !!!failed to add intersectoin at (%i(%i), %i(%i)) for the solution at %lf !!!", curve_number, ind, int(stat_l), indp, int(stat_u), lambda_star);
+                    bool stat_l = get_lower(ind);
+                    bool stat_u = get_upper(indp);
+                    if(stat_l&&stat_u)
+                    {
+                        if(interpolate_solutions(lambda_star))
+                        {
+                            solution_vector->push_back(x1);
+                            log->info_f("container::bifurcation_diagram_curve(%i): added intersectoin at (%i,%i) for the solution at lambda =  %lf", curve_number, ind, indp, lambda_star);
+                        }
+                        else
+                        {
+                            //throw std::runtime_error(std::string("container::bifurcation_diagram_curve: newton failed in solution section") );
+                            log->warning_f("container::bifurcation_diagram_curve(%i): !!!newton failed in solution section at (%i(%i), %i(%i)) for the solution at lambda =  %lf !!!", curve_number, ind, int(stat_l), indp, int(stat_u), lambda_star);
+                        }
+                    }
+                    else
+                    {
+                        //std::string fail_find_files = std::string("container::bifurcation_diagram_curve(") + std::to_string(curve_number) + std::string("): failed to find a valid solution for the parameter = ") + std::to_string(lambda_star) + std::string(" with lower flag = ") + std::to_string(stat_l) + std::string(" and upper flag = ") + std::to_string(stat_u) + std::string(", indexing = (") + std::to_string(ind) + std::string(",") + std::to_string(indp) + std::string(").");
+                        log->warning_f("container::bifurcation_diagram_curve(%i): !!!failed to add intersectoin at (%i(%i), %i(%i)) for the solution at lambda =  %lf !!!", curve_number, ind, int(stat_l), indp, int(stat_u), lambda_star);
 
-                    //throw std::runtime_error( fail_find_files );
+                        //throw std::runtime_error( fail_find_files );
+                    }
                 }
             }
         }
@@ -249,6 +331,17 @@ public:
         f.close();
     }
 
+
+    void close_curve()
+    {
+        
+        container.shrink_to_fit();
+        if(debug_file.is_open())
+            debug_file.close();
+        curve_open = false; 
+        log->info_f("container::bifurcation_diagram_curve(%i) closed.", curve_number); 
+    }
+
 //TODO: function that adds to a specific file at every step for monitoring.
     
 
@@ -256,12 +349,14 @@ public:
     void delete_ponts(const int& lambda_min, const int& lambda_max)
     {
 
+
     }
 
 private:
     typedef std::pair<bool, uint64_t> store_t;
     typedef complex_values<T> values_t;
     typedef std::vector<values_t> b_d_container_t;
+    
     b_d_container_t container;
     uint64_t global_id = 0; 
     uint64_t global_index = 0;
@@ -269,6 +364,25 @@ private:
     T_vec x0 = nullptr;
     T_vec x1 = nullptr;
     T lambda0, lambda1;
+    bool curve_open;
+
+
+    //boost serialization
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+        ar & data_directory;
+        ar & curve_number;
+        ar & full_path;     // do we need it???
+        ar & skip_output;   
+        ar & debug_f_name; 
+        ar & container;
+        ar & global_id;
+        ar & global_index;
+        ar & curve_open;
+
+        //should we add x0 and x1? we won't be able to continue the curve unless these are added
+    }
 
     store_t store(const T& lambda_, const T_vec& x_, bool force_store_)
     {

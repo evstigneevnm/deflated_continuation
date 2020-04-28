@@ -1,16 +1,22 @@
 #ifndef __KNOTS_HPP__
 #define __KNOTS_HPP__
 
+
+
+/**
+*   Class that contains knots that are used to perform deflation and continuation check of itersections.
+*
+*/
+
+
+
 #include <string>
 #include <stdexcept>
 #include <vector>
 #include <map>
 #include <algorithm>
 
-/**
-*	Class that contains knots that are used to perform deflation and continuation check of itersections.
-*
-*/
+
 
 namespace container
 {
@@ -21,10 +27,14 @@ class knots  //contains knots at which deflation is considered
 {
 private:
     typedef typename std::vector<T> container_t;
-    container_t container;  
     typedef typename container_t::iterator iterator_t;
     typedef typename container_t::const_iterator const_iterator_t;
+    
+    container_t container;  
     unsigned int current_position = 0;
+
+
+    
 
     void unique_and_sort()
     {

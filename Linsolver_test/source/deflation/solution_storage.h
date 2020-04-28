@@ -39,7 +39,7 @@ public:
     void push_back(const T_vec& vect)
     {
     
-        container.emplace_back( internal_container(vec_ops, vect) );
+        container.emplace_back(vec_ops, vect);
         elements_number++;
     
     }
