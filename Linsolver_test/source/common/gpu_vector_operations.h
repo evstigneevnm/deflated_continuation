@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iomanip>
 
+
 namespace gpu_vector_operations_type{
 
 template<typename T>
@@ -147,6 +148,19 @@ struct gpu_vector_operations
         if(x!=nullptr)
             host_2_device_cpy<scalar_type>(x, x_host, sz);
     }
+    //sets a vector from a host vector. 
+    void set(vector_type& x_host_, vector_type& x_) const
+    {
+        if(x_!=nullptr)
+            host_2_device_cpy<scalar_type>(x_, x_host_, sz);
+    }    
+
+    //returns a pointer to the allocated host buffer vector. 
+    vector_type get_buffer()
+    {
+        return(x_host);
+    }
+
 
 
     // DEBUG! This plots the vector at request to the file on disk!
@@ -162,7 +176,8 @@ struct gpu_vector_operations
         check_file.close();
     }
 
-    //DEBUG!
+    //DEBUG ENDS!
+
     bool check_is_valid_number(const vector_type &x)const;
     // dot product of two vectors
     scalar_type scalar_prod(const vector_type &x, const vector_type &y)const
@@ -296,7 +311,8 @@ struct gpu_vector_operations
         /* Generate n doubles on device */
         curandGenerateUniformDistribution(gen, vec, sz);    
         CURAND_SAFE_CALL(curandDestroyGenerator(gen));
-
+        Tsc v_norm = norm_l2(vec);
+        scale(T(v_norm), vec);
     }
 
 

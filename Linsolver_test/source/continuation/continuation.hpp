@@ -354,8 +354,8 @@ private:
         }
         catch(const std::exception& e)
         {
-            throw std::runtime_error(std::string("continuation::start_semicurve:") + std::string(e.what()) );
-//            log->info_f("continuation::start_semicurve: %s\n", e.what());
+//            throw std::runtime_error(std::string("continuation::start_semicurve:") + std::string(e.what()) );
+            log->warning_f("continuation::start_semicurve: %s\n", e.what());
             break_semicurve++;
             fail_flag = true;
         }

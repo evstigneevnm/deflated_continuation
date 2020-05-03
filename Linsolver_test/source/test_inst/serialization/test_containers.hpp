@@ -46,8 +46,16 @@ public:
 
     void set_refs(VecOps* vec_ops_, VecFiles* vec_files_)
     {
-        vec_ops = vec_ops_;
-        vec_files = vec_files_;
+        if(!refs_set)
+        {
+            vec_ops = vec_ops_;
+            vec_files = vec_files_;
+            refs_set = true;
+        }
+        else
+        {
+            std::cout << "set_refs call: refs already set." << std::endl;
+        }
     }
 
     curve_container(VecOps* vec_ops_, VecFiles* vec_files_, const std::string& directory_, int id_):
@@ -57,6 +65,7 @@ public:
     curve_id(id_)
     {
         open = true;
+        refs_set = true;
     }
     
     curve_container() //default constructor for boost
@@ -175,6 +184,7 @@ private:
     uint64_t global_id = 0;
     int curve_id;
     bool open = false;
+    bool refs_set = false;
 
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)

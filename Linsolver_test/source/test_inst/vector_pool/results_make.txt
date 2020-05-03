@@ -1,0 +1,25 @@
+nvcc warning : The 'compute_20', 'sm_20', and 'sm_21' architectures are deprecated, and may be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+../../../source/external_libraries/cublas_wrap.h(562): warning: type qualifier is meaningless on cast type
+
+../../../source/external_libraries/cublas_wrap.h(577): warning: type qualifier is meaningless on cast type
+
+../../../source/external_libraries/cublas_wrap.h(591): warning: type qualifier is meaningless on cast type
+
+../../../source/external_libraries/cublas_wrap.h(605): warning: type qualifier is meaningless on cast type
+
+../../../source/external_libraries/cublas_wrap.h(619): warning: type qualifier is meaningless on cast type
+
+../../../source/external_libraries/cublas_wrap.h(634): warning: type qualifier is meaningless on cast type
+
+../../../source/external_libraries/cublas_wrap.h(562): warning: type qualifier is meaningless on cast type
+
+../../../source/external_libraries/cublas_wrap.h(577): warning: type qualifier is meaningless on cast type
+
+../../../source/external_libraries/cublas_wrap.h(591): warning: type qualifier is meaningless on cast type
+
+../../../source/external_libraries/cublas_wrap.h(605): warning: type qualifier is meaningless on cast type
+
+../../../source/external_libraries/cublas_wrap.h(619): warning: type qualifier is meaningless on cast type
+
+../../../source/external_libraries/cublas_wrap.h(634): warning: type qualifier is meaningless on cast type
+

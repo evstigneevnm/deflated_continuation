@@ -5,10 +5,10 @@
 #include <utils/cuda_support.h>
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D.h>
-#include "macros.h"
-#include "gpu_file_operations.h"
-#include "gpu_vector_operations.h"
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D.h>
+#include <common/macros.h>
+#include <common/gpu_file_operations.h>
+#include <common/gpu_vector_operations.h>
 
 #define Blocks_x_ 64
 #define Blocks_y_ 16
@@ -60,6 +60,30 @@ int main(int argc, char const *argv[])
     real_vec u_out_ph;
     vec_ops_R->init_vector(u_out_ph); vec_ops_R->start_use_vector(u_out_ph);
 
+    complex_vec vec_C_on_host, vec_C_on_device;
+
+    size_t NNN = vec_ops_C->get_vector_size();
+    vec_C_on_host = (complex_vec) malloc( NNN*sizeof(complex) );
+    vec_ops_C->init_vector(vec_C_on_device); vec_ops_C->start_use_vector(vec_C_on_device);
+    for(int j=0;j<NNN;j++)
+    {
+        vec_C_on_host[j] = complex(0,-j);
+    }
+
+    vec_ops_C->set(vec_C_on_host, vec_C_on_device);
+
+    for(int j=NNN-10;j<NNN;j++)
+    {
+        complex_vec val_vec_l = vec_ops_C->view(vec_C_on_device);
+
+        printf("%le ", double(vec_C_on_host[j].imag() - val_vec_l[j].imag()) );
+    }
+
+    vec_ops_C->stop_use_vector(vec_C_on_device); vec_ops_C->free_vector(vec_C_on_device);
+
+    free(vec_C_on_host);
+
+
     complex_vec uC_in, uC_out;
     vec_ops_C->init_vector(uC_in); vec_ops_C->start_use_vector(uC_in);
     vec_ops_C->init_vector(uC_out); vec_ops_C->start_use_vector(uC_out);
@@ -78,9 +102,9 @@ int main(int argc, char const *argv[])
     KS2D->physical_solution(u_out, u_out_ph);
 
     // gpu_file_operations::write_matrix<complex>("uC_out_M.dat",  My, Nx, uC_out, 3);
-    gpu_file_operations::write_vector<complex>("uC_out.dat",  My*Nx, uC_out, 3);
-    gpu_file_operations::write_vector<real>("u_im_out.dat", Nx*My-1, u_out, 3);
-    gpu_file_operations::write_matrix<real>("u_out.dat", Nx, Ny, u_out_ph, 3);
+    // gpu_file_operations::write_vector<complex>("uC_out.dat",  My*Nx, uC_out, 3);
+    // gpu_file_operations::write_vector<real>("u_im_out.dat", Nx*My-1, u_out, 3);
+    // gpu_file_operations::write_matrix<real>("u_out.dat", Nx, Ny, u_out_ph, 3);
 
     vec_ops_R->stop_use_vector(u_out_ph); vec_ops_R->free_vector(u_out_ph);
     vec_ops_R_im->stop_use_vector(u_in); vec_ops_R_im->free_vector(u_in);

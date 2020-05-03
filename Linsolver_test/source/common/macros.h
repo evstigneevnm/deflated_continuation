@@ -7,4 +7,16 @@
 #endif
 
 
+#ifndef _I3
+    #define _I3(i, j, k, Nx, Ny, Nz) (i)*(Ny*Nz) + (j)*(Nz) + (k)
+#endif
+
+#ifndef I3 //default for Nx, Ny, Nz
+    #define I3(i, j, k) _I3(i, j, k, Nx, Ny, Nz)
+#endif
+
+#ifndef I3P
+	#define I3P(i, j, k) (Ny*Nz)*((i)>(Nx-1)?(i)-Nx:(i)<0?(Nx+(i)):(i))+((j)>(Ny-1)?(j)-Ny:(j)<0?(Ny+(j)):(j))*(Nz)+((k)>(Nz-1)?(k)-Nz:(k)<0?(Nz+(k)):(k))
+#endif
+
 #endif

@@ -1,0 +1,14 @@
+#0:   Tesla C2050, pci-bus id:1 0 0 
+       using it...
+=--=
+3162.28
+del 316.228
+del 31.6228
+del 31.6228
+del 31.6228
+del 31.6228
+del 31.6228
+del 31.6228
+del 31.6228
+del 31.6228
+del 

@@ -1,5 +1,5 @@
-#ifndef __POS_TM_OUTPUT_H__
-#define __POS_TM_OUTPUT_H__
+#ifndef __POS_BIF_DIAG_OUTPUT_H__
+#define __POS_BIF_DIAG_OUTPUT_H__
 
 #include "taylor_model.h"
 
@@ -138,4 +138,4 @@ void    print_res(FILE *stream, const prooving_algos::taylor_model_operations<De
         ops.free_taylor_model(tmp1); ops.free_taylor_model(tmp2);
 }
 
-#endif
+#endif //__POS_BIF_DIAG_OUTPUT_H__

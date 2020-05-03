@@ -238,6 +238,7 @@ public:
             std::ifstream load_file( (project_dir + file_name_).c_str() );
             if(load_file.good())
             {
+                log->info_f("MAIN:deflation_continuation: reading data for the bifurcaiton diagram from %s ...", (project_dir + file_name_).c_str() );
                 data_input ia(load_file);
                 ia >> (*bif_diag);
                 load_file.close();
@@ -254,6 +255,7 @@ public:
     {
         if(!file_name_.empty())
         {
+            log->info_f("MAIN:deflation_continuation: saving data for the bifurcaiton diagram in %s ...", (project_dir + file_name_).c_str() );
             std::ofstream save_file( (project_dir + file_name_).c_str() );
             data_output oa(save_file);
             oa << (*bif_diag);

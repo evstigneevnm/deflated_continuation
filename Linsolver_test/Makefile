@@ -1,4 +1,6 @@
-#once i was framed by autoconf (found two different gcc's for different libraries, cost me 2 days), so now i use all by hand
+#once i was framed by autoconf (found two different gcc's for different libraries, cost me 2 days), 
+#so now i use all by hand
+
 #set these variables for your local machine
 SCALAR_TYPE =-DSCALAR_TYPE=double
 NVCC = /usr/local/cuda/bin/nvcc
@@ -8,10 +10,13 @@ NVCCFLAGS = -Wno-deprecated-gpu-targets -g -arch=sm_20 -std=c++11
 GCCFLAGS = -g -std=c++11
 ICUDA = -I/usr/local/cuda
 IPROJECT = -I source/
+IBOOST = -I/usr/local/boost_1_66_0
 
 LCUDA = -L/usr/local/cuda/lib64
+LBOOST = -L/usr/local/boost_1_66_0/lib
 LIBS1 = -lcublas -lcurand 
 LIBS2 = -lcufft -lcublas -lcurand 
+LIBBOOST = -lboost_serialization
 
 #all targets
 cpu_1st_call_alloc_test: source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp
@@ -42,9 +47,8 @@ gpu_vector_operations_ker:
 KS_2D_ker:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D_ker.cu -c -o O/Kuramoto_Sivashinskiy_2D_ker.o 2>results_make.txt
 
-KS_2D: source/Kuramoto_Sivashinskiy_2D_RHS.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D_ker.cu -c -o O/Kuramoto_Sivashinskiy_2D_ker.o 2>results_make.txt
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/Kuramoto_Sivashinskiy_2D_RHS.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D_RHS.bin 2>results_make.txt
+KS_2D: source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/test_Kuramoto_Sivashinskiy_2D_RHS.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_Kuramoto_Sivashinskiy_2D_RHS.bin 2>results_make.txt
 
 deflation_KS_2D: source/test_deflation.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/test_deflation.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_deflation.bin 2>results_make.txt
@@ -62,4 +66,12 @@ circle_bd: source/circle_bd.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/circle_bd.cpp O/circle_ker.o O/gpu_vector_operations_kernels.o $(LIBS1) -o circle_bd.bin 2>results_make.txt	
 
 KS_bd: source/KS_bd.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/KS_bd.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o $(LIBS2) -o KS_bd.bin 2>results_make.txt	
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/KS_bd.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBBOOST) $(LIBS2)  -o KS_bd.bin 2>results_make.txt	
+
+Kolmogorov_3D_ker: source/nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D_ker.cu
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D_ker.cu -c -o O/Kolmogorov_3D_ker.o 2>results_make.txt
+
+Kolmogorov_3D: source/test_Kolmogorov_3D_RHS.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/test_Kolmogorov_3D_RHS.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_Kolmogorov_3D_RHS.bin 2>results_make.txt
+
+Kolmogorov_3D_all: Kolmogorov_3D_ker Kolmogorov_3D

@@ -157,6 +157,12 @@ void device_allocate_all(int Nx, int Ny, int Nz, int count, ...)
 }
 
 template <class T>
+void device_deallocate(T* array)
+{
+    CUDA_SAFE_CALL(cudaFree(array));
+}
+
+template <class T>
 void device_deallocate_all(int count, ...)
 {
 

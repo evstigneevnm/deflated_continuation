@@ -337,7 +337,7 @@ public:
         T val5 = vec_ops_R_im->norm_l2(u_in);
         
         res.clear();
-        res.reserve(4);
+        res.reserve(5);
         res.push_back(val1);
         res.push_back(val2);
         res.push_back(val3);
