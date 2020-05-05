@@ -76,7 +76,7 @@ public:
         nonlin_op->F(x, lambda, Fx);
         T normFx = vec_ops->norm_l2(Fx);
         //update solution
-        vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
+        vec_ops->assign_mul(T(1.0), x, newton_wight, delta_x, x1);
         nonlin_op->F(x1, lambda, Fx);
         T normFx1 = vec_ops->norm_l2(Fx);
         if(store_norms_history)

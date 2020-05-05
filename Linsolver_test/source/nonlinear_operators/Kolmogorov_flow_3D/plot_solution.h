@@ -38,7 +38,7 @@ public:
 
     }
 
-    void write_to_disk(const std::string& f_name, const T_vec& u_d)
+    void write_to_disk(const std::string& f_name, const T_vec& u_d, int what = 2)
     {
         
         size_t sz = Nx*Ny*Nz;
@@ -47,12 +47,12 @@ public:
         device_2_host_cpy<T>(u_h, u_d, sz);
 
 
-        write_out_file_pos(f_name, u_h, Nx, Ny, Nz, 2);
+        write_out_file_pos(f_name, u_h, Nx, Ny, Nz, what);
 
         free(u_h);
     }
 
-    void write_to_disk(const std::string& f_name, const T_vec& ux_d, const T_vec& uy_d, const T_vec& uz_d)
+    void write_to_disk(const std::string& f_name, const T_vec& ux_d, const T_vec& uy_d, const T_vec& uz_d, int what = 2)
     {
         size_t sz = Nx*Ny*Nz;
         T_vec ux_h = (T_vec) malloc(sizeof(T)*sz);
@@ -64,7 +64,7 @@ public:
         device_2_host_cpy<T>(uz_h, uz_d, sz);
 
 
-        write_out_file_pos(f_name, ux_h, uy_h, uz_h, Nx, Ny, Nz, 2);
+        write_out_file_pos(f_name, ux_h, uy_h, uz_h, Nx, Ny, Nz, what);
 
         free(ux_h);
         free(uy_h);

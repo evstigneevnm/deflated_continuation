@@ -195,7 +195,7 @@ public:
         BC_vec* W = pool_BC.take(); //output        
 
         V2C(u, *U);
-        F(*U, Reynolds_, *W);
+        F(*U, Reynolds_, *W); 
         C2V(*W, v);
 
         pool_BC.release(U);
@@ -204,17 +204,19 @@ public:
     //   F(u,alpha)=v
     void F(const BC_vec& U, const T Reynolds_, BC_vec& W)
     {
+        // vec_ops_C->assign_scalar(0.0,W.x);
+        // vec_ops_C->assign_scalar(0.0,W.y);
+        // vec_ops_C->assign_scalar(0.0,W.z);
         B_V_nabla_F(U, U, W); //W:= (U, nabla) U
         kern->add_mul3(TC(-1.0,0), force.x, force.y, force.z, W.x, W.y, W.z); // force:= W-force
-        kern->negate3(W.x, W.y, W.z); //W:=-W;
         project(W); // W:=P[W]
+        kern->negate3(W.x, W.y, W.z); //W:=-W;
         // U := \nabla^2 U
         kern->apply_Laplace(TR(1.0/Reynolds_), Laplace, U.x, U.y, U.z);
         // W := W + U
         kern->add_mul3(TC(1.0,0), U.x, U.y, U.z, W.x, W.y, W.z);   
+        
     }
-
-
 
     //sets (u_0, alpha_0) for jacobian linearization
     //stores alpha_0, u_0  MUST NOT BE CHANGED!!!
@@ -232,15 +234,20 @@ public:
     {
     // dV:=P[-(U_0, \nabla) dU - (dU, \nabla) U0] + nu*\nabla^2 dU
         BC_vec* dW = pool_BC.take(); //input        
-        B_V_nabla_F(dU, U_0, dV); //dV:= (dU, nabla) U_0
-        B_V_nabla_F(U_0, dU, *dW); //dW:= (U_0, nabla) dU
+        
+        B_V_nabla_F(U_0, dU, dV); //dV:= (dU, nabla) U_0
+        B_V_nabla_F(dU, U_0,*dW); //dW:= (U_0, nabla) dU
         kern->add_mul3(TC(1.0,0), dW->x, dW->y, dW->z, dV.x, dV.y, dV.z); // dV:=dV+dW
-        pool_BC.release(dW); 
+
         kern->negate3(dV.x, dV.y, dV.z); // dV:=-dV
         project(dV); // dV:=P[dV]
+        // vec_ops_C->assign_scalar(0.0,dV.x);
+        // vec_ops_C->assign_scalar(0.0,dV.y);
+        // vec_ops_C->assign_scalar(0.0,dV.z);
         kern->apply_Laplace(TR(1.0/Reynolds_0), Laplace, dU.x, dU.y, dU.z); // dU:=nu*\nabla^2 dU
         kern->add_mul3(TC(1.0,0), dU.x, dU.y, dU.z, dV.x, dV.y, dV.z); // dV:=dU+dV
-
+ 
+        pool_BC.release(dW); 
     }
 
     void jacobian_u(const T_vec& du, T_vec& dv)
@@ -269,6 +276,7 @@ public:
     void jacobian_alpha(const BC_vec& U0, const T& Reynolds_0_, BC_vec& dV)
     {
           
+        kern->copy3(U0.x, U0.y, U0.z, dV.x, dV.y, dV.z);
         kern->apply_Laplace(TR(-1.0/(Reynolds_0_*Reynolds_0_)), Laplace, dV.x, dV.y, dV.z);
 
     }
@@ -277,7 +285,7 @@ public:
     {
         BC_vec* dV = pool_BC.take();
         V2C(dv, *dV);
-        jacobian_alpha(*dV);
+        jacobian_alpha(*dV); 
         C2V(*dV, dv);
         pool_BC.release(dV);
     }
@@ -385,7 +393,7 @@ public:
         pool_BC.release(UC0);
         pool_BR.release(UR0);
 
-        plot->write_to_disk(f_name, u_out->x);
+        plot->write_to_disk(f_name, u_out->x, 2 );
 
         pool_R.release(u_out);
 
@@ -399,14 +407,47 @@ public:
 
         physical_solution(u_in, UR0->x, UR0->y, UR0->z);
 
-        plot->write_to_disk(f_name, UR0->x, UR0->y, UR0->z);
+        plot->write_to_disk(f_name, UR0->x, UR0->y, UR0->z, 2);
 
         pool_BR.release(UR0);
 
     }
 
 
-    void randomize_vector(T_vec& u_out, int steps_ = 1)
+    void ABC_exact_solution(const T Reynolds, T_vec u_out)
+    {
+        BC_vec* UA = pool_BC.take();
+        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.x, UA->x);
+        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.y, UA->y);
+        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.z, UA->z);        
+        C2V(*UA, u_out);
+        pool_BC.release(UA);
+    }
+
+    void B_ABC_exact_solution(T_vec u_out)
+    {
+        BR_vec* UR = pool_BR.take();
+        kern->B_ABC_exact(1.0, UR->x, UR->y, UR->z);
+
+        BC_vec* UC = pool_BC.take();
+        fft(*UR, *UC);
+        project(*UC);
+        C2V(*UC, u_out);
+        pool_BR.release(UR);
+        pool_BC.release(UC);
+    }
+
+    void B_ABC_approx_solution(T_vec u_out)
+    {
+        BC_vec* UC = pool_BC.take();
+        B_V_nabla_F(forceABC, forceABC, *UC);
+        project(*UC);
+        C2V(*UC, u_out);
+        pool_BC.release(UC);
+    } 
+
+
+    void randomize_vector(T_vec u_out, int steps_ = 2)
     {
         
         BC_vec* UC0 = pool_BC.take();
@@ -415,17 +456,25 @@ public:
         vec_ops_R->assign_random(UR0->x);
         vec_ops_R->assign_random(UR0->y);
         vec_ops_R->assign_random(UR0->z);
+        
+        // vec_ops_R->assign_scalar(0, UR0->y);
+        // vec_ops_R->assign_scalar(0, UR0->z);
+
         fft(*UR0, *UC0);
+        imag_vec(*UC0);
+        project(*UC0);
         for(int st=0;st<steps_;st++)
         {
             smooth(TR(0.1), *UC0);
         }
-        imag_vec(*UC0);
-        project(*UC0);
+
+
         C2V(*UC0, u_out);
-        
         pool_BC.release(UC0);
-        pool_BR.release(UR0);
+        pool_BR.release(UR0);     
+
+        std::cout << "div norm = " << div_norm(u_out);
+        write_solution_vec("vec_i.pos", u_out);
     }
     
 
@@ -474,6 +523,7 @@ private:
 
     BC_vec force;
     BC_vec forceABC;
+    BR_vec forceABC_R;
 
     TC_vec mask23;
 
@@ -488,12 +538,14 @@ private:
         vec_ops_C->stop_use_vector(mask23);  vec_ops_C->free_vector(mask23);         
         force.free();
         forceABC.free();
+        forceABC_R.free();
         U_0.free();
 
         pool_R.free_all();
         pool_C.free_all();    
         pool_BR.free_all();
         pool_BC.free_all();
+
 
 
     }
@@ -509,6 +561,7 @@ private:
         vec_ops_C->init_vector(mask23);  vec_ops_C->start_use_vector(mask23);
         force.alloc(vec_ops_C);
         forceABC.alloc(vec_ops_C);
+        forceABC_R.alloc(vec_ops_R);
         U_0.alloc(vec_ops_C);
 
         //adjust pool sizes!!!
@@ -520,6 +573,7 @@ private:
 
 
     }
+
 
     //advection operator in classical form as F := ((V, \nabla) F).
     //V, F and ret are block vectors.
@@ -649,11 +703,11 @@ private:
     {
         kern->force_Fourier(1, force.x, force.y, force.z);
         
-        BR_vec* FR = pool_BR.take();
-        kern->force_ABC(FR->x, FR->y, FR->z);
+        
+        kern->force_ABC(forceABC_R.x, forceABC_R.y, forceABC_R.z);
 
-        fft(*FR, forceABC);
-        pool_BR.release(FR);
+        fft(forceABC_R, forceABC);
+
 
     }
 

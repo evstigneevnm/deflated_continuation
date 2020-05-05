@@ -61,6 +61,7 @@ public:
 
     bool check_convergence(NonlinearOperator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status)
     {
+    
         bool finish = false;
         nonlin_op->F(x, lambda, Fx);
         T normFx = vec_ops->norm_l2(Fx);

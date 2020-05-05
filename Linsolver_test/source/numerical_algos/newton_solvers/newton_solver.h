@@ -39,8 +39,8 @@ public:
     {
         
         int result_status = 1;
-        T delta_lambda = T(1);
-        vec_ops->assign_scalar(T(1), delta_x);
+        
+        vec_ops->assign_scalar(T(0.0), delta_x);
         bool converged = false;
         bool finished = false;
         bool linsolver_converged;

@@ -382,7 +382,8 @@ if ( index_in < sizeOfData )
 
     T lap = Laplace[I3(j,k,l)].real(); //Laplace is assumed to have 1 at the zero wavenumber!
 
-    v[I3(j,k,l)]*=coeff/lap;
+    v[I3(j,k,l)]*=TC(coeff/lap,0);
+    v[0] = TC(0,0);
 
 
 
@@ -420,7 +421,9 @@ if ( index_in < sizeOfData )
     v_y[I3(j,k,l)]*=coeff/lap;
     v_z[I3(j,k,l)]*=coeff/lap;
 
-
+    v_x[0] = TC(0,0);
+    v_y[0] = TC(0,0);
+    v_z[0] = TC(0,0);
 
 }
 }
@@ -472,6 +475,7 @@ __global__ void add_mul3_kernel(size_t N, TC alpha, TC_vec u_x, TC_vec u_y, TC_v
     v_x[i]+=alpha*u_x[i];
     v_y[i]+=alpha*u_y[i];
     v_z[i]+=alpha*u_z[i];
+    
 
 }
 
@@ -568,6 +572,7 @@ if ( index_in < sizeOfData )
     TC u2l = u2[I3(j,k,l)];
     TC u3l = u3[I3(j,k,l)];
     TC mask_l = mask[I3(j,k,l)];
+    //TC gx = 1, gy = 1, gz = 1, mask_l = 1;
 
     v1_x[I3(j,k,l)] = gx*u1l*mask_l;
     v1_y[I3(j,k,l)] = gy*u1l*mask_l;
@@ -580,6 +585,18 @@ if ( index_in < sizeOfData )
     v3_x[I3(j,k,l)] = gx*u3l*mask_l;
     v3_y[I3(j,k,l)] = gy*u3l*mask_l;
     v3_z[I3(j,k,l)] = gz*u3l*mask_l;
+
+    v1_x[0] = TC(0,0);
+    v1_y[0] = TC(0,0);
+    v1_z[0] = TC(0,0);
+    
+    v2_x[0] = TC(0,0);
+    v2_y[0] = TC(0,0);
+    v2_z[0] = TC(0,0);
+    
+    v3_x[0] = TC(0,0);
+    v3_y[0] = TC(0,0);
+    v3_z[0] = TC(0,0);
 
 }
 }
@@ -620,6 +637,8 @@ if ( index_in < sizeOfData )
     resy[I3(j,k,l)] = vx*Fy_x[I3(j,k,l)] + vy*Fy_y[I3(j,k,l)] + vz*Fy_z[I3(j,k,l)];
 
     resz[I3(j,k,l)] = vx*Fz_x[I3(j,k,l)] + vy*Fz_y[I3(j,k,l)] + vz*Fz_z[I3(j,k,l)];    
+
+    
 
 }
 }
@@ -681,4 +700,50 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::copy3(TC_ve
     copy3_kernel<TC, TC_vec><<<dimGrid1C, dimBlock1>>>(u_x, u_y, u_z, Nx*Ny*Mz, v_x, v_y, v_z);
 
 }
+
+
+
+
+template<typename T, typename T_vec>
+__global__ void B_ABC_exact_kernel(size_t Nx, size_t Ny, size_t Nz, T coeff, T_vec ux, T_vec uy, T_vec uz)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+    
+    T x = T(j)*T(4.0*M_PI)/T(Nx);
+    T y = T(k)*T(2.0*M_PI)/T(Ny);
+    T z = T(l)*T(2.0*M_PI)/T(Nz);
+
+    T sx = coeff*sin(x);
+    T sy = coeff*sin(y);
+    T sz = coeff*sin(z);
+    T cx = coeff*cos(x);
+    T cy = coeff*cos(y);
+    T cz = coeff*cos(z);        
+
+    ux[I3(j,k,l)] = sz*cx*cy*cz - sx*cy*sy*sz;
+    uy[I3(j,k,l)] = sx*cy*cz*cx - sy*cz*sz*sx;
+    uz[I3(j,k,l)] = sy*cy*cx*cz - sz*cx*sx*sy;
+
+}
+}
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::B_ABC_exact(TR coeff, TR_vec ux, TR_vec uy, TR_vec uz)
+{
+
+    B_ABC_exact_kernel<TR, TR_vec><<<dimGridNR, dimBlockN>>>(Nx, Ny, Nz, coeff, ux, uy, uz);
+}
+
+
+
 #endif // __KOLMOGOROV_3D_IMPL_CUH__

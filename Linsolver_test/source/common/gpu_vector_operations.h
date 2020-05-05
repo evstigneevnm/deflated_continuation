@@ -311,8 +311,8 @@ struct gpu_vector_operations
         /* Generate n doubles on device */
         curandGenerateUniformDistribution(gen, vec, sz);    
         CURAND_SAFE_CALL(curandDestroyGenerator(gen));
-        Tsc v_norm = norm_l2(vec);
-        scale(T(v_norm), vec);
+        //Tsc v_norm = norm_l2(vec);
+        //scale(T(v_norm), vec);
     }
 
 

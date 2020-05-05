@@ -38,7 +38,8 @@ public:
         vec_ops->assign(f, b);
         vec_ops->add_mul_scalar(T(0), T(-1), b); //b=-F(x,lambda)
         sol_storage->calc_distance(x, beta, c); //beta = 1/||x-x0_j||, c = (x-x0_j)
-        flag_lin_solver = SM_solver->solve(beta, *lin_op, T(1), c, f, b, d_x);
+        std::cout << "distance = " << beta << " ";
+        flag_lin_solver = SM_solver->solve(beta, *lin_op, T(1.0), c, f, b, d_x);
         d_lambda = 0;
         return flag_lin_solver;
     }

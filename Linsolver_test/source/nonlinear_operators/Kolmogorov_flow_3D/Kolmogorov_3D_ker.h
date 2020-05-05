@@ -70,7 +70,7 @@ struct Kolmogorov_3D_ker
 
     void copy3(TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z);
 
-
+    void B_ABC_exact(TR coeff, TR_vec ux, TR_vec uy, TR_vec uz);
 
 private:
     unsigned int BLOCKSIZE_x, BLOCKSIZE_y, BLOCKSIZE;

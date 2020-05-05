@@ -17,9 +17,10 @@ public:
     typedef typename VectorOperations::vector_type  T_vec;
 
     
-    solution_storage(VectorOperations*& vec_ops_, int number_of_solutions_, T norm_weight_):
+    solution_storage(VectorOperations*& vec_ops_, int number_of_solutions_, T norm_weight_, T P_ = T(2.0)):
     vec_ops(vec_ops_),
-    norm_weight(norm_weight_)
+    norm_weight(norm_weight_),
+    P(P_)
     {
         //reserve elements in container
         //each is of size about 60 bytes => can reserve more =)
@@ -54,7 +55,7 @@ public:
         return elements_number;
     }
 
-    void calc_distance(const T_vec& x, T& beta, T_vec& c, int P = 2)
+    void calc_distance(const T_vec& x, T& beta, T_vec& c)
     {
         calc_distance_norms(x, c, P);
         beta = distance;
@@ -66,16 +67,17 @@ private:
     T distance = 1;
     T_vec distance_help;
     T norm_weight;
+    T P; //power of the distance
 
     unsigned int elements_number = 0;
     VectorOperations* vec_ops;
     
-    void calc_distance_norms(const T_vec& x, T_vec& c, int p)
+    void calc_distance_norms(const T_vec& x, T_vec& c, const T p)
     {
         T distance_der;
 
-        distance = T(1)/(std::pow(vec_ops->norm_l2(x),p)*(elements_number+1));
-        distance_der = T(p)/(std::pow(vec_ops->norm_l2(x), p+2)*(elements_number+1));
+        distance = T(1)/(std::pow(vec_ops->norm_l2(x),p)*(elements_number+1)); //distance to zero
+        distance_der = T(p)/(std::pow(vec_ops->norm_l2(x), p+T(2.0))*(elements_number+1)); //distance to zero
         //calc: y := mul_x*x
         // c = distance_der*(x-0)
         vec_ops->assign_mul(distance_der/norm_weight, x, c);
@@ -87,7 +89,7 @@ private:
             vec_ops->assign_mul(T(1), x, T(-1), container[j].get_ref(), distance_help);
 
             distance += T(1)/(std::pow(vec_ops->norm_l2(distance_help),p)*(elements_number+1));
-            distance_der = T(p)/(std::pow(vec_ops->norm_l2(distance_help),p+2)*(elements_number+1));
+            distance_der = T(p)/(std::pow(vec_ops->norm_l2(distance_help),p+T(2.0))*(elements_number+1));
             //calc: y := mul_x*x + mul_y*y
             //c := c + distance_der*distance_help
             vec_ops->add_mul(distance_der/norm_weight, distance_help, T(1), c);
