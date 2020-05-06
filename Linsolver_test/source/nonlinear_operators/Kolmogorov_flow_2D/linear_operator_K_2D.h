@@ -1,5 +1,5 @@
-#ifndef __LINEAR_OPERATOR_K_3D_H__
-#define __LINEAR_OPERATOR_K_3D_H__
+#ifndef __LINEAR_OPERATOR_K_2D_H__
+#define __LINEAR_OPERATOR_K_2D_H__
 
 /**
 *   Helper class for iterative linear solver
@@ -13,18 +13,18 @@ namespace nonlinear_operators
 
 
 template<class vector_operations, class nonlinear_operator> 
-class linear_operator_K_3D
+class linear_operator_K_2D
 {
 public:    
     typedef typename vector_operations::scalar_type  T;
     typedef typename vector_operations::vector_type  T_vec;
 
-    linear_operator_K_3D(nonlinear_operator*& nonlin_op_): 
+    linear_operator_K_2D(nonlinear_operator*& nonlin_op_): 
     nonlin_op(nonlin_op_)
     {
 
     }
-    ~linear_operator_K_3D()
+    ~linear_operator_K_2D()
     {
 
     }

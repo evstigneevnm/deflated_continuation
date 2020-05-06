@@ -22,7 +22,7 @@ private:
 //    typedef utils::logged_obj_base<Logging> logged_obj_t;
 
 public:    
-    convergence_strategy(VectorOperations*& vec_ops_, Logging*& log_, T tolerance_ = 1.0e-6, unsigned int maximum_iterations_ =100, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true):
+    convergence_strategy(VectorOperations*& vec_ops_, Logging*& log_, T tolerance_ = 1.0e-6, unsigned int maximum_iterations_ = 100, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true):
     vec_ops(vec_ops_),
     log(log_),
     iterations(0),
@@ -39,6 +39,7 @@ public:
         {
             norms_evolution.reserve(maximum_iterations);
         }
+        stagnation_max = 10;
     }
     ~convergence_strategy()
     {
@@ -46,13 +47,14 @@ public:
         vec_ops->stop_use_vector(Fx); vec_ops->free_vector(Fx);
     }
 
-    void set_convergence_constants(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true)
+    void set_convergence_constants(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true, unsigned int stagnation_max_ = 10)
     {
         tolerance = tolerance_;
         maximum_iterations = maximum_iterations_;
         newton_wight = newton_wight_;
         store_norms_history = store_norms_history_;
         verbose = verbose_;
+        stagnation_max = stagnation_max_;
         if(store_norms_history)
         {
             norms_evolution.reserve(maximum_iterations);
@@ -76,27 +78,27 @@ public:
         }
 
         iterations++;
-        log->info_f("convergence_strategy::iteration %i, previous residual %le, current residual %le",iterations, (double)normFx, (double)normFx1);
+        log->info_f("deflation::convergence: iteration %i, residuals n: %le, n+1: %le",iterations, (double)normFx, (double)normFx1);
 
         if(std::isnan(normFx))
         {
-            log->info("convergence_strategy::Newton initial vector caused nan.");
+            log->error("deflation::convergence: Newton initial vector caused nan.");
             finish = true;
             result_status = 3;
         }
         else if(std::isnan(normFx1))
         {
-            log->info("convergence_strategy::Newton updated vector caused nan.");
+            log->error("deflation::convergence: Newton updated vector caused nan.");
             finish = true;
             result_status = 3;
         }else if(std::isinf(normFx))
         {
-            log->info("convergence_strategy::Newton initial vector caused inf.");
+            log->error("deflation::convergence: Newton initial vector caused inf.");
             finish = true;
             result_status = 2;            
         }else if(std::isinf(normFx1))
         {
-            log->info("convergence_strategy::Newton update caused inf.");
+            log->error("deflation::convergence: Newton update caused inf.");
             finish = true;
             result_status = 2;            
         }else
@@ -107,17 +109,26 @@ public:
         }
         if(normFx1<tolerance)
         {
-            log->info_f("convergence_strategy::Newton converged with %le for %i iterations.", (double)normFx1, iterations);
+            log->info_f("deflation::convergence: Newton converged with %le for %i iterations.", (double)normFx1, iterations);
             result_status = 0;
             finish = true;
         }
         else if(iterations>=maximum_iterations)
         {
-            log->info_f("convergence_strategy::Newton max iterations (%i) reached with norm %le", iterations, (double)normFx1);
+            log->warning_f("deflation::convergence: Newton max iterations (%i) reached with norm %le", iterations, (double)normFx1);
             result_status = 1;
             finish = true;
         }
-
+        if( std::abs(normFx-normFx1)<1.0e-6)
+        {
+            stagnation++;
+        }
+        if(stagnation>stagnation_max)
+        {   
+            log->warning_f("deflation::convergence: Newton stagnated at iteration(%i) with norm %le", iterations, (double)normFx1);
+            result_status = 1;
+            finish = true;            
+        }
 
         return finish;
     }
@@ -130,6 +141,7 @@ public:
         iterations = 0;
         reset_wight();
         norms_evolution.clear();
+        stagnation = 0;
     }
     void reset_wight()
     {
@@ -141,6 +153,8 @@ public:
     }
 
 private:
+    unsigned int stagnation = 0;
+    unsigned int stagnation_max = 0;
     VectorOperations* vec_ops;
     Logging* log;
     unsigned int maximum_iterations;

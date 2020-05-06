@@ -1,5 +1,5 @@
-#ifndef __PRECONDITIONER_K_3D_H__
-#define __PRECONDITIONER_K_3D_H__
+#ifndef __PRECONDITIONER_K_2D_H__
+#define __PRECONDITIONER_K_2D_H__
 
 
 /**
@@ -13,19 +13,19 @@ namespace nonlinear_operators
 {
 
 template<class vector_operations, class nonlinear_operator, class linear_operator> 
-class preconditioner_K_3D
+class preconditioner_K_2D
 {
 public:
     typedef typename vector_operations::scalar_type  T;
     typedef typename vector_operations::vector_type  T_vec;
 
-    preconditioner_K_3D(nonlinear_operator*& nonlin_op_):
+    preconditioner_K_2D(nonlinear_operator*& nonlin_op_):
     nonlin_op(nonlin_op_)
     {
 
     }
 
-    ~preconditioner_K_3D()
+    ~preconditioner_K_2D()
     {
 
     }

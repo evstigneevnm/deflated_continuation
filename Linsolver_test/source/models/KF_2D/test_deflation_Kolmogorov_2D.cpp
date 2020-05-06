@@ -9,11 +9,11 @@
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
 
-#include <nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D.h>
-#include <nonlinear_operators/Kolmogorov_flow_3D/linear_operator_K_3D.h>
-#include <nonlinear_operators/Kolmogorov_flow_3D/preconditioner_K_3D.h>
-#include <nonlinear_operators/Kolmogorov_flow_3D/convergence_strategy.h>
-#include <nonlinear_operators/Kolmogorov_flow_3D/system_operator.h>
+#include <nonlinear_operators/Kolmogorov_flow_2D/Kolmogorov_2D.h>
+#include <nonlinear_operators/Kolmogorov_flow_2D/linear_operator_K_2D.h>
+#include <nonlinear_operators/Kolmogorov_flow_2D/preconditioner_K_2D.h>
+#include <nonlinear_operators/Kolmogorov_flow_2D/convergence_strategy.h>
+#include <nonlinear_operators/Kolmogorov_flow_2D/system_operator.h>
 
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
@@ -30,7 +30,7 @@
 #include <common/macros.h>
 #include <common/gpu_vector_operations.h>
 
-#include <models/KF_3D/test_deflation_typedefs_Kolmogorov_3D.h>
+#include <models/KF_2D/test_deflation_typedefs_Kolmogorov_2D.h>
 
 int main(int argc, char const *argv[])
 {
@@ -48,8 +48,9 @@ int main(int argc, char const *argv[])
 
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
-    size_t Nz = N;
-    std::cout << "Testing deflation.\nUsing alpha = " << alpha << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << std::endl;
+    size_t Nv = real(2*(Nx*My-1));
+    
+    std::cout << "Testing deflation.\nUsing alpha = " << alpha << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << std::endl;
 
     
     init_cuda(-1);
@@ -59,26 +60,26 @@ int main(int argc, char const *argv[])
     real lin_solver_tol = 5.0e-3;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 3;
+    unsigned int basis_sz = 2;
     //newton deflation control
     unsigned int newton_def_max_it = 2000;
     real newton_def_tol = 1.0e-9;
-    real Power = 1.0;
+    real Power = 2.0;
 
 
-    cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
-    size_t Mz = CUFFT_C2R->get_reduced_size();
-    real norm_wight = (real(3*(Nx*Ny*Mz-1)));
+    cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny);
+    size_t My = CUFFT_C2R->get_reduced_size();
+    real norm_wight = std::sqrt(Nv);
 
 
     cublas_wrap *CUBLAS = new cublas_wrap();
     CUBLAS->set_pointer_location_device(false);
 
-    gpu_vector_operations_real_t *vec_ops_R = new gpu_vector_operations_real_t(Nx*Ny*Nz, CUBLAS);
-    gpu_vector_operations_complex_t *vec_ops_C = new gpu_vector_operations_complex_t(Nx*Ny*Mz, CUBLAS);
-    gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(3*(Nx*Ny*Mz-1), CUBLAS);
+    gpu_vector_operations_real_t *vec_ops_R = new gpu_vector_operations_real_t(Nx*Ny, CUBLAS);
+    gpu_vector_operations_complex_t *vec_ops_C = new gpu_vector_operations_complex_t(Nx*My, CUBLAS);
+    gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(Nv, CUBLAS);
 
-    KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
+    KF_2D_t *KF_2D = new KF_2D_t(alpha, Nx, Ny, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
 
 
     log_t *log = new log_t();
@@ -86,8 +87,8 @@ int main(int argc, char const *argv[])
     log_t *log3 = new log_t();
     log3->set_verbosity(0);
 
-    lin_op_t *Ax = new lin_op_t(KF_3D);
-    prec_t *prec = new prec_t(KF_3D);
+    lin_op_t *Ax = new lin_op_t(KF_2D);
+    prec_t *prec = new prec_t(KF_2D);
     monitor_t *mon;
     
     //setup deflation system
@@ -122,8 +123,8 @@ int main(int argc, char const *argv[])
     deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops, log, newton_def, 5);
 
     
-    deflation_op->execute_all(Rey, KF_3D, sol_storage_def);
-    //deflation_op->find_add_solution(Rey, KF_3D, sol_storage_def);
+    deflation_op->execute_all(Rey, KF_2D, sol_storage_def);
+    //deflation_op->find_add_solution(Rey, KF_2D, sol_storage_def);
     
 
     unsigned int p=0;
@@ -132,8 +133,8 @@ int main(int argc, char const *argv[])
         
         std::string f_name_vec("vec_" + std::to_string(p) + ".pos");
         std::string f_name_abs("abs_" + std::to_string(p) + ".pos");      
-        KF_3D->write_solution_vec(f_name_vec, (vec&)x);
-        KF_3D->write_solution_abs(f_name_abs, (vec&)x);
+        KF_2D->write_solution_vec(f_name_vec, (vec&)x);
+        KF_2D->write_solution_abs(f_name_abs, (vec&)x);
 
         p++;
     }
@@ -142,7 +143,7 @@ int main(int argc, char const *argv[])
 
     
     delete deflation_op;
-    delete KF_3D;
+    delete KF_2D;
     delete prec;
     delete SM;
     delete log;

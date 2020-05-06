@@ -154,7 +154,7 @@ public:
         knots = new knots_t();
         continuate = new continuate_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
         bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files_);
-        sol_storage_def = new sol_storage_def_t(vec_ops, 50, T(1.0) );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
+        sol_storage_def = new sol_storage_def_t(vec_ops, 50, vec_ops->get_l2_size(), 1.5 );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
         deflate = new deflate_t(vec_ops, file_ops, log, nonlin_op, lin_op, SM, sol_storage_def);
     }
     ~deflation_continuation()
@@ -309,9 +309,10 @@ public:
                 
                 bif_diag->init_new_curve();
                 bif_diag->get_current_ref(bdf);
+                //std::cin.get(); 
                 continuate->continuate_curve(bdf, x_deflation, lambda);
                 bif_diag->close_curve();
-                
+                std::cin.get(); 
                 save_data(file_name);
                 
                 bdf->find_intersection(lambda, sol_storage_def);

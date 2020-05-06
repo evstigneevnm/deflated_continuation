@@ -46,6 +46,7 @@ public:
         nonlin_op->set_linearization_point(x, lambda);
         nonlin_op->jacobian_alpha(f);
         
+        
         //This is important!!!
         vec_ops->assign_scalar(T(0.0), x_s);
         //

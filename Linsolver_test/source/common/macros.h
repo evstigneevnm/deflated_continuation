@@ -6,6 +6,9 @@
     #define I2(i, j, Col) (i)*(Col)+(j)
 #endif
 
+#ifndef I2P
+    #define I2P(j, k) ((j)>(Nx-1)?(j)-Nx:(j)<0?(Nx+(j)):(j))*(Ny)+((k)>(Ny-1)?(k)-Ny:(k)<0?(Ny+(k)):(k))
+#endif
 
 #ifndef _I3
     #define _I3(i, j, k, Nx, Ny, Nz) (i)*(Ny*Nz) + (j)*(Nz) + (k)

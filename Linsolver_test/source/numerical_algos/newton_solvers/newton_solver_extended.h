@@ -45,6 +45,10 @@ public:
         conv_strat->reset_iterations(); //reset iteration count, newton wight and iteration history
         while(!finished)
         {
+            //reset iterational vectors?!
+            delta_lambda = T(0.0);
+            vec_ops->assign_scalar(T(0.0), delta_x);     
+
             linsolver_converged = system_op->solve(nonlin_op, x, lambda, delta_x, delta_lambda);
             if(linsolver_converged)
             {

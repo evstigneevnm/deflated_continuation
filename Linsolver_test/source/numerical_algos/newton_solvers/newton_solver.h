@@ -39,7 +39,6 @@ public:
     {
         
         int result_status = 1;
-        
         vec_ops->assign_scalar(T(0.0), delta_x);
         bool converged = false;
         bool finished = false;
@@ -47,6 +46,7 @@ public:
         conv_strat->reset_iterations();
         while(!finished)
         {
+            vec_ops->assign_scalar(T(0.0), delta_x);
             linsolver_converged = system_op->solve(nonlin_op, x, lambda, delta_x);
             if(linsolver_converged)
             {

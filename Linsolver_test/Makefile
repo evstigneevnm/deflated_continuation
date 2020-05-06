@@ -84,3 +84,15 @@ deflation_Kolmogorov_3D: source/models/KF_3D/test_deflation_Kolmogorov_3D.cpp
 
 KF3D_bd: source/models/KF_3D/KF3D_bd.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KF_3D/KF3D_bd.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBBOOST) $(LIBS2)  -o KF3D_bd.bin 2>results_make.txt	
+
+Kolmogorov_2D_ker: source/nonlinear_operators/Kolmogorov_flow_2D/Kolmogorov_2D_ker.cu
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/nonlinear_operators/Kolmogorov_flow_2D/Kolmogorov_2D_ker.cu -c -o O/Kolmogorov_2D_ker.o 2>results_make.txt
+
+Kolmogorov_2D: source/nonlinear_operators/Kolmogorov_flow_2D/
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_2D/test_Kolmogorov_2D_RHS.cpp O/Kolmogorov_2D_ker.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_Kolmogorov_2D_RHS.bin 2>results_make.txt
+
+newton_Kolmogorov_2D: source/models/KF_2D/test_Kolmogorov_2D_Newton.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_2D/test_Kolmogorov_2D_Newton.cpp O/Kolmogorov_2D_ker.o O/gpu_vector_operations_kernels.o $(LIBS2) -o newton_Kolmogorov_2D.bin 2>results_make.txt
+
+deflation_Kolmogorov_2D: source/models/KF_2D/test_deflation_Kolmogorov_2D.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_2D/test_deflation_Kolmogorov_2D.cpp O/Kolmogorov_2D_ker.o O/gpu_vector_operations_kernels.o $(LIBS2) -o deflation_Kolmogorov_2D.bin 2>results_make.txt
