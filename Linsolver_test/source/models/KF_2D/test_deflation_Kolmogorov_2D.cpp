@@ -48,7 +48,6 @@ int main(int argc, char const *argv[])
 
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
-    size_t Nv = real(2*(Nx*My-1));
     
     std::cout << "Testing deflation.\nUsing alpha = " << alpha << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << std::endl;
 
@@ -57,10 +56,10 @@ int main(int argc, char const *argv[])
 
     //linsolver control
     unsigned int lin_solver_max_it = 2000;
-    real lin_solver_tol = 5.0e-3;
+    real lin_solver_tol = 1.0e-1;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 2;
+    unsigned int basis_sz = 4;
     //newton deflation control
     unsigned int newton_def_max_it = 2000;
     real newton_def_tol = 1.0e-9;
@@ -69,6 +68,7 @@ int main(int argc, char const *argv[])
 
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny);
     size_t My = CUFFT_C2R->get_reduced_size();
+    size_t Nv = real(2*(Nx*My-1));
     real norm_wight = std::sqrt(Nv);
 
 

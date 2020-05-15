@@ -125,8 +125,17 @@ public:
         }
         if(stagnation>stagnation_max)
         {   
-            log->warning_f("deflation::convergence: Newton stagnated at iteration(%i) with norm %le", iterations, (double)normFx1);
-            result_status = 1;
+    
+            if(normFx1 < 1.0e-6)
+            {
+                result_status = 0; 
+                log->warning_f("deflation::convergence: Newton stagnated at iteration(%i) with norm %le < 1.0e-6. Assume covergence.", iterations, (double)normFx1);
+            }
+            else
+            {
+                result_status = 1;
+                log->warning_f("deflation::convergence: Newton stagnated at iteration(%i) with norm %le >= 1.0e-6. Assume covergence failed.", iterations, (double)normFx1);                
+            }
             finish = true;            
         }
 

@@ -99,7 +99,7 @@ protected:
 
 public:
     bicgstabl(const vector_operations_type *vec_ops, 
-              Log *log = NULL, int obj_log_lev = 1) : 
+              Log *log = NULL, int obj_log_lev = 3) : 
         parent_t(vec_ops, log, obj_log_lev, "bicgstabl::"),
         buf(vec_ops), r(vec_ops), u(vec_ops), rtilde(buf[0]), 
         use_precond_resid_(true), resid_recalc_freq_(0), 
@@ -223,7 +223,7 @@ public:
 
         res = monitor_.converged();
         if(!res)
-            logged_obj_t::info_f("solve: linear solver failed to converge");
+            logged_obj_t::error_f("solve: linear solver failed to converge");
         
         return res;
 

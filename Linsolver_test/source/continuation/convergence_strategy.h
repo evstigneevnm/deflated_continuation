@@ -52,6 +52,7 @@ public:
         tolerance = tolerance_;
         maximum_iterations = maximum_iterations_;
         newton_wight = newton_wight_;
+        newton_wight_initial = newton_wight_;
         store_norms_history = store_norms_history_;
         verbose = verbose_;
         stagnation_max = stagnation_max_;
@@ -90,7 +91,7 @@ public:
                 norms_evolution.push_back(normFx1);
             }
         //}
-        if(normFx1<10.0*normFx)
+        if(T(3.0)*normFx1<normFx)
         {
             reset_wight();
             log->info_f("continuation::convergence: fast descent, Newton wight updated to (%le).", double(newton_wight) );
@@ -140,9 +141,10 @@ public:
             result_status = 1;
             finish = true;
         }
-        if( std::abs(normFx-normFx1)<1.0e-6)
+        if( std::abs(normFx-normFx1)/normFx < 0.1)
         {
             stagnation++;
+            log->warning_f("continuation::convergence: Newton stagnating step %i with norms %le and %le with difference = %le", stagnation, (double)normFx1,(double)normFx, std::abs(normFx-normFx1)/normFx);
         }
         if(stagnation>stagnation_max)
         {   
@@ -171,6 +173,7 @@ public:
     void reset_wight()
     {
         newton_wight = newton_wight_initial;
+        stagnation = 0;
     }
     std::vector<T>* get_norms_history_handle()
     {

@@ -350,6 +350,7 @@ private:
         //assume that x0 and lambda0 are valid solutions, so that ||F(x_0,lambda_0)||<eps
         try
         {
+            log->warning_f("continuation::start_semicurve: starting semicurve with direction = %i", direction);
             init_tangent->execute(nonlin_op, T(direction), x0, lambda0, x0_s, lambda0_s);
         }
         catch(const std::exception& e)

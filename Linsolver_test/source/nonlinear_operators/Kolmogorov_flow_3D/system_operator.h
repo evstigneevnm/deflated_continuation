@@ -14,15 +14,15 @@ namespace nonlinear_operators
 {
 
 
-template<class vector_operations, class nonlinear_operator, class linear_operator, class linear_solver>
+template<class VectorOperations, class NonlinearOperator, class LinearOperator, class LinearSolver>
 class system_operator
 {
 public:
-    typedef typename vector_operations::scalar_type  T;
-    typedef typename vector_operations::vector_type  T_vec;
+    typedef typename VectorOperations::scalar_type  T;
+    typedef typename VectorOperations::vector_type  T_vec;
     
 
-    system_operator(vector_operations*& vec_ops_, linear_operator*& lin_op_, linear_solver*& lin_solver_):
+    system_operator(VectorOperations* vec_ops_, LinearOperator* lin_op_, LinearSolver* lin_solver_):
     vec_ops(vec_ops_),
     lin_op(lin_op_),
     lin_solver(lin_solver_)
@@ -34,7 +34,7 @@ public:
         vec_ops->stop_use_vector(b); vec_ops->free_vector(b);
     }
 
-    bool solve(nonlinear_operator* nonlin_op, const T_vec& x, const T lambda, T_vec& d_x)
+    bool solve(NonlinearOperator* nonlin_op, const T_vec& x, const T lambda, T_vec& d_x)
     {
         bool flag_lin_solver;
         
@@ -45,15 +45,16 @@ public:
         return flag_lin_solver;
     }
 private:
-    vector_operations* vec_ops;
-    linear_operator* lin_op;
-    linear_solver* lin_solver;
+    VectorOperations* vec_ops;
+    LinearOperator* lin_op;
+    LinearSolver* lin_solver;
     T_vec b;
     T_vec f;
     T_vec c;
     T beta;
 
 };
+
 
 }
 

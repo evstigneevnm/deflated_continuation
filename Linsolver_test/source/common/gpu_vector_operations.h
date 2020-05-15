@@ -220,11 +220,29 @@ struct gpu_vector_operations
         return result;
 
     }
+    // Tsc norm_rank1_l2(const vector_type &x, const scalar_type val_x)
+    // {
+    //     return( norm_rank1(x, val_x)/std::sqrt(Tsc(sz)) );
+    // }
+    //norm for a rank 1 updated vector with weight
+    Tsc norm_rank1_(const vector_type &x, const scalar_type val_x)
+    {
+        vector_type y;
+        init_vector_rank1(y); start_use_vector(y); //this is not good, but it will do for now.
+
+        assign(x, y);
+        set_value_at_point(scalar_type(sz)*val_x, sz, y, sz+1);
+        Tsc result;
+        cuBLAS->norm2<T>(sz+1, y, &result);
+
+        stop_use_vector(y); free_vector(y);
+        return result;
+
+    }
     Tsc norm_rank1_l2(const vector_type &x, const scalar_type val_x)
     {
-        return( norm_rank1(x, val_x)/std::sqrt(Tsc(sz)) );
+        return( norm_rank1_(x, val_x)/std::sqrt(Tsc(sz)) );
     }
-
     //for GPU pointer storage with call from CPU
     void norm(const vector_type &x, Tsc* result)
     {

@@ -38,7 +38,8 @@
 
 #include <vector>
 #include <cmath>
-
+#include <ctime>
+#include <cstdlib>
 
 #include <common/macros.h>
 #include <nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D_ker.h>
@@ -202,8 +203,9 @@ public:
         pool_BC.release(W);
     }
     //   F(u,alpha)=v
-    void F(const BC_vec& U, const T Reynolds_, BC_vec& W)
+    void F(BC_vec& U, const T Reynolds_, BC_vec& W)
     {
+        project(U);
         // vec_ops_C->assign_scalar(0.0,W.x);
         // vec_ops_C->assign_scalar(0.0,W.y);
         // vec_ops_C->assign_scalar(0.0,W.z);
@@ -224,17 +226,22 @@ public:
     {
         
         V2C(u_0_, U_0);   
+        project(U_0); //just in case!
         Reynolds_0 = Reynolds_0_;     
     }
 
 
     //variational jacobian J=dF/du:=
     //returns vector dv as Jdu->dv, where J(u_0,alpha_0) linearized at (u_0, alpha_0) by set_linearization_point
-     void jacobian_u(const BC_vec& dU, BC_vec& dV)
+     void jacobian_u(BC_vec& dU, BC_vec& dV)
     {
     // dV:=P[-(U_0, \nabla) dU - (dU, \nabla) U0] + nu*\nabla^2 dU
         BC_vec* dW = pool_BC.take(); //input        
-        
+
+        // vec_ops_C->assign_scalar(0.0,dW->x);
+        // vec_ops_C->assign_scalar(0.0,dW->y);
+        // vec_ops_C->assign_scalar(0.0,dW->z);
+        project(dU);
         B_V_nabla_F(U_0, dU, dV); //dV:= (dU, nabla) U_0
         B_V_nabla_F(dU, U_0,*dW); //dW:= (U_0, nabla) dU
         kern->add_mul3(TC(1.0,0), dW->x, dW->y, dW->z, dV.x, dV.y, dV.z); // dV:=dV+dW
@@ -306,8 +313,8 @@ public:
 
     void preconditioner_jacobian_u(BC_vec& dR)
     {
-        kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, Reynolds_0);
         project(dR);
+        kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, Reynolds_0);
 
     }
     void preconditioner_jacobian_u(T_vec& dr)
@@ -447,7 +454,7 @@ public:
     } 
 
 
-    void randomize_vector(T_vec u_out, int steps_ = 5)
+    void randomize_vector(T_vec u_out, int steps_ = -1)
     {
         
         BC_vec* UC0 = pool_BC.take();
@@ -457,13 +464,20 @@ public:
         vec_ops_R->assign_random(UR0->y);
         vec_ops_R->assign_random(UR0->z);
         
-        vec_ops_R->assign_scalar(0, UR0->x);
+        //vec_ops_R->assign_scalar(0, UR0->x);
         // vec_ops_R->assign_scalar(0, UR0->z);
+        int steps = steps_;
+        if(steps_ == -1)
+        {
+            std::srand(unsigned(std::time(0))); //init new seed
+            steps = std::rand()%8 + 1;     // random from 1 to 8
+
+        }
 
         fft(*UR0, *UC0);
         imag_vec(*UC0);
         project(*UC0);
-        for(int st=0;st<steps_;st++)
+        for(int st=0;st<steps;st++)
         {
             smooth(TR(0.1), *UC0);
         }
@@ -495,7 +509,15 @@ public:
 
     }
 
-
+    //projects vector to div free space
+    void project(T_vec& u_)
+    {
+        BC_vec* UC0 = pool_BC.take();
+        V2C(u_, *UC0);        
+        project(*UC0);
+        C2V(*UC0, u_);
+        pool_BC.release(UC0);          
+    }
 
 
 private:

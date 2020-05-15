@@ -12,7 +12,7 @@ namespace numerical_algos
 namespace newton_method_extended
 {
 
-template<class vector_operations, class nonlinear_operator, class system_operator, class convergence_strategy, class solution_point/*, class nonlinear_operator, */>
+template<class vector_operations, class nonlinear_operator, class system_operator, class convergence_strategy, class solution_point>
 class newton_solver_extended
 {
 public:
@@ -45,7 +45,7 @@ public:
         conv_strat->reset_iterations(); //reset iteration count, newton wight and iteration history
         while(!finished)
         {
-            //reset iterational vectors?!
+            //reset iterational vectors??!
             delta_lambda = T(0.0);
             vec_ops->assign_scalar(T(0.0), delta_x);     
 

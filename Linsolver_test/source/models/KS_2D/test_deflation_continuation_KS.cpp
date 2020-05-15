@@ -250,7 +250,7 @@ int main(int argc, char const *argv[])
         lambda0 = lambda1;
         lambda0_s = lambda1_s;
         
-        file_diag << lambda1 << " " << vec_ops_R_im->norm_l2(x0p) << " " << lambda1 << " " << vec_ops_R_im->norm_l2(x1) << std::endl;
+        file_diag << lambda_0p << " " << vec_ops_R_im->norm_l2(x0p) << " " << lambda1 << " " << vec_ops_R_im->norm_l2(x1) << std::endl;
         std::flush(file_diag);
     }
     file_diag.close();

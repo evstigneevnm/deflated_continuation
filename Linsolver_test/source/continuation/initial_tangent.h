@@ -69,6 +69,8 @@ public:
             T norm = vec_ops->norm_rank1(x_s,lambda_s);
             lambda_s/=norm;
             vec_ops->scale(T(1)/norm, x_s);
+            //vec_ops->scale(T(1)/T(vec_ops->get_l2_size()), x_s);
+
         }
         else
         {

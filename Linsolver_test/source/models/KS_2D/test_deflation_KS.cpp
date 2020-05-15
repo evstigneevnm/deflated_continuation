@@ -38,7 +38,7 @@ int main(int argc, char const *argv[])
     init_cuda(1);
     size_t Nx=1024;
     size_t Ny=1024;
-    real norm_wight = std::sqrt(real(Nx*Ny));
+    real norm_wight = real(1);//std::sqrt(real(Nx*Ny));
     real size_problem = real(1);//std::sqrt(real(Nx*Ny));
 
     //linsolver control

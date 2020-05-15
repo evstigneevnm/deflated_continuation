@@ -27,7 +27,6 @@
 #include <numerical_algos/newton_solvers/newton_solver.h>
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
-#include <common/macros.h>
 #include <common/gpu_vector_operations.h>
 
 #include <models/KF_3D/test_deflation_typedefs_Kolmogorov_3D.h>
@@ -56,19 +55,20 @@ int main(int argc, char const *argv[])
 
     //linsolver control
     unsigned int lin_solver_max_it = 2000;
-    real lin_solver_tol = 5.0e-3;
+    real lin_solver_tol = 1.0e-1;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;
     //newton deflation control
     unsigned int newton_def_max_it = 2000;
     real newton_def_tol = 1.0e-9;
-    real Power = 1.0;
+    real Power = 2.0;
 
 
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
     size_t Mz = CUFFT_C2R->get_reduced_size();
-    real norm_wight = (real(3*(Nx*Ny*Mz-1)));
+    size_t Nv = real(3*(Nx*Ny*Mz-1));
+    real norm_wight = std::sqrt(Nv);
 
 
     cublas_wrap *CUBLAS = new cublas_wrap();
@@ -76,7 +76,7 @@ int main(int argc, char const *argv[])
 
     gpu_vector_operations_real_t *vec_ops_R = new gpu_vector_operations_real_t(Nx*Ny*Nz, CUBLAS);
     gpu_vector_operations_complex_t *vec_ops_C = new gpu_vector_operations_complex_t(Nx*Ny*Mz, CUBLAS);
-    gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(3*(Nx*Ny*Mz-1), CUBLAS);
+    gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(Nv, CUBLAS);
 
     KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
 
@@ -100,7 +100,7 @@ int main(int argc, char const *argv[])
     SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle()->set_basis_size(basis_sz);
 
-    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops, log, newton_def_tol, newton_def_max_it, real(1), true );
+    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops, log, newton_def_tol, newton_def_max_it, real(0.5), true );
 
     sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops, 50, norm_wight, Power);
     system_operator_def_t *system_operator_def = new system_operator_def_t(vec_ops, Ax, SM, sol_storage_def);
@@ -110,7 +110,7 @@ int main(int argc, char const *argv[])
     mon = &SM->get_linsolver_handle_original()->monitor();
     mon->init(lin_solver_tol, real(0), lin_solver_max_it);
     mon->set_save_convergence_history(true);
-    mon->set_divide_out_norms_by_rel_base(false);
+    mon->set_divide_out_norms_by_rel_base(true);
     SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
     SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle_original()->set_basis_size(basis_sz);    
@@ -159,6 +159,8 @@ int main(int argc, char const *argv[])
     delete vec_ops_R;
     delete vec_ops_C;
     delete vec_ops;
-
+    delete CUBLAS;
+    delete CUFFT_C2R;
+    
     return 0;
 }

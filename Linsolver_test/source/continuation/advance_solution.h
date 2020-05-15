@@ -55,7 +55,7 @@ public:
         {
             predictor->apply(x_p, lambda_p, x1, lambda1);
             T ds_l = predictor->get_ds();
-            log->info_f("continuation::predict: ||x_p|| = %le, lambda_p = %le, ||x1|| = %le, lambda1 = %le", (double)vec_ops->norm(x0), (double)lambda_p, (double)vec_ops->norm(x1), (double)lambda1);
+            log->info_f("continuation::predict: ||x_p|| = %le, lambda_p = %le, ||x1|| = %le, lambda1 = %le", (double)vec_ops->norm(x_p), (double)lambda_p, (double)vec_ops->norm(x1), (double)lambda1);
             if(continuation_type == 'S')
             {
                 sys_op->set_tangent_space((T_vec&)x0, (T&)lambda0, (T_vec&)x0_s, (T&)lambda0_s, ds_l, continuation_type);

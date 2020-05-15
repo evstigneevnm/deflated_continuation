@@ -38,7 +38,8 @@
 
 #include <vector>
 #include <cmath>
-
+#include <ctime>
+#include <cstdlib>
 
 #include <common/macros.h>
 #include <nonlinear_operators/Kolmogorov_flow_2D/Kolmogorov_2D_ker.h>
@@ -446,7 +447,7 @@ public:
     } 
 
 
-    void randomize_vector(T_vec u_out, int steps_ = 1)
+    void randomize_vector(T_vec u_out, int steps_ = -1)
     {
         
         BC_vec* UC0 = pool_BC.take();
@@ -456,7 +457,14 @@ public:
         vec_ops_R->assign_random(UR0->y);
 
         fft(*UR0, *UC0);
-        for(int st=0;st<steps_;st++)
+        int steps = steps_;
+        if(steps_ == -1)
+        {
+            std::srand(unsigned(std::time(0))); //init new seed
+            steps = std::rand()%50 + 1;     // random from 1 to 50
+
+        }
+        for(int st=0;st<steps;st++)
         {
             smooth(TR(0.1), *UC0);
         }

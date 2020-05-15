@@ -56,19 +56,39 @@ public:
     bool update_tangent_space(NonlinearOperator* nonlin_op, const T_vec& x, const T lambda, T_vec& x_1_s, T& lambda_1_s)
     {
 
-        
         bool flag_lin_solver = false;
-        nonlin_op->set_linearization_point(x, lambda);
-        nonlin_op->jacobian_alpha(Jlambda);
-        vec_ops->assign_scalar(T(0), f);
-        T beta = T(1);
-        T alpha = lambda_0_s;
-        SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(T(1.0e-8)*vec_ops->get_l2_size());
-        flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, x_1_s, lambda_1_s);
-        SM_solver->get_linsolver_handle()->monitor().restore_tolerance();
-        T norm = vec_ops->norm_rank1(x_1_s, lambda_1_s);
-        lambda_1_s/=norm;
-        vec_ops->scale(T(1.0)/norm, x_1_s);
+        if(tangent_set)
+        {
+            std::cout << "update_tangent_space start" << std::endl;
+            flag_lin_solver = false;
+            nonlin_op->set_linearization_point(x, lambda);
+            nonlin_op->jacobian_alpha(Jlambda);
+            vec_ops->assign_scalar(T(0.0), f);
+            T beta = T(1.0);
+            T alpha = lambda_0_s;
+            //???
+            vec_ops->assign(x_0_s, x_1_s);
+            lambda_1_s = lambda_0_s;
+            // vec_ops->assign_scalar(T(0.0), x_1_s);
+            // lambda_1_s = T(0.0);
+
+            SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(T(1.0e-8)*vec_ops->get_l2_size());
+            flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, x_1_s, lambda_1_s);
+            SM_solver->get_linsolver_handle()->monitor().restore_tolerance();
+            T norm = vec_ops->norm_rank1(x_1_s, lambda_1_s);
+            lambda_1_s/=norm;
+            vec_ops->scale(T(1.0)/(norm), x_1_s);
+            
+            //vec_ops->scale(T(vec_ops->get_l2_size()), x_1_s);
+
+            std::cout << "update_tangent_space end" << std::endl;
+            tangent_set = false;
+        }
+        else
+        {
+            flag_lin_solver = false;
+            throw std::runtime_error(std::string("continuation::system_operator " __FILE__ " " __STR(__LINE__) " tangent space is not set. Set it with the method set_tangent_space(...).") );            
+        }
         return flag_lin_solver;
     }
 
@@ -95,12 +115,11 @@ public:
             nonlin_op->jacobian_alpha(Jlambda);
             nonlin_op->F(x, lambda, f);            
             
-            vec_ops->add_mul_scalar(T(0), T(-1), f); //f=-F(x,lambda)
+            vec_ops->add_mul_scalar(T(0), T(-1.0), f); //f=-F(x,lambda)
             T beta =  - orthogonal_projection(x, lambda); //beta = -orth_proj
             T alpha = lambda_0_s;
 
             flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, d_x, d_lambda);
-            
             
         }  
         else

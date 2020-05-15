@@ -14,11 +14,11 @@
 #include <common/gpu_file_operations.h>
 //vector dependant ends
 //problem dependant
-#include <nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D.h>
-#include <nonlinear_operators/Kolmogorov_flow_3D/linear_operator_K_3D.h>
-#include <nonlinear_operators/Kolmogorov_flow_3D/preconditioner_K_3D.h>
-#include <nonlinear_operators/Kolmogorov_flow_3D/convergence_strategy.h>
-#include <nonlinear_operators/Kolmogorov_flow_3D/system_operator.h>
+#include <nonlinear_operators/Kolmogorov_flow_2D/Kolmogorov_2D.h>
+#include <nonlinear_operators/Kolmogorov_flow_2D/linear_operator_K_2D.h>
+#include <nonlinear_operators/Kolmogorov_flow_2D/preconditioner_K_2D.h>
+#include <nonlinear_operators/Kolmogorov_flow_2D/convergence_strategy.h>
+#include <nonlinear_operators/Kolmogorov_flow_2D/system_operator.h>
 //problem dependant ends
 
 #include <numerical_algos/lin_solvers/default_monitor.h>
@@ -59,8 +59,7 @@ int main(int argc, char const *argv[])
 
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
-    size_t Nz = N;
-    std::cout << "Running bifurcation diagram construction.\nUsing alpha = " << alpha << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << std::endl;
+    std::cout << "Running bifurcation diagram construction.\nUsing alpha = " << alpha << ", with discretization: " << Nx << "X" << Ny << std::endl;
 
     typedef utils::log_std log_t;
     typedef thrust::complex<real> complex;
@@ -74,17 +73,17 @@ int main(int argc, char const *argv[])
     typedef numerical_algos::lin_solvers::default_monitor<
         vec_ops_t,log_t> monitor_t;
     
-    typedef nonlinear_operators::Kolmogorov_3D<cufft_type, 
+    typedef nonlinear_operators::Kolmogorov_2D<cufft_type, 
             vec_ops_real_t, 
             vec_ops_complex_t, 
             vec_ops_t,
-            Blocks_x_, Blocks_y_> KF_3D_t;
+            Blocks_x_, Blocks_y_> KF_2D_t;
 
-    typedef nonlinear_operators::linear_operator_K_3D<
-        vec_ops_t, KF_3D_t> lin_op_t;
+    typedef nonlinear_operators::linear_operator_K_2D<
+        vec_ops_t, KF_2D_t> lin_op_t;
     
-    typedef nonlinear_operators::preconditioner_K_3D<
-        vec_ops_t, KF_3D_t, lin_op_t> prec_t;
+    typedef nonlinear_operators::preconditioner_K_2D<
+        vec_ops_t, KF_2D_t, lin_op_t> prec_t;
 
     typedef container::knots<real> knots_t;
 
@@ -95,8 +94,8 @@ int main(int argc, char const *argv[])
     unsigned int lin_solver_max_it = 2000;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 3;
-    real lin_solver_tol = 1.0e-2; //relative tolerance wrt to rhs vector. For Krylov-Newton method can be set lower
+    unsigned int basis_sz = 2;
+    real lin_solver_tol = 5.0e-3; //relative tolerance wrt to rhs vector. For Krylov-Newton method can be set lower
     bool is_small_alpha = false;
     bool save_convergence_history = false;
     bool divide_out_norms_by_rel_base = true;
@@ -104,28 +103,28 @@ int main(int argc, char const *argv[])
     //newton control
     unsigned int newton_max_it = 2000;
     unsigned int newton_def_max_it = 2000;
-    unsigned int newton_cont_max_it = 200;
+    unsigned int newton_cont_max_it = 2000;
     real newton_tol = 1.0e-9;
     real newton_def_tol = 1.0e-9;
-    real newton_cont_tol = 1.0e-9;
+    real newton_cont_tol = 1.0e-8;
     //skipping files:
-    unsigned int skip_files_ = 60;
+    unsigned int skip_files_ = 100;
 
 
-    cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
-    size_t Mz=CUFFT_C2R->get_reduced_size();
-    size_t Nv = 3*(Nx*Ny*Mz-1);
+    cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny);
+    size_t My=CUFFT_C2R->get_reduced_size();
+    size_t Nv = 2*(Nx*My-1);
 
     cublas_wrap *CUBLAS = new cublas_wrap();
     CUBLAS->set_pointer_location_device(false);
-    vec_ops_real_t vec_ops_R(Nx*Ny*Nz, CUBLAS);
-    vec_ops_complex_t vec_ops_C(Nx*Ny*Mz, CUBLAS);
+    vec_ops_real_t vec_ops_R(Nx*Ny, CUBLAS);
+    vec_ops_complex_t vec_ops_C(Nx*My, CUBLAS);
     vec_ops_t vec_ops(Nv, CUBLAS);
 
     files_t file_ops_im( (vec_ops_t*) &vec_ops);    
     //CUDA GRIDS
 
-    KF_3D_t KF3D(alpha, Nx, Ny, Nz, (vec_ops_real_t*) &vec_ops_R, (vec_ops_complex_t*) &vec_ops_C, (vec_ops_t*) &vec_ops, CUFFT_C2R);
+    KF_2D_t KF2D(alpha, Nx, Ny, (vec_ops_real_t*) &vec_ops_R, (vec_ops_complex_t*) &vec_ops_C, (vec_ops_t*) &vec_ops, CUFFT_C2R);
 
     log_t log;
     log_t log_linsolver;
@@ -133,21 +132,21 @@ int main(int argc, char const *argv[])
        
 
     typedef main_classes::deflation_continuation<
-        vec_ops_t, files_t, log_t, monitor_t, KF_3D_t, 
+        vec_ops_t, files_t, log_t, monitor_t, KF_2D_t, 
         lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl, 
         nonlinear_operators::system_operator> deflation_continuation_t;
 
-    deflation_continuation_t DC( (vec_ops_t*) &vec_ops, (files_t*) &file_ops_im, (log_t*) &log,  (log_t*) &log_linsolver, (KF_3D_t*) &KF3D, path_to_prject_, skip_files_);
+    deflation_continuation_t DC( (vec_ops_t*) &vec_ops, (files_t*) &file_ops_im, (log_t*) &log,  (log_t*) &log_linsolver, (KF_2D_t*) &KF2D, path_to_prject_, skip_files_);
 
 
     DC.set_linsolver(lin_solver_tol, lin_solver_max_it, use_precond_resid, resid_recalc_freq, basis_sz, save_convergence_history, divide_out_norms_by_rel_base);
     DC.set_extended_linsolver(lin_solver_tol, lin_solver_max_it, is_small_alpha, use_precond_resid, resid_recalc_freq, basis_sz);
-    DC.set_newton(newton_tol, newton_max_it, real(0.5), true);
-    DC.set_newton_continuation(newton_cont_tol, newton_cont_max_it, real(0.5), true);
+    DC.set_newton(newton_tol, newton_max_it, real(0.75), true);
+    DC.set_newton_continuation(newton_cont_tol, newton_cont_max_it, real(0.75), true);
     DC.set_newton_deflation(newton_def_tol, newton_def_max_it, real(0.5), true);
 
     DC.set_steps(S, dS);
-    DC.set_deflation_knots({2.0, 4.0, 4.25, 4.5, 4.75, 5.0, 5.25, 5.5, 5.75, 6.0, 6.25, 6.5, 7.0});
+    DC.set_deflation_knots({2.0, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 8.0, 10.0});
     
     DC.execute("bifurcation_diagram.dat");
 

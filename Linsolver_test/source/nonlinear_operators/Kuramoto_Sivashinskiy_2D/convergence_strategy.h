@@ -84,7 +84,7 @@ public:
             norms_evolution.push_back(normFx1);
         }
         log->info_f("nonlinear_operators::convergence_strategy::iteration %i, previous residual %le, current residual %le",iterations, (double)normFx, (double)normFx1);
-        if(normFx1/normFx>T(2))
+        if(normFx1>T(2)*normFx)
         {
             newton_wight *= 0.75;
             log->info_f("nonlinear_operators::convergence_strategy::adjusting Newton wight to %le and updating...", newton_wight);            

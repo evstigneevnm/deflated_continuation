@@ -15,7 +15,8 @@
 #include <nonlinear_operators/Kolmogorov_flow_3D/linear_operator_K_3D.h>
 #include <nonlinear_operators/Kolmogorov_flow_3D/preconditioner_K_3D.h>
 
-#include <nonlinear_operators/Kolmogorov_flow_3D/system_operator.h>
+//#include <nonlinear_operators/Kolmogorov_flow_3D/system_operator.h>
+#include <nonlinear_operators/Kolmogorov_flow_3D/system_operator_time_globalization.h>
 #include <nonlinear_operators/Kolmogorov_flow_3D/convergence_strategy.h>
 
 #include <numerical_algos/newton_solvers/newton_solver.h>
@@ -207,17 +208,24 @@ int main(int argc, char const *argv[])
         KF_3D_t, 
         log_t> convergence_newton_t;
     
-    typedef nonlinear_operators::system_operator<
+    // typedef nonlinear_operators::system_operator<
+    //     gpu_vector_operations_t, 
+    //     KF_3D_t,
+    //     lin_op_t,
+    //     lin_solver_t
+    //     > system_operator_t;
+
+    typedef nonlinear_operators::system_operator_time_globalization<
         gpu_vector_operations_t, 
         KF_3D_t,
         lin_op_t,
         lin_solver_t
-        > system_operator_t;
-        
+        > system_operator_tg_t;
+
     typedef numerical_algos::newton_method::newton_solver<
         gpu_vector_operations_t, 
         KF_3D_t,
-        system_operator_t, 
+        system_operator_tg_t, 
         convergence_newton_t
         > newton_t;
 
@@ -226,8 +234,8 @@ int main(int argc, char const *argv[])
     
     lin_op_t* lin_op_p = &lin_op;
     lin_solver_t* lin_solver_p = &lin_solver;
-    system_operator_t *system_operator = new system_operator_t(vec_ops, lin_op_p, lin_solver_p);
-    newton_t *newton = new newton_t(vec_ops, system_operator, conv_newton);
+    system_operator_tg_t *system_operator_td = new system_operator_tg_t(vec_ops, lin_op_p, lin_solver_p);
+    newton_t *newton = new newton_t(vec_ops, system_operator_td, conv_newton);
 
     conv_newton->set_convergence_constants(newton_def_tol, newton_def_max_it);
 
@@ -249,7 +257,7 @@ int main(int argc, char const *argv[])
  
 
     delete newton;
-    delete system_operator;
+    delete system_operator_td;
     delete conv_newton;
     
 
