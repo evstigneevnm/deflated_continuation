@@ -7,15 +7,16 @@
 
 namespace continuation
 {
-template<class VectorOperations, class NonlinearOperator, class LinearOperator, class LinearSystemSolver>
+template<class VectorOperations, class NonlinearOperator, class LinearOperator, class LinearSystemSolver, class Log>
 class system_operator_continuation
 {
 public:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
 
-    system_operator_continuation(VectorOperations* vec_ops_, LinearOperator* lin_op_, LinearSystemSolver* SM_solver_):
+    system_operator_continuation(VectorOperations* vec_ops_, Log* log_, LinearOperator* lin_op_, LinearSystemSolver* SM_solver_):
     vec_ops(vec_ops_),
+    log(log_),
     lin_op(lin_op_),
     SM_solver(SM_solver_)
     {
@@ -59,7 +60,8 @@ public:
         bool flag_lin_solver = false;
         if(tangent_set)
         {
-            std::cout << "update_tangent_space start" << std::endl;
+            log->info("continuation::system_operator: update_tangent_space starts.");
+        
             flag_lin_solver = false;
             nonlin_op->set_linearization_point(x, lambda);
             nonlin_op->jacobian_alpha(Jlambda);
@@ -71,9 +73,16 @@ public:
             lambda_1_s = lambda_0_s;
             // vec_ops->assign_scalar(T(0.0), x_1_s);
             // lambda_1_s = T(0.0);
-
-            SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(T(1.0e-8)*vec_ops->get_l2_size());
+            T tolerance_local = T(1.0e-9)*vec_ops->get_l2_size();
+            SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(tolerance_local);
+            SM_solver->get_linsolver_handle()->monitor().set_temp_max_iterations(2000);
             flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, x_1_s, lambda_1_s);
+            
+            T minimum_resid = SM_solver->get_linsolver_handle()->monitor().resid_norm_out();
+            
+            log->info_f("desired residual = %le, minimum attained residual = %le", tolerance_local, minimum_resid);
+
+            SM_solver->get_linsolver_handle()->monitor().restore_max_iterations();
             SM_solver->get_linsolver_handle()->monitor().restore_tolerance();
             T norm = vec_ops->norm_rank1(x_1_s, lambda_1_s);
             lambda_1_s/=norm;
@@ -81,7 +90,7 @@ public:
             
             //vec_ops->scale(T(vec_ops->get_l2_size()), x_1_s);
 
-            std::cout << "update_tangent_space end" << std::endl;
+            log->info("continuation::system_operator: update_tangent_space ends.");
             tangent_set = false;
         }
         else
@@ -133,8 +142,10 @@ public:
 
 private:
     VectorOperations* vec_ops;
+    Log* log;
     LinearOperator* lin_op;
     LinearSystemSolver* SM_solver;
+
     bool tangent_set = false;
     T_vec x_0, x_0_s;
     T lambda_0, lambda_0_s;

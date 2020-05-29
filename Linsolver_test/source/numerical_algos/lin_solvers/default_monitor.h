@@ -45,6 +45,7 @@ private:
     T           rel_tol_, abs_tol_;
     T           rel_tol_save_;
     int         max_iters_num_, min_iters_num_;
+    int         max_iters_num_save_;
     bool        out_min_resid_norm_;
     bool        save_convergence_history_;
     bool        divide_out_norms_by_rel_base_;
@@ -77,6 +78,7 @@ public:
     {
         rel_tol_ = rel_tol; abs_tol_ = abs_tol;
         max_iters_num_ = max_iters_num; min_iters_num_ = min_iters_num;
+        max_iters_num_save_ = max_iters_num;
         out_min_resid_norm_ = out_min_resid_norm;
         if (out_min_resid_norm_) buf_.init();
         save_convergence_history_ = save_convergence_history;
@@ -102,6 +104,16 @@ public:
     {
         rel_tol_ = rel_tol_save_;
     }
+    void set_temp_max_iterations(int max_iter_local)
+    {
+        max_iters_num_save_ = max_iters_num_;
+        max_iters_num_ = max_iter_local;
+    }
+    void restore_max_iterations()
+    {
+        max_iters_num_ = max_iters_num_save_;
+    }
+
 
     void                    start(const vector_type& rhs)
     {
@@ -174,7 +186,8 @@ public:
         resid_norm_ = vec_ops_.norm(r);
 
         logged_obj_t::info_f("resid norm = %0.6e tol = %0.6e", resid_norm_out(), tol_out());
-        if (save_convergence_history_) convergence_history_.push_back( std::pair<int,T>(iters_performed(), resid_norm_out()) );
+        if (save_convergence_history_) 
+            convergence_history_.push_back( std::pair<int,T>(iters_performed(), resid_norm_out()) );
 
         if (out_min_resid_norm()) {
             if ((iters_performed() == 0)||(resid_norm() < min_resid_norm_)) {

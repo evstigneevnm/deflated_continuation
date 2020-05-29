@@ -310,7 +310,7 @@ public:
 
     }
 
-
+    //preconditioner for the Jacobian dF/du
     void preconditioner_jacobian_u(BC_vec& dR)
     {
         project(dR);
@@ -329,7 +329,7 @@ public:
     }
 
 
-    
+    //funciton that returns std::vector with different bifurcatoin norms
 
     void norm_bifurcation_diagram(const T_vec& u_in, std::vector<T>& res)
     {
@@ -356,6 +356,17 @@ public:
         pool_R.release(uR0);
     }
 
+    //function that returns exact solution(ES)
+    //if the ES is trivial, then return zero vector
+    void exact_solution(const T& Reynolds, T_vec& u_out)
+    {
+        BC_vec* UA = pool_BC.take();
+        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.x, UA->x);
+        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.y, UA->y);
+        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.z, UA->z);        
+        C2V(*UA, u_out);
+        pool_BC.release(UA);
+    }
 
 
     void physical_solution(const T_vec& u_in, TR_vec& u_out)
@@ -420,16 +431,6 @@ public:
 
     }
 
-
-    void ABC_exact_solution(const T Reynolds, T_vec u_out)
-    {
-        BC_vec* UA = pool_BC.take();
-        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.x, UA->x);
-        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.y, UA->y);
-        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.z, UA->z);        
-        C2V(*UA, u_out);
-        pool_BC.release(UA);
-    }
 
     void B_ABC_exact_solution(T_vec u_out)
     {
@@ -518,6 +519,8 @@ public:
         C2V(*UC0, u_);
         pool_BC.release(UC0);          
     }
+
+
 
 
 private:

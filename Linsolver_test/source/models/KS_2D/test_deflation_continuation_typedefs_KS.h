@@ -90,7 +90,8 @@
         vec_ops_real_im, 
         KS_2D,
         lin_op_t,
-        sherman_morrison_linear_system_solve_t
+        sherman_morrison_linear_system_solve_t,
+        log_t
         > system_operator_cont_t;
 
     typedef continuation::newton_method_extended::convergence_strategy<

@@ -290,6 +290,11 @@ public:
         C2R(u_helper_in, dr);
     }
 
+    void exact_solution(const T alpha, T_vec_im& vec_out)
+    {
+       vec_ops_R_im->assign_scalar(T(0.0), vec_out);
+    }
+
     void set_cuda_grid(dim3 dimGrid_, dim3 dimGrid_F_, dim3 dimBlock_)
     {
         dimGrid=dimGrid_;

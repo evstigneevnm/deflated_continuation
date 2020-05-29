@@ -75,8 +75,20 @@ int main(int argc, char const *argv[])
     vec_ops->init_vector(dx); vec_ops->start_use_vector(dx);
     vec_ops->init_vector(dy); vec_ops->start_use_vector(dy);
 
+
+
+    KF_3D->exact_solution(R, x1);
+    KF_3D->write_solution_vec("exact_solution_vec.pos", x1);
+    KF_3D->write_solution_abs("exact_solution_abs.pos", x1);
+    real div_norm_exact = KF_3D->div_norm(x1);
+    printf("Divergence norm exact solution = %le\n", double(div_norm_exact) );
+
+
     KF_3D->randomize_vector(x1, 3);
     KF_3D->randomize_vector(dx, 5);
+
+
+
 
     KF_3D->B_ABC_exact_solution(x1);
     // KF_3D->write_solution_abs("test_exact_A_ABC.pos", x1);
@@ -92,7 +104,8 @@ int main(int argc, char const *argv[])
 
 //check RHS
     KF_3D->randomize_vector(x1, 5);
-    printf("Divergence rand vec = %le\n", vec_ops->norm(x1) );
+    printf("rand vec = %le\n", vec_ops->norm(x1) );
+    printf("Divergence rand vec = %le\n", KF_3D->div_norm(x1) );
 
     KF_3D->F(x1, R, x0);
     real div_norm = KF_3D->div_norm(x0);

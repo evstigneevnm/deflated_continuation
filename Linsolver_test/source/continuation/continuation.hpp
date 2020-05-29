@@ -26,7 +26,7 @@ namespace continuation
 template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperations, class LinearOperator,  class Knots, class LinearSolver, class Newton, class Curve>
 class continuation
 {
-public:
+protected:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
 
@@ -38,7 +38,8 @@ private:
         VectorOperations, 
         NonlinearOperations,
         LinearOperator,
-        LinearSolver
+        LinearSolver,
+        Log
         > system_operator_cont_t;
 
     typedef newton_method_extended::convergence_strategy<
@@ -90,7 +91,7 @@ public:
     lin_op(lin_op_)
     {
         predict = new predictor_cont_t(vec_ops, log);
-        system_operator_cont = new system_operator_cont_t(vec_ops, lin_op, SM);
+        system_operator_cont = new system_operator_cont_t(vec_ops, log, lin_op, SM);
         conv_newton_cont = new convergence_newton_cont_t(vec_ops, log);
         newton_cont = new newton_cont_t(vec_ops, system_operator_cont, conv_newton_cont);
         continuation_step = new advance_step_cont_t(vec_ops, log, system_operator_cont, newton_cont, predict);
@@ -168,7 +169,7 @@ public:
     }
 
 
-private:
+protected: //changed to protected for inheritance
     //passed:
     VectorOperations* vec_ops;
     VectorFileOperations* file_ops;
@@ -193,12 +194,13 @@ private:
     unsigned int max_S;
     T epsilon = T(1.0e-6);
 
+
     void change_direction()
     {
         direction *= -1;
     }
 
-    //vactors and points for continuation
+    //vectors and points for continuation
 
     T lambda_start; T_vec x_start;
     T lambda0, lambda0_s, lambda1, lambda1_s;
@@ -208,7 +210,7 @@ private:
     bool fail_flag = false;
     bool continue_next_step = true;
     bool just_interpolated = false;
-
+private:
     void set_all_vectors()
     {
         

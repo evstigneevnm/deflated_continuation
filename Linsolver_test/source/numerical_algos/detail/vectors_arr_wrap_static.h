@@ -55,17 +55,33 @@ struct vectors_arr_wrap_static
         }
         void start_use_all()
         {
-            try {
+            try 
+            {
                 vec_wrap_.start_use_all();
-            } catch (...) {
+            }
+            catch (...)
+            {
                 stop_use_all();
                 throw;
             }
         }
+        void start_use_range(size_t Sz_new, int from = 0)
+        {
+            try 
+            {
+                vec_wrap_.start_use_range(Sz_new, from);
+            }
+            catch (...)
+            {
+                stop_use_all();
+                throw;
+            }
+        }        
         void stop_use_all()
         {
             vec_wrap_.stop_use_all();
         }
+
 
         ~vectors_arr_use_wrap_type()
         {
@@ -82,21 +98,37 @@ struct vectors_arr_wrap_static
         if (call_init) init();
     }
 
-    const vector_type       &operator[](int i)const { return vecs[i].vector(); }
-    vector_type             &operator[](int i) { return vecs[i].vector(); }
+    const vector_type &operator[](int i)const { return vecs[i].vector(); }
+    vector_type &operator[](int i) { return vecs[i].vector(); }
 
-    void init()
+    void init(size_t Sz_new = Sz)
     {
-        try {
-            for (int i = 0;i < Sz;++i) vecs[i].init(*vec_ops_);
-        } catch (...) {
+        if(Sz_new > Sz)
+            throw std::logic_error("numerical_algos::detail::vector_wrap_static: provided buffer size is greater than the static size.");
+
+        try 
+        {
+            for (int i = 0;i < Sz_new;++i)
+            {
+                vecs[i].init(*vec_ops_);
+            }
+            //free if extra data was taken?
+            for (int i = Sz_new;i < Sz;++i)
+            {
+                vecs[i].stop_use(*vec_ops_);
+                vecs[i].free(*vec_ops_);
+            }            
+        }
+        catch (...) 
+        {
             free();
             throw;
         }
     }
     void  free()
     {
-        for (int i = 0;i < Sz;++i) vecs[i].free(*vec_ops_);
+        for (int i = 0;i < Sz;++i) 
+            vecs[i].free(*vec_ops_);
     }
 
     void start_use(int i)
@@ -109,11 +141,23 @@ struct vectors_arr_wrap_static
     }
     void start_use_all()
     {
-        for (int i = 0;i < Sz;++i) vecs[i].start_use(*vec_ops_);
+        for (int i = 0;i < Sz;++i) 
+            vecs[i].start_use(*vec_ops_);
     }
     void stop_use_all()
     {
-        for (int i = 0;i < Sz;++i) vecs[i].stop_use(*vec_ops_);
+        for (int i = 0;i < Sz;++i) 
+            vecs[i].stop_use(*vec_ops_);
+    }
+    
+    void start_use_range(size_t Sz_new, int from = 0)
+    {
+        if(Sz_new > Sz)
+            throw std::logic_error("numerical_algos::detail::vector_wrap_static: provided buffer size is greater than the static size.");
+
+        for (int i = from;i < Sz_new;++i) 
+            vecs[i].start_use(*vec_ops_); 
+
     }
 
     ~vectors_arr_wrap_static()

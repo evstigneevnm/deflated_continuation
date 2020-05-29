@@ -71,12 +71,12 @@ struct cpu_vector_operations
     }
     
     //calc: x := <vector_type with all elements equal to given scalar value> 
-    void            assign_scalar(scalar_type scalar, vector_type& x)const
+    void assign_scalar(scalar_type scalar, vector_type& x)const
     {
         for (int i = 0;i < sz_;++i) x[i] = scalar;
     }
     //calc: x := mul_x*x + <vector_type of all scalar value> 
-    void            add_mul_scalar(scalar_type scalar, scalar_type mul_x, vector_type& x)const
+    void add_mul_scalar(scalar_type scalar, scalar_type mul_x, vector_type& x)const
     {
         for (int i = 0;i < sz_;++i) x[i] = mul_x*x[i] + scalar;
     }
@@ -100,6 +100,11 @@ struct cpu_vector_operations
                                vector_type& z)const
     {
         for (int i = 0;i < sz_;++i) z[i] = mul_x*x[i] + mul_y*y[i];
+    }
+    //calc: y := mul_x*x + y
+    void            add_mul(scalar_type mul_x, const vector_type& x, vector_type& y)const
+    {
+        for (int i = 0;i < sz_;++i) y[i] += mul_x*x[i];
     }
     //calc: y := mul_x*x + mul_y*y
     void            add_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, vector_type& y)const

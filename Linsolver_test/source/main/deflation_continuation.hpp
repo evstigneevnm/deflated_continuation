@@ -11,6 +11,7 @@
 */
 #include <string>
 #include <vector>
+// #include <type_traits> //to check linsolvers
 //boost serializatoin
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
@@ -27,6 +28,7 @@
 #include <containers/bifurcation_diagram.h>
 
 #include <continuation/continuation.hpp>
+#include <continuation/continuation_analytical.hpp> // inherited from continuation to put a nontrivial analytical solution on the curve, if needed.
 
 #include <deflation/solution_storage.h>
 #include <deflation/deflation.hpp>
@@ -119,6 +121,18 @@ private:
         bif_diag_curve_t
         > continuate_t;
 
+    typedef continuation::continuation_analytical<
+        VectorOperations, 
+        VectorFileOperations, 
+        Log, 
+        NonlinearOperations, 
+        LinearOperator,  
+        knots_t,
+        sherman_morrison_linear_system_solve_t,  
+        newton_t,
+        bif_diag_curve_t
+        > continuate_analytical_t;
+
     typedef deflation::deflation<
         VectorOperations,
         VectorFileOperations,
@@ -154,6 +168,7 @@ public:
         newton = new newton_t(vec_ops, system_operator, conv_newton);
         knots = new knots_t();
         continuate = new continuate_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
+        continuate_analytical = new continuate_analytical_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
         bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files_);
         sol_storage_def = new sol_storage_def_t(vec_ops, 50, vec_ops->get_l2_size(), 2.0 );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
         deflate = new deflate_t(vec_ops, file_ops, log, nonlin_op, lin_op, SM, sol_storage_def);
@@ -165,6 +180,7 @@ public:
         delete sol_storage_def;
         delete bif_diag;
         delete continuate;
+        delete continuate_analytical;
         delete knots;
         delete newton;
         delete system_operator;
@@ -194,6 +210,7 @@ public:
             SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
         if(basis_sz > 0)
             SM->get_linsolver_handle_original()->set_basis_size(basis_sz);  
+            // SM->get_linsolver_handle_original()->set_restarts(basis_sz);  
 //
     }
     void set_extended_linsolver(T lin_solver_tol, unsigned int lin_solver_max_it, bool is_small_alpha = false, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true)
@@ -209,7 +226,8 @@ public:
         if(resid_recalc_freq >= 0)
             SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
         if(basis_sz > 0)
-            SM->get_linsolver_handle()->set_basis_size(basis_sz); 
+           SM->get_linsolver_handle()->set_basis_size(basis_sz); 
+            // SM->get_linsolver_handle()->set_restarts(basis_sz); 
 //
         SM->is_small_alpha(is_small_alpha);        
     }
@@ -230,10 +248,11 @@ public:
 
     }
 
-    void set_steps(unsigned int max_S_, T ds_0_, unsigned int deflation_attempts_ = 5, int initial_direciton_ = -1, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4)
+    void set_steps(unsigned int max_S_, T ds_0_, unsigned int deflation_attempts_ = 5, unsigned int attempts_0_ = 4, int initial_direciton_ = -1, T step_ds_m_ = 0.2, T step_ds_p_ = 0.01)
     {
         deflate->set_max_retries(deflation_attempts_);
         continuate->set_steps(max_S_, ds_0_, initial_direciton_, step_ds_m_, step_ds_p_, attempts_0_);
+        continuate_analytical->set_steps(max_S_, ds_0_, initial_direciton_, step_ds_m_, step_ds_p_, attempts_0_);
     }
 
     void set_deflation_knots(std::vector<T> knots_)
@@ -241,9 +260,15 @@ public:
         knots->add_element(knots_);
     }
 
-
-    void load_data(const std::string& file_name_ = {})
+    void use_analytical_solution(bool analytical_solution_ = false)
     {
+        analytical_solution = analytical_solution_;
+    }
+
+
+    bool load_data(const std::string& file_name_ = {})
+    {
+        bool file_exists = false;
         if(!file_name_.empty())
         {
             std::ifstream load_file( (project_dir + file_name_).c_str() );
@@ -254,12 +279,15 @@ public:
                 ia >> (*bif_diag);
                 load_file.close();
                 log->info_f("MAIN:deflation_continuation: read data for the bifurcaiton diagram from %s", (project_dir + file_name_).c_str() );
+                file_exists = true;
             }
             else
             {
                 log->warning_f("MAIN:deflation_continuation: failed to load saved data for the bifurcaiton diagram %s", (project_dir + file_name_).c_str() );
+                file_exists = false;
             }
         }
+        return file_exists;
     }
 
     void save_data(const std::string& file_name_ = {})
@@ -295,10 +323,29 @@ public:
         //}
         //
 
-        load_data(file_name);
+        bool file_exists = load_data(file_name);
 
-        bool is_there_a_next_knot = knots->next();
         T_vec x_deflation; //pointer to the found deflated solution
+        bool is_there_a_next_knot = knots->next();
+
+        //perform analytical solution continuation if desired and if it is the first run
+        if( (analytical_solution)&&(!file_exists))
+        {
+            log->info_f("MAIN:deflation_continuation: using the analytical solution to form a curve...");
+            bif_diag_curve_t* bdf;
+            T lambda = knots->get_value();
+            vec_ops->init_vector(x_deflation); vec_ops->start_use_vector(x_deflation);
+            nonlin_op->exact_solution(lambda, x_deflation);
+            bif_diag->init_new_curve();
+            bif_diag->get_current_ref(bdf);
+            continuate_analytical->continuate_curve(bdf, x_deflation, lambda);
+            bif_diag->close_curve();
+            save_data(file_name);
+            vec_ops->stop_use_vector(x_deflation); vec_ops->free_vector(x_deflation);
+            log->info_f("MAIN:deflation_continuation: analytical solution formed.");
+        }
+        //
+
         int number_of_solutions = 0;
         while(is_there_a_next_knot)
         {
@@ -365,10 +412,11 @@ private:
     knots_t* knots;
     bif_diag_t* bif_diag = nullptr;
     continuate_t* continuate;
+    continuate_analytical_t* continuate_analytical;
     deflate_t* deflate;
     sol_storage_def_t* sol_storage_def;
     std::string project_dir;
-
+    bool analytical_solution = false;
 };
 
 

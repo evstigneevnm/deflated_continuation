@@ -54,8 +54,11 @@ public:
         vec_ops->add_mul_scalar(T(0.0), T(-1.0), f);
 
         lin_solv->get_linsolver_handle_original()->monitor().set_temp_tolerance(T(1.0e-8)*vec_ops->get_l2_size());
+        lin_solv->get_linsolver_handle_original()->monitor().set_temp_max_iterations(2000);
         linear_system_converged = lin_solv->solve((*lin_op), f, x_s);
+        lin_solv->get_linsolver_handle_original()->monitor().restore_max_iterations();
         lin_solv->get_linsolver_handle_original()->monitor().restore_tolerance();
+
         if(linear_system_converged)
         {
             T z_sq = vec_ops->scalar_prod(x_s, x_s); //(dx,x_0_s)

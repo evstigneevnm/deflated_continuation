@@ -63,7 +63,9 @@ struct gpu_vector_operations
 {
     typedef T  scalar_type;
     typedef T* vector_type;
-    typedef typename gpu_vector_operations_type::vec_ops_cuComplex_type_hlp<T>::norm_type Tsc;
+    //typedef typename gpu_vector_operations_type::vec_ops_cuComplex_type_hlp<T>::norm_type Tsc;
+    typedef typename gpu_vector_operations_type::vec_ops_cuComplex_type_hlp<T>::norm_type norm_type;
+    typedef norm_type Tsc;
     bool location;
 
     //CONSTRUCTORS!
@@ -93,13 +95,13 @@ struct gpu_vector_operations
 
     void init_vector(vector_type& x)const 
     {
-        //x = NULL;
-        x = device_allocate<scalar_type>(sz);
+        x = NULL;
+        //x = device_allocate<scalar_type>(sz);
     }
     void init_vector_rank1(vector_type& x)const 
     {
-        //x = NULL;
-        x = device_allocate<scalar_type>(sz+1);
+        x = NULL;
+        // x = device_allocate<scalar_type>(sz+1);
     }    
     void free_vector(vector_type& x)const 
     {
@@ -108,9 +110,14 @@ struct gpu_vector_operations
     }
     void start_use_vector(vector_type& x)const
     {
-        //if (x == NULL) 
-        //    x = device_allocate<T>(sz);
+        if (x == NULL) 
+           x = device_allocate<T>(sz);
     }
+    void start_use_vector_rank1(vector_type& x)const
+    {
+        if (x == NULL) 
+           x = device_allocate<scalar_type>(sz+1);
+    }    
     void stop_use_vector(vector_type& x)const
     {
         
@@ -209,7 +216,7 @@ struct gpu_vector_operations
     Tsc norm_rank1(const vector_type &x, const scalar_type val_x)
     {
         vector_type y;
-        init_vector_rank1(y); start_use_vector(y); //this is not good, but it will do for now.
+        init_vector_rank1(y); start_use_vector_rank1(y); //this is not good, but it will do for now.
 
         assign(x, y);
         set_value_at_point(val_x, sz, y, sz+1);

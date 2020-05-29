@@ -99,7 +99,7 @@ int main(int argc, char const *argv[])
     unsigned int basis_sz = 3;
     real lin_solver_tol = 1.0e-2; //relative tolerance wrt to rhs vector. For Krylov-Newton method can be set lower
     bool is_small_alpha = false;
-    bool save_convergence_history = false;
+    bool save_convergence_history = true;
     bool divide_out_norms_by_rel_base = true;
 
     //newton control
@@ -110,7 +110,7 @@ int main(int argc, char const *argv[])
     real newton_def_tol = 1.0e-9;
     real newton_cont_tol = 1.0e-9;
     //skipping files:
-    unsigned int skip_files_ = 60;
+    unsigned int skip_files_ = 225;
 
 
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
@@ -147,8 +147,10 @@ int main(int argc, char const *argv[])
     DC.set_newton_deflation(newton_def_tol, newton_def_max_it, real(0.5), true);
 
     DC.set_steps(S, dS, 10, 20); //max_S, ds_0, deflation_attempts, attempts_0
-    // DC.set_deflation_knots({2.0, 4.0, 4.25, 4.5, 4.75, 5.0, 5.25, 5.5, 5.75, 6.0, 6.25, 6.5, 7.0});
-    DC.set_deflation_knots({2.0, 5.55, 5.6, 5.65, 5.7, 5.75, 5.8, 5.85, 5.9, 5.95, 6.0, 6.05, 6.1, 6.15, 6.2, 6.25, 6.3, 6.4, 6.5, 7.0});
+    //DC.set_deflation_knots({2.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0});
+    DC.set_deflation_knots({0.0, 4.0, 4.33, 4.5, 4.75, 5.0, 5.25, 5.5, 5.75, 5.9, 6.0, 6.2, 6.3, 6.4, 6.5, 6.7, 6.8, 7.0, 7.23, 7.33, 7.5, 7.56, 7.75, 7.85, 8.0, 8.15, 8.25, 8.333, 8.4, 8.5, 8.67, 8.75, 8.8, 8.9, 9.0, 9.23, 9.33, 9.5, 9.65, 9.777, 9.87, 9.9, 10.0, 10.13, 10.25, 10.33, 10.45, 10.5, 10.6, 10.78, 10.9, 11.0});
+    
+    DC.use_analytical_solution(false);
     
     DC.execute("bifurcation_diagram.dat");
 

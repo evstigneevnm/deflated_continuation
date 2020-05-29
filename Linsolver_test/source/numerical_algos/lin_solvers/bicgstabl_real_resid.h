@@ -22,7 +22,7 @@
 #include "iter_solver_base.h"
 
 #ifndef SCFD_BICGSTABL_MAX_BASIS_SIZE
-#define SCFD_BICGSTABL_MAX_BASIS_SIZE 100
+#define SCFD_BICGSTABL_MAX_BASIS_SIZE 10
 #endif
 
 namespace numerical_algos

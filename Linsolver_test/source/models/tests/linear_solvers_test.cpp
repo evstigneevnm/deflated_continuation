@@ -1,11 +1,13 @@
-#include <cstdlib>
+// #include <cstdlib>
 #include <cmath>
+#include <string>
 #include <iostream>
 #include <fstream>
 #include <utils/log.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
+#include <numerical_algos/lin_solvers/gmres.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
-//#include <numerical_algos/lin_solvers/bicgstab.h>
+// #include <numerical_algos/lin_solvers/bicgstab.h>
 #include <common/file_operations.h>
 #include <common/cpu_vector_operations.h>
 
@@ -92,10 +94,19 @@ private:
 
 };
 
-typedef utils::log_std                                                                  log_t;
-typedef default_monitor<cpu_vector_operations_real,log_t>                                    monitor_t;
-typedef bicgstabl<system_operator,prec_operator,cpu_vector_operations_real,monitor_t,log_t>  lin_solver_bicgstabl_t;
+typedef utils::log_std log_t;
 
+typedef default_monitor<
+    cpu_vector_operations_real,log_t
+        > monitor_t;
+
+typedef bicgstabl<
+// typedef gmres<
+    system_operator,
+    prec_operator,
+    cpu_vector_operations_real,
+    monitor_t,
+    log_t>  lin_solver_c_t;
 
 int main(int argc, char **args)
 {
@@ -121,39 +132,92 @@ int main(int argc, char **args)
 
     file_operations::read_matrix<real>("./dat_files/A.dat",  sz, sz, A);
     file_operations::read_matrix<real>("./dat_files/iP.dat",  sz, sz, iP);
-    file_operations::read_vector<real>("./dat_files/x0.dat",  sz, x0);
+    //file_operations::read_vector<real>("./dat_files/x0.dat",  sz, x0);
     file_operations::read_vector<real>("./dat_files/b.dat",  sz, b);
 
 
-    std::cout << sz << std::endl;
+    std::cout << "vector size is " << sz << std::endl;
     log_t log;
+    log.set_verbosity(3);
+
     cpu_vector_operations_real vec_ops(sz);
     system_operator Ax(sz, A);
     prec_operator prec(sz, iP);
     
-    vec_ops.assign_scalar(0.0, x);
+    vec_ops.assign_scalar(real(0.0), x);
+    vec_ops.assign_scalar(real(0.0), x0);
 
-    lin_solver_bicgstabl_t lin_solver_bicgstabl(&vec_ops, &log);
+    lin_solver_c_t lin_solver_c(&vec_ops, &log);
     monitor_t *mon;
-    mon = &lin_solver_bicgstabl.monitor();
+    mon = &lin_solver_c.monitor();
    
-    mon->init(rel_tol, real(0.f), max_iters);
+    mon->init(rel_tol, real(0.0), max_iters);
     mon->set_save_convergence_history(true);
     mon->set_divide_out_norms_by_rel_base(true);
-    lin_solver_bicgstabl.set_preconditioner(&prec);
-    lin_solver_bicgstabl.set_use_precond_resid(use_precond_resid);
-    lin_solver_bicgstabl.set_resid_recalc_freq(resid_recalc_freq);
-    lin_solver_bicgstabl.set_basis_size(basis_sz);
+    lin_solver_c.set_preconditioner(&prec);
+    lin_solver_c.set_use_precond_resid(use_precond_resid);
+    lin_solver_c.set_resid_recalc_freq(resid_recalc_freq);
+    // lin_solver_c.set_restarts(basis_sz);
+    lin_solver_c.set_basis_size(basis_sz);
     
-    bool res_flag = lin_solver_bicgstabl.solve(Ax, b, x);
+    bool res_flag = lin_solver_c.solve(Ax, b, x);
     if (res_flag) 
         log.info("lin_solver returned success result");
     else
         log.info("lin_solver returned fail result");
 
 
+
+    //pseudo newton method to solve the problem iteratively with residual update
+
+    std::cout << "testing pseudo-newton iterative method" << std::endl;
+    std::cin.get();
+
+    vector_t r, f, dx;
+    r=(vector_t) malloc(sz*sizeof(real));
+    f=(vector_t) malloc(sz*sizeof(real));
+    dx=(vector_t) malloc(sz*sizeof(real));
+
+    bool use_newton = true;
+    int iter = 0;
+    if(use_newton)
+    {
+        vec_ops.assign_scalar(real(0.0), x);
+        vec_ops.assign_scalar(real(0.0), dx);
+        real resid_norm = real(1.0);
+
+        mon->init(1.0e-1, real(0.0), max_iters);
+        real resid_base = vec_ops.norm(b);
+
+        while(resid_norm>rel_tol*resid_base)
+        {
+            vec_ops.assign_scalar(real(0.0), dx);
+            Ax.apply(x,r);
+            //calc: z := mul_x*x + mul_y*y
+            vec_ops.assign_mul(1.0, b, -1.0, r, f);
+            bool res_flag = lin_solver_c.solve(Ax, f, dx);
+            if (res_flag) 
+                log.info("lin_solver returned success result");
+            else
+                log.info("lin_solver returned fail result");        
+            
+            vec_ops.add_mul(1.0, dx, x);
+            resid_norm = vec_ops.norm(f);
+            std::cout << "residual norm = " << resid_norm << std::endl;
+            std::cin.get();
+            iter++;
+        }
+    }
+
+    Ax.apply(x, r);
+    vec_ops.add_mul(-1.0, b, r);
+    std::cout << "final true residual = " << vec_ops.norm(r) << " for " << iter << " outer iterations." << std::endl;
+
     file_operations::write_vector<real>("./dat_files/x.dat", sz, x);
 
+    free(dx);
+    free(r);
+    free(f);
     free(A);
     free(iP);
     free(x0);

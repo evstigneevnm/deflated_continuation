@@ -9,7 +9,9 @@
 
 #include <utils/log.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
-#include <numerical_algos/lin_solvers/bicgstabl.h>
+//#include <numerical_algos/lin_solvers/bicgstabl.h>
+#include <numerical_algos/lin_solvers/gmres.h>
+
 
 #include <nonlinear_operators/Kolmogorov_flow_2D/Kolmogorov_2D.h>
 #include <nonlinear_operators/Kolmogorov_flow_2D/linear_operator_K_2D.h>
@@ -69,7 +71,7 @@ int main(int argc, char const *argv[])
     real lin_solver_tol = 5.0e-3;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 3;
+    unsigned int basis_sz = 30;
     //newton deflation control
     unsigned int newton_def_max_it = 250;
     real newton_def_tol = 1.0e-10;
@@ -94,7 +96,9 @@ int main(int argc, char const *argv[])
         gpu_vector_operations_t, KF_2D_t> lin_op_t;
     typedef nonlinear_operators::preconditioner_K_2D<
         gpu_vector_operations_t, KF_2D_t, lin_op_t> prec_t;    
-    typedef numerical_algos::lin_solvers::bicgstabl<
+    // typedef numerical_algos::lin_solvers::bicgstabl<
+    //     lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t> lin_solver_t;
+    typedef numerical_algos::lin_solvers::gmres<
         lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t> lin_solver_t;
 
     monitor_t *mon;
@@ -110,7 +114,8 @@ int main(int argc, char const *argv[])
 
     lin_solver.set_use_precond_resid(use_precond_resid);
     lin_solver.set_resid_recalc_freq(resid_recalc_freq);
-    lin_solver.set_basis_size(basis_sz);
+    //lin_solver.set_basis_size(basis_sz);
+    lin_solver.set_restarts(basis_sz);
     mon = &lin_solver.monitor();
     mon->init(lin_solver_tol, real(0.f), lin_solver_max_it);
     mon->set_save_convergence_history(true);

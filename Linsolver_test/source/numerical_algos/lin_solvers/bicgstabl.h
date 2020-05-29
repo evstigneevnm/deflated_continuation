@@ -22,7 +22,7 @@
 #include "iter_solver_base.h"
 
 #ifndef SCFD_BICGSTABL_MAX_BASIS_SIZE
-#define SCFD_BICGSTABL_MAX_BASIS_SIZE 100
+#define SCFD_BICGSTABL_MAX_BASIS_SIZE 30
 #endif
 
 namespace numerical_algos
@@ -84,7 +84,10 @@ private:
     {
         A.apply(x, r);
         vec_ops_->add_mul(T(1.f), b, -T(1.f), r);
-        if (prec_ != NULL) prec_->apply(r);
+        if (prec_ != NULL)
+        {
+            prec_->apply(r);
+        }
     }
     int     normalize_(vector_type &v)const
     {
@@ -105,10 +108,17 @@ public:
         use_precond_resid_(true), resid_recalc_freq_(0), 
         basis_sz_(2) 
     {
-        buf.init(); r.init(); u.init();
+        buf.init(); 
+        r.init(basis_sz_+1); 
+        u.init(basis_sz_+1);
     }
 
-    void    set_basis_size(int basis_sz) { basis_sz_ = basis_sz; }
+    void    set_basis_size(int basis_sz) 
+    { 
+        basis_sz_ = basis_sz; 
+        r.init(basis_sz_+1); 
+        u.init(basis_sz_+1);
+    }
     void    set_use_precond_resid(bool use_precond_resid) { use_precond_resid_ = use_precond_resid; }
     void    set_resid_recalc_freq(int resid_recalc_freq) { resid_recalc_freq_ = resid_recalc_freq; }
 
@@ -119,10 +129,12 @@ public:
             throw std::logic_error("bicgstabl::solve: use_precond_resid_ == false with non-empty preconditioner is not supported");
         if (prec_ != NULL) prec_->set_operator(&A);
 
-        bufs_arr_use_wrap_t     use_wrap_r(r), use_wrap_u(u);
-        use_wrap_r.start_use_all(); use_wrap_u.start_use_all();
+        bufs_arr_use_wrap_t use_wrap_r(r);
+        bufs_arr_use_wrap_t use_wrap_u(u);
+        use_wrap_r.start_use_range(basis_sz_+1); 
+        use_wrap_u.start_use_range(basis_sz_+1);
 
-        buf_use_wrap_t          use_wrap_buf(buf);
+        buf_use_wrap_t use_wrap_buf(buf);
         use_wrap_buf.start_use_all();
 
         monitor_call_wrap_t     monitor_wrap(monitor_);
