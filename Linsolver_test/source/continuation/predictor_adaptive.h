@@ -28,6 +28,7 @@ public:
     attempts_0(attempts_0_)
     {
         attempts = 0;
+        attempts_increase = 0;
         ds = ds_0;
         ds_p = ds;
         ds_m = ds;
@@ -46,6 +47,7 @@ public:
         attempts_0 = attempts_0_; 
 
         attempts = 0;
+        attempts_increase = 0;
         ds = ds_0;
         ds_p = ds;
         ds_m = ds;
@@ -53,11 +55,22 @@ public:
     }
     void reset()
     {
-        ds = ds_0;
-        ds_p = ds;
-        ds_m = ds;        
+        // ds = ds_0;
+        // ds_p = ds;
+        // ds_m = ds;     
+
         attempts = 0;
         log->info_f("predictor::arclength step dS = %le", (double)ds);
+    }
+    
+    //resets all, including ds and advance ounters
+    void reset_all()
+    {
+        ds = ds_0;
+        ds_p = ds_0;
+        ds_m = ds_0;  
+        attempts = 0;
+        attempts_increase = 0;        
     }
 
     void set_tangent_space(const T_vec& x_0_, const T& lambda_0_, const T_vec& x_s_, const T& lambda_s_)
@@ -116,7 +129,7 @@ public:
 
     bool modify_ds()
     {
-        if(attempts<2*attempts_0)
+        if(attempts<=4*attempts_0)
         {        
 
             if(attempts%2==0)
@@ -134,7 +147,7 @@ public:
         log->info_f("predictor::ds_modified to %le", (double)ds);
         attempts++;
         
-        if(attempts>2*attempts_0)
+        if(attempts>4*attempts_0)
         {
             return true;
 
@@ -145,6 +158,57 @@ public:
         }
     }
 
+
+    bool decrease_ds()
+    {
+        attempts_increase = 0;
+        ds = ds*0.5;
+        log->info_f("predictor::ds is decreased to %le", (double)ds);
+        attempts++;
+        if(ds<ds_0*T(0.01))
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    bool decrease_ds_adaptive()
+    {
+        bool modify = modify_ds();
+        bool decrease = false;
+        if(modify)
+        {
+            decrease = decrease_ds();
+        }
+        return decrease;
+    }
+
+    void increase_ds()
+    {
+        attempts_increase++;
+        if(attempts_increase>5)
+        {
+            
+            if(ds >= T(15.0)*ds_0)
+            {
+                ds = T(15.0)*ds_0;
+                log->info_f("predictor::ds is maximized to %le", (double)ds);
+            }
+            else
+            {
+                ds = ds*T(2.0);
+                log->info_f("predictor::ds is increased to %le", (double)ds);
+            }
+            attempts_increase = 0;
+            
+        }
+
+    }
+
+
     T get_ds()
     {
         return ds;    
@@ -152,7 +216,7 @@ public:
 
 private:
     T ds_0, ds, step_ds_p, step_ds_m, ds_p, ds_m;
-    unsigned int attempts_0, attempts;
+    unsigned int attempts_0, attempts, attempts_increase;
     VectorOperations* vec_ops;
     T_vec x_s, x_0;
     T lambda_s, lambda_0;

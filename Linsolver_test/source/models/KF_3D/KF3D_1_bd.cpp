@@ -38,24 +38,43 @@
 int main(int argc, char const *argv[])
 {
     
-    if(argc!=6)
+    if((argc!=6)&&(argc!=4))
     {
-        printf("Usage: %s path_to_project dS S alpha N, where:\n",argv[0]);
+        printf("For continuation:\n");
+        printf("usage: %s path_to_project dS S alpha N, where:\n",argv[0]);
         printf("    path_to_project is the relative path to the storage of bifurcation diagram data;\n");
         printf("    dS - continuation step;\n");
         printf("    S - number of continuation steps;\n");
         printf("    0<alpha<=1;\n");
         printf("    N = 2^n- discretization in one direction.\n");
+        printf("For editing:\n");
+        printf("usage: %s path_to_project alpha N, where:\n",argv[0]);
+        printf("    path_to_project is the relative path to the storage of bifurcation diagram data;\n");
+        printf("    0<alpha<=1;\n");
+        printf("    N = 2^n- discretization in one direction.\n");                
         return 0;
     }
+
     typedef SCALAR_TYPE real;
     
     std::string path_to_prject_(argv[1]);
-    real dS = atof(argv[2]);
-    unsigned int S = atoi(argv[3]);
+    real dS = real(1.0);
+    unsigned int S = 100;
+    real alpha = real(1.0);
+    size_t N = 32;
+    if(argc==2)
+    {
+        alpha = std::atof(argv[2]);
+        N = std::atoi(argv[3]);
+    }
+    else if(argc==6)
+    {
+        dS = atof(argv[2]);
+        S = atoi(argv[3]);
+        alpha = std::atof(argv[4]);
+        N = std::atoi(argv[5]);
+    }
 
-    real alpha = std::atof(argv[4]);
-    size_t N = std::atoi(argv[5]);
     int one_over_alpha = int(1/alpha);
 
     size_t Nx = N*one_over_alpha;
@@ -110,7 +129,7 @@ int main(int argc, char const *argv[])
     real newton_def_tol = 1.0e-9;
     real newton_cont_tol = 1.0e-9;
     //skipping files:
-    unsigned int skip_files_ = 225;
+    unsigned int skip_files_ = 30;
 
 
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
@@ -148,11 +167,17 @@ int main(int argc, char const *argv[])
 
     DC.set_steps(S, dS, 10, 20); //max_S, ds_0, deflation_attempts, attempts_0
     //DC.set_deflation_knots({2.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0});
-    DC.set_deflation_knots({0.0, 4.0, 4.33, 4.5, 4.75, 5.0, 5.25, 5.5, 5.75, 5.9, 6.0, 6.2, 6.3, 6.4, 6.5, 6.7, 6.8, 7.0, 7.23, 7.33, 7.5, 7.56, 7.75, 7.85, 8.0, 8.15, 8.25, 8.333, 8.4, 8.5, 8.67, 8.75, 8.8, 8.9, 9.0, 9.23, 9.33, 9.5, 9.65, 9.777, 9.87, 9.9, 10.0, 10.13, 10.25, 10.33, 10.45, 10.5, 10.6, 10.78, 10.9, 11.0});
+    DC.set_deflation_knots({0.0, /*4.0, 4.33, 4.5, 4.75, 5.0, 5.25, 5.5, 5.75, 5.9, 6.0, 6.2, 6.3, 6.4, 6.5, 6.7, 6.8, 7.0, 7.23, 7.33, 7.5, 7.56, 7.75, 7.85,*/ 8.0, 8.15, 8.25, 8.333, 8.4, 8.5, 8.67, 8.75, 8.8, 8.9, 9.0, 9.23, 9.33, 9.5, 9.65, 9.777, 9.87, 9.9, 10.0, 10.13, 10.25, 10.33, 10.45, 10.5, 10.6, 10.78, 10.9, 11.0});
     
-    DC.use_analytical_solution(false);
-    
-    DC.execute("bifurcation_diagram.dat");
-
+    if(argc==6)
+    {
+        DC.use_analytical_solution(false);
+        DC.execute("bifurcation_diagram.dat");
+    }
+    else if(argc==4)
+    {
+        DC.edit("bifurcation_diagram.dat");
+        
+    }
     return 0;
 }

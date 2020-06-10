@@ -71,6 +71,8 @@ private:
 
     typedef initial_tangent<
         VectorOperations,
+        Log,
+        Newton,
         NonlinearOperations, 
         LinearOperator,
         LinearSolver
@@ -95,7 +97,7 @@ public:
         conv_newton_cont = new convergence_newton_cont_t(vec_ops, log);
         newton_cont = new newton_cont_t(vec_ops, system_operator_cont, conv_newton_cont);
         continuation_step = new advance_step_cont_t(vec_ops, log, system_operator_cont, newton_cont, predict);
-        init_tangent = new tangent_0_cont_t(vec_ops, lin_op, SM);
+        init_tangent = new tangent_0_cont_t(vec_ops, log, newton, lin_op, SM);
 
 
         max_S = 100;
@@ -365,6 +367,7 @@ private:
         if(!fail_flag)
         {        
             bif_diag->add(lambda0, x0, true); //add initial knot, force save data!           
+            continuation_step->reset(); //resets all data for initial continuation stepping
             unsigned int s;
             for(s=0;s<max_S;s++)
             {

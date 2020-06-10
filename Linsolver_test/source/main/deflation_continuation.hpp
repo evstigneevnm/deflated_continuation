@@ -151,7 +151,8 @@ public:
     log(log_),
     nonlin_op(nonlin_op_),
     project_dir(project_dir_),
-    log_linsolver(log_linsolver_)
+    log_linsolver(log_linsolver_),
+    skip_files(skip_files_)
     {
         
         //add '/' to the end of the project dir, if needed
@@ -303,6 +304,39 @@ public:
         }        
     }
 
+    void edit(const std::string& file_name = {})
+    {
+        bool file_exists = load_data(file_name);
+        if(file_exists)
+        {
+            std::cout << "entering interactive edit mode" << std::endl;
+            std::cout << "enter 'd' to pop_back() the curve or 'q' to quit." << std::endl;
+            char c = 'c';
+            while(c != 'q')
+            {
+                std::cout << "file " << file_name << " contains:" << std::endl;
+                bif_diag->print_curves_status();
+                c = std::cin.get();
+                if(c=='d')
+                {
+                    bif_diag->pop_back_curve();
+                }
+            }
+            c = std::cin.get();
+            std::cout << "save file(y/n)>>>";
+            c = std::cin.get();
+            if(c == 'y')
+                save_data(file_name);
+
+        }
+        else
+        {
+            log->warning_f("MAIN:deflation_continuation: file %s doesn't exist; called edit with no file provided!", file_name.c_str());
+        }
+
+    }
+
+
     void execute(const std::string& file_name = {})
     {
         //Algorithm pseudocode:
@@ -324,6 +358,11 @@ public:
         //
 
         bool file_exists = load_data(file_name);
+
+        // force file printing skip after serialization
+        // unless it is done, the skip data is taken from the serialization class from file!
+        bif_diag->set_skip_output(skip_files);
+
 
         T_vec x_deflation; //pointer to the found deflated solution
         bool is_there_a_next_knot = knots->next();
@@ -417,6 +456,7 @@ private:
     sol_storage_def_t* sol_storage_def;
     std::string project_dir;
     bool analytical_solution = false;
+    unsigned int skip_files;
 };
 
 

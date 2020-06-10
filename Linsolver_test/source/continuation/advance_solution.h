@@ -44,12 +44,18 @@ public:
     }
     
 
+    void reset() //can be used to set everything in default state
+    {
+        predictor->reset_all(); 
+    }
+
     bool solve(NonlinearOperator* nonlin_op, const T_vec& x0, const T& lambda0, const T_vec& x0_s, const T& lambda0_s, T_vec& x1, T& lambda1, T_vec& x1_s, T& lambda1_s)
     {
         bool converged = false;
         bool failed = false;
         T lambda_p;
-        log->info_f("continuation::advance_solution::starting point: ||x0|| = %le, lambda0 = %le, ||x0_s|| = %le, lambda0_s = %le", (double)vec_ops->norm(x0), (double)lambda0, (double)vec_ops->norm(x0_s), (double)lambda0_s);
+        log->info("continuation::advance_solution::starting point:");
+        log->info_f("   ||x0|| = %le, lambda0 = %le, ||x0_s|| = %le, lambda0_s = %le", (double)vec_ops->norm(x0), (double)lambda0, (double)vec_ops->norm(x0_s), (double)lambda0_s);
         predictor->reset_tangent_space(x0, lambda0, x0_s, lambda0_s);
         while((!converged)&&(!failed))
         {
@@ -71,9 +77,16 @@ public:
             converged = newton->solve(nonlin_op, x1, lambda1);
             if(!converged)
             {
-                failed = predictor->modify_ds();
+                //failed = predictor->modify_ds();
+                //failed = predictor->decrease_ds();
+                failed = predictor->decrease_ds_adaptive();
 
                 log->info("continuation::advance_solution failed to converged. Modifiying dS.");
+            }
+            else
+            {
+                predictor->increase_ds();
+                log->info("continuation::advance_solution converged. Attempting to increase dS.");
             }
         }
         if(converged)
@@ -100,7 +113,7 @@ public:
             // throw std::runtime_error(std::string("advance_solution::advance_solution (tangent) " __FILE__ " " __STR(__LINE__) " linear system failed to converge.") );
             log->info("continuation::advance_solution::tangent system failed to converge. Nearing singularity with dim(ker(J))>1. Using FD estimaiton.");  
             T ds = predictor->get_ds();
-            T d_ds = T(1.0e-6);
+            T d_ds = T(10.0*std::sqrt(2.0)*1.0e-6);
             //T ds_p = ds + d_ds;
             T ds_m = ds - d_ds;
             //T ds_factor_p = ds_p/ds;
@@ -127,7 +140,7 @@ public:
             converged_m = newton->solve(nonlin_op, x1_l, lambda1_l);
             if(!converged_m)
             {
-                log->info("continuation::advance_solution::newton solver failed for additional point in tangent");
+                log->warning("continuation::advance_solution::newton solver failed for additional point in tangent");
                 vec_ops->assign(x0_s, x1_s);
                 lambda1_s = lambda0_s;
             }
@@ -138,7 +151,7 @@ public:
                 T norm = vec_ops->norm_rank1(x1_s, lambda1_s);
                 lambda1_s/=norm;
                 vec_ops->scale(T(1)/norm, x1_s);
-                //log->info_f("advance_solution::||(x_s, l_s)|| = %le", lambda1_s*lambda1_s + vec_ops->scalar_prod(x1_s, x1_s) );
+                log->info_f("continuation::advance_solution::||(x_s, l_s)|| = %le", lambda1_s*lambda1_s + vec_ops->scalar_prod(x1_s, x1_s) );
             }
         }
 

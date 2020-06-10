@@ -64,6 +64,11 @@ public:
         delete cont_help;
     }
 
+    void set_skip_output(unsigned int skip_output_)
+    {
+        skip_output = skip_output_;
+    }
+
     void get_current_ref(Curve*& curve_ref)
     {
         //std::cout << "reference to the curve inside = " << &curve_container.back() << std::endl;
@@ -80,6 +85,14 @@ public:
     {
         curve_number++;
         curve_container.emplace_back( vec_ops, file_ops, log, nonlin_op, newton, curve_number, directory, cont_help, skip_output ) ;
+    }
+    void pop_back_curve()
+    {
+        if(curve_number > 0)
+        {
+            curve_container.pop_back();
+            curve_number--;
+        }
     }
 
     void close_curve()
@@ -99,12 +112,22 @@ public:
             }
             catch(const std::exception& e)
             {
-                log->info_f("bifurcation_diagram::find_intersection: %s\n", e.what());
+                log->info_f("container::bifurcation_diagram::find_intersection: %s", e.what());
             }
         }
 
     }
 
+    void print_curves_status()
+    {
+        //log->info("container::bifurcation_diagram curve number = %i\n", curve_number);
+        std::cout << "container::bifurcation_diagram curve number = " << curve_number << std::endl;
+        for(auto &x: curve_container)
+        {   
+            x.print_curve_status();
+        }  
+
+    }
 
 private:
     std::vector<Curve> curve_container;

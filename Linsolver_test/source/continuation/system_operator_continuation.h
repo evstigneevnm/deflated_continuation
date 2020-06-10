@@ -75,12 +75,12 @@ public:
             // lambda_1_s = T(0.0);
             T tolerance_local = T(1.0e-9)*vec_ops->get_l2_size();
             SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(tolerance_local);
-            SM_solver->get_linsolver_handle()->monitor().set_temp_max_iterations(2000);
+            SM_solver->get_linsolver_handle()->monitor().set_temp_max_iterations(3000);
             flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, x_1_s, lambda_1_s);
             
             T minimum_resid = SM_solver->get_linsolver_handle()->monitor().resid_norm_out();
-            
-            log->info_f("desired residual = %le, minimum attained residual = %le", tolerance_local, minimum_resid);
+            int iters_performed = SM_solver->get_linsolver_handle()->monitor().iters_performed();
+            log->info_f("desired residual = %le, minimum attained residual = %le with %i iterations.", tolerance_local, minimum_resid, iters_performed);
 
             SM_solver->get_linsolver_handle()->monitor().restore_max_iterations();
             SM_solver->get_linsolver_handle()->monitor().restore_tolerance();

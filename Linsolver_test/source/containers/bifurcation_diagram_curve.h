@@ -312,6 +312,8 @@ public:
                 }
                 debug_file << x.id_file_name << std::endl;
             }
+            debug_file.flush();
+            log->info_f("container::bifurcation_diagram_curve(%i): printed debug bifurcation curve data.", curve_number); 
         }
     }
 
@@ -329,8 +331,15 @@ public:
             f << x.id_file_name << std::endl;
         }
         f.close();
+        log->info_f("container::bifurcation_diagram_curve(%i): printed final bifurcation curve data.", curve_number); 
     }
 
+
+    void print_curve_status()
+    {
+        std::cout << "container::bifurcation_diagram_curve::curve number = " << curve_number << std::endl;
+        std::cout << "container::bifurcation_diagram_curve::container_length = " << container.size() << std::endl;
+    }
 
     void close_curve()
     {
