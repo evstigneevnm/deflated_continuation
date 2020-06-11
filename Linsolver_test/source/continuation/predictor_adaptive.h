@@ -63,7 +63,7 @@ public:
         log->info_f("predictor::arclength step dS = %le", (double)ds);
     }
     
-    //resets all, including ds and advance ounters
+    //resets all, including ds and advance counters
     void reset_all()
     {
         ds = ds_0;
@@ -189,6 +189,7 @@ public:
     void increase_ds()
     {
         attempts_increase++;
+        attempts = 0; //reset decrease attempts!!!
         if(attempts_increase>5)
         {
             

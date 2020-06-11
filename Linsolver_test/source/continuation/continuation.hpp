@@ -64,6 +64,7 @@ private:
         VectorOperations,
         Log,
         newton_cont_t,
+        Newton,
         NonlinearOperations,
         system_operator_cont_t,
         predictor_cont_t
@@ -96,7 +97,7 @@ public:
         system_operator_cont = new system_operator_cont_t(vec_ops, log, lin_op, SM);
         conv_newton_cont = new convergence_newton_cont_t(vec_ops, log);
         newton_cont = new newton_cont_t(vec_ops, system_operator_cont, conv_newton_cont);
-        continuation_step = new advance_step_cont_t(vec_ops, log, system_operator_cont, newton_cont, predict);
+        continuation_step = new advance_step_cont_t(vec_ops, log, system_operator_cont, newton_cont, newton, predict);
         init_tangent = new tangent_0_cont_t(vec_ops, log, newton, lin_op, SM);
 
 
@@ -354,13 +355,13 @@ private:
         //assume that x0 and lambda0 are valid solutions, so that ||F(x_0,lambda_0)||<eps
         try
         {
-            log->warning_f("continuation::start_semicurve: starting semicurve with direction = %i", direction);
+            log->info_f("continuation::start_semicurve: starting semicurve with direction = %i", direction);
             init_tangent->execute(nonlin_op, T(direction), x0, lambda0, x0_s, lambda0_s);
         }
         catch(const std::exception& e)
         {
 //            throw std::runtime_error(std::string("continuation::start_semicurve:") + std::string(e.what()) );
-            log->warning_f("continuation::start_semicurve: %s\n", e.what());
+            log->error_f("continuation::start_semicurve exception init_tangent: %s\n", e.what());
             break_semicurve++;
             fail_flag = true;
         }
@@ -396,7 +397,7 @@ private:
                 }
                 catch(const std::exception& e)
                 {
-                    log->info_f("continuation::start_semicurve: %s\n", e.what());
+                    log->error_f("continuation::start_semicurve exception continuation_step: %s\n", e.what());
                     break_semicurve++;
                     fail_flag = true; 
                     continue_next_step = false;                   
@@ -409,6 +410,7 @@ private:
             }
             if(s==max_S)
             {
+                log->warning_f("continuation::start_semicurve: reached maximum steps = %i", s);
                 continue_next_step = false;
                 break_semicurve++;
             }

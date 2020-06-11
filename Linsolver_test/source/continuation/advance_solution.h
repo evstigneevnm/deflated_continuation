@@ -12,7 +12,7 @@
 namespace continuation
 {
 
-template<class VectorOperations, class Loggin, class NewtonMethod, class NonlinearOperator, class SystemOperator, class Predictoror>
+template<class VectorOperations, class Loggin, class NewtonMethodExtended, class NewtonMethod, class NonlinearOperator, class SystemOperator, class Predictoror>
 class advance_solution
 {
 public:
@@ -20,10 +20,11 @@ public:
     typedef typename VectorOperations::vector_type  T_vec;
 
     
-    advance_solution(VectorOperations* vec_ops_, Loggin* log_, SystemOperator* sys_op_, NewtonMethod* newton_, Predictoror* predictor_, char continuation_type_ = 'S'):
+    advance_solution(VectorOperations* vec_ops_, Loggin* log_, SystemOperator* sys_op_, NewtonMethodExtended* newton_extended_, NewtonMethod* newton_, Predictoror* predictor_, char continuation_type_ = 'S'):
     vec_ops(vec_ops_),
     log(log_),
     sys_op(sys_op_),
+    newton_extended(newton_extended_),
     newton(newton_),
     predictor(predictor_),
     continuation_type(continuation_type_)
@@ -74,7 +75,7 @@ public:
             {
                 throw std::runtime_error(std::string("continuation::advance_solution (corrector) " __FILE__ " " __STR(__LINE__) " incorrect continuation_type parameter. Only 'S'pherical or 'O'rthogonal can be used") );
             }
-            converged = newton->solve(nonlin_op, x1, lambda1);
+            converged = newton_extended->solve(nonlin_op, x1, lambda1);
             if(!converged)
             {
                 //failed = predictor->modify_ds();
@@ -92,7 +93,7 @@ public:
         if(converged)
         {
             log->info("continuation::advance_solution::corrector Newton step norms:");
-            for(auto& x: *newton->get_convergence_strategy_handle()->get_norms_history_handle())
+            for(auto& x: *newton_extended->get_convergence_strategy_handle()->get_norms_history_handle())
             {
                 
                 log->info_f("%le",(double)x);
@@ -108,7 +109,7 @@ public:
         {
             tangent_obtained = sys_op->update_tangent_space(nonlin_op, x1, lambda1, x1_s, lambda1_s);
         }
-        if(!tangent_obtained)
+        if((converged)&&(!tangent_obtained))
         {
             // throw std::runtime_error(std::string("advance_solution::advance_solution (tangent) " __FILE__ " " __STR(__LINE__) " linear system failed to converge.") );
             log->info("continuation::advance_solution::tangent system failed to converge. Nearing singularity with dim(ker(J))>1. Using FD estimaiton.");  
@@ -137,14 +138,8 @@ public:
             {
                 throw std::runtime_error(std::string("continuation::advance_solution (tnagent) " __FILE__ " " __STR(__LINE__) " incorrect continuation_type parameter. Only 'S'pherical or 'O'rthogonal can be used") );
             }
-            converged_m = newton->solve(nonlin_op, x1_l, lambda1_l);
-            if(!converged_m)
-            {
-                log->warning("continuation::advance_solution::newton solver failed for additional point in tangent");
-                vec_ops->assign(x0_s, x1_s);
-                lambda1_s = lambda0_s;
-            }
-            else
+            converged_m = newton_extended->solve(nonlin_op, x1_l, lambda1_l);
+            if(converged_m)
             {
                 lambda1_s = (lambda1 - lambda1_l)/d_ds;
                 vec_ops->assign_mul(T(-1)/d_ds, x1_l, T(1)/d_ds, x1, x1_s);    
@@ -152,16 +147,56 @@ public:
                 lambda1_s/=norm;
                 vec_ops->scale(T(1)/norm, x1_s);
                 log->info_f("continuation::advance_solution::||(x_s, l_s)|| = %le", lambda1_s*lambda1_s + vec_ops->scalar_prod(x1_s, x1_s) );
+
+                tangent_obtained = true;
             }
+            else
+            {
+                reset(); //resets predictor step!
+                log->warning("continuation::advance_solution::newton_extended solver failed for additional point in tangent");
+                log->info("continuation::advance_solution using Newton-Raphson estimation.");
+                T x_norm = vec_ops->norm(x1);
+                T sign = (lambda1 - lambda0)/std::abs(lambda1 - lambda0);
+                T d_lambda = sign*T(1.0)/x_norm;
+                lambda1_l = lambda1 + d_lambda;
+                vec_ops->assign(x1, x1_l); //guess for x1 
+                bool converged = newton->solve(nonlin_op, x1_l, lambda1_l);
+                if(!converged)
+                {
+                    //newton method failed to converge!
+                    //throw std::runtime_error(std::string("continuation::initial_tangent " __FILE__ " " __STR(__LINE__) " tangent space couldn't be obtained - Newton method failed to converge.") );
+                    log->error("continuation::advance_solution: Newton-Raphson failed to converged. Nothing can be done so far, setting estimation equal to the previous step.");
+                    vec_ops->assign(x0_s, x1_s);
+                    lambda1_s = lambda0_s;
+                    tangent_obtained = true; //????
+                }
+                else
+                {
+                    lambda1_s = lambda1_l - lambda1; //lambda_s = ds*d(lambda)/ds
+                    //x_s = x1 - x;      
+                    vec_ops->assign_mul(T(1.0), x1_l, T(-1.0), x1, x1_s);  //x_s = ds*d(x)/ds
+                    T ds_l = vec_ops->norm_rank1(x1_s, lambda1_s); 
+                    lambda1_s/=ds_l;
+                    vec_ops->scale(T(1.0)/ds_l, x1_s);
+                    log->info_f("continuation::advance_solution: estimated local ds = %le", (double) ds_l);
+                    log->info("continuation::advance_solution: Newton-Raphson estimate ends successfully.");
+                    tangent_obtained = true;
+                }
+
+
+
+            }
+
         }
 
-
+        return tangent_obtained;
     }
 
 
 private:
     VectorOperations* vec_ops;
     SystemOperator* sys_op;
+    NewtonMethodExtended* newton_extended;
     NewtonMethod* newton;
     Predictoror* predictor;
     T_vec x_p, x1_l, dx10;
