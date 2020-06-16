@@ -26,7 +26,7 @@ SM_test: source/models/tests/SM_test.cpp
 	$(GCC) $(GCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/models/tests/SM_test.cpp -o SM_test.bin 2>results_make.txt
 
 lin_solvers_test: source/models/tests/linear_solvers_test.cpp
-	$(GCC) $(GCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/models/tests/linear_solvers_test.cpp -o linear_solvers_test.bin
+	$(NVCC) $(GCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/models/tests/linear_solvers_test.cpp -o linear_solvers_test.bin 2>results_make.txt
 
 cufft_test: source/models/tests/cufft_test.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/cufft_test_kernels.cu -c -o O/cufft_test_kernels.o 2>results_make.txt
@@ -98,7 +98,10 @@ deflation_Kolmogorov_2D: source/models/KF_2D/test_deflation_Kolmogorov_2D.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_2D/test_deflation_Kolmogorov_2D.cpp O/Kolmogorov_2D_ker.o O/gpu_vector_operations_kernels.o $(LIBS2) -o deflation_Kolmogorov_2D.bin 2>results_make.txt
 
 KF2D_bd: source/models/KF_2D/KF2D_bd.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KF_2D/KF2D_bd.cpp O/Kolmogorov_2D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBBOOST) $(LIBS2)  -o KF2D_bd.bin 2>results_make.txt	
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KF_2D/KF2D_bd.cpp O/Kolmogorov_2D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBBOOST) $(LIBS2) -o KF2D_bd.bin 2>results_make.txt	
 
 KF3D_view: source/models/KF_3D/view_solution.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/view_solution.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBS2)  -o KF3D_view_solution.bin 2>results_make.txt		
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/view_solution.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBS2) -o KF3D_view_solution.bin 2>results_make.txt		
+
+KF3D_1_bd: source/models/KF_3D/KF3D_1_bd.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KF_3D/KF3D_1_bd.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBBOOST) $(LIBS2)  -o KF3D_1_bd.bin 2>results_make.txt	
