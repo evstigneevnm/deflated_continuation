@@ -129,7 +129,7 @@ public:
 
     bool modify_ds()
     {
-        if(attempts<=4*attempts_0)
+        if(attempts<4*attempts_0)
         {        
 
             if(attempts%2==0)
@@ -142,18 +142,25 @@ public:
                 ds_m = ds_m*T(1-step_ds_m);            
                 ds = ds_m;
             }
+            log->info_f("predictor::ds_modified to %le", (double)ds);
 
         }
-        log->info_f("predictor::ds_modified to %le", (double)ds);
-        attempts++;
+        else if(attempts == 4*attempts_0)
+        {
+            ds = ds_0;
+            log->info_f("predictor::ds_modified. Max attempts now, ds = %le", (double)ds);
+        }
+        
+
         
         if(attempts>4*attempts_0)
         {
+            log->info_f("predictor::ds_modified. Max attempts reached");
             return true;
-
         }
         else
         {
+            attempts++;
             return false;
         }
     }
@@ -162,11 +169,12 @@ public:
     bool decrease_ds()
     {
         attempts_increase = 0;
-        ds = ds*0.5;
+        ds = ds*0.2;
         log->info_f("predictor::ds is decreased to %le", (double)ds);
         attempts++;
-        if(ds<ds_0*T(0.01))
+        if(ds<ds_0*T(0.0005))
         {
+            log->info_f("predictor::ds decrease. Max attempts reached with ds = %le", (double)ds);
             return true;
         }
         else

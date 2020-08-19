@@ -40,9 +40,9 @@ void write_matrix(const std::string &f_name, size_t Row, size_t Col, T *matrix, 
         for(size_t j=0;j<Col;j++)
         {
             if(j<Col-1)
-                f << std::setprecision(prec) << matrix[I2(i,j,Row)] << " ";
+                f << std::setprecision(prec) << matrix[I2_R(i,j,Row)] << " ";
             else
-                f << std::setprecision(prec) << matrix[I2(i,j,Row)];
+                f << std::setprecision(prec) << matrix[I2_R(i,j,Row)];
 
         }
         f << std::endl;
@@ -78,7 +78,7 @@ void read_matrix(const std::string &f_name,  size_t Row, size_t Col,  T *matrix)
             // matrix[I2(i,j,Row)]=(real)val;
             T val;
             f >> val;
-            matrix[I2(i,j,Row)]=(T)val;
+            matrix[I2_R(i,j,Row)]=(T)val;
         }
         
     } 

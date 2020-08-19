@@ -29,6 +29,7 @@ index of a matrix element in row ''i'' and column 'j'' can be computed via the f
 #include <cublas_v2.h>
 #include <thrust/complex.h>
 #include <utils/cublas_safe_call.h>
+#include <stdexcept>
 
 namespace cublas_complex_types{
     template<typename T>
@@ -256,10 +257,65 @@ public:
     //TODO: add Givens rotations construction for Arnoldi process
 
     //===cuBLAS Level-2 Functions=== see: https://docs.nvidia.com/cuda/cublas/index.html#cublas-level-2-function-reference
-    //TODO: to be inplemented on demand.
+private:
+    cublasOperation_t switch_operation_real(const char& op)
+    {
+        cublasOperation_t operation = CUBLAS_OP_N;
+        switch(op)
+        {
+            case 'N':
+                operation = CUBLAS_OP_N;
+                break;
+            case 'T':
+                operation = CUBLAS_OP_T;
+                break;
+            default:
+                // invalid operation code throw
+                throw std::runtime_error("switch_operation_real: invalid code for original or transpose operations. Only 'N' or 'T' are defined.");
+                break;                   
+        }  
+        return operation;
+
+    }
+
+    cublasOperation_t switch_operation_complex(const char& op)
+    {
+        cublasOperation_t operation = CUBLAS_OP_N;
+        switch(op)
+        {
+            case 'N':
+                operation = CUBLAS_OP_N;
+                break;
+            case 'T':
+                operation = CUBLAS_OP_C;// CUBLAS_OP_H is defined in documentaiton?!? 
+                                        //definition in:
+                                        // ../cuda/include/cublas_api.h
+                break;    
+            default:
+                // invalid operation code throw
+                throw std::runtime_error("switch_operation_complex: invalid code for original or transpose operations. Only 'N' or 'T' (for Hermitian transpose) are defined.");                
+                break;                              
+        }  
+        return operation;
+
+    }
+public:    
+    //This function performs the matrix-vector multiplication: 
+    //                  y = α op ( A ) x + β y,
+    //where A is a m × n matrix stored in column-major format, x and y are vectors, and α and β are scalars. 
+    //Also, for matrix A:
+    //   op(A) = A  if transa == CUBLAS_OP_N 
+    //   op(A) = A^T  if transa == CUBLAS_OP_T 
+    //   op(A) = A^H  if transa == CUBLAS_OP_H 
+    //   op = 'N' for CUBLAS_OP_N, op = 'T' for CUBLAS_OP_T, op = 'H' for CUBLAS_OP_H
+    //LDimA is the leading dimension of A, for C arrays LDimA = RowA.
+    template<typename T>
+    void gemv(const char op, size_t RowA, const T *A, size_t ColA, size_t LDimA, const T alpha, const T *x, const T beta, T *y);
+
 
     //===cuBLAS Level-3 Functions=== see: https://docs.nvidia.com/cuda/cublas/index.html#cublas-level-3-function-reference
-    //TODO: to be inplemented on demand.
+    template<typename T>
+    void gemm(const char opA, const char opB, size_t RowAC, size_t ColBC, size_t ColARowB, const T alpha, const T* A, size_t LDimA, const T* B, size_t LDimB, const T beta, T* C, size_t LdimC);
 
     //===cuBLAS BLAS-like EXTENSIONS=== see: https://docs.nvidia.com/cuda/cublas/index.html#blas-like-extension
     //TODO: to be inplemented on demand.
@@ -636,12 +692,128 @@ void cublas_wrap::normalize(size_t vector_size, thrust::complex<double> *x, type
 }
 
 
+//level 2 BLAS specializations:
+
+template<> inline
+void cublas_wrap::gemv(const char op, size_t RowA, const float *A, size_t ColA, size_t LDimA, const float alpha, const float *x, const float beta, float *y)
+{
+
+/*
+cublasStatus_t cublasSgemv(cublasHandle_t handle, 
+                           cublasOperation_t trans,
+                           int m, 
+                           int n,
+                           const float *alpha,
+                           const float *A, 
+                           int lda,
+                           const float *x, 
+                           int incx,
+                           const float *beta,
+                           float *y, 
+                           int incy)
+*/    
+    CUBLAS_SAFE_CALL( cublasSgemv(handle, switch_operation_real(op), RowA, ColA, &alpha, A, LDimA, x, 1, &beta, y, 1) );
+
+}
+
+template<> inline
+void cublas_wrap::gemv(const char op, size_t RowA, const double *A, size_t ColA, size_t LDimA, const double alpha, const double *x, const double beta, double *y)
+{
+
+    CUBLAS_SAFE_CALL( cublasDgemv(handle, switch_operation_real(op), RowA, ColA, &alpha, A, LDimA, x, 1, &beta, y, 1) );
+
+}
+template<> inline
+void cublas_wrap::gemv(const char op, size_t RowA, const thrust::complex<float> *A, size_t ColA, size_t LDimA, const thrust::complex<float> alpha, const thrust::complex<float> *x, const thrust::complex<float> beta, thrust::complex<float> *y)
+{
+
+    CUBLAS_SAFE_CALL( cublasCgemv(handle, switch_operation_complex(op), RowA, ColA, (const cuComplex*) &alpha, (const cuComplex*) A, LDimA, (const cuComplex*)x, 1, (const cuComplex*) &beta, (cuComplex*)y, 1) );
+
+}
+template<> inline
+void cublas_wrap::gemv(const char op, size_t RowA, const thrust::complex<double> *A, size_t ColA, size_t LDimA, const thrust::complex<double> alpha, const thrust::complex<double> *x, const thrust::complex<double> beta, thrust::complex<double> *y)
+{
+
+    CUBLAS_SAFE_CALL( cublasZgemv(handle, switch_operation_complex(op), RowA, ColA, (const cuDoubleComplex*) &alpha, (const cuDoubleComplex*) A, LDimA, (const cuDoubleComplex*) x, 1, (const cuDoubleComplex*) &beta, (cuDoubleComplex*) y, 1) );
+
+}
+
+//level 3 BLAS specializations:
+template<> inline
+void cublas_wrap::gemm(const char opA, const char opB, size_t RowA, size_t ColBC, size_t ColARowB, const float alpha, const float* A, size_t LDimA, const float* B, size_t LDimB, const float beta, float* C, size_t LDimC)
+{
+/*
+ C = α op ( A ) op ( B ) + β C 
+
+cublasStatus_t cublasDgemm(cublasHandle_t handle,
+                           cublasOperation_t transa, cublasOperation_t transb,
+                           int m, int n, int k,
+                           const double          *alpha,
+                           const double          *A, int lda,
+                           const double          *B, int ldb,
+                           const double          *beta,
+                           double          *C, int ldc)
+
+    m - number of rows of matrix op(A) and C.
+
+    n - number of columns of matrix op(B) and C.
+    
+    k - number of columns of op(A) and rows of op(B). 
+
+    lda - leading dimension of two-dimensional array used to store the matrix A. 
+
+    ldb - leading dimension of two-dimensional array used to store matrix B. 
+
+    ldc - leading dimension of a two-dimensional array used to store the matrix C. 
+
+*/
+
+   CUBLAS_SAFE_CALL( cublasSgemm(handle, switch_operation_real(opA), switch_operation_real(opB),
+                           RowA, ColBC, ColARowB,
+                           &alpha,
+                           A, LDimA,
+                           B, LDimB,
+                           &beta,
+                           C, LDimC) ); 
 
 
+}
 
+template<> inline
+void cublas_wrap::gemm(const char opA, const char opB, size_t RowA, size_t ColBC, size_t ColARowB, const double alpha, const double* A, size_t LDimA, const double* B, size_t LDimB, const double beta, double* C, size_t LDimC)
+{
+   CUBLAS_SAFE_CALL( cublasDgemm(handle, switch_operation_real(opA), switch_operation_real(opB),
+                           RowA, ColBC, ColARowB,
+                           &alpha,
+                           A, LDimA,
+                           B, LDimB,
+                           &beta,
+                           C, LDimC) );  
 
+}
+template<> inline
+void cublas_wrap::gemm(const char opA, const char opB, size_t RowA, size_t ColBC, size_t ColARowB, const thrust::complex<float> alpha, const thrust::complex<float>* A, size_t LDimA, const thrust::complex<float>* B, size_t LDimB, const thrust::complex<float> beta, thrust::complex<float>* C, size_t LDimC)
+{
+   CUBLAS_SAFE_CALL( cublasCgemm(handle, switch_operation_complex(opA), switch_operation_complex(opB),
+                           RowA, ColBC, ColARowB,
+                           (const cuComplex*)&alpha,
+                           (const cuComplex*)A, LDimA,
+                           (const cuComplex*)B, LDimB,
+                           (const cuComplex*)&beta,
+                           (cuComplex*)C, LDimC) );  
 
+}
+template<> inline
+void cublas_wrap::gemm(const char opA, const char opB, size_t RowA, size_t ColBC, size_t ColARowB, const thrust::complex<double> alpha, const thrust::complex<double>* A, size_t LDimA, const thrust::complex<double>* B, size_t LDimB, const thrust::complex<double> beta, thrust::complex<double>* C, size_t LDimC)
+{
+   CUBLAS_SAFE_CALL( cublasZgemm(handle, switch_operation_complex(opA), switch_operation_complex(opB),
+                           RowA, ColBC, ColARowB,
+                           (const cuDoubleComplex*)&alpha,
+                           (const cuDoubleComplex*)A, LDimA,
+                           (const cuDoubleComplex*)B, LDimB,
+                           (const cuDoubleComplex*)&beta,
+                           (cuDoubleComplex*)C, LDimC) );  
 
-
+}
 
 #endif

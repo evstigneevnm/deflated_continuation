@@ -298,7 +298,7 @@ struct gpu_vector_operations
     void assign_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                                vector_type& z)const;
     //calc: y := mul_x*x + mul_y*y
-    void add_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, vector_type& y)const;    //calc: z := mul_x*x + mul_y*y + mul_z*z
+    void add_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, vector_type& y)const;    
     //calc: z := mul_x*x + mul_y*y + mul_z*z;
     void add_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                             const scalar_type mul_z, vector_type& z)const;
@@ -340,6 +340,7 @@ struct gpu_vector_operations
         //scale(T(v_norm), vec);
     }
 
+    
 
 //*/
 private:

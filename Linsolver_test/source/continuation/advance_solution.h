@@ -120,9 +120,9 @@ public:
             //T ds_factor_p = ds_p/ds;
             T ds_factor_m = ds_m/ds;
             //x1-x0=dx10
-            vec_ops->assign_mul(T(1), x1, T(-1), x0, dx10);
+            vec_ops->assign_mul(T(1.0), x1, T(-1.0), x0, dx10);
             //minus_point
-            vec_ops->assign_mul(ds_factor_m, dx10, T(1), x0, x1_l);
+            vec_ops->assign_mul(ds_factor_m, dx10, T(1.0), x0, x1_l);
             T lambda1_l = ds_factor_m*(lambda1 - lambda0) + lambda0;
 
             bool converged_p, converged_m;
@@ -152,7 +152,7 @@ public:
             }
             else
             {
-                reset(); //resets predictor step!
+                
                 log->warning("continuation::advance_solution::newton_extended solver failed for additional point in tangent");
                 log->info("continuation::advance_solution using Newton-Raphson estimation.");
                 T x_norm = vec_ops->norm(x1);
@@ -165,6 +165,7 @@ public:
                 {
                     //newton method failed to converge!
                     //throw std::runtime_error(std::string("continuation::initial_tangent " __FILE__ " " __STR(__LINE__) " tangent space couldn't be obtained - Newton method failed to converge.") );
+                    reset(); //resets predictor step!
                     log->error("continuation::advance_solution: Newton-Raphson failed to converged. Nothing can be done so far, setting estimation equal to the previous step.");
                     vec_ops->assign(x0_s, x1_s);
                     lambda1_s = lambda0_s;

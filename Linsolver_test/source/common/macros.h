@@ -1,6 +1,9 @@
 #ifndef __ARNOLDI_MACROS_H__
 #define __ARNOLDI_MACROS_H__
 
+#ifndef I2_R
+	#define I2_R(i , j, Rows) (i)+(j)*(Rows)
+#endif
 
 #ifndef I2
     #define I2(i, j, Col) (i)*(Col)+(j)

@@ -370,7 +370,7 @@ public:
         //perform analytical solution continuation if desired and if it is the first run
         if( (analytical_solution)&&(!file_exists))
         {
-            log->info_f("MAIN:deflation_continuation: using the analytical solution to form a curve...");
+            log->info("MAIN:deflation_continuation: using the analytical solution to form a curve...");
             bif_diag_curve_t* bdf;
             T lambda = knots->get_value();
             vec_ops->init_vector(x_deflation); vec_ops->start_use_vector(x_deflation);
@@ -381,7 +381,7 @@ public:
             bif_diag->close_curve();
             save_data(file_name);
             vec_ops->stop_use_vector(x_deflation); vec_ops->free_vector(x_deflation);
-            log->info_f("MAIN:deflation_continuation: analytical solution formed.");
+            log->info("MAIN:deflation_continuation: analytical solution formed.");
         }
         //
 

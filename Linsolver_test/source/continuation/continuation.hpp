@@ -208,7 +208,7 @@ protected: //changed to protected for inheritance
     T lambda_start; T_vec x_start;
     T lambda0, lambda0_s, lambda1, lambda1_s;
     T lambda_min, lambda_max;
-    T_vec x0, x0_s, x1, x1_s, x_check;
+    T_vec x0, x0_s, x1, x1_back, x1_s, x_check;
     char break_semicurve = 0;
     bool fail_flag = false;
     bool continue_next_step = true;
@@ -223,6 +223,7 @@ private:
         vec_ops->init_vector(x0_s); vec_ops->start_use_vector(x0_s);
         vec_ops->init_vector(x1_s); vec_ops->start_use_vector(x1_s);
         vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
+        vec_ops->init_vector(x1_back); vec_ops->start_use_vector(x1_back);
     }
     void unset_all_vectors()
     {
@@ -232,6 +233,7 @@ private:
         vec_ops->stop_use_vector(x0_s); vec_ops->free_vector(x0_s);
         vec_ops->stop_use_vector(x1_s); vec_ops->free_vector(x1_s);
         vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
+        vec_ops->stop_use_vector(x1_back); vec_ops->free_vector(x1_back);
     }
 
 
@@ -250,6 +252,10 @@ private:
         vec_ops->add_mul(w, x0_, _w, x1_);
         lambda_1_ = lambda_star;
         bool res = get_solution(lambda_star, x1_);
+        if(!res)
+        {
+            log->error("continuation::interpolate_solutions: newton solver for interpolation failed to converge.");
+        }
         return(res);
     }
 
@@ -380,8 +386,22 @@ private:
                     {
                         check_interval();
                         check_returning();
+                        
+                        //save for restoring if interpolation fails!
+                        bool fail_flag_b4_interpolation = fail_flag;
+                        vec_ops->assign(x1, x1_back);
+                        T lambda1_back = lambda1;
+                        
                         did_knot_interpolation = interpolate_all_knots();
-                        //if fail flag after the interpolation, restore (x1, lambda1)?!
+                        //if fail flag after the interpolation, restore (x1, lambda1) and continue?
+                        if((fail_flag)&&(!fail_flag_b4_interpolation))
+                        {
+                            vec_ops->assign(x1_back, x1);
+                            lambda1 = lambda1_back;
+                            fail_flag = false;
+                            did_knot_interpolation = false;
+                            log->warning("continuation::start_semicurve did_knot_interpolation falied, restoring state. May cause problems during deflation!");
+                        }
                     }
                     else
                     {

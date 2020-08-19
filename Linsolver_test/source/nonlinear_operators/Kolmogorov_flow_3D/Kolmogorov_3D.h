@@ -316,6 +316,8 @@ public:
         project(dR);
         kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, Reynolds_0);
 
+
+        //project(dR);
     }
     void preconditioner_jacobian_u(T_vec& dr)
     {
@@ -328,6 +330,27 @@ public:
         pool_BC.release(dR);
     }
 
+
+
+    //preconditioner for the temporal Jacobian a*E + b*dF/du
+    void preconditioner_jacobian_temporal_u(BC_vec& dR, T a, T b)
+    {
+        project(dR);
+        kern->apply_iLaplace3_plus_E(Laplace, dR.x, dR.y, dR.z, Reynolds_0, a, b);
+
+
+        //project(dR);
+    }
+    void preconditioner_jacobian_temporal_u(T_vec& dr, T a, T b)
+    {
+        BC_vec* dR = pool_BC.take();
+        
+        V2C(dr, *dR);
+        preconditioner_jacobian_temporal_u(*dR, a, b);
+        C2V(*dR, dr);
+        
+        pool_BC.release(dR);
+    }
 
     //funciton that returns std::vector with different bifurcatoin norms
 

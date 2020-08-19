@@ -72,6 +72,8 @@ struct Kolmogorov_3D_ker
 
     void B_ABC_exact(TR coeff, TR_vec ux, TR_vec uy, TR_vec uz);
 
+    void apply_iLaplace3_plus_E(TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR a, TR b);
+    
 private:
     unsigned int BLOCKSIZE_x, BLOCKSIZE_y, BLOCKSIZE;
     size_t Nx, Ny, Nz, Mz;
