@@ -53,6 +53,7 @@ public:
     }
     
 
+
     ~arnoldi_power_iterations()
     {
 
@@ -60,6 +61,10 @@ public:
     
     }
 
+    void set_liner_operator_stable_eigenvalues_halfplane(const T sign_)
+    {
+        sign = -sign_;
+    }  
 
     eigs_t execute()
     {
@@ -69,7 +74,7 @@ public:
         eigs.reserve(small_rows);
         for(int j=0;j<small_rows;j++)
         {
-            eigs.push_back(std::make_pair(eig_real[j], eig_imag[j]));
+            eigs.push_back(std::make_pair(sign*eig_real[j], eig_imag[j]));
         }
         
         std::sort(eigs.rbegin(), eigs.rend()); //from max to min by the first pair
@@ -130,6 +135,8 @@ private:
 
     T* eig_real;
     T* eig_imag;
+
+    T sign = T(1.0);
 
     void start_all()
     {

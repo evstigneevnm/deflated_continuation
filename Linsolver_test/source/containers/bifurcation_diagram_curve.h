@@ -149,7 +149,7 @@ public:
             lambda1 = that.lambda1;
             skip_output = that.skip_output;
             debug_f_name  = std::move(that.debug_f_name);
-            debug_file = std::move(that.debug_file);
+            debug_file = std::move(that.debug_file); //std::move(that.debug_file). Move of std::ofstream supported only from C++5.X and above!
             curve_open = that.curve_open;
             return *this;
             
@@ -232,6 +232,45 @@ public:
         }    
     }
 
+
+    //return a solution pair (x,\lambda) from the container
+    //for the stability analysis. 
+    //Should be done as a querry operation.
+    //container_index is returned to the upper level
+    //returned 'true' means that the pair is found, 'false' - that there are no more pairs
+    bool get_avalible_solution(int& container_index, T& lambda_p, T_vec& x_p)
+    {
+        int N = container.size();
+        if(container_index<N)
+        {
+            bool solution_found = false;
+            int j = 0;
+            for(j=container_index;j<N;j++)
+            {
+                auto &p_j = container[j];
+                if(p_j.is_data_avaliable)
+                {
+                    uint64_t local_id = p_j.id_file_name;
+                    std::string f_name = full_path+std::string("/")+std::to_string(local_id);
+                    vec_files->read_vector(f_name, x_p);
+                    lambda_p = p_j.lambda;
+                    solution_found = true;
+                    break;
+                }
+            }
+            container_index = j+1;
+            if(solution_found)
+                return true;
+            else
+                return false;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    //intersect solutions
     bool find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)
     {
         int N = container.size();
@@ -351,6 +390,11 @@ public:
         log->info_f("container::bifurcation_diagram_curve(%i) closed.", curve_number); 
     }
 
+
+    bool is_curve_open()
+    {
+        return(curve_open);
+    }
 //TODO: function that adds to a specific file at every step for monitoring.
     
 

@@ -418,16 +418,8 @@ public:
             {
                 is_there_a_next_knot = knots->next();
             }
-
         }
-
-
-    
-
-
-
     }
-
 
 
 

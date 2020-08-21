@@ -1,12 +1,12 @@
-#ifndef __STABILITY_STABILITY_HPP__
-#define __STABILITY_STABILITY_HPP__
+#ifndef __STABILITY_STABILITY_ANALYSIS_HPP__
+#define __STABILITY_STABILITY_ANALYSIS_HPP__
 
 /**
 *   The main stability class that basically assembles everything
 *   and then executes the particular eigensolver to obtain the dim of the unstable manfold
 *   for a provided solution.
 */
-
+#include <stdexcept>
 #include <vector>
 #include <string>
 #include <iostream>
@@ -20,7 +20,7 @@ namespace stability
 {
 
 template<class VectorOperations, class MatrixOperations,  class NonlinearOperations, class LinearOperator,  class LinearSolver,class Log, class Newton>
-class stability
+class stability_analysis
 {
 
 public:
@@ -38,7 +38,7 @@ private:
     typedef typename arnoldi_pow_t::eigs_t eigs_t;
 
 public:
-    stability(VectorOperations* vec_ops_l_, MatrixOperations* mat_ops_l_, VectorOperations* vec_ops_s_, MatrixOperations* mat_ops_s_, Log* log_, NonlinearOperations* nonlin_op_, LinearOperator* lin_op_, LinearSolver* lin_slv_, Newton* newton_):
+    stability_analysis(VectorOperations* vec_ops_l_, MatrixOperations* mat_ops_l_, VectorOperations* vec_ops_s_, MatrixOperations* mat_ops_s_, Log* log_, NonlinearOperations* nonlin_op_, LinearOperator* lin_op_, LinearSolver* lin_slv_, Newton* newton_):
     vec_ops_l(vec_ops_l_),
     mat_ops_l(mat_ops_l_),
     vec_ops_s(vec_ops_s_),
@@ -61,7 +61,7 @@ public:
         vec_ops_l->init_vector(x_p2); vec_ops_l->start_use_vector(x_p2);
 
     }
-    ~stability()
+    ~stability_analysis()
     {
         vec_ops_l->stop_use_vector(x_p1); vec_ops_l->free_vector(x_p1);
         vec_ops_l->stop_use_vector(x_p2); vec_ops_l->free_vector(x_p2);        
@@ -72,6 +72,10 @@ public:
 
     }
 
+    void set_liner_operator_stable_eigenvalues_halfplane(const T sign_)
+    {
+        arnoldi_pow->set_liner_operator_stable_eigenvalues_halfplane(sign_);
+    }   
 
     std::pair<int, int> execute(const T_vec& u0_in, const T lambda)
     {
@@ -107,6 +111,48 @@ public:
         return(unstable_dim);
     }
 
+
+
+    void bisect_bifurcation_point_known(const T_vec& x_1, const T& lambda_1, std::pair<int, int> dim1, const T_vec& x_2, const T& lambda_2, std::pair<int, int> dim2, T_vec& x_p, T& lambda_p, unsigned int max_bisect_iterations = 15)
+    {
+        int iter = 0;
+        T lambda_a = lambda_1;
+        T lambda_b = lambda_2;
+        vec_ops_l->assign(x_1, x_p1);
+        vec_ops_l->assign(x_2, x_p2);
+        while(iter<max_bisect_iterations)
+        {
+            lambda_p = lambda_a + 0.5*(lambda_b-lambda_a);
+            linear_interp_solution(x_p1, x_p2, x_p); //initial guess for x_p
+            bool converged = newton->solve(nonlin_op, x_p, lambda_p);
+            if(!converged)
+            {
+                throw std::runtime_error(std::string("Newton method failed to converge.") );
+            }
+            std::pair<int, int> dim_p = execute(x_p, lambda_p);
+            if(dim_p == dim2)
+            {
+                lambda_b = lambda_p;
+                vec_ops_l->assign(x_p, x_p2);
+            }
+            else if(dim_p == dim1)
+            {
+                lambda_a = lambda_p;
+                vec_ops_l->assign(x_p, x_p1);                    
+            }
+            else
+            {
+                //assume that a new point with dim_p!=dim2 and dim1 is a new dim2 point. This way we can isolate a prticular point if there are more than one bifurcaiton points in the parameter segement.
+                dim2 = dim_p;
+                lambda_b = lambda_p;
+                vec_ops_l->assign(x_p, x_p2);                    
+            }
+            iter++;
+            log->info_f("stability.bisect_bifurcaiton_point: bisected to lambda = %lf, dim(U) = (%i,%i), iteration = %i", lambda_p, dim_p.first, dim_p.second, iter);  
+        }        
+
+    }
+
     void bisect_bifurcaiton_point(const T_vec& x_1, const T& lambda_1, const T_vec& x_2, const T& lambda_2, T_vec& x_p, T& lambda_p, unsigned int max_bisect_iterations = 15)
     {
         std::pair<int, int> dim1 = execute(x_1, lambda_1);
@@ -118,41 +164,7 @@ public:
         }
         else
         {
-            int iter = 0;
-            T lambda_a = lambda_1;
-            T lambda_b = lambda_2;
-            vec_ops_l->assign(x_1, x_p1);
-            vec_ops_l->assign(x_2, x_p2);
-            while(iter<max_bisect_iterations)
-            {
-                lambda_p = lambda_a + 0.5*(lambda_b-lambda_a);
-                linear_interp_solution(x_p1, x_p2, x_p);
-                bool converged = newton->solve(nonlin_op, x_p, lambda_p);
-                if(!converged)
-                {
-                    //???
-                }
-                std::pair<int, int> dim_p = execute(x_p, lambda_p);
-                if(dim_p == dim2)
-                {
-                    lambda_b = lambda_p;
-                    vec_ops_l->assign(x_p, x_p2);
-                }
-                else if(dim_p == dim1)
-                {
-                    lambda_a = lambda_p;
-                    vec_ops_l->assign(x_p, x_p1);                    
-                }
-                else
-                {
-                    //assume that a new point in new dim2 point. This way we can isolate a prticualr point if there are more than one point in the parameter segement.
-                    dim2 = dim_p;
-                    lambda_b = lambda_p;
-                    vec_ops_l->assign(x_p, x_p2);                    
-                }
-                iter++;
-                log->info_f("stability.bisect_bifurcaiton_point: bisected to lambda = %lf, dim(U) = (%i,%i), iteration = %i", lambda_p, dim_p.first, dim_p.second, iter);  
-            }
+            bisect_bifurcation_point_known(x_1, lambda_1, dim1, x_2, lambda_2, dim2, x_p, lambda_p, max_bisect_iterations);
         }
 
     }

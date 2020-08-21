@@ -76,6 +76,8 @@ public:
         curve_ref = &curve_container.back();
     }
 
+
+
     int current_curve()
     {
         return curve_container.size();
@@ -100,6 +102,35 @@ public:
         curve_container.back().close_curve();
     }
 
+    std::pair<bool, bool> get_solutoin_from_curve(int& curve_number_, int& container_index_, T& lambda_p, T_vec& x_p)
+    {
+        if(curve_number_>curve_number)
+        {
+            log->error_f("requested curve number %i is not avaliable, current maximum number is %i.", curve_number_, curve_number);
+            return std::make_pair(false, false);
+        }
+        else
+        {
+            auto &curve = curve_container.at(curve_number_);
+            if(curve.is_curve_open())
+            {
+                log->error_f("requested curve number %i is opened and cannod be accessed unless it's closed", curve_number_);
+                return std::make_pair(false, false);
+            }
+            curve.set_main_refs( vec_ops, file_ops, log, nonlin_op, newton, cont_help );
+            bool is_there_a_solution = curve.get_avalible_solution(container_index_, lambda_p, x_p);
+            if(is_there_a_solution)
+            {
+                return std::make_pair(true, true);
+            }
+            else
+            {
+                curve_number_++;
+                return std::make_pair(true, false);
+            }
+        }
+    }
+
     void find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)
     {
 
@@ -118,10 +149,12 @@ public:
 
     }
 
+
+
     void print_curves_status()
     {
-        //log->info("container::bifurcation_diagram curve number = %i\n", curve_number);
-        std::cout << "container::bifurcation_diagram curve number = " << curve_number << std::endl;
+        //log->info("container::bifurcation_diagram current curve number = %i\n", curve_number);
+        std::cout << "container::bifurcation_diagram current curve number = " << curve_number << std::endl;
         for(auto &x: curve_container)
         {   
             x.print_curve_status();

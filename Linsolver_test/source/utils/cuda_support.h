@@ -91,6 +91,11 @@ inline int init_cuda(int PCI_ID)
     return deviceNumber;
 }
 
+//
+// https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__MEMORY.html
+//
+//__host__ ​cudaError_t cudaMemcpy ( void* dst, const void* src, size_t count, cudaMemcpyKind kind ) 
+//
 
 template <class T>
 void host_2_device_cpy(T* device, T* host, int Nx, int Ny, int Nz)
@@ -110,6 +115,12 @@ template <class T>
 void host_2_device_cpy(T* device, T* host, size_t size)
 {
     CUDA_SAFE_CALL(cudaMemcpy(device, host, sizeof(T)*size, cudaMemcpyHostToDevice));
+}
+
+template <class T>
+void device_2_device_cpy(const T* device_from, T* device_to, size_t size)
+{
+    CUDA_SAFE_CALL(cudaMemcpy(device_to, device_from, sizeof(T)*size, cudaMemcpyDeviceToDevice));
 }
 
 

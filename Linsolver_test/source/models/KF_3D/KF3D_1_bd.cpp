@@ -178,5 +178,6 @@ int main(int argc, char const *argv[])
     {
         DC.edit("bifurcation_diagram.dat");  
     }
+    
     return 0;
 }

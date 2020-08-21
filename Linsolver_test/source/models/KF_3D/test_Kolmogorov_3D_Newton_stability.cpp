@@ -25,7 +25,7 @@
 #include <common/gpu_file_operations.h>
 #include <common/gpu_vector_operations.h>
 #include <common/gpu_matrix_vector_operations.h>
-#include <stability/stability.hpp>
+#include <stability/stability_analysis.hpp>
 
 
 
@@ -197,7 +197,7 @@ int main(int argc, char const *argv[])
     printf("Newton 2 solution norm = %le, div = %le\n", vec_ops->norm(x0), KF_3D->div_norm(x0));
     KF_3D->write_solution_abs("x_2.pos", x0);
     
-    typedef stability::stability<gpu_vector_operations_t, gpu_matrix_vector_operations_t,  
+    typedef stability::stability_analysis<gpu_vector_operations_t, gpu_matrix_vector_operations_t,  
                                 KF_3D_t, lin_op_t, lin_solver_t, log_t, newton_t> stability_t;
 
     stability_t *stabl = new stability_t(vec_ops, mat_ops, vec_ops_small, mat_ops_small, log_p, KF_3D, lin_op_p, lin_solver_p, newton);
