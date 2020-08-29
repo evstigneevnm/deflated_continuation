@@ -119,7 +119,10 @@ KF2D_bd: source/models/KF_2D/KF2D_bd.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KF_2D/KF2D_bd.cpp O/Kolmogorov_2D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBBOOST) $(LIBS2) -o KF2D_bd.bin 2>results_make.txt	
 
 KF3D_view: source/models/KF_3D/view_solution.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/view_solution.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBS2) -o KF3D_view_solution.bin 2>results_make.txt		
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/view_solution.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBS2) -o KF3D_view_solution.bin 2>results_make.txt
+
+KS2D_view: source/models/KS_2D/view_solution.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KS_2D/view_solution.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBS2) -o KS2D_view_solution.bin 2>results_make.txt
 
 KF3D_1_bd: source/models/KF_3D/KF3D_1_bd.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(LBOOST) source/models/KF_3D/KF3D_1_bd.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o  $(LCUDA)  $(LIBS2) $(LIBBOOST) -o KF3D_1_bd.bin 2>results_make.txt	

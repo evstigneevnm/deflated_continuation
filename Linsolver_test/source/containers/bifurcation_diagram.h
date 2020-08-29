@@ -40,6 +40,9 @@ private:
     std::string directory;
 
 public:
+    typedef typename Curve::values_t curve_point_type;
+
+public:
     bifurcation_diagram(VectorOperations* vec_ops_, VectorFileOperations* vec_files_, Log* log_, NonlinearOperator* nlin_op_, Newton* newton_, const std::string& directory_ = {}, unsigned int skip_output_ = 10):
     vec_ops(vec_ops_),
     file_ops(vec_files_),
@@ -88,6 +91,7 @@ public:
         curve_number++;
         curve_container.emplace_back( vec_ops, file_ops, log, nonlin_op, newton, curve_number, directory, cont_help, skip_output ) ;
     }
+
     void pop_back_curve()
     {
         if(curve_number > 0)
@@ -101,6 +105,23 @@ public:
     {
         curve_container.back().close_curve();
     }
+
+    std::vector<curve_point_type> get_curve_points_vector(int curve_number_)
+    {
+        try
+        {
+            auto &curve = curve_container.at(curve_number_);
+            return( curve.return_curve_vector() );
+        }
+        catch(const std::exception& e)
+        {
+            log->warning_f("container::bifurcation_diagram::get_curve_points_vector: %s", e.what());
+            std::vector<curve_point_type> zero;
+            return(zero);
+        }
+
+    }
+
 
     std::pair<bool, bool> get_solutoin_from_curve(int& curve_number_, int& container_index_, T& lambda_p, T_vec& x_p)
     {
@@ -143,7 +164,7 @@ public:
             }
             catch(const std::exception& e)
             {
-                log->info_f("container::bifurcation_diagram::find_intersection: %s", e.what());
+                log->warning_f("container::bifurcation_diagram::find_intersection: %s", e.what());
             }
         }
 

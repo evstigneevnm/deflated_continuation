@@ -21,7 +21,10 @@
 *
 */
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D_ker.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/plot_solution.h>
 #include <vector>
+#include <ctime>
+
 
 namespace nonlinear_operators
 {
@@ -43,6 +46,8 @@ public:
     typedef typename VectorOperations_RC_reduced::scalar_type  T_im;
     typedef typename VectorOperations_RC_reduced::vector_type  T_vec_im;   
 
+    //class for plotting
+    typedef plot_solution<vector_operations_real> plot_t;
 
     Kuramoto_Sivashinskiy_2D(T a_val_, T b_val_, size_t Nx_, size_t Ny_, 
         vector_operations_real *vec_ops_R_, 
@@ -76,6 +81,8 @@ public:
 
     ~Kuramoto_Sivashinskiy_2D()
     {
+        delete plot;
+
         vec_ops_C->stop_use_vector(gradient_x); vec_ops_C->free_vector(gradient_x);
         vec_ops_C->stop_use_vector(gradient_y); vec_ops_C->free_vector(gradient_y);
         vec_ops_C->stop_use_vector(Laplace); vec_ops_C->free_vector(Laplace);
@@ -325,7 +332,7 @@ public:
        ifft(u_in, u_out);
     }
 
-    void physical_solution(T_vec_im& u_in, T_vec& u_out)
+    void physical_solution(const T_vec_im& u_in, T_vec& u_out)
     {
        R2C(u_in, u_helper_in);
        physical_solution(u_helper_in, u_out);
@@ -362,12 +369,66 @@ public:
         C2R(u_helper_out, u_out);
     }
 
-    void randomize_vector(T_vec_im& u_out)
+    void randomize_vector(T_vec_im& u_out, int steps_ = -1)
     {
         vec_ops_R->assign_random(du_x_ext);
-        fourier_solution(du_x_ext, u_out);
+        int steps = steps_;
+        
+        if(steps_ == -1)
+        {
+            std::srand(unsigned(std::time(0))); //init new seed
+            steps = std::rand()%8 + 1;     // random from 1 to 8
+
+        }        
+
+
+        fourier_solution(du_x_ext, u_helper_out);
+        //vec_ops_C->assign_scalar(TC(steps,0), u_helper_out);
+
+        for(int st=0;st<steps;st++)
+        {
+            apply_smooth<T, TC>(dimGrid_F, dimBlock, Nx, My, T(10.0*steps), T(0.05), Laplace, u_helper_out);
+        }
+
+
+        C2R(u_helper_out, u_out);
+
+        // std::string file_name = "sooth_file_" + std::to_string(steps) + std::string(".pos");
+        // write_solution(file_name, u_out);
+
     }
     
+    void write_solution(const std::string& f_name, const T_vec_im& u_in)
+    {   
+        
+
+        T_vec u_out;
+        vec_ops_R->init_vector(u_out); vec_ops_R->start_use_vector(u_out); 
+        
+        physical_solution(u_in, u_out);
+
+        plot->write_to_disk(f_name, u_out);
+
+        vec_ops_R->stop_use_vector(u_out); vec_ops_R->free_vector(u_out); 
+
+    }
+    void write_solution_plain(const std::string& f_name, const T_vec_im& u_in)
+    {   
+        
+
+        T_vec u_out;
+        vec_ops_R->init_vector(u_out); vec_ops_R->start_use_vector(u_out); 
+        
+        physical_solution(u_in, u_out);
+
+        plot->write_to_disk_plain(f_name, u_out);
+
+        vec_ops_R->stop_use_vector(u_out); vec_ops_R->free_vector(u_out); 
+
+    }
+
+
+
 
 private:
     T a_val,b_val;
@@ -414,7 +475,7 @@ private:
     T_vec du_x_ext=nullptr;
     T_vec du_y_ext=nullptr;
 
-
+    plot_t* plot;
 
     void common_constructor_operation()
     {  
@@ -446,6 +507,8 @@ private:
         vec_ops_R->init_vector(du_ext); vec_ops_R->start_use_vector(du_ext);
         vec_ops_R->init_vector(du_x_ext); vec_ops_R->start_use_vector(du_x_ext);
         vec_ops_R->init_vector(du_y_ext); vec_ops_R->start_use_vector(du_y_ext);
+        
+        plot = new plot_t(vec_ops_R, Nx, Ny, T(2*3.14159265358979), T(2*3.14159265358979) ) ;    
     }
 
     void init_all_derivatives()

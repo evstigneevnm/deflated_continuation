@@ -113,7 +113,7 @@ public:
 
 
 
-    void bisect_bifurcation_point_known(const T_vec& x_1, const T& lambda_1, std::pair<int, int> dim1, const T_vec& x_2, const T& lambda_2, std::pair<int, int> dim2, T_vec& x_p, T& lambda_p, unsigned int max_bisect_iterations = 15)
+    void bisect_bifurcation_point_known(const T_vec x_1, const T lambda_1, std::pair<int, int> dim1, const T_vec x_2, const T lambda_2, std::pair<int, int> dim2, T_vec& x_p, T& lambda_p, unsigned int max_bisect_iterations = 15)
     {
         int iter = 0;
         T lambda_a = lambda_1;
@@ -122,11 +122,17 @@ public:
         vec_ops_l->assign(x_2, x_p2);
         while(iter<max_bisect_iterations)
         {
-            lambda_p = lambda_a + 0.5*(lambda_b-lambda_a);
+            lambda_p = lambda_a + T(0.5)*(lambda_b-lambda_a);
             linear_interp_solution(x_p1, x_p2, x_p); //initial guess for x_p
+
             bool converged = newton->solve(nonlin_op, x_p, lambda_p);
             if(!converged)
             {
+                // vec_ops_l->assign(x_p1, x_p);
+                // vec_ops_l->add_mul(T(0.333), x_p2, x_p);
+                // newton->solve(nonlin_op, x_p, lambda_a);
+
+                // vec_ops_l->assign_scalar(T(0.0), x_p);
                 throw std::runtime_error(std::string("Newton method failed to converge.") );
             }
             std::pair<int, int> dim_p = execute(x_p, lambda_p);

@@ -28,7 +28,9 @@
 #include <containers/bifurcation_diagram_curve.h>
 #include <containers/bifurcation_diagram.h>
 
+#include <containers/stability_diagram.h>
 #include <stability/stability_analysis.hpp>
+
 
 namespace main_classes
 {
@@ -105,6 +107,14 @@ private:
         container_helper_t
         > bif_diag_t;
 
+    typedef container::stability_diagram<
+        VectorOperations, 
+        VectorFileOperations, 
+        Log
+        > stability_diagram_t;
+
+
+
     typedef utils::pointer_queue<T> queue_pointer_t;
     typedef utils::queue_fixed_size<T, 2> queue_lambda_t;
     typedef utils::queue_fixed_size<std::pair<int, int>, 2> queue_dims_t;    
@@ -137,9 +147,12 @@ public:
 
         bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files_);
 
+        stability_diagram = new stability_diagram_t(vec_ops, file_ops, log, project_dir);
+
         queue_pointer = new queue_pointer_t(vec_ops->get_vector_size(), 2);
         queue_lambda = new queue_lambda_t();
         queue_dims = new queue_dims_t();
+
 
         vec_ops->init_vector(x_p); vec_ops->start_use_vector(x_p);
         
@@ -149,6 +162,7 @@ public:
         delete queue_dims;
         delete queue_lambda;
         delete queue_pointer;
+        delete stability_diagram;
         delete bif_diag;
         delete stab;        
         delete newton;
@@ -199,6 +213,10 @@ public:
         int container_index = 0;
 
         bool2 res_read = bool2(true, true);
+        
+        queue_pointer->clear();
+        queue_lambda->clear();
+        queue_dims->clear(); 
 
         while(res_read.second)
         { 
@@ -238,19 +256,39 @@ public:
 
             queue_pointer->push(x_p); 
             queue_lambda->push(lambda_p);
-            std::pair<int, int> unstable_dim_p = stab->execute(x_p, lambda_p);
-            queue_dims->push(unstable_dim_p);
             
-            if( queue_pointer->is_queue_filled() )
+            try
             {
-                if( queue_dims->at(0) != queue_dims->at(1) )
+                std::pair<int, int> unstable_dim_p = stab->execute(x_p, lambda_p);
+                queue_dims->push(unstable_dim_p);
+                bool bifurcation_point = false;
+                if( queue_pointer->is_queue_filled() )
                 {
-                    stab->bisect_bifurcation_point_known(queue_pointer->at(0), queue_lambda->at(0), queue_dims->at(0), queue_pointer->at(1), queue_lambda->at(1), queue_dims->at(1), x_p, lambda_p, 21);
-                    //after this (lambda_p,x_p) contain the bifurcaiton point data.
-                    
+                    if( queue_dims->at(0) != queue_dims->at(1) )
+                    {
+                        log->info_f("container::stability_diagram: (lambda0,||x0||) = (%lf;%lf), (lambda1,||x1||) = (%lf;%lf).", double(queue_lambda->at(0)), vec_ops->norm(queue_pointer->at(0)), double(queue_lambda->at(1)), vec_ops->norm(queue_pointer->at(1)) );
+                        stab->bisect_bifurcation_point_known(queue_pointer->at(0), queue_lambda->at(0), queue_dims->at(0), queue_pointer->at(1), queue_lambda->at(1), queue_dims->at(1), x_p, lambda_p, 20);
+                        //after this (lambda_p,x_p) contain the bifurcaiton point data.
+                        bifurcation_point = true;
+                    }
+
                 }
 
+                if(bifurcation_point)
+                    stability_diagram->add(lambda_p, unstable_dim_p.first, unstable_dim_p.second, x_p);
+                else
+                    stability_diagram->add(lambda_p, unstable_dim_p.first, unstable_dim_p.second);
+
             }
+            catch(const std::exception& e)
+            {
+                log->warning_f("container::stability_diagram: %s. Point was not added.", e.what());
+                log->warning_f("container::stability_diagram: failed for lambda_p = %lf, queue is cleared.", lambda_p);
+                queue_pointer->clear();
+                queue_lambda->clear();
+                queue_dims->clear();
+            }
+
             
         }
 
@@ -260,15 +298,64 @@ public:
     }
 
 
-    void execute_all(const std::string file_name_)
+    void edit(const std::string file_name_stability_ = {})
     {
-        load_data(file_name_);
-        int curve_number = 0;
-        bool get_curve = true;
-        while(get_curve)
+        bool stability_data = load_stability_data(file_name_stability_);  
+        if(stability_data)
         {
-            get_curve = execute_single_curve(curve_number);
-            log->info_f("executing curve = %i", curve_number);
+            std::cout << "entering interactive edit mode" << std::endl;
+            std::cout << "enter 'd' to pop_back() the curve or 'q' to quit." << std::endl;
+            char c = 'c';
+            while(c != 'q')
+            {
+                std::cout << "file " << file_name_stability_ << " contains:" << std::endl;
+                stability_diagram->print_curves_status();
+                c = std::cin.get();
+                if(c=='d')
+                {
+                    stability_diagram->pop_back_curve();
+                }
+            }
+            c = std::cin.get();
+            std::cout << "save file(y/n)>>>";
+            c = std::cin.get();
+            if(c == 'y')
+                save_stability_data(file_name_stability_);
+
+        }
+        else
+        {
+            log->warning_f("MAIN:stability_diagram: file %s doesn't exist; called edit with no file provided!", file_name_stability_.c_str());
+        }
+
+    }
+
+
+    void execute(const std::string file_name_diagram_, const std::string file_name_stability_ = {})
+    {
+        bool file_exists = load_diagram_data(file_name_diagram_);
+        if(file_exists)
+        {
+            bool stability_data = load_stability_data(file_name_stability_);
+            int curve_number = 0;
+            if(stability_data)
+            {
+                curve_number = stability_diagram->current_curve();
+            }
+            bool get_curve = true;
+            while(get_curve)
+            {
+                log->info_f("executing curve = %i", curve_number);
+                stability_diagram->open_curve(curve_number);
+                get_curve = execute_single_curve(curve_number);
+                if(get_curve)
+                {
+                    stability_diagram->close_curve();
+                    save_stability_data(file_name_stability_);
+                }
+                
+
+            }
         }
 
     }
@@ -296,6 +383,7 @@ private:
     queue_pointer_t* queue_pointer = nullptr;
     queue_lambda_t* queue_lambda = nullptr;
     queue_dims_t* queue_dims = nullptr;
+    stability_diagram_t* stability_diagram = nullptr;
 
 //  to detect curve break during analysis
     T x_p_start_norm;
@@ -305,7 +393,7 @@ private:
     T lambda_p;
 
 
-    bool load_data(const std::string file_name_ = {})
+    bool load_diagram_data(const std::string file_name_ = {})
     {
         bool file_exists = false;
         if(!file_name_.empty())
@@ -313,20 +401,59 @@ private:
             std::ifstream load_file( (project_dir + file_name_).c_str() );
             if(load_file.good())
             {
-                log->info_f("MAIN:deflation_continuation: reading data for the bifurcaiton diagram from %s ...", (project_dir + file_name_).c_str() );
+                log->info_f("MAIN:stability_continuation: reading data for the bifurcaiton diagram from %s ...", (project_dir + file_name_).c_str() );
                 data_input ia(load_file);
                 ia >> (*bif_diag);
                 load_file.close();
-                log->info_f("MAIN:deflation_continuation: read data for the bifurcaiton diagram from %s", (project_dir + file_name_).c_str() );
+                log->info_f("MAIN:stability_continuation: read data for the bifurcaiton diagram from %s", (project_dir + file_name_).c_str() );
                 file_exists = true;
             }
             else
             {
-                log->warning_f("MAIN:deflation_continuation: failed to load saved data for the bifurcaiton diagram %s", (project_dir + file_name_).c_str() );
+                log->warning_f("MAIN:stability_continuation: failed to load saved data for the bifurcaiton diagram %s", (project_dir + file_name_).c_str() );
                 file_exists = false;
             }
         }
         return file_exists;
+    }
+
+    bool load_stability_data(const std::string file_name_ = {})
+    {
+        bool file_exists = false;
+        if(!file_name_.empty())
+        {
+            std::ifstream load_file( (project_dir + file_name_).c_str() );  
+            if(load_file.good())
+            {
+                log->info_f("MAIN:stability_continuation: reading data for the stability diagram from %s ...", (project_dir + file_name_).c_str() );
+                data_input ia(load_file);
+                ia >> (*stability_diagram);
+                load_file.close();
+                log->info_f("MAIN:stability_continuation: read data for the stability diagram from %s", (project_dir + file_name_).c_str() );
+                file_exists = true;
+            }
+            else
+            {
+                log->warning_f("MAIN:stability_continuation: failed to load stability saved data for the stability diagram %s", (project_dir + file_name_).c_str() );
+                file_exists = false;                
+            }
+
+        }        
+        return file_exists;
+    }
+
+
+    void save_stability_data(const std::string& file_name_ = {})
+    {
+        if(!file_name_.empty())
+        {
+            log->info_f("MAIN:stability_continuation: saving data for the stability diagram in %s ...", (project_dir + file_name_).c_str() );
+            std::ofstream save_file( (project_dir + file_name_).c_str() );
+            data_output oa(save_file);
+            oa << (*stability_diagram);
+            save_file.close();
+            log->info_f("MAIN:stability_continuation: saved data for the stability diagram in %s", (project_dir + file_name_).c_str() );
+        }        
     }
 
 };

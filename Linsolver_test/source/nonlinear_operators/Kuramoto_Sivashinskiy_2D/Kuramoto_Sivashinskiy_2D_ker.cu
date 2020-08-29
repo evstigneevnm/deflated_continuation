@@ -91,6 +91,28 @@ __global__ void R2C_kernel(size_t N, T_vec_im arrayR_im, TC_vec arrayC)
 
 }
 
+template<typename T, typename TC>
+__global__ void apply_smooth_kernel(size_t Nx, size_t My, T mult, T tau, TC* Laplace, TC* v)
+{
+int j=blockDim.x * blockIdx.x + threadIdx.x;
+int k=blockDim.y * blockIdx.y + threadIdx.y;
+    
+if((j>=Nx)||(k>=My)) return;
+    
+    T il = tau*Laplace[I2(j,k,My)].real(); //Laplace is assumed to have 1 at the zero wavenumber!
+
+    v[I2(j,k,My)]/=(T(1.0)-il);
+
+    v[I2(j,k,My)]*=mult;
+
+}
+
+template<typename T, typename T_C>
+void apply_smooth(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, T mult, T tau, T_C* Laplace, T_C* v)
+{
+    apply_smooth_kernel<T, T_C><<<dimGrid, dimBlock>>>(Nx, My, mult, tau, Laplace, v);
+}
+
 
 template<typename T_C>
 void gradient_Fourier(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, T_C*& gradient_x, T_C*& gradient_y)
@@ -139,6 +161,7 @@ void R2C_(unsigned int BLOCK_SIZE, size_t Nx, size_t My, T_vec_im& arrayR_im, TC
 
 }
 
+
 //explicit instantiation
 template void gradient_Fourier<thrust::complex<float> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<float>*& gradient_x, thrust::complex<float>*& gradient_y);
 template void gradient_Fourier<thrust::complex<double> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, thrust::complex<double>*& gradient_x, thrust::complex<double>*& gradient_y);
@@ -152,3 +175,7 @@ template void C2R_<thrust::complex<double>, double*, thrust::complex<double>* >(
 
 template void R2C_<thrust::complex<float>, float*, thrust::complex<float>* >(unsigned int BLOCK_SIZE, size_t Nx, size_t My, float*& arrayR_im, thrust::complex<float>*& arrayC);
 template void R2C_<thrust::complex<double>, double*, thrust::complex<double>* >(unsigned int BLOCK_SIZE, size_t Nx, size_t My, double*& arrayR_im, thrust::complex<double>*& arrayC);
+
+
+template void apply_smooth<float, thrust::complex<float> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, float mult, float tau, thrust::complex<float>* Laplace, thrust::complex<float>* v);
+template void apply_smooth<double, thrust::complex<double> >(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, double mult, double tau, thrust::complex<double>* Laplace, thrust::complex<double>* v);

@@ -48,6 +48,8 @@ private:
     typedef typename VectorOperations::vector_type  T_vec;
 
 public:
+    
+
     //for bost serialization!
     void set_main_refs(VectorOperations* vec_ops_, VectorFileOperations* vec_files_, Log* log_, NonlinearOperator* nlin_op_, Newton* newton_, HelperVectors* helper_vectors_)
     {
@@ -232,6 +234,10 @@ public:
         }    
     }
 
+    std::string get_full_path()
+    {
+        return(full_path);
+    }
 
     //return a solution pair (x,\lambda) from the container
     //for the stability analysis. 
@@ -395,6 +401,8 @@ public:
     {
         return(curve_open);
     }
+
+
 //TODO: function that adds to a specific file at every step for monitoring.
     
 
@@ -405,11 +413,20 @@ public:
 
     }
 
+public:
+    typedef complex_values<T> values_t;
 private:
     typedef std::pair<bool, uint64_t> store_t;
-    typedef complex_values<T> values_t;
     typedef std::vector<values_t> b_d_container_t;
-    
+public:
+    //takes some memory, can be used only for visualization
+    //makes a copy so that original container is undamaged!
+    b_d_container_t return_curve_vector()
+    {
+        return(container);
+    }
+
+private:
     b_d_container_t container;
     uint64_t global_id = 0; 
     uint64_t global_index = 0;

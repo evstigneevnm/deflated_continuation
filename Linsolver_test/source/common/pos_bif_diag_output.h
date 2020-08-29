@@ -1,6 +1,7 @@
 #ifndef __POS_BIF_DIAG_OUTPUT_H__
 #define __POS_BIF_DIAG_OUTPUT_H__
 
+/*
 #include "taylor_model.h"
 
 void    print_res_line(FILE *stream, double u1, double v1, double u2, double v2)
@@ -136,6 +137,164 @@ void    print_res(FILE *stream, const prooving_algos::taylor_model_operations<De
 
         ops.stop_use_taylor_model(tmp1); ops.stop_use_taylor_model(tmp2);
         ops.free_taylor_model(tmp1); ops.free_taylor_model(tmp2);
+}
+
+*/
+#include <cstdlib>
+#include <cmath>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+
+namespace file_operations
+{
+
+    template<class T, class DiagramPointType>
+    void plot_diagram_no_stability(const std::string path_to_file_, const std::string file_name_, int curve_number_, const std::vector<DiagramPointType>& diag_, int coord1_ = 0, int coord2_ = 1, unsigned int prec=6)
+    {
+        std::string f_name = path_to_file_ + file_name_;
+        std::ofstream f(f_name.c_str(), std::ofstream::out);
+        if (!f) throw std::runtime_error("file_operations::plot_diagram_no_stability: error while opening file" + f_name);
+        f << "View '" << file_name_ << "'" << std::endl << "{" << std::endl;
+        T lambda_text = T(0.0);
+        T coord0_text = T(0.0);
+        T coord1_text = T(0.0);
+        
+        int num_points = diag_.size();
+        
+        T coord1_0 = diag_.at(0).vector_norms.at(coord1_);
+        T coord2_0 = diag_.at(0).vector_norms.at(coord2_);
+
+        for (auto &x: diag_)
+        {
+            T lambda = x.lambda;
+            T coord1 = x.vector_norms.at(coord1_);
+            T coord2 = x.vector_norms.at(coord2_);
+            
+            f << "SP(";
+            f << std::setprecision(prec) << lambda << "," << coord1 << "," << coord2;
+            f << "){" << curve_number_ << "};" << std::endl;
+            lambda_text += lambda/T(num_points);
+            coord0_text += coord1/T(num_points);
+            coord1_text += coord2/T(num_points);
+            
+        }
+        //T3(0, 0.11, 0, TextAttributes("Align", "Center", "Font", "Helvetica")){ "Hole" };
+        //f << "T3(" << lambda_text << "," << coord0_text+coord1_0 << "," << coord1_text+coord2_0 << ", TextAttributes(\"Align\", \"Center\", \"Font\", \"Helvetica\")){\"" << std::to_string(curve_number_) << "\"};" << std::endl;
+
+        f << "};";
+
+
+        f.close();
+
+    }
+
+
+    template<class T, class DiagramPointType>
+    void plot_diagram_stability(const std::string path_to_file_, const std::string file_name_, int curve_number_, const std::vector<DiagramPointType>& diag_, const std::vector<DiagramPointType>& diag_bif_, int coord1_ = 0, int coord2_ = 1, unsigned int prec=6)
+    {
+        std::string f_name = path_to_file_ + file_name_;
+        std::ofstream f(f_name.c_str(), std::ofstream::out);
+        if (!f) throw std::runtime_error("file_operations::plot_diagram_stability: error while opening file" + f_name);
+        f << "View '" << file_name_ << "'" << std::endl << "{" << std::endl;
+        T lambda_text = T(0.0);
+        T coord0_text = T(0.0);
+        T coord1_text = T(0.0);
+        
+        int num_points = diag_.size();
+        
+        T coord1_0 = diag_.at(0).vector_norms.at(coord1_);
+        T coord2_0 = diag_.at(0).vector_norms.at(coord2_);
+
+        for (auto &x: diag_)
+        {
+            T lambda = x.lambda;
+            T coord1 = x.vector_norms.at(coord1_);
+            T coord2 = x.vector_norms.at(coord2_);
+            
+            f << "SP(";
+            f << std::setprecision(prec) << lambda << "," << coord1 << "," << coord2;
+            f << "){" << x.dim_unstable << "};" << std::endl;
+            lambda_text += lambda/T(num_points);
+            coord0_text += coord1/T(num_points);
+            coord1_text += coord2/T(num_points);
+            
+        }
+
+        //add bifurcation points
+        for (auto &x: diag_bif_)
+        {
+            T lambda = x.lambda;
+            T coord1 = x.vector_norms.at(coord1_);
+            T coord2 = x.vector_norms.at(coord2_);
+            
+            f << "SP(";
+            f << std::setprecision(prec) << lambda << "," << coord1 << "," << coord2;
+            f << "){" << x.dim_unstable << "};" << std::endl;
+
+            //T3(0, 0.11, 0, TextAttributes("Align", "Center", "Font", "Helvetica")){ "Hole" };
+            f << "T3(" << lambda << "," << coord1 << "," << coord2 << ", TextAttributes(\"Align\", \"Center\", \"Font\", \"Helvetica\")){\"" << std::to_string(x.dim_unstable) << "\"};" << std::endl;
+
+        }
+
+
+        f << "};";
+
+
+        f.close();
+
+    }
+
+    template<class T, class DiagramPointType>
+    void plot_diagram_stability_gnuplot(const std::string path_to_file_, const std::string file_name_, int curve_number_, const std::vector<DiagramPointType>& diag_, const std::vector<DiagramPointType>& diag_bif_, unsigned int prec=6)
+    {
+        std::string f_name = path_to_file_ + std::string("regular") + file_name_;
+        std::ofstream f(f_name.c_str(), std::ofstream::out);
+        if (!f) throw std::runtime_error("file_operations::plot_diagram_stability_gnuplot: error while opening file" + f_name);
+
+        
+        for (auto &x: diag_)
+        {
+            
+            f << std::setprecision(prec) << x.lambda << " ";
+            for(auto &y: x.vector_norms)
+                f << y << " ";
+            f << x.dim_unstable << " ";
+            f << x.id_file_name; // needed to read image for bifurcation diagram
+            f  << std::endl;
+
+        }
+        f.close();
+
+        //add bifurcation points in a separate file
+        f_name = path_to_file_ + std::string("singular") + file_name_;
+        std::ofstream f_b(f_name.c_str(), std::ofstream::out);
+        if (!f_b) throw std::runtime_error("file_operations::plot_diagram_stability_gnuplot: error while opening file" + f_name);
+
+        
+        for (auto &x: diag_bif_)
+        {
+
+            f_b << std::setprecision(prec) << x.lambda << " ";
+            for(auto &y: x.vector_norms)
+                f_b << y << " ";
+            f_b << x.dim_unstable << " ";
+            f_b << "B" << " "; //parse bifurcation type
+            f_b << x.id_file_name; // needed to read image for bifurcation diagram
+            f_b  << std::endl;
+
+        }
+        f_b.close();
+
+
+
+
+
+    }
+
+
+
+
 }
 
 #endif //__POS_BIF_DIAG_OUTPUT_H__

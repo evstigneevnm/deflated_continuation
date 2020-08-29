@@ -2,6 +2,19 @@
 #define __STABILITY__SYSTEM_OPERATOR_STABILITY_H__
     
 
+/**
+*
+*   Class that implements particular funciton over the linear operator 
+*   to accelerate eigenvalues solver.
+*   
+*   This particular class uses shift-inverse method with zero shift (i.e. looking at eigenvalues near (0,0)
+*
+*/
+
+
+//for the estimaiton of the original eigenvalues
+// #include <thrust/complex.h>
+
 namespace stability
 {
 
@@ -19,7 +32,7 @@ public:
     lin_solv(lin_solv_),
     log(log_)
     {
-        tolerance = 1.0e-4;
+        tolerance = 1.0e-5;
         max_iterations = 5000;
         vec_ops->init_vector(r_v); vec_ops->start_use_vector(r_v);
         vec_ops->init_vector(dx_v); vec_ops->start_use_vector(dx_v);
@@ -49,7 +62,7 @@ public:
 
         bool linear_system_converged = false;
         int iter = 0;
-        T factor = 1;
+        T factor = T(1.0);
         while((!linear_system_converged)&&(iter<max_retries))
         {
             vec_ops->assign_scalar(T(0.0), v_out);  //THIS IS A MUST for an inexact arnold process
@@ -60,12 +73,13 @@ public:
             T minimum_resid = lin_solv->monitor().resid_norm_out();
             int iters_performed = lin_solv->monitor().iters_performed();
             
-            //log->info_f("system_operator_stability: desired residual = %le, minimum attained residual = %le with %i iterations.", tolerance_local*factor, minimum_resid, iters_performed);   
-            
+            lin_solv->monitor().restore_max_iterations();
+            lin_solv->monitor().restore_tolerance(); 
+
             if(!linear_system_converged)
                 log->warning_f("system_operator_stability: linear solver failed, desired residual = %le, minimum attained residual = %le with %i iterations. Retrying...", tolerance_local*factor, minimum_resid, iters_performed); 
             iter++;
-            factor*=10;
+            factor*=T(10.0);  
         }
         if(!linear_system_converged)
         {
@@ -73,10 +87,7 @@ public:
         }
         
     
-        lin_solv->monitor().restore_max_iterations();
-        lin_solv->monitor().restore_tolerance();        
-
-        
+      
 
         return linear_system_converged;
     }
@@ -86,6 +97,16 @@ public:
         nonlin_op->set_linearization_point(v_0, lambda);
         linearization_set = true;
     }
+
+    // // eigenvalues are on the host computer.
+    // void map_eigenvalues_to_original(std::vector< thrust::complex<T> >& eigenvalues)
+    // {
+    //     for(auto &x: eigenvalues)
+    //     {
+            
+    //     }
+
+    // }
 
 private:
     VectorOperations* vec_ops;

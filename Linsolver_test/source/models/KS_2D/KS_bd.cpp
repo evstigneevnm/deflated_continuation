@@ -27,7 +27,7 @@
 
 #include <main/deflation_continuation.hpp>
 #include <main/stability_continuation.hpp>
-
+#include <main/plot_diagram_to_pos.hpp>
 
 #ifndef Blocks_x_
     #define Blocks_x_ 32
@@ -55,7 +55,12 @@ int main(int argc, char const *argv[])
         printf("Usage: %s path_to_project N m, where:\n",argv[0]);
         printf("    path_to_project is the relative path to the storage of bifurcation diagram data;\n");  
         printf("    N - discretization size in one direction.\n");
-        printf("    m - size of the Krylov subspace in Arnoldi process.\n");        
+        printf("    m - size of the Krylov subspace in Arnoldi process.\n");    
+        printf("For plotting:\n");
+        printf("Usage: %s path_to_project N p, where:\n",argv[0]);
+        printf("    path_to_project is the relative path to the storage of bifurcation diagram data;\n");  
+        printf("    N - discretization size in one direction.\n");
+        printf("    p - just the char 'p' for plotting.\n");             
         return 0;
     }
     typedef SCALAR_TYPE real;
@@ -76,8 +81,15 @@ int main(int argc, char const *argv[])
     }
     if(argc == 4)
     {
-        m_Krylov = atoi(argv[3]);
-        what_to_execute = 'S';
+        if(argv[3][0] == 'p')
+        {
+            what_to_execute = 'P';
+        }
+        else
+        {
+            m_Krylov = atoi(argv[3]);
+            what_to_execute = 'S';
+        }
     }
     size_t Nx = N, Ny = N;
     real a_val = real(2.0);
@@ -182,7 +194,8 @@ int main(int argc, char const *argv[])
         DC.set_newton_continuation(newton_cont_tol, newton_cont_max_it, real(1.0), true);
         DC.set_newton_deflation(newton_def_tol, newton_def_max_it, real(1.0), true);
         DC.set_steps(S, dS);
-        DC.set_deflation_knots({3.0, 4.5, 5.5, 6.0, 7.5, 9.0, 10.5, 12.0, 13.5, 15.0, 16.5, 18.0, 19.5, 21.0, 22.5, 24.0, 25.5, 27.0, 28.5, 30.0});
+        //DC.set_deflation_knots({3.0, 4.5, 5.5, 6.0, 7.5, 9.0, 10.5, 12.0, 13.5, 15.0, 16.5, 18.0, 19.5, 21.0, 22.5, 24.0, 25.5, 27.0, 28.5, 30.0});
+        DC.set_deflation_knots({3.0, 8.05, 8.1, 8.15, 8.2, 8.5, 8.676, 8.912, 9.0, 9.1, 9.12, 9.15, 9.35, 9.45, 9.56, 9.7, 9.89, 10.1, 10.3, 10.6, 10.8, 10.9, 11.4, 30.0});
         
         if(what_to_execute == 'D')
         {
@@ -191,7 +204,7 @@ int main(int argc, char const *argv[])
         }
         else if(what_to_execute == 'E')
         {
-            DC.edit("bifurcation_diagram.dat");  
+            DC.edit("bifurcation_diagram.dat");
         }
     }
     else if(what_to_execute == 'S')
@@ -207,8 +220,24 @@ int main(int argc, char const *argv[])
         ST.set_newton(newton_tol, newton_max_it, real(1.0), true);
 
         ST.set_liner_operator_stable_eigenvalues_halfplane(real(1.0)); // +1 for RHP, -1 for LHP (default) 
+        ST.edit("stability_diagram.dat");
+        ST.execute("bifurcation_diagram.dat", "stability_diagram.dat");
+    }
+    else if(what_to_execute == 'P')
+    {
+        typedef main_classes::plot_diagram_to_pos<vec_ops_real_im, mat_vec_ops_t, files_real_im_t, log_t, monitor_t, KS_2D_t, lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator> plot_diagram_t;       
 
-        ST.execute_all("bifurcation_diagram.dat");
+        plot_diagram_t PD( (vec_ops_real_im*) &vec_ops_R_im, (files_real_im_t*) &file_ops_im, (log_t*) &log, (log_t*) &log_linsolver, (KS_2D_t*) &KS2D, path_to_prject_);
+
+        PD.set_linsolver(lin_solver_tol, lin_solver_max_it, use_precond_resid, resid_recalc_freq, basis_sz);
+        PD.set_newton(newton_tol, newton_max_it, real(1.0), true);
+
+        PD.set_plot_pos_sols(3);
+        PD.execute("bifurcation_diagram.dat", "stability_diagram.dat");
+    }
+    else
+    {
+        std::cout << "No correct usage scheme was selected." << std::endl;
     }
 
 
