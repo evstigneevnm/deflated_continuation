@@ -42,7 +42,7 @@ namespace main_classes
 
 
 
-template<class VectorOperations, class MatrixOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, template<class , class , class , class , class > class LinearSolver,  template<class , class , class , class > class SystemOperator>
+template<class VectorOperations, class MatrixOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, template<class , class , class , class , class > class LinearSolver,  template<class , class , class , class > class SystemOperator, class Parameters>
 class plot_diagram_to_pos
 {
 private:
@@ -130,14 +130,15 @@ private:
 
 
 public:
-    plot_diagram_to_pos(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, Log* log_linsolver_, NonlinearOperations* nonlin_op_, const std::string project_dir_):
+    plot_diagram_to_pos(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, Log* log_linsolver_, NonlinearOperations* nonlin_op_, Parameters* parameters_):
             vec_ops(vec_ops_),
             file_ops(file_ops_),
             log(log_),
             nonlin_op(nonlin_op_),
-            project_dir(project_dir_),
-            log_linsolver(log_linsolver_)
+            log_linsolver(log_linsolver_),
+            parameters(parameters_)
     {
+        project_dir = parameters->path_to_prject;
         //set project directory the same way as in deflation_continuation
         if(!project_dir.empty() && *project_dir.rbegin() != '/')
             project_dir += '/';
@@ -187,10 +188,30 @@ public:
     }
    
 
-    void set_linsolver(T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true)
+    void set_parameters()
+    {
+        set_linsolver();
+        set_newton();
+        set_plot_pos_sols( parameters->plot_solutions.plot_solution_frequency );
+    }
+
+
+    void set_linsolver()
+/*
+T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true
+*/    
     {
         //setup linear system:
         mon = &lin_slv->monitor();
+
+        T lin_solver_tol = parameters->nonlinear_operator.linear_solver.lin_solver_tol;
+        unsigned int lin_solver_max_it = parameters->nonlinear_operator.linear_solver.lin_solver_max_it;
+        bool save_convergence_history_ = parameters->nonlinear_operator.linear_solver.save_convergence_history;
+        bool divide_out_norms_by_rel_base_ = parameters->nonlinear_operator.linear_solver.divide_out_norms_by_rel_base;
+        int use_precond_resid = parameters->nonlinear_operator.linear_solver.use_precond_resid;
+        int resid_recalc_freq = parameters->nonlinear_operator.linear_solver.resid_recalc_freq;
+        int basis_sz = parameters->nonlinear_operator.linear_solver.basis_size;
+
         mon->init(lin_solver_tol, T(0), lin_solver_max_it);
         mon->set_save_convergence_history(save_convergence_history_);
         mon->set_divide_out_norms_by_rel_base(divide_out_norms_by_rel_base_);
@@ -201,12 +222,22 @@ public:
         if(resid_recalc_freq >= 0)
             lin_slv->set_resid_recalc_freq(resid_recalc_freq);
         if(basis_sz > 0)
-            lin_slv->set_basis_size(basis_sz);  
+            lin_slv->set_basis_size(basis_sz);        
 //
     }
 
-    void set_newton(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true)
+    void set_newton()
+/*
+T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true
+*/    
     {
+        T tolerance_ = parameters->nonlinear_operator.newton.tolerance;
+        unsigned int maximum_iterations_ = parameters->nonlinear_operator.newton.newton_max_it;
+        T newton_wight_ = parameters->nonlinear_operator.newton.newton_wight;
+
+        bool store_norms_history_ = parameters->nonlinear_operator.newton.store_norms_history;
+        bool verbose_ = parameters->nonlinear_operator.newton.verbose;
+
         convergence_newton->set_convergence_constants(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_, verbose_);
     }
 
@@ -379,8 +410,12 @@ public:
         plot_pos_sols = plot_pos_sols_;
     }
 
-    void execute(const std::string file_name_diagram_, const std::string file_name_stability_ = {})
+    void execute()
     {
+        
+        std::string file_name_diagram_ = parameters->bifurcaiton_diagram_file_name;
+        std::string file_name_stability_ = parameters->stability_diagram_file_name;
+
         bool file_exists = load_diagram_data(file_name_diagram_);
         if(file_exists)
         {
@@ -410,6 +445,7 @@ private:
     NonlinearOperations* nonlin_op;
     std::string project_dir;
     std::string save_diagram_dir;
+    Parameters* parameters;
     unsigned int skip_files;
 //created locally:
     LinearOperator* lin_op = nullptr;

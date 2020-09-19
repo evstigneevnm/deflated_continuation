@@ -35,7 +35,7 @@
 namespace main_classes
 {
 
-template<class VectorOperations, class MatrixOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, template<class , class , class , class , class > class LinearSolver,  template<class , class , class , class > class SystemOperator>
+template<class VectorOperations, class MatrixOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, template<class , class , class , class , class > class LinearSolver,  template<class , class , class , class > class SystemOperator, class Parameters>
 class stability_continuation
 {
 private:
@@ -120,16 +120,20 @@ private:
     typedef utils::queue_fixed_size<std::pair<int, int>, 2> queue_dims_t;    
 
 public:
-    stability_continuation(VectorOperations* vec_ops_, MatrixOperations* mat_ops_, VectorOperations* vec_ops_small_, MatrixOperations* mat_ops_small_, VectorFileOperations* file_ops_, Log* log_, Log* log_linsolver_, NonlinearOperations* nonlin_op_, const std::string project_dir_, unsigned int skip_files_ = 10):
+    stability_continuation(VectorOperations* vec_ops_, MatrixOperations* mat_ops_, VectorOperations* vec_ops_small_, MatrixOperations* mat_ops_small_, VectorFileOperations* file_ops_, Log* log_, Log* log_linsolver_, NonlinearOperations* nonlin_op_, Parameters* parameters_):
             vec_ops(vec_ops_),
             mat_ops(mat_ops_),
             file_ops(file_ops_),
             log(log_),
             nonlin_op(nonlin_op_),
-            project_dir(project_dir_),
             log_linsolver(log_linsolver_),
-            skip_files(skip_files_)    
+            parameters(parameters_)
+
     {
+        
+        project_dir = parameters->path_to_prject;
+        skip_files = parameters->deflation_continuation.skip_files;
+
         //set project directory the same way as in deflation_continuation
         if(!project_dir.empty() && *project_dir.rbegin() != '/')
             project_dir += '/';
@@ -145,7 +149,7 @@ public:
         
         stab = new stability_t(vec_ops, mat_ops, vec_ops_small_, mat_ops_small_, log, nonlin_op, lin_op, lin_slv, newton);
 
-        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files_);
+        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files);
 
         stability_diagram = new stability_diagram_t(vec_ops, file_ops, log, project_dir);
 
@@ -178,10 +182,27 @@ public:
     }
    
 
-    void set_linsolver(T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true)
+    void set_parameters()
+    {
+        set_linsolver();
+        set_newton();
+        set_linear_operator_stable_eigenvalues_halfplane();
+    }
+
+    void set_linsolver()
+/*T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true*/    
     {
         //setup linear system:
         mon = &lin_slv->monitor();
+    
+        T lin_solver_tol = parameters->stability_continuation.linear_solver.lin_solver_tol;
+        unsigned int lin_solver_max_it = parameters->stability_continuation.linear_solver.lin_solver_max_it;
+        bool save_convergence_history_ = parameters->stability_continuation.linear_solver.save_convergence_history;
+        bool divide_out_norms_by_rel_base_ = parameters->stability_continuation.linear_solver.divide_out_norms_by_rel_base;
+        int use_precond_resid = parameters->stability_continuation.linear_solver.use_precond_resid;
+        int resid_recalc_freq = parameters->stability_continuation.linear_solver.resid_recalc_freq;
+        int basis_sz = parameters->stability_continuation.linear_solver.basis_size;
+
         mon->init(lin_solver_tol, T(0), lin_solver_max_it);
         mon->set_save_convergence_history(save_convergence_history_);
         mon->set_divide_out_norms_by_rel_base(divide_out_norms_by_rel_base_);
@@ -196,15 +217,29 @@ public:
 //
     }
 
-    void set_newton(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true)
+    void set_newton()
+/*T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true*/    
     {
+        T tolerance_ = parameters->stability_continuation.newton.tolerance;
+        unsigned int maximum_iterations_ = parameters->stability_continuation.newton.newton_max_it;
+        T newton_wight_ = parameters->stability_continuation.newton.newton_wight;
+
+        bool store_norms_history_ = parameters->stability_continuation.newton.store_norms_history;
+        bool verbose_ = parameters->stability_continuation.newton.verbose;        
+
         convergence_newton->set_convergence_constants(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_, verbose_);
     }
 
-    void set_liner_operator_stable_eigenvalues_halfplane(const T sign_)
+    void set_linear_operator_stable_eigenvalues_halfplane()
+/*const T sign_*/    
     {
-        stab->set_liner_operator_stable_eigenvalues_halfplane(sign_);
+        bool left_hp = parameters->stability_continuation.linear_operator_stable_eigenvalues_left_halfplane;
+        if(left_hp)
+            stab->set_linear_operator_stable_eigenvalues_halfplane(T(-1.0));
+        else
+            stab->set_linear_operator_stable_eigenvalues_halfplane(T(1.0));
     }
+
 
     bool execute_single_curve(int& curve_number_)
     {
@@ -298,8 +333,10 @@ public:
     }
 
 
-    void edit(const std::string file_name_stability_ = {})
+    void edit()
     {
+        std::string file_name_stability_ = parameters->stability_diagram_file_name;
+        
         bool stability_data = load_stability_data(file_name_stability_);  
         if(stability_data)
         {
@@ -331,8 +368,11 @@ public:
     }
 
 
-    void execute(const std::string file_name_diagram_, const std::string file_name_stability_ = {})
+    void execute()
     {
+        std::string file_name_diagram_ = parameters->bifurcaiton_diagram_file_name;
+        std::string file_name_stability_ = parameters->stability_diagram_file_name;
+
         bool file_exists = load_diagram_data(file_name_diagram_);
         if(file_exists)
         {
@@ -368,6 +408,7 @@ private:
     Log* log;
     Log* log_linsolver;
     NonlinearOperations* nonlin_op;
+    Parameters* parameters;
     std::string project_dir;
     unsigned int skip_files;
 //created locally:

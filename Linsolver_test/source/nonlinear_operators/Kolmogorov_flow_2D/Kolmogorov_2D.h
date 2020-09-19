@@ -3,7 +3,7 @@
 
 
 /**
-*    Problem class for the 3D Kolmogorov flow:
+*    Problem class for the 2D Kolmogorov flow:
 *    (1)    (U, \nabla U) + \nabla p - \nu \nabla^2 U - f = 0,
 *    (2)    \nabla \cdot U = 0,
 *    where U=(ux, uy)^T is a 2D vector-function, p is a scalar-function and f is a given vector-funciton RHS: 
@@ -146,15 +146,15 @@ private:
 
     //data all passed to constructor as pointers
     T alpha;
-    vec_R_t *vec_ops_R;
-    vec_C_t *vec_ops_C;
-    vec_ops_t *vec_ops;
+    vec_R_t *vec_ops_R =nullptr;
+    vec_C_t *vec_ops_C =nullptr;
+    vec_ops_t *vec_ops =nullptr;
     size_t Nx, Ny, My; //size in physical space Nx*Ny*Nz
                            //size in Fourier space Nx*Ny*Mz
                            //size in the main stretched vector 3*(Nx*Ny*Mz-1)
-    FFT_type *FFT;
-    kern_t* kern;
-    plot_t* plot;
+    FFT_type *FFT =nullptr;
+    kern_t* kern =nullptr;
+    plot_t* plot =nullptr;
 
 
 public:
@@ -200,8 +200,9 @@ public:
         pool_BC.release(W);
     }
     //   F(u,alpha)=v
-    void F(const BC_vec& U, const T Reynolds_, BC_vec& W)
+    void F(BC_vec& U, const T Reynolds_, BC_vec& W)
     {
+        project(U);
         // vec_ops_C->assign_scalar(0.0,W.x);
         // vec_ops_C->assign_scalar(0.0,W.y);
         // vec_ops_C->assign_scalar(0.0,W.z);
@@ -222,17 +223,18 @@ public:
     {
         
         V2C(u_0_, U_0);   
+        project(U_0); //just in case!
         Reynolds_0 = Reynolds_0_;     
     }
 
 
     //variational jacobian J=dF/du:=
     //returns vector dv as Jdu->dv, where J(u_0,alpha_0) linearized at (u_0, alpha_0) by set_linearization_point
-     void jacobian_u(const BC_vec& dU, BC_vec& dV)
+     void jacobian_u(BC_vec& dU, BC_vec& dV)
     {
     // dV:=P[-(U_0, \nabla) dU - (dU, \nabla) U0] + nu*\nabla^2 dU
         BC_vec* dW = pool_BC.take(); //input        
-        
+        project(dU);
         B_V_nabla_F(U_0, dU, dV); //dV:= (dU, nabla) U_0
         B_V_nabla_F(dU, U_0,*dW); //dW:= (U_0, nabla) dU
         kern->add_mul3(TC(1.0,0), dW->x, dW->y, dV.x, dV.y); // dV:=dV+dW
@@ -353,11 +355,11 @@ public:
     
     //funciton that returns exact solution(ES)
     //if the ES is trivial, then return zero vector
-    void exact_solution(const T Reynolds, T_vec u_out)
+    void exact_solution(const T Reynolds, T_vec& u_out)
     {
         BC_vec* UA = pool_BC.take();
-        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.x, UA->x);
-        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.y, UA->y);       
+        vec_ops_C->assign_mul(TC(0.25*Reynolds, 0), force.x, UA->x);
+        vec_ops_C->assign_mul(TC(0.25*Reynolds, 0), force.y, UA->y);   
         C2V(*UA, u_out);
         pool_BC.release(UA);
     }
@@ -410,6 +412,26 @@ public:
 
 
     }
+
+    void write_solution_plain(const std::string& f_name, const T_vec& u_in)
+    {   
+        BC_vec* UC0 = pool_BC.take();
+        BR_vec* UR0 = pool_BR.take();
+        R_vec* u_out = pool_R.take();
+        
+        V2C(u_in, *UC0);
+        ifft(*UC0, *UR0);        
+        kern->apply_abs(UR0->x, UR0->y, u_out->x);
+        pool_BC.release(UC0);
+        pool_BR.release(UR0);
+
+        plot->write_to_disk_plain(f_name, u_out->x);
+
+        pool_R.release(u_out);
+
+
+    }
+
 
     void write_solution_vec(const std::string& f_name, const T_vec& u_in)
     {   

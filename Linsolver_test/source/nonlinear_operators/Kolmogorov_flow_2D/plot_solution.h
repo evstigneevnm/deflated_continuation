@@ -68,8 +68,28 @@ public:
         free(uy_h);
     }
     
+    void write_to_disk_plain(const std::string& f_name, const T_vec& u_d)
+    {
+        
+        size_t sz = Nx*Ny;
+        T_vec u_h = (T_vec) malloc(sizeof(T)*sz);
 
+        device_2_host_cpy<T>(u_h, u_d, sz);
 
+        FILE *stream;
+        stream=fopen(f_name.c_str(), "w" );
+        for(int j=0;j<Nx;j++)
+        {
+            for(int k=0;k<Ny-1;k++)
+            {
+                fprintf(stream, "%lf ", (double)u_h[I2P(j,k)]);
+            }
+            fprintf(stream, "%lf\n", (double)u_h[I2P(j,Ny-1)]);
+        }
+        fclose(stream);
+        free(u_h);
+    }
+    
 private:
     
 

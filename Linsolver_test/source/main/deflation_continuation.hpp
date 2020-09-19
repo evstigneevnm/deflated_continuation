@@ -38,7 +38,7 @@
 namespace main_classes{
 
 
-template<class VectorOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, template<class , class , class , class , class > class LinearSolver, template<class , class , class , class > class SystemOperator>
+template<class VectorOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, template<class , class , class , class , class > class LinearSolver, template<class , class , class , class > class SystemOperator, class Parameters>
 class deflation_continuation
 {
 private:
@@ -145,18 +145,20 @@ private:
 
 
 public:
-    deflation_continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, Log* log_linsolver_, NonlinearOperations* nonlin_op_, const std::string& project_dir_, unsigned int skip_files_ = 10):
+    deflation_continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, Log* log_linsolver_, NonlinearOperations* nonlin_op_, Parameters* parameters_):
     vec_ops(vec_ops_),
     file_ops(file_ops_),
     log(log_),
     nonlin_op(nonlin_op_),
-    project_dir(project_dir_),
     log_linsolver(log_linsolver_),
-    skip_files(skip_files_)
+    parameters(parameters_)
     {
         
         //add '/' to the end of the project dir, if needed
         
+        project_dir = parameters->path_to_prject;
+        skip_files = parameters->deflation_continuation.skip_files;
+
         if(!project_dir.empty() && *project_dir.rbegin() != '/')
             project_dir += '/';
 
@@ -170,9 +172,10 @@ public:
         knots = new knots_t();
         continuate = new continuate_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
         continuate_analytical = new continuate_analytical_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
-        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files_);
+        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files);
         sol_storage_def = new sol_storage_def_t(vec_ops, 50, vec_ops->get_l2_size(), 2.0 );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
         deflate = new deflate_t(vec_ops, file_ops, log, nonlin_op, lin_op, SM, sol_storage_def);
+
     }
     ~deflation_continuation()
     {
@@ -193,13 +196,31 @@ public:
 
 
 
-//TODO: change all this rubbish to a single class that populates the structure. 
-//      It can be populated form anywhere: stdin, file, pipe etc.
+//  called to set all parameters from the parameter structure
+    void set_parameters()
+    {
+        set_linsolver();
+        set_extended_linsolver();
+        set_newton();
+        set_newton_continuation();
+        set_newton_deflation();
+        set_steps();
+        set_deflation_knots();
+    }
 
-    void set_linsolver(T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true)
+    void set_linsolver()
+/*T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true*/
     {
         //setup linear system:
         mon_orig = &SM->get_linsolver_handle_original()->monitor();
+        T lin_solver_tol = parameters->nonlinear_operator.linear_solver.lin_solver_tol;
+        unsigned int lin_solver_max_it = parameters->nonlinear_operator.linear_solver.lin_solver_max_it;
+        bool save_convergence_history_ = parameters->nonlinear_operator.linear_solver.save_convergence_history;
+        bool divide_out_norms_by_rel_base_ = parameters->nonlinear_operator.linear_solver.divide_out_norms_by_rel_base;
+        int use_precond_resid = parameters->nonlinear_operator.linear_solver.use_precond_resid;
+        int resid_recalc_freq = parameters->nonlinear_operator.linear_solver.resid_recalc_freq;
+        int basis_sz = parameters->nonlinear_operator.linear_solver.basis_size;
+
         mon_orig->init(lin_solver_tol, T(0), lin_solver_max_it);
         mon_orig->set_save_convergence_history(save_convergence_history_);
         mon_orig->set_divide_out_norms_by_rel_base(divide_out_norms_by_rel_base_);
@@ -214,9 +235,20 @@ public:
             // SM->get_linsolver_handle_original()->set_restarts(basis_sz);  
 //
     }
-    void set_extended_linsolver(T lin_solver_tol, unsigned int lin_solver_max_it, bool is_small_alpha = false, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true)
+    void set_extended_linsolver()
+/*T lin_solver_tol, unsigned int lin_solver_max_it, bool is_small_alpha = false, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true
+*/    
     {
         mon = &SM->get_linsolver_handle()->monitor();
+        T lin_solver_tol = parameters->deflation_continuation.linear_solver_extended.lin_solver_tol;
+        unsigned int lin_solver_max_it = parameters->deflation_continuation.linear_solver_extended.lin_solver_max_it;
+        bool save_convergence_history_ = parameters->deflation_continuation.linear_solver_extended.save_convergence_history;
+        bool divide_out_norms_by_rel_base_ = parameters->deflation_continuation.linear_solver_extended.divide_out_norms_by_rel_base;
+        int use_precond_resid = parameters->deflation_continuation.linear_solver_extended.use_precond_resid;
+        int resid_recalc_freq = parameters->deflation_continuation.linear_solver_extended.resid_recalc_freq;
+        int basis_sz = parameters->deflation_continuation.linear_solver_extended.basis_size;
+        bool is_small_alpha = parameters->deflation_continuation.linear_solver_extended.is_small_alpha;
+
         mon->init(lin_solver_tol, T(0), lin_solver_max_it);
         mon->set_save_convergence_history(save_convergence_history_);
         mon->set_divide_out_norms_by_rel_base(divide_out_norms_by_rel_base_);
@@ -232,33 +264,69 @@ public:
 //
         SM->is_small_alpha(is_small_alpha);        
     }
-    void set_newton(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true)
+    void set_newton()
+    /*T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true*/
     {
+        T tolerance_ = parameters->nonlinear_operator.newton.tolerance;
+        unsigned int maximum_iterations_ = parameters->nonlinear_operator.newton.newton_max_it;
+        T newton_wight_ = parameters->nonlinear_operator.newton.newton_wight;
+
+        bool store_norms_history_ = parameters->nonlinear_operator.newton.store_norms_history;
+        bool verbose_ = parameters->nonlinear_operator.newton.verbose;
+
         conv_newton->set_convergence_constants(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_,  verbose_);
     }
 
-    void set_newton_continuation(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.8), bool store_norms_history_ = false, bool verbose_ = true)
+    void set_newton_continuation()
+/*T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.8), bool store_norms_history_ = false, bool verbose_ = true*/    
     {
+        T tolerance_ = parameters->deflation_continuation.newton_extended_continuation.tolerance;
+        unsigned int maximum_iterations_ = parameters->deflation_continuation.newton_extended_continuation.newton_max_it;
+        T newton_wight_ = parameters->deflation_continuation.newton_extended_continuation.newton_wight;
+
+        bool store_norms_history_ = parameters->deflation_continuation.newton_extended_continuation.store_norms_history;
+        bool verbose_ = parameters->deflation_continuation.newton_extended_continuation.verbose;
+
         continuate->set_newton(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_, verbose_);
 
     }
 
-    void set_newton_deflation(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true)
+    void set_newton_deflation()
+/*T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true*/    
     {
+        
+        T tolerance_ = parameters->deflation_continuation.newton_extended_deflation.tolerance;
+        unsigned int maximum_iterations_ = parameters->deflation_continuation.newton_extended_deflation.newton_max_it;
+        T newton_wight_ = parameters->deflation_continuation.newton_extended_deflation.newton_wight;
+
+        bool store_norms_history_ = parameters->deflation_continuation.newton_extended_deflation.store_norms_history;
+        bool verbose_ = parameters->deflation_continuation.newton_extended_deflation.verbose;
         deflate->set_newton(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_, verbose_);
 
     }
 
-    void set_steps(unsigned int max_S_, T ds_0_, unsigned int deflation_attempts_ = 5, unsigned int attempts_0_ = 4, int initial_direciton_ = -1, T step_ds_m_ = 0.2, T step_ds_p_ = 0.01)
+    void set_steps()
+/*unsigned int max_S_, T ds_0_, unsigned int deflation_attempts_ = 5, unsigned int attempts_0_ = 4, int initial_direciton_ = -1, T step_ds_m_ = 0.2, T step_ds_p_ = 0.01*/    
     {
+        
+        unsigned int max_S_ = parameters->deflation_continuation.continuation_steps;
+        T ds_0_ = parameters->deflation_continuation.step_size;
+        int initial_direciton_ = parameters->deflation_continuation.initial_direciton;
+        T step_ds_m_ = parameters->deflation_continuation.step_ds_m;
+        T step_ds_p_ = parameters->deflation_continuation.step_ds_p;
+        unsigned int attempts_0_ = parameters->deflation_continuation.continuation_fail_attempts;
+        unsigned int deflation_attempts_ = parameters->deflation_continuation.deflation_attempts;
+
+
         deflate->set_max_retries(deflation_attempts_);
         continuate->set_steps(max_S_, ds_0_, initial_direciton_, step_ds_m_, step_ds_p_, attempts_0_);
         continuate_analytical->set_steps(max_S_, ds_0_, initial_direciton_, step_ds_m_, step_ds_p_, attempts_0_);
     }
 
-    void set_deflation_knots(std::vector<T> knots_)
+    void set_deflation_knots()
+/*std::vector<T> knots_*/    
     {
-        knots->add_element(knots_);
+        knots->add_element(parameters->deflation_continuation.deflation_knots);
     }
 
     void use_analytical_solution(bool analytical_solution_ = false)
@@ -304,9 +372,10 @@ public:
         }        
     }
 
-    void edit(const std::string& file_name = {})
+    void edit()
     {
-        bool file_exists = load_data(file_name);
+        std::string file_name = parameters->bifurcaiton_diagram_file_name;
+        bool file_exists = load_data( file_name );
         if(file_exists)
         {
             std::cout << "entering interactive edit mode" << std::endl;
@@ -337,8 +406,9 @@ public:
     }
 
 
-    void execute(const std::string& file_name = {})
+    void execute()
     {
+        std::string file_name = parameters->bifurcaiton_diagram_file_name;
         //Algorithm pseudocode:
         //
         //Set second knot value: knots.next()
@@ -430,6 +500,7 @@ private:
     Log* log;
     Log* log_linsolver;
     NonlinearOperations* nonlin_op;
+    Parameters* parameters;
 
 //created locally:
     LinearOperator* lin_op;

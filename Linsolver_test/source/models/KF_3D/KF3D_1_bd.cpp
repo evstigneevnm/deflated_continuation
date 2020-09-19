@@ -11,6 +11,7 @@
 
 //vector dependant
 #include <common/gpu_vector_operations.h>
+#include <common/gpu_matrix_vector_operations.h>
 #include <common/gpu_file_operations.h>
 //vector dependant ends
 //problem dependant
@@ -26,6 +27,8 @@
 // #include <numerical_algos/lin_solvers/gmres.h>
 
 #include <main/deflation_continuation.hpp>
+#include <main/stability_continuation.hpp>
+#include <main/plot_diagram_to_pos.hpp>
 
 
 #ifndef Blocks_x_
@@ -38,41 +41,65 @@
 int main(int argc, char const *argv[])
 {
     
-    if((argc!=6)&&(argc!=4))
+    if((argc!=6)&&(argc!=4&&(argc!=5)))
     {
         printf("For continuation:\n");
-        printf("usage: %s path_to_project dS S alpha N, where:\n",argv[0]);
-        printf("    path_to_project is the relative path to the storage of bifurcation diagram data;\n");
+        printf("Usage: %s path_to_project N alpha dS S, where:\n",argv[0]);
+        printf("    path_to_project is the relative path to the storage of bifurcation diagram data;\n");  
+        printf("    N - discretization size in one direction.\n");
+        printf("    alpha - domain extension in 'x' direciton as 1/alpha.\n");
         printf("    dS - continuation step;\n");
         printf("    S - number of continuation steps;\n");
-        printf("    0<alpha<=1;\n");
-        printf("    N = 2^n- discretization in one direction.\n");
         printf("For editing:\n");
-        printf("usage: %s path_to_project alpha N, where:\n",argv[0]);
-        printf("    path_to_project is the relative path to the storage of bifurcation diagram data;\n");
-        printf("    0<alpha<=1;\n");
-        printf("    N = 2^n- discretization in one direction.\n");                
+        printf("Usage: %s path_to_project N one_over_alpha, where:\n",argv[0]);
+        printf("    path_to_project is the relative path to the storage of bifurcation diagram data;\n");  
+        printf("    N - discretization size in one direction.\n");        
+        printf("    alpha - domain extension in 'x' direciton as 1/alpha.\n");        
+        printf("For stability analysis:\n");
+        printf("Usage: %s path_to_project N one_over_alpha m, where:\n",argv[0]);
+        printf("    path_to_project is the relative path to the storage of bifurcation diagram data;\n");  
+        printf("    N - discretization size in one direction.\n");
+        printf("    alpha - domain extension in 'x' direciton as 1/alpha.\n");
+        printf("    m - size of the Krylov subspace in Arnoldi process.\n");    
+        printf("For plotting:\n");
+        printf("Usage: %s path_to_project N one_over_alpha p, where:\n",argv[0]);
+        printf("    path_to_project is the relative path to the storage of bifurcation diagram data;\n");  
+        printf("    N - discretization size in one direction.\n");
+        printf("    alpha - domain extension in 'x' direciton as 1/alpha.\n");      
+        printf("    p - just the char 'p' for plotting.\n");             
         return 0;
     }
-
     typedef SCALAR_TYPE real;
     
+    char what_to_execute = 'E';
     std::string path_to_prject_(argv[1]);
+    size_t N = atoi(argv[2]);
+    real alpha = atof(argv[3]);
+
     real dS = real(1.0);
     unsigned int S = 100;
-    real alpha = real(1.0);
-    size_t N = 32;
-    if(argc==2)
+    unsigned int m_Krylov = 1;    
+
+    if(argc==6)
     {
-        alpha = std::atof(argv[2]);
-        N = std::atoi(argv[3]);
+        dS = atof(argv[4]);
+        S = atoi(argv[5]);
+        what_to_execute = 'D';
+        std::cout << "Running bifurcation diagram construction.\nUsing alpha = " << alpha << ", with discretization: " << N/alpha << "X" << N << "X" << N << std::endl;        
     }
-    else if(argc==6)
+    if(argc == 5)
     {
-        dS = atof(argv[2]);
-        S = atoi(argv[3]);
-        alpha = std::atof(argv[4]);
-        N = std::atoi(argv[5]);
+        if(argv[4][0] == 'p')
+        {
+            what_to_execute = 'P';
+            std::cout << "Running print bifurcation diagram.\nUsing alpha = " << alpha << ", with discretization: " << N/alpha << "X" << N << "X" << N  << std::endl; 
+        }
+        else
+        {
+            m_Krylov = atoi(argv[4]);
+            what_to_execute = 'S';
+            std::cout << "Running stability analysis of the bifurcation diagram.\nUsing alpha = " << alpha << ", with discretization: " << N/alpha << "X" << N << "X" << N << std::endl;             
+        }
     }
 
     int one_over_alpha = int(1/alpha);
@@ -80,7 +107,7 @@ int main(int argc, char const *argv[])
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
     size_t Nz = N;
-    std::cout << "Running bifurcation diagram construction.\nUsing alpha = " << alpha << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << std::endl;
+
 
     typedef utils::log_std log_t;
     typedef thrust::complex<real> complex;
@@ -88,6 +115,7 @@ int main(int argc, char const *argv[])
     typedef gpu_vector_operations<complex> vec_ops_complex_t;
     typedef gpu_vector_operations<real> vec_ops_t;
     typedef cufft_wrap_R2C<real> cufft_type;
+    typedef gpu_matrix_vector_operations<real, vec_ops_t> mat_vec_ops_t;
     
     typedef gpu_file_operations<vec_ops_t> files_t;
 

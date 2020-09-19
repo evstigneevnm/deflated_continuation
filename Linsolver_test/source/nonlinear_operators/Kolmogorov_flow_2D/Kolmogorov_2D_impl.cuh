@@ -92,8 +92,8 @@ if((j>=Nx)||(k>=Ny)) return;
     force_x[I2(j,k,Ny)] = TC(0,0);
     force_y[I2(j,k,Ny)] = TC(0,0);
 
-    force_x[I2(0,n, Ny)]=TC(0, -T(scale) );
-    force_x[I2(0,Ny-n, Ny)]=TC(0, T(scale) );
+    force_x[I2(0, n, Ny)]=TC(0, T(scale) );
+    //force_x[I2(0,Ny-n, Ny)]=TC(0, T(0.5*scale) );
 
 }
 template <typename TR, typename TR_vec, typename TC, typename TC_vec>

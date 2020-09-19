@@ -61,7 +61,7 @@ public:
     
     }
 
-    void set_liner_operator_stable_eigenvalues_halfplane(const T sign_)
+    void set_linear_operator_stable_eigenvalues_halfplane(const T sign_) // sign_ = -1  => left half plane
     {
         sign = -sign_;
     }  

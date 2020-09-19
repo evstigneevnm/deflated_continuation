@@ -72,9 +72,9 @@ public:
 
     }
 
-    void set_liner_operator_stable_eigenvalues_halfplane(const T sign_)
+    void set_linear_operator_stable_eigenvalues_halfplane(const T sign_)
     {
-        arnoldi_pow->set_liner_operator_stable_eigenvalues_halfplane(sign_);
+        arnoldi_pow->set_linear_operator_stable_eigenvalues_halfplane(sign_);
     }   
 
     std::pair<int, int> execute(const T_vec& u0_in, const T lambda)
