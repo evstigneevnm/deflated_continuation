@@ -63,9 +63,16 @@ public:
         bool linear_system_converged = false;
         int iter = 0;
         T factor = T(1.0);
+        // if(zero_linearization)
+        // {
+        //     linear_system_converged = true;
+        //     vec_ops->assign_scalar(T(0.0), v_out);
+        //     log->warning_f("system_operator_stability: Zero vector of linearization!"); 
+        // }
+
         while((!linear_system_converged)&&(iter<max_retries))
         {
-            vec_ops->assign_scalar(T(0.0), v_out);  //THIS IS A MUST for an inexact arnold process
+            vec_ops->assign_scalar(T(0.0), v_out);  //THIS IS A MUST for an inexact arnoldi process
             lin_solv->monitor().set_temp_tolerance(tolerance_local*factor);
 
             linear_system_converged = lin_solv->solve((*lin_op), v_in, v_out);   
@@ -95,6 +102,11 @@ public:
     void set_linerization_point(const T_vec& v_0, const T lambda)
     {
         nonlin_op->set_linearization_point(v_0, lambda);
+        if(vec_ops->norm(v_0) == T(0.0))
+            zero_linearization = true;
+        else
+            zero_linearization = false;
+
         linearization_set = true;
     }
 
@@ -119,6 +131,7 @@ private:
     unsigned int max_iterations;
     unsigned int max_retries = 4;
     bool linearization_set = false;
+    bool zero_linearization = false;
     T_vec r_v;
     T_vec dx_v;
 

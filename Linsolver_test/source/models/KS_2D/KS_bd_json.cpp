@@ -61,8 +61,6 @@ int main(int argc, char const *argv[])
     typedef main_classes::parameters<real> parameters_t;
     parameters_t parameters = main_classes::read_parameters_json<real>(path_to_config_file_);
     parameters.plot_all();
-    //parameters.set_default();
-    //call read structure(path_to_config_file_)
 
 
     unsigned int m_Krylov = parameters.stability_continuation.Krylov_subspace;

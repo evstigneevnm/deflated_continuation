@@ -42,6 +42,7 @@ int main(int argc, char const *argv[])
     typedef gpu_vector_operations<real> gpu_vector_operations_real_t;
     typedef gpu_vector_operations<complex> gpu_vector_operations_complex_t;
     typedef gpu_vector_operations<real> gpu_vector_operations_t;
+    typedef gpu_file_operations<gpu_vector_operations_t> gpu_file_operations_t;
     typedef cufft_wrap_R2C<real> cufft_type;
     typedef nonlinear_operators::Kolmogorov_3D<cufft_type, 
             gpu_vector_operations_real_t, 
@@ -55,17 +56,19 @@ int main(int argc, char const *argv[])
     typedef gpu_matrix_vector_operations<real, vec> gpu_matrix_vector_operations_t;
     typedef typename gpu_matrix_vector_operations_t::matrix_type mat;
 
-    if(argc != 6)
+    if(argc != 8)
     {
-        std::cout << argv[0] << " alpha R1 R2 N m:\n 0<alpha<=1, R_j is the j-th Reynolds number (between two points),\n   N = 2^n- discretization in one direction, \n   m is the number of Krylov basis vectors for the eigensolver.\n";
+        std::cout << argv[0] << " file_1 file_2 alpha R1 R2 N m:\n 0<alpha<=1, R_j is the j-th Reynolds number (between two points),\n   N = 2^n- discretization in one direction, \n   m is the number of Krylov basis vectors for the eigensolver.\n";
         return(0);       
     }
     
-    real alpha = std::atof(argv[1]);
-    real Rey = std::atof(argv[2]);
-    real Rey2 = std::atof(argv[3]);
-    size_t N = std::atoi(argv[4]);
-    size_t m = std::atoi(argv[5]);
+    std::string file_1(argv[1]);
+    std::string file_2(argv[2]);
+    real alpha = std::atof(argv[3]);
+    real Rey = std::atof(argv[4]);
+    real Rey2 = std::atof(argv[5]);
+    size_t N = std::atoi(argv[6]);
+    size_t m = std::atoi(argv[7]);
     int one_over_alpha = int(1/alpha);
 
 
@@ -73,17 +76,18 @@ int main(int argc, char const *argv[])
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
     size_t Nz = N;
-    std::cout << "Using alpha = " << alpha << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << ", and dim(Krylov) = " << m << std::endl;
+    std::cout << "Using alpha = " << alpha << ", Reynolds 1 = " << Rey << ", Reynolds 2 = " << Rey2 << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << ", and dim(Krylov) = " << m << std::endl;
+    std::cout << "file 1: " << file_1 << " file 2: " << file_2 << std::endl;
 
     //linsolver control
     unsigned int lin_solver_max_it = 1000;
     real lin_solver_tol = 5.0e-3;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 3;
+    unsigned int basis_sz = 4;
     //newton deflation control
     unsigned int newton_def_max_it = 250;
-    real newton_def_tol = 1.0e-10;
+    real newton_def_tol = 1.0e-9;
 
 
 
@@ -100,6 +104,7 @@ int main(int argc, char const *argv[])
     gpu_matrix_vector_operations_t *mat_ops = new gpu_matrix_vector_operations_t(N_global, m, CUBLAS);
     gpu_vector_operations_t *vec_ops_small = new gpu_vector_operations_t(m, CUBLAS);
     gpu_matrix_vector_operations_t *mat_ops_small = new gpu_matrix_vector_operations_t(m, m, CUBLAS);
+    gpu_file_operations_t *file_ops = new gpu_file_operations_t(vec_ops);
 
 
 
@@ -119,7 +124,7 @@ int main(int argc, char const *argv[])
 
     log_t log;
     log_t log3;
-    log3.set_verbosity(3);
+    log3.set_verbosity(2);
     lin_op_t lin_op(KF_3D);
     prec_t prec(KF_3D);    
 
@@ -130,7 +135,7 @@ int main(int argc, char const *argv[])
     lin_solver.set_resid_recalc_freq(resid_recalc_freq);
     lin_solver.set_basis_size(basis_sz);
     mon = &lin_solver.monitor();
-    mon->init(lin_solver_tol, real(0.f), lin_solver_max_it);
+    mon->init(lin_solver_tol, real(0.0), lin_solver_max_it);
     mon->set_save_convergence_history(true);
     mon->set_divide_out_norms_by_rel_base(true);   
 
@@ -143,13 +148,8 @@ int main(int argc, char const *argv[])
     vec_ops->init_vector(dx); vec_ops->start_use_vector(dx);
     vec_ops->init_vector(x_back); vec_ops->start_use_vector(x_back);
     
-
-    
-    KF_3D->randomize_vector(x0);
-    vec_ops->assign(x0, x_back);
-    vec_ops->assign(x0, x1);
-    printf("initial solution norm = %le, div = %le\n", vec_ops->norm(x0), KF_3D->div_norm(x0));
-
+    // KF_3D->randomize_vector(x0);
+    // KF_3D->randomize_vector(x1);
 
     // testing newton with convergence strategy
     typedef nonlinear_operators::newton_method::convergence_strategy<
@@ -186,17 +186,19 @@ int main(int argc, char const *argv[])
     system_operator_t *system_operator = new system_operator_t(vec_ops, lin_op_p, lin_solver_p);
     newton_t *newton = new newton_t(vec_ops, system_operator, conv_newton);
 
-    conv_newton->set_convergence_constants(newton_def_tol, newton_def_max_it);
+    conv_newton->set_convergence_constants(newton_def_tol, newton_def_max_it, 1.0, true, true);
 
-    vec_ops->assign(x_back, x0);
+    file_ops->read_vector(file_1, x0);
+    //file_ops->read_vector("x_1.dat", x0);
     bool converged = newton->solve(KF_3D, x0, Rey);
     if(!converged)
     {
-        printf("Newton 2 failed to converge!\n");
+        printf("Newton file 1 failed to converge!\n");
     }
-    printf("Newton 2 solution norm = %le, div = %le\n", vec_ops->norm(x0), KF_3D->div_norm(x0));
-    KF_3D->write_solution_abs("x_2.pos", x0);
-    
+    printf("Newton file 1 solution norm = %le, div = %le\n", vec_ops->norm_l2(x0), KF_3D->div_norm(x0));
+    KF_3D->write_solution_abs("x_1.pos", x0);
+    //file_ops->write_vector("x_1.dat", x0);
+
     typedef stability::stability_analysis<gpu_vector_operations_t, gpu_matrix_vector_operations_t,  
                                 KF_3D_t, lin_op_t, lin_solver_t, log_t, newton_t> stability_t;
 
@@ -206,16 +208,22 @@ int main(int argc, char const *argv[])
     stabl->execute(x0, Rey);
 
 //  testing bisection
+    file_ops->read_vector(file_2, x1);
+    //file_ops->read_vector("x_2.dat", x1);
+
     bool converged2 = newton->solve(KF_3D, x1, Rey2);
     if(!converged2)
     {
-        printf("Newton 2 failed to converge for the second Reynolds number!\n");
+        printf("Newton file 2 failed to converge for the second Reynolds number!\n");
     }    
+    printf("Newton file 2 solution norm = %le, div = %le\n", vec_ops->norm_l2(x1), KF_3D->div_norm(x1));
+    KF_3D->write_solution_abs("x_2.pos", x1);
+    //file_ops->write_vector("x_2.dat", x1);
 
     real lambda_p = 0.0;
     stabl->bisect_bifurcaiton_point(x0, Rey, x1, Rey2, dx, lambda_p);
     std::cout <<  "Bisected parameter value = " << lambda_p << std::endl;
-    printf("Bisected solution norm = %le, div = %le\n", vec_ops->norm(dx), KF_3D->div_norm(dx));
+    printf("Bisected solution norm = %le, div = %le\n", vec_ops->norm_l2(dx), KF_3D->div_norm(dx));
     KF_3D->write_solution_abs("x_bisected.pos", dx);
 
     vec_ops->stop_use_vector(b); vec_ops->free_vector(b);
@@ -231,7 +239,7 @@ int main(int argc, char const *argv[])
     delete conv_newton;
     
 
-
+    delete file_ops;
     delete KF_3D;
     delete vec_ops_R;
     delete vec_ops_C;

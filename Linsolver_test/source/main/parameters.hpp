@@ -47,6 +47,18 @@ struct parameters
                 save_convergence_history = true;
                 divide_out_norms_by_rel_base = true;
             }
+
+            void plot_all()
+            {
+                std::cout << "||  |==lin_solver_max_it: " << lin_solver_max_it << std::endl;
+                std::cout << "||  |==use_precond_resid: " << use_precond_resid << std::endl;
+                std::cout << "||  |==resid_recalc_freq: " << resid_recalc_freq << std::endl;
+                std::cout << "||  |==basis_size: " << basis_size << std::endl;
+                std::cout << "||  |==lin_solver_tol: " << lin_solver_tol << std::endl;
+                std::cout << "||  |==is_small_alpha: " << is_small_alpha << std::endl;                
+                std::cout << "||  |==save_convergence_history: " << save_convergence_history << std::endl;
+                std::cout << "||  |==divide_out_norms_by_rel_base: " << divide_out_norms_by_rel_base << std::endl;
+            }             
         };
         struct newton_extended_continuation_s
         {
@@ -64,6 +76,14 @@ struct parameters
                 verbose = true;            
                 tolerance = 1.0e-9;                
             }
+            void plot_all()
+            {
+                std::cout << "||  |==newton_max_it: " << newton_max_it << std::endl;
+                std::cout << "||  |==newton_wight: " << newton_wight << std::endl;
+                std::cout << "||  |==store_norms_history: " << store_norms_history << std::endl;
+                std::cout << "||  |==verbose: " << verbose << std::endl;
+                std::cout << "||  |==tolerance: " << tolerance << std::endl;
+            }             
         };
         struct newton_extended_deflation_s
         {
@@ -79,7 +99,15 @@ struct parameters
                 store_norms_history = true;
                 verbose = true;            
                 tolerance = 1.0e-9;                
-            }            
+            } 
+            void plot_all()
+            {
+                std::cout << "||  |==newton_max_it: " << newton_max_it << std::endl;
+                std::cout << "||  |==newton_wight: " << newton_wight << std::endl;
+                std::cout << "||  |==store_norms_history: " << store_norms_history << std::endl;
+                std::cout << "||  |==verbose: " << verbose << std::endl;
+                std::cout << "||  |==tolerance: " << tolerance << std::endl;
+            } 
         };              
         
         unsigned int continuation_steps;
@@ -112,6 +140,27 @@ struct parameters
             newton_extended_continuation.set_default();  
             newton_extended_deflation.set_default();        
         }
+        void plot_all()
+        {
+            std::cout << "||==continuation_steps: " << continuation_steps << std::endl;   
+            std::cout << "||==step_size: " << step_size << std::endl;   
+            std::cout << "||==deflation_attempts: " << deflation_attempts << std::endl;  
+            std::cout << "||==continuation_fail_attempts: " << continuation_fail_attempts << std::endl;  
+            std::cout << "||==initial_direciton: " << initial_direciton << std::endl;  
+            std::cout << "||==step_ds_m: " << step_ds_m << std::endl;  
+            std::cout << "||==step_ds_p: " << step_ds_p << std::endl;  
+            std::cout << "||==skip_files: " << skip_files << std::endl; 
+            std::cout << "||==deflation_knots: ";
+            for(auto &x: deflation_knots)
+                std::cout << x << " ";
+            std::cout << std::endl;
+            std::cout << "||==linear_solver_extended: " << std::endl;  
+            linear_solver_extended.plot_all();
+            std::cout << "||==newton_extended_continuation: " << std::endl;
+            newton_extended_continuation.plot_all();
+            std::cout << "||==newton_extended_deflation: " << std::endl;
+            newton_extended_deflation.plot_all();
+        }        
 
     };
 
@@ -139,7 +188,18 @@ struct parameters
                         //those are custom parameters to be set only to high dim Krylov methods
                 save_convergence_history = true;
                 divide_out_norms_by_rel_base = true;  
-            }    
+            }  
+
+            void plot_all()
+            {
+                std::cout << "||  |==lin_solver_max_it: " << lin_solver_max_it << std::endl;
+                std::cout << "||  |==use_precond_resid: " << use_precond_resid << std::endl;
+                std::cout << "||  |==resid_recalc_freq: " << resid_recalc_freq << std::endl;
+                std::cout << "||  |==basis_size: " << basis_size << std::endl;
+                std::cout << "||  |==lin_solver_tol: " << lin_solver_tol << std::endl;
+                std::cout << "||  |==save_convergence_history: " << save_convergence_history << std::endl;
+                std::cout << "||  |==divide_out_norms_by_rel_base: " << divide_out_norms_by_rel_base << std::endl;
+            }  
         };
 
         struct newton_s
@@ -158,6 +218,14 @@ struct parameters
                 verbose = true;            
                 tolerance = 1.0e-9;                
             }
+            void plot_all()
+            {
+                std::cout << "||  |==newton_max_it: " << newton_max_it << std::endl;
+                std::cout << "||  |==newton_wight: " << newton_wight << std::endl;
+                std::cout << "||  |==store_norms_history: " << store_norms_history << std::endl;
+                std::cout << "||  |==verbose: " << verbose << std::endl;
+                std::cout << "||  |==tolerance: " << tolerance << std::endl;
+            }              
         };
 
         bool linear_operator_stable_eigenvalues_left_halfplane;
@@ -172,6 +240,15 @@ struct parameters
             Krylov_subspace = 15;
             linear_solver.set_default();
             newton.set_default();
+        }
+        void plot_all()
+        {
+            std::cout << "||==linear_operator_stable_eigenvalues_left_halfplane: " << linear_operator_stable_eigenvalues_left_halfplane << std::endl;   
+            std::cout << "||==Krylov_subspace: " << Krylov_subspace << std::endl;   
+            std::cout << "||==linear_solver: " << std::endl;  
+            linear_solver.plot_all();
+            std::cout << "||==newton: " << std::endl;  
+            newton.plot_all();
         }
     
     };
@@ -198,7 +275,18 @@ struct parameters
                 lin_solver_tol = 5.0e-3; //relative tolerance wrt to rhs vector. For Krylov-Newton method can be set lower
                 save_convergence_history = true;
                 divide_out_norms_by_rel_base = true;                   
-            }         
+            }   
+
+            void plot_all()
+            {
+                std::cout << "||  |==lin_solver_max_it: " << lin_solver_max_it << std::endl;
+                std::cout << "||  |==use_precond_resid: " << use_precond_resid << std::endl;
+                std::cout << "||  |==resid_recalc_freq: " << resid_recalc_freq << std::endl;
+                std::cout << "||  |==basis_size: " << basis_size << std::endl;     
+                std::cout << "||  |==lin_solver_tol: " << lin_solver_tol << std::endl;  
+                std::cout << "||  |==save_convergence_history: " << save_convergence_history << std::endl; 
+                std::cout << "||  |==divide_out_norms_by_rel_base: " << divide_out_norms_by_rel_base << std::endl; 
+            }      
         };
 
         struct newton_s
@@ -216,6 +304,16 @@ struct parameters
                 store_norms_history = true;
                 verbose = true;
                 tolerance = 1.0e-9;                
+            }
+
+            void plot_all()
+            {
+                std::cout << "||  |==newton_max_it: " << newton_max_it << std::endl;
+                std::cout << "||  |==newton_wight: " << newton_wight << std::endl;                
+                std::cout << "||  |==store_norms_history: " << store_norms_history << std::endl;
+                std::cout << "||  |==verbose: " << verbose << std::endl;
+                std::cout << "||  |==tolerance: " << tolerance << std::endl;                
+
             }
         };
 
@@ -237,6 +335,25 @@ struct parameters
             linear_solver.set_default();
             newton.set_default();
         }
+        void plot_all()
+        {   
+            std::cout << "||==N_size: ";
+            for(auto &x: N_size)
+                std::cout << x << " ";
+            std::cout << std::endl;
+            std::cout << "||==problem_real_parameters_vector: ";
+            for(auto &x: problem_real_parameters_vector)
+                std::cout << x << " ";
+            std::cout << std::endl;      
+            std::cout << "||==problem_int_parameters_vector: ";
+            for(auto &x: problem_int_parameters_vector)
+                std::cout << x << " ";
+            std::cout << std::endl;   
+            std::cout << "||==linear_solver: " << std::endl;
+            linear_solver.plot_all();
+            std::cout << "||==newton: " << std::endl;
+            newton.plot_all();
+        }
     };
 
     struct plot_solutions_s
@@ -246,6 +363,10 @@ struct parameters
         void set_default()
         {
             plot_solution_frequency = 3;
+        }
+        void plot_all()
+        {
+            std::cout << "||==plot_solution_frequency: " << plot_solution_frequency << std::endl;
         }
     };
 
@@ -277,6 +398,19 @@ struct parameters
 
     void plot_all()
     {
+        std::cout << std::endl;
+        std::cout << "nvidia_pci_id: " << nvidia_pci_id << std::endl;
+        std::cout << "path_to_prject: " << path_to_prject << std::endl;
+        std::cout << "bifurcaiton_diagram_file_name: " << bifurcaiton_diagram_file_name << std::endl;
+        std::cout << "stability_diagram_file_name: " << stability_diagram_file_name << std::endl;
+        std::cout << "deflation_continuation: " << std::endl;
+        deflation_continuation.plot_all();
+        std::cout << "stability_continuation: " << std::endl;
+        stability_continuation.plot_all();
+        std::cout << "nonlinear_operator: " << std::endl;
+        nonlinear_operator.plot_all();
+        std::cout << "plot_solutions: " << std::endl;
+        plot_solutions.plot_all();
 
     }
 
@@ -381,7 +515,7 @@ void from_json(const nlohmann::json &j, parameters_d::deflation_continuation_s &
     // std::vector<T> deflation_knots;    
     params_dc_ = parameters_d::deflation_continuation_s
     {
-        j.at("continuation_steps").get<unsigned int>(),
+        j.at("maximum_continuation_steps").get<unsigned int>(),
         j.at("step_size").get<double>(),
         j.at("deflation_attempts").get<unsigned int>(),
         j.at("continuation_fail_attempts").get<unsigned int>(),
@@ -400,7 +534,7 @@ void from_json(const nlohmann::json &j, parameters_f::deflation_continuation_s &
 {  
     params_dc_ = parameters_f::deflation_continuation_s
     {
-        j.at("continuation_steps").get<unsigned int>(),
+        j.at("maximum_continuation_steps").get<unsigned int>(),
         j.at("step_size").get<float>(),
         j.at("deflation_attempts").get<unsigned int>(),
         j.at("continuation_fail_attempts").get<unsigned int>(),
@@ -644,7 +778,8 @@ nlohmann::json read_json(const std::string &project_file_name_)
     }
     catch (const nlohmann::json::exception &exception)
     {
-        std::throw_with_nested(std::runtime_error{"json path: " + project_file_name_});
+        //std::cout << exception.what() << std::endl;
+        std::throw_with_nested(std::runtime_error{"json path: " + project_file_name_ + "\n" + exception.what()});
     }
 }
 
@@ -660,7 +795,9 @@ parameters<T> read_parameters_json(const std::string &project_file_name_)
     catch(const std::exception& e)
     {
         std::cout << "====================X====================" <<std::endl;
-        std::cout << e.what() << std::endl << "setting default values for parameters structure" << std::endl;
+        std::cout << "failed to read json file because:" << std::endl;
+        std::cout << e.what() << std::endl;
+        std::cout << "setting default values for parameters structure" << std::endl;
         std::cout << "====================X====================" <<std::endl;
         parameters_str.set_default();
     }

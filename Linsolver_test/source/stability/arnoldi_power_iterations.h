@@ -68,16 +68,27 @@ public:
 
     eigs_t execute()
     {
-        arnolid_proc->execute_arnoldi(0, V_mat, H_mat);
+        size_t k = 0;
+        arnolid_proc->execute_arnoldi(k, V_mat, H_mat);
         lapack->hessinberg_eigs_from_gpu(H_mat, small_rows, eig_real, eig_imag);
         eigs_t eigs;
+        std::vector<T> eigs_magnitude;
         eigs.reserve(small_rows);
+
+        T max_re_eig = 0.0; 
         for(int j=0;j<small_rows;j++)
         {
-            eigs.push_back(std::make_pair(sign*eig_real[j], eig_imag[j]));
+            T eig_real_l = sign*eig_real[j];
+            T eig_imag_l = eig_imag[j];
+            eigs.push_back(std::make_pair(eig_real_l, eig_imag_l ));
+            eigs_magnitude.push_back(eig_real_l*eig_real_l+eig_imag_l*eig_imag_l);
+
+            if(max_re_eig<eig_real_l)
+                max_re_eig = eig_real_l;
         }
         
         std::sort(eigs.rbegin(), eigs.rend()); //from max to min by the first pair
+
 
 //        TODO: temporal checking 
 /*

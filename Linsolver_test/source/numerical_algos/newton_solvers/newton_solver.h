@@ -44,6 +44,8 @@ public:
         bool finished = false;
         bool linsolver_converged;
         conv_strat->reset_iterations();
+        finished = conv_strat->check_convergence(nonlin_op, x, lambda, delta_x, result_status); //check that the supplied initial guess is not a solution
+
         while(!finished)
         {
             vec_ops->assign_scalar(T(0.0), delta_x);

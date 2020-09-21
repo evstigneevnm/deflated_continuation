@@ -46,13 +46,13 @@ public:
     //sutable for both single execution and for the IRA execution
     // for the IRA: 0<=k<m and v_in is set
     // both V_mat and H_mat are on device
-    void execute_arnoldi(size_t k, T_mat& V_mat, T_mat& H_mat, T_vec v_in = NULL)
+    void execute_arnoldi(size_t& k, T_mat& V_mat, T_mat& H_mat, T_vec v_in = nullptr)
     {
         if(k > m)
         {
             throw std::runtime_error("arnoldi_process: execute_arnoldi k > m");
         }
-        if(v_in == NULL)
+        if(v_in == nullptr)
         {
             v_in = v_v;
             vec_ops_large->assign_random(v_in);

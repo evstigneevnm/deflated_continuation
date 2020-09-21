@@ -27,7 +27,7 @@ public:
         file_operations::write_vector<T>(f_name, sz, vec_op->view(vec_gpu), prec);
     }
 
-    void read_vector(const std::string &f_name, T_vec& vec_gpu) const
+    void read_vector(const std::string &f_name, T_vec vec_gpu) const
     {
         
         file_operations::read_vector<T>(f_name, sz, vec_op->view(vec_gpu));

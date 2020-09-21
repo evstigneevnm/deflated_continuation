@@ -203,7 +203,7 @@ public:
         int resid_recalc_freq = parameters->stability_continuation.linear_solver.resid_recalc_freq;
         int basis_sz = parameters->stability_continuation.linear_solver.basis_size;
 
-        mon->init(lin_solver_tol, T(0), lin_solver_max_it);
+        mon->init(lin_solver_tol, T(0.0), lin_solver_max_it);
         mon->set_save_convergence_history(save_convergence_history_);
         mon->set_divide_out_norms_by_rel_base(divide_out_norms_by_rel_base_);
         mon->out_min_resid_norm();
@@ -234,10 +234,17 @@ public:
 /*const T sign_*/    
     {
         bool left_hp = parameters->stability_continuation.linear_operator_stable_eigenvalues_left_halfplane;
+        
         if(left_hp)
+        {
             stab->set_linear_operator_stable_eigenvalues_halfplane(T(-1.0));
+            std::cout << "set_linear_operator_stable_eigenvalues_halfplane is set to -1" << std::endl;
+        }
         else
+        {
             stab->set_linear_operator_stable_eigenvalues_halfplane(T(1.0));
+            std::cout << "set_linear_operator_stable_eigenvalues_halfplane is set to 1" << std::endl;
+        }
     }
 
 
@@ -257,6 +264,7 @@ public:
         { 
             bool curve_break = false;
             res_read = bif_diag->get_solutoin_from_curve(curve_number_, container_index, lambda_p, x_p);
+
             if(!res_read.first)
             {
                 queue_pointer->clear();
@@ -265,6 +273,7 @@ public:
                 break;
             }
             T x_p_norm = vec_ops->norm_l2(x_p);
+            
             if(container_index == 1)
             {
                 x_p_start_norm = x_p_norm;
@@ -272,7 +281,7 @@ public:
             }
             else
             {
-                if ( (std::abs(lambda_p_start-lambda_p)<T(1.0e-6))&&(std::abs(x_p_start_norm - x_p_norm)<T(1.0e-6)) )
+                if ( (x_p_norm == T(0.0))||(std::abs(lambda_p_start-lambda_p)<T(1.0e-6))&&(std::abs(x_p_start_norm - x_p_norm)<T(1.0e-6)) )
                 {
                     curve_break = true;
                 }

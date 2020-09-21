@@ -133,7 +133,7 @@ public:
                 // newton->solve(nonlin_op, x_p, lambda_a);
 
                 // vec_ops_l->assign_scalar(T(0.0), x_p);
-                throw std::runtime_error(std::string("Newton method failed to converge.") );
+                throw std::runtime_error(std::string("stability.bisect_bifurcation_point_known: Newton method failed to converge.") );
             }
             std::pair<int, int> dim_p = execute(x_p, lambda_p);
             if(dim_p == dim2)

@@ -43,6 +43,7 @@ public:
         bool finished = false;
         bool linsolver_converged = false;
         conv_strat->reset_iterations(); //reset iteration count, newton wight and iteration history
+        finished = conv_strat->check_convergence(nonlin_op, x, lambda, delta_x, delta_lambda, result_status); //check that the supplied initial guess is not a solution
         while(!finished)
         {
             //reset iterational vectors??!

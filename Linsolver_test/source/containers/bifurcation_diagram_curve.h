@@ -261,6 +261,7 @@ public:
                     vec_files->read_vector(f_name, x_p);
                     lambda_p = p_j.lambda;
                     solution_found = true;
+                    log->info_f("bifurcation_diagram_curve::get_avalible_solution: got solution from %s", f_name.c_str());
                     break;
                 }
             }

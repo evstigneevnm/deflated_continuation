@@ -318,7 +318,7 @@ T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool s
                     } 
                     lambda_pr = c.lambda;
                     int dim_unstable = stab_point_front.unstable_dim_R + 2*stab_point_front.unstable_dim_C;
-                    c.dim_unstable = dim_unstable - 1;
+                    c.dim_unstable = dim_unstable; //-1;
 
 
 
@@ -343,7 +343,7 @@ T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool s
             
             if(plot_pos_sols>0)
             {
-                FILE * gnuplotPipe = popen ("gnuplot -persistent", "w");
+/*                FILE * gnuplotPipe = popen ("gnuplot -persistent", "w");
                 std::string gnuplot_command = "set term png size 1900,1024";
                 fprintf(gnuplotPipe, "%s \n", gnuplot_command.c_str());
                 gnuplot_command = "unset colorbox";
@@ -397,6 +397,7 @@ T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool s
                     }
                 }
                 pclose(gnuplotPipe);
+*/            
             }
 
             curve_number_++;
