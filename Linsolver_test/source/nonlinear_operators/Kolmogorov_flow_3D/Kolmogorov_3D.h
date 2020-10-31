@@ -159,6 +159,11 @@ private:
     kern_t* kern;
     plot_t* plot;
 
+    //parameters of the external forcing and its magnitude
+    //should be passed as parameters???
+    int n_y_force;
+    int n_z_force;
+    T scale_force;
 
 public:
     Kolmogorov_3D(T alpha_, size_t Nx_, size_t Ny_, size_t Nz_,
@@ -171,6 +176,10 @@ public:
     FFT(FFT_), 
     alpha(alpha_)
     {
+        n_y_force = 1;
+        n_z_force = 0;
+        scale_force = T(1.0);
+
         Mz=FFT->get_reduced_size();
         common_constructor_operation();
         kern = new kern_t(alpha, Nx, Ny, Nz, Mz, BLOCK_SIZE_x, BLOCK_SIZE_y);
@@ -381,14 +390,29 @@ public:
 
     //function that returns exact solution(ES)
     //if the ES is trivial, then return zero vector
-    void exact_solution(const T& Reynolds, T_vec& u_out)
+    void exact_solution_sin_cos(const T& Reynolds, T_vec& u_out)
     {
         BC_vec* UA = pool_BC.take();
         vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.x, UA->x);
         vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.y, UA->y);
         vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.z, UA->z);        
         C2V(*UA, u_out);
-        pool_BC.release(UA);
+        pool_BC.release(UA);        
+    }
+    void exact_solution_sin(const T& Reynolds, T_vec& u_out)
+    {
+        T n = T(n_y_force);
+        BC_vec* UA = pool_BC.take();
+        vec_ops_C->assign_mul(TC(scale_force*Reynolds/(n*n),0), force.x, UA->x);
+        vec_ops_C->assign_mul(TC(scale_force*Reynolds/(n*n),0), force.y, UA->y);
+        vec_ops_C->assign_mul(TC(scale_force*Reynolds/(n*n),0), force.z, UA->z);        
+        C2V(*UA, u_out);
+        pool_BC.release(UA);        
+    }
+
+    void exact_solution(const T& Reynolds, T_vec& u_out)
+    {       
+        exact_solution_sin(Reynolds, u_out);
     }
 
 
@@ -494,7 +518,7 @@ public:
         if(steps_ == -1)
         {
             std::srand(unsigned(std::time(0))); //init new seed
-            steps = std::rand()%8 + 1;     // random from 1 to 8
+            steps = std::rand()%12 + 3;     // random from 3 to 14
 
         }
 
@@ -748,8 +772,8 @@ private:
    
     void set_force()
     {
-        kern->force_Fourier(1, force.x, force.y, force.z);
-        
+        //kern->force_Fourier_cos_sin(n_y_force, n_z_force, scale_force, force.x, force.y, force.z);
+        kern->force_Fourier_sin(n_y_force, n_z_force, scale_force, force.x, force.y, force.z);
         
         kern->force_ABC(forceABC_R.x, forceABC_R.y, forceABC_R.z);
 

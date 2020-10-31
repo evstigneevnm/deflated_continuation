@@ -44,7 +44,7 @@ int main(int argc, char const *argv[])
     
     if(argc!=3)
     {
-        printf(" ==================================================================================================.\n");
+        printf(".==================================================================================================.\n");
         printf("Usage: %s path_to_config_file.json operaton, where:\n",argv[0]);
         printf("    path_to_config_file.json is the json file containing all project configuration;\n");  
         printf("    operaton stands for 'D', 'E', 'S', 'P' :\n");
@@ -52,7 +52,7 @@ int main(int argc, char const *argv[])
         printf("    'E' - edit bifurcaiton curve.\n");             
         printf("    'S' - execute/edit stability curve.\n");             
         printf("    'P' - plot out the resutls.\n");             
-        printf(" ==================================================================================================.\n");             
+        printf(".==================================================================================================.\n");             
         return 0;
     }
     typedef SCALAR_TYPE real;

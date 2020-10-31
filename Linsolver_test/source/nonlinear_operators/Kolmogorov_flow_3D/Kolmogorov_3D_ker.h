@@ -30,7 +30,9 @@ struct Kolmogorov_3D_ker
 
     void Laplace_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace);
 
-    void force_Fourier(int n, TC_vec force_x, TC_vec force_y, TC_vec force_z);    
+    void force_Fourier_sin(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z);    
+
+    void force_Fourier_sin_cos(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z);    
 
     void force_ABC(TR_vec force_x, TR_vec force_y, TR_vec force_z);
 

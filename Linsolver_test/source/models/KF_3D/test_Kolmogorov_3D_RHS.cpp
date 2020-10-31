@@ -81,6 +81,7 @@ int main(int argc, char const *argv[])
     KF_3D->write_solution_vec("exact_solution_vec.pos", x1);
     KF_3D->write_solution_abs("exact_solution_abs.pos", x1);
     real div_norm_exact = KF_3D->div_norm(x1);
+    printf("exact solution norm = %le\n", vec_ops->norm_l2(x1));
     printf("Divergence norm exact solution = %le\n", double(div_norm_exact) );
 
 
@@ -108,6 +109,7 @@ int main(int argc, char const *argv[])
     printf("Divergence rand vec = %le\n", KF_3D->div_norm(x1) );
 
     KF_3D->F(x1, R, x0);
+    printf("F(x) norm = %le\n", vec_ops->norm(x0));
     real div_norm = KF_3D->div_norm(x0);
     printf("Divergence norm F = %le\n", double(div_norm) );
 
