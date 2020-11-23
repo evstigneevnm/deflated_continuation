@@ -10,6 +10,7 @@
 
 #include <vector>
 #include <string>
+#include <iostream>
 #include <fstream>
 
 //includes json library by nlohmann
@@ -67,14 +68,17 @@ struct parameters
             bool store_norms_history;
             bool verbose;            
             T tolerance;
-
+            T relax_tolerance_factor;
+            int relax_tolerance_steps;
             void set_default()
             {
                 newton_max_it = 300;
                 newton_wight = T(1.0);
                 store_norms_history = true;
                 verbose = true;            
-                tolerance = 1.0e-9;                
+                tolerance = 1.0e-9;   
+                relax_tolerance_factor = 10;
+                relax_tolerance_steps = 1;       
             }
             void plot_all()
             {
@@ -83,6 +87,8 @@ struct parameters
                 std::cout << "||  |==store_norms_history: " << store_norms_history << std::endl;
                 std::cout << "||  |==verbose: " << verbose << std::endl;
                 std::cout << "||  |==tolerance: " << tolerance << std::endl;
+                std::cout << "||  |==relax_tolerance_factor: " << relax_tolerance_factor << std::endl;
+                std::cout << "||  |==relax_tolerance_steps: " << relax_tolerance_steps << std::endl;
             }             
         };
         struct newton_extended_deflation_s
@@ -459,7 +465,9 @@ void from_json(const nlohmann::json &j, parameters_d::deflation_continuation_s::
         j.at("update_wight_maximum").get<double>(),
         j.at("save_norms_history").get<bool>(),
         j.at("verbose").get<bool>(),
-        j.at("tolerance").get<double>()
+        j.at("tolerance").get<double>(),
+        j.at("relax_tolerance_factor").get<double>(),
+        j.at("relax_tolerance_steps").get<int>()
         
     };
 }
@@ -471,7 +479,9 @@ void from_json(const nlohmann::json &j, parameters_f::deflation_continuation_s::
         j.at("update_wight_maximum").get<float>(),
         j.at("save_norms_history").get<bool>(),
         j.at("verbose").get<bool>(),
-        j.at("tolerance").get<float>()
+        j.at("tolerance").get<float>(),
+        j.at("relax_tolerance_factor").get<float>(),
+        j.at("relax_tolerance_steps").get<int>()        
         
     };
 }

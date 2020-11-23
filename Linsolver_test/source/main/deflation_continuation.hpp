@@ -287,7 +287,11 @@ public:
         bool store_norms_history_ = parameters->deflation_continuation.newton_extended_continuation.store_norms_history;
         bool verbose_ = parameters->deflation_continuation.newton_extended_continuation.verbose;
 
-        continuate->set_newton(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_, verbose_);
+        T relax_tolerance_factor_ =  parameters->deflation_continuation.newton_extended_continuation.relax_tolerance_factor;
+
+        int relax_tolerance_steps_ = parameters->deflation_continuation.newton_extended_continuation.relax_tolerance_steps;
+
+        continuate->set_newton(tolerance_, maximum_iterations_, relax_tolerance_factor_, relax_tolerance_steps_, newton_wight_, store_norms_history_, verbose_);
 
     }
 

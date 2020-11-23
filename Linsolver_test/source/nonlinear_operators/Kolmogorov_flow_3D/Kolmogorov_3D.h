@@ -518,7 +518,7 @@ public:
         if(steps_ == -1)
         {
             std::srand(unsigned(std::time(0))); //init new seed
-            steps = std::rand()%12 + 3;     // random from 3 to 14
+            steps = std::rand()%12 + 1;     // random from 1 to 12
 
         }
 

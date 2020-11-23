@@ -47,19 +47,53 @@ public:
         vec_ops->stop_use_vector(Fx); vec_ops->free_vector(Fx);
     }
 
-    void set_convergence_constants(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true, unsigned int stagnation_max_ = 10)
+    void set_convergence_constants(T tolerance_, unsigned int maximum_iterations_, T relax_tolerance_factor_, int relax_tolerance_steps_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true, unsigned int stagnation_max_ = 10)
     {
         tolerance = tolerance_;
+        tolerance_0 = tolerance_;
         maximum_iterations = maximum_iterations_;
         newton_wight = newton_wight_;
         newton_wight_initial = newton_wight_;
         store_norms_history = store_norms_history_;
         verbose = verbose_;
         stagnation_max = stagnation_max_;
+        relax_tolerance_factor = relax_tolerance_factor_;
+        relax_tolerance_steps = relax_tolerance_steps_;
+        current_relax_step = 0;
         if(store_norms_history)
         {
             norms_evolution.reserve(maximum_iterations);
-        }        
+        } 
+        T d_step = relax_tolerance_factor/T(relax_tolerance_steps);   
+        log->info_f("continuation::convergence: check: relax_tolerance_steps = %i, relax_tolerance_factor = %le, d_step = %le", (double)relax_tolerance_steps, relax_tolerance_factor, (double)d_step);
+    }
+
+    void reset_relaxted_tolerance()
+    {
+        tolerance = tolerance_0;
+        current_relax_step = 0;
+
+    }
+
+
+    bool relax_tolerance()
+    {
+        T d_step = relax_tolerance_factor/T(relax_tolerance_steps);
+        current_relax_step++;
+        tolerance = tolerance_0*d_step*T(current_relax_step);
+        if(current_relax_step > relax_tolerance_steps)
+        {
+            reset_relaxted_tolerance();
+            log->info_f("continuation::convergence: reset tolerance relaxation with step %i to %le", current_relax_step, (double)tolerance);            
+            return(false);
+        }
+        else
+        {
+            log->info_f("continuation::convergence: relaxing tolerance to %le with relaxed tolerance step %le (%le, %le), iteration %i", (double)tolerance, (double)d_step, (double)relax_tolerance_factor, (double)T(relax_tolerance_steps), current_relax_step);
+            return(true);
+        }
+
+
     }
 
     bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status)
@@ -68,29 +102,19 @@ public:
         nonlin_op->F(x, lambda, Fx);
         T normFx = vec_ops->norm_l2(Fx);
         //update solution
-        vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
+        vec_ops->assign_mul(T(1.0), x, newton_wight, delta_x, x1);
         T lambda1 = lambda + newton_wight*delta_lambda;
         nonlin_op->F(x1, lambda1, Fx);
         T normFx1 = vec_ops->norm_l2(Fx);
 
         iterations++;
         log->info_f("continuation::convergence: iteration %i, residuals n: %le, n+1: %le ",iterations, (double)normFx, (double)normFx1);
-        // if(normFx1>10.0*normFx) //cancel update and decrease the nonlinear update wight if the norm is growing
-        // {   
-        //     iterations--;
-        //     newton_wight*=T(0.75);
-        //     lambda1 = lambda;
-        //     vec_ops->assign(x, x1);
-        //     log->info_f("convergence_strategy::step is cancelled, Newton wight updated to (%le).", double(newton_wight) );
-        // }
-        // else
-        // {
-            //store norm only if the step is successfull
-            if(store_norms_history)
-            {
-                norms_evolution.push_back(normFx1);
-            }
-        //}
+
+        //store norm only if the step is successfull
+        if(store_norms_history)
+        {
+            norms_evolution.push_back(normFx1);
+        }
         if(T(3.0)*normFx1<normFx)
         {
             reset_wight();
@@ -113,17 +137,20 @@ public:
             log->error("continuation::convergence: Newton updated vector caused nan.");
             finish = true;
             result_status = 3;
-        }else if(std::isinf(normFx))
+        }
+        else if(std::isinf(normFx))
         {
             log->error("continuation::convergence: Newton initial vector caused inf.");
             finish = true;
             result_status = 2;            
-        }else if(std::isinf(normFx1))
+        }
+        else if(std::isinf(normFx1))
         {
             log->error("continuation::convergence: Newton update caused inf.");
             finish = true;
             result_status = 2;            
-        }else
+        }
+        else
         {   
             //update solution
             lambda = lambda1;
@@ -151,9 +178,13 @@ public:
             log->warning_f("continuation::convergence: Newton stagnated at iteration(%i) with norm %le", iterations, (double)normFx1);
             finish = true;     
             if(normFx1<1.0e-6) //?? threshold tolerance for stagnation?
+            {
                 result_status = 0; 
+            }
             else
+            {
                 result_status = 1; 
+            }
                      
         }        
 
@@ -188,10 +219,15 @@ private:
     unsigned int maximum_iterations;
     unsigned int iterations;
     T tolerance;
+    T tolerance_0;
     T_vec x1, Fx;
     T newton_wight, newton_wight_initial;
     bool verbose, store_norms_history;
     std::vector<T> norms_evolution;
+    T relax_tolerance_factor;
+    int relax_tolerance_steps;
+
+    int current_relax_step;
 
 };
 

@@ -67,7 +67,8 @@ private:
         Newton,
         NonlinearOperations,
         system_operator_cont_t,
-        predictor_cont_t
+        predictor_cont_t,
+        convergence_newton_cont_t
         >advance_step_cont_t;
 
     typedef initial_tangent<
@@ -97,7 +98,7 @@ public:
         system_operator_cont = new system_operator_cont_t(vec_ops, log, lin_op, SM);
         conv_newton_cont = new convergence_newton_cont_t(vec_ops, log);
         newton_cont = new newton_cont_t(vec_ops, system_operator_cont, conv_newton_cont);
-        continuation_step = new advance_step_cont_t(vec_ops, log, system_operator_cont, newton_cont, newton, predict);
+        continuation_step = new advance_step_cont_t(vec_ops, log, system_operator_cont, newton_cont, newton, predict, conv_newton_cont);
         init_tangent = new tangent_0_cont_t(vec_ops, log, newton, lin_op, SM);
 
 
@@ -124,7 +125,7 @@ public:
         
     }
 
-    void set_newton(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true)
+    void set_newton(T tolerance_, unsigned int maximum_iterations_, T relax_tolerance_factor_, int relax_tolerance_steps_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true)
     {
         conv_newton_cont->set_convergence_constants(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_,  verbose_);
         epsilon = T(5.0)*tolerance_; //tolerance to check distance between vectors in curves.

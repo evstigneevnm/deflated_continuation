@@ -3,7 +3,7 @@
 
 #include <string>
 #include <stdexcept>
-
+#include <cmath>
 /**
   continuation of a single solution forward or backward on a single step
   execute SOLVE method to continue solution in one step
@@ -12,7 +12,7 @@
 namespace continuation
 {
 
-template<class VectorOperations, class Loggin, class NewtonMethodExtended, class NewtonMethod, class NonlinearOperator, class SystemOperator, class Predictoror>
+template<class VectorOperations, class Loggin, class NewtonMethodExtended, class NewtonMethod, class NonlinearOperator, class SystemOperator, class Predictoror, class ConvergenceNewtonExtended>
 class advance_solution
 {
 public:
@@ -20,20 +20,19 @@ public:
     typedef typename VectorOperations::vector_type  T_vec;
 
     
-    advance_solution(VectorOperations* vec_ops_, Loggin* log_, SystemOperator* sys_op_, NewtonMethodExtended* newton_extended_, NewtonMethod* newton_, Predictoror* predictor_, char continuation_type_ = 'S'):
+    advance_solution(VectorOperations* vec_ops_, Loggin* log_, SystemOperator* sys_op_, NewtonMethodExtended* newton_extended_, NewtonMethod* newton_, Predictoror* predictor_, ConvergenceNewtonExtended* convergence_newton_extended_, char continuation_type_ = 'S'):
     vec_ops(vec_ops_),
     log(log_),
     sys_op(sys_op_),
     newton_extended(newton_extended_),
     newton(newton_),
     predictor(predictor_),
-    continuation_type(continuation_type_)
+    continuation_type(continuation_type_),
+    convergence_newton_extended(convergence_newton_extended_)
     {
         vec_ops->init_vector(x_p); vec_ops->start_use_vector(x_p);
         vec_ops->init_vector(x1_l); vec_ops->start_use_vector(x1_l);
         vec_ops->init_vector(dx10);  vec_ops->start_use_vector(dx10);
-        
-
     }
 
     ~advance_solution()
@@ -41,13 +40,13 @@ public:
         vec_ops->stop_use_vector(x_p); vec_ops->free_vector(x_p);
         vec_ops->stop_use_vector(x1_l); vec_ops->free_vector(x1_l);
         vec_ops->stop_use_vector(dx10); vec_ops->free_vector(dx10);
-        
     }
     
 
     void reset() //can be used to set everything in default state
     {
         predictor->reset_all(); 
+        convergence_newton_extended->reset_relaxted_tolerance();
     }
 
     bool solve(NonlinearOperator* nonlin_op, const T_vec& x0, const T& lambda0, const T_vec& x0_s, const T& lambda0_s, T_vec& x1, T& lambda1, T_vec& x1_s, T& lambda1_s)
@@ -57,6 +56,7 @@ public:
         T lambda_p;
         log->info("continuation::advance_solution::starting point:");
         log->info_f("   ||x0|| = %le, lambda0 = %le, ||x0_s|| = %le, lambda0_s = %le", (double)vec_ops->norm(x0), (double)lambda0, (double)vec_ops->norm(x0_s), (double)lambda0_s);
+        convergence_newton_extended->reset_relaxted_tolerance();
         predictor->reset_tangent_space(x0, lambda0, x0_s, lambda0_s);
         while((!converged)&&(!failed))
         {
@@ -78,11 +78,13 @@ public:
             converged = newton_extended->solve(nonlin_op, x1, lambda1);
             if(!converged)
             {
-                //failed = predictor->modify_ds();
-                //failed = predictor->decrease_ds();
-                failed = predictor->decrease_ds_adaptive();
+                bool do_relaxted = convergence_newton_extended->relax_tolerance(); //this one relaxes tolerance. To be used for hard problems.
+                if(!do_relaxted)
+                {
+                    failed = predictor->decrease_ds_adaptive();
+                    log->info("continuation::advance_solution failed to converged. Modifiying dS.");
+                }
 
-                log->info("continuation::advance_solution failed to converged. Modifiying dS.");
             }
             else
             {
@@ -200,6 +202,7 @@ private:
     NewtonMethodExtended* newton_extended;
     NewtonMethod* newton;
     Predictoror* predictor;
+    ConvergenceNewtonExtended* convergence_newton_extended;
     T_vec x_p, x1_l, dx10;
     Loggin* log;
     char continuation_type;
