@@ -5,7 +5,7 @@
     "stability_diagram_file_name": "stability_diagram.dat",
     "deflation_continuation":{
         "maximum_continuation_steps": 2000,
-        "step_size": 20.0,
+        "step_size": 100.0,
         "deflation_attempts": 10,
         "continuation_fail_attempts": 15,
         "initial_direciton": -1,
@@ -28,7 +28,9 @@
             "update_wight_maximum": 1.0,
             "save_norms_history": true,
             "verbose": true,
-            "tolerance": 1.0e-9
+            "tolerance": 1.0e-9,
+            "relax_tolerance_factor": 500.0,
+            "relax_tolerance_steps": 5
         },
         "newton_deflation":{
             "maximum_iterations": 4000,
