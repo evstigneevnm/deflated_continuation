@@ -212,7 +212,7 @@ public:
             }
             else
             {
-                ds = std::max(ds*T(1.5), ds_max);
+                ds = std::min(ds*T(1.5), ds_max);
                 log->info_f("predictor::ds is increased to %le", (double)ds);
             }
             attempts_increase = 0;
