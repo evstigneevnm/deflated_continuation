@@ -117,7 +117,8 @@ struct parameters
         };              
         
         unsigned int continuation_steps;
-        T step_size; 
+        T step_size;
+        T max_step_size; 
         unsigned int deflation_attempts;
         unsigned int continuation_fail_attempts;
         int initial_direciton;
@@ -135,6 +136,7 @@ struct parameters
         {
             continuation_steps = 5000;
             step_size = 0.5; 
+            max_step_size = 5.0;
             deflation_attempts = 5;
             continuation_fail_attempts = 4;
             initial_direciton = -1;
@@ -150,6 +152,7 @@ struct parameters
         {
             std::cout << "||==continuation_steps: " << continuation_steps << std::endl;   
             std::cout << "||==step_size: " << step_size << std::endl;   
+            std::cout << "||==max_step_size: " << max_step_size << std::endl;
             std::cout << "||==deflation_attempts: " << deflation_attempts << std::endl;  
             std::cout << "||==continuation_fail_attempts: " << continuation_fail_attempts << std::endl;  
             std::cout << "||==initial_direciton: " << initial_direciton << std::endl;  
@@ -527,6 +530,7 @@ void from_json(const nlohmann::json &j, parameters_d::deflation_continuation_s &
     {
         j.at("maximum_continuation_steps").get<unsigned int>(),
         j.at("step_size").get<double>(),
+        j.at("max_step_size").get<double>(),
         j.at("deflation_attempts").get<unsigned int>(),
         j.at("continuation_fail_attempts").get<unsigned int>(),
         j.at("initial_direciton").get<int>(),
@@ -546,6 +550,7 @@ void from_json(const nlohmann::json &j, parameters_f::deflation_continuation_s &
     {
         j.at("maximum_continuation_steps").get<unsigned int>(),
         j.at("step_size").get<float>(),
+        j.at("max_step_size").get<float>(),
         j.at("deflation_attempts").get<unsigned int>(),
         j.at("continuation_fail_attempts").get<unsigned int>(),
         j.at("initial_direciton").get<int>(),

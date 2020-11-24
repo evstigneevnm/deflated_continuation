@@ -9,6 +9,8 @@
     modify_ds modifies ds either increases or dereases step, thus using a swinging tries.
 */
 
+#include <algorithm>
+
 namespace continuation
 {
 
@@ -39,9 +41,10 @@ public:
         
 
     }
-    void set_steps(T ds_0_, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4)
+    void set_steps(T ds_0_, T ds_max_, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4)
     {
         ds_0 = ds_0_;
+        ds_max = ds_max_;
         step_ds_p = step_ds_p_;
         step_ds_m = step_ds_m_;
         attempts_0 = attempts_0_; 
@@ -136,6 +139,7 @@ public:
             {
                 ds_p = ds_p*T(1+step_ds_p);
                 ds = ds_p;
+                ds = std::max(ds_p, ds_max);
             }
             else
             {
@@ -201,14 +205,14 @@ public:
         if(attempts_increase>5)
         {
             
-            if(ds >= T(15.0)*ds_0)
+            if(ds >= ds_max)
             {
-                ds = T(15.0)*ds_0;
+                ds = ds_max;
                 log->info_f("predictor::ds is maximized to %le", (double)ds);
             }
             else
             {
-                ds = ds*T(2.0);
+                ds = std::max(ds*T(1.5), ds_max);
                 log->info_f("predictor::ds is increased to %le", (double)ds);
             }
             attempts_increase = 0;
@@ -224,7 +228,7 @@ public:
     }
 
 private:
-    T ds_0, ds, step_ds_p, step_ds_m, ds_p, ds_m;
+    T ds_max, ds_0, ds, step_ds_p, step_ds_m, ds_p, ds_m;
     unsigned int attempts_0, attempts, attempts_increase;
     VectorOperations* vec_ops;
     T_vec x_s, x_0;

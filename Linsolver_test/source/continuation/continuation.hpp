@@ -117,11 +117,11 @@ public:
 
     }
 
-    void set_steps(unsigned int max_S_, T ds_0_, int initial_direciton_ = -1, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4)
+    void set_steps(unsigned int max_S_, T ds_0_, T ds_max_, int initial_direciton_ = -1, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4)
     {
         max_S = max_S_;
         initial_direciton = initial_direciton_;
-        predict->set_steps(ds_0_, step_ds_m_, step_ds_p_, attempts_0_);
+        predict->set_steps(ds_0_, ds_max_, step_ds_m_, step_ds_p_, attempts_0_);
         
     }
 

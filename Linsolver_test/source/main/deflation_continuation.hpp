@@ -315,6 +315,7 @@ public:
         
         unsigned int max_S_ = parameters->deflation_continuation.continuation_steps;
         T ds_0_ = parameters->deflation_continuation.step_size;
+        T ds_max_ = parameters->deflation_continuation.max_step_size;
         int initial_direciton_ = parameters->deflation_continuation.initial_direciton;
         T step_ds_m_ = parameters->deflation_continuation.step_ds_m;
         T step_ds_p_ = parameters->deflation_continuation.step_ds_p;
@@ -323,8 +324,8 @@ public:
 
 
         deflate->set_max_retries(deflation_attempts_);
-        continuate->set_steps(max_S_, ds_0_, initial_direciton_, step_ds_m_, step_ds_p_, attempts_0_);
-        continuate_analytical->set_steps(max_S_, ds_0_, initial_direciton_, step_ds_m_, step_ds_p_, attempts_0_);
+        continuate->set_steps(max_S_, ds_0_, ds_max_, initial_direciton_, step_ds_m_, step_ds_p_, attempts_0_);
+        continuate_analytical->set_steps(max_S_, ds_0_, ds_max_, initial_direciton_, step_ds_m_, step_ds_p_, attempts_0_);
     }
 
     void set_deflation_knots()

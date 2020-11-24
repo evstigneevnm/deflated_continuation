@@ -64,8 +64,8 @@ public:
         {
             norms_evolution.reserve(maximum_iterations);
         } 
-        T d_step = relax_tolerance_factor/T(relax_tolerance_steps);   
-        log->info_f("continuation::convergence: check: relax_tolerance_steps = %i, relax_tolerance_factor = %le, d_step = %le", (double)relax_tolerance_steps, relax_tolerance_factor, (double)d_step);
+        // T d_step = relax_tolerance_factor/T(relax_tolerance_steps);   
+        // log->info_f("continuation::convergence: check: relax_tolerance_steps = %i, relax_tolerance_factor = %le, d_step = %le", relax_tolerance_steps, (double)relax_tolerance_factor, (double)d_step);
     }
 
     void reset_relaxted_tolerance()
