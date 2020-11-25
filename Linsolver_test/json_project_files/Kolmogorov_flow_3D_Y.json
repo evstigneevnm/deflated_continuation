@@ -6,7 +6,7 @@
     "deflation_continuation":{
         "maximum_continuation_steps": 2000,
         "step_size": 100.0,
-        "max_step_size": 300.0,
+        "max_step_size": 600.0,
         "deflation_attempts": 10,
         "continuation_fail_attempts": 15,
         "initial_direciton": -1,

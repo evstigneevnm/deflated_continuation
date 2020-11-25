@@ -65,8 +65,12 @@ public:
             norms_evolution.reserve(maximum_iterations);
         } 
         // T d_step = relax_tolerance_factor/T(relax_tolerance_steps);   
-        // log->info_f("continuation::convergence: check: relax_tolerance_steps = %i, relax_tolerance_factor = %le, d_step = %le", relax_tolerance_steps, (double)relax_tolerance_factor, (double)d_step);
-    }
+        
+        d_step = std::log10(relax_tolerance_factor)/T(relax_tolerance_steps);
+        
+        log->info_f("continuation::convergence: check: relax_tolerance_steps = %i, relax_tolerance_factor = %le, d_step = %le, d_step_exp = %le", relax_tolerance_steps, (double)relax_tolerance_factor, (double)d_step, (double)std::pow<T>(T(10), d_step));
+
+    }   
 
     void reset_relaxted_tolerance()
     {
@@ -78,9 +82,11 @@ public:
 
     bool relax_tolerance()
     {
-        T d_step = relax_tolerance_factor/T(relax_tolerance_steps);
+        
         current_relax_step++;
-        tolerance = tolerance_0*d_step*T(current_relax_step);
+        T d_step_log = d_step*(T(current_relax_step));
+        T d_step_exp = std::pow<T>(T(10), d_step_log);
+        tolerance = tolerance_0*d_step_exp;
         if(current_relax_step > relax_tolerance_steps)
         {
             reset_relaxted_tolerance();
@@ -89,7 +95,7 @@ public:
         }
         else
         {
-            log->info_f("continuation::convergence: relaxing tolerance to %le with relaxed tolerance step %le (%le, %le), iteration %i", (double)tolerance, (double)d_step, (double)relax_tolerance_factor, (double)T(relax_tolerance_steps), current_relax_step);
+            log->info_f("continuation::convergence: relaxing tolerance to %le with relaxed tolerance step %le (%le, %le), iteration %i", (double)tolerance, (double)d_step_exp, (double)relax_tolerance_factor, (double)T(relax_tolerance_steps), current_relax_step);
             return(true);
         }
 
@@ -226,7 +232,7 @@ private:
     std::vector<T> norms_evolution;
     T relax_tolerance_factor;
     int relax_tolerance_steps;
-
+    T d_step;
     int current_relax_step;
 
 };

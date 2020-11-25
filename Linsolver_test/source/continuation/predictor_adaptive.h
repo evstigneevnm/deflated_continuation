@@ -139,7 +139,7 @@ public:
             {
                 ds_p = ds_p*T(1+step_ds_p);
                 ds = ds_p;
-                ds = std::max(ds_p, ds_max);
+                //ds = std::max(ds_p, ds_max);
             }
             else
             {
