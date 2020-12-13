@@ -1,0 +1,1 @@
+splot "./0/debug_curve_all.dat" u 1:2:6 w l, "./1/debug_curve_all.dat" u 1:2:6 w p pt 7, "./2/debug_curve_all.dat" u 1:2:6 w p pt 7, "./3/debug_curve_all.dat" u 1:2:6 w p pt 7, "./4/debug_curve_all.dat" u 1:2:6 w p pt 7, "./5/debug_curve_all.dat" u 1:2:6 w p pt 7, "./6/debug_curve_all.dat" u 1:2:6 w p pt 7, "./7/debug_curve.dat" u 1:2:6 w p pt 7

@@ -4,9 +4,9 @@
     "bifurcaiton_diagram_file_name": "bifurcation_diagram.dat",
     "stability_diagram_file_name": "stability_diagram.dat",
     "deflation_continuation":{
-        "maximum_continuation_steps": 2000,
+        "maximum_continuation_steps": 3000,
         "step_size": 100.0,
-        "max_step_size": 600.0,
+        "max_step_size": 1000.0,
         "deflation_attempts": 10,
         "continuation_fail_attempts": 15,
         "initial_direciton": -1,
