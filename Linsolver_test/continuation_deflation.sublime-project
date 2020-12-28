@@ -1,0 +1,32 @@
+{
+    "folders":
+    [
+        {
+            "path": "source",
+            "folder_exclude_patterns": ["backup"],
+            "follow_symlinks": true
+        },
+    ],
+    "settings":
+    {
+        "tab_size": 4,
+        "easy_clang_complete_verbose": true, 
+        "ecc_use_libclang": true,
+        "ecc_common_flags" : [
+            "-I/usr/local/cuda/include",
+            "-I/usr/local/inlcude",
+            "-I$project_base_path/source",
+            "-I$project_base_path/Linsolver_test/source",
+			"-I$project_base_path"
+          ] 
+
+    },
+    "build_systems":
+    [
+        {
+            "name": "List",
+            "shell_cmd": "ls -l"
+        }
+    ]
+}
+
