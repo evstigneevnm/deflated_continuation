@@ -406,21 +406,21 @@ public:
 
                         vec_ops_->add_mul(-alpha, V[k], r); // V(i+1) -= H(k, i) * V(k)
 
-                        // T c_norm = alpha;
-                        // int correction_iterations = 0;
-                        // while(c_norm > 1.0e-10*std::sqrt(vec_ops_->sz_)) //iterative correction
-                        // {
-                        //     correction_iterations++;
-                        //     T c = vec_ops_->scalar_prod(V[k], r); // H(k,i) = (V[k],V[i+1])
-                        //     c_norm = std::abs(c);
-                        //     vec_ops_->add_mul(-c, V[k], r);
-                        //     alpha += c;
-                        //     if(correction_iterations>10)
-                        //     {
-                        //         break;
-                        //         //if we are here, then the method will probably diverge
-                        //     }
-                        // }
+                        T c_norm = alpha;
+                        int correction_iterations = 0;
+                        while(c_norm > 1.0e-10*std::sqrt(vec_ops_->sz_)) //iterative correction
+                        {
+                            correction_iterations++;
+                            T c = vec_ops_->scalar_prod(V[k], r); // H(k,i) = (V[k],V[i+1])
+                            c_norm = std::abs(c);
+                            vec_ops_->add_mul(-c, V[k], r);
+                            alpha += c;
+                            if(correction_iterations>10)
+                            {
+                                break;
+                                //if we are here, then the method will probably diverge
+                            }
+                        }
 
                         H[k*restart_+i] = alpha;
 
