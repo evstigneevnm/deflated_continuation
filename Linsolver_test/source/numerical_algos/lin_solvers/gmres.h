@@ -17,6 +17,8 @@
 #ifndef __SCFD_GMRES_H__
 #define __SCFD_GMRES_H__
 
+#include <stdexcept>
+#include <cmath>
 #include <numerical_algos/detail/vectors_arr_wrap_static.h>
 #include "detail/monitor_call_wrap.h"
 #include "iter_solver_base.h"
@@ -209,35 +211,47 @@ private:
 
     void generate_plane_rotation_(const T& dx, const T& dy, T& cs, T& sn) const
     {
-        if (dx == T(0.0))
+        if (dy == T(0.0))
         {
-            cs = T(0.0);
-            sn = T(1.0);
+            cs = T(1.0);
+            sn = T(0.0);
         }
+        // else
+        // {
+        //     //TODO: norm type problem again!
+        //     T scale = std::abs(dx) + std::abs(dy);
+        //     T norm = scale * std::sqrt(std::abs(dx / scale) * std::abs(dx / scale) +
+        //                                       std::abs(dy / scale) * std::abs(dy / scale));
+        //     T alpha = dx / std::abs(dx);
+        //     cs = std::abs(dx) / norm;
+        //     sn = alpha * conj_(dy) / norm;
+        // }
+        else if(std::abs(dy) > std::abs(dx))
+        {
+            T tmp = dx / dy;
+            sn = T(1.0) / std::sqrt(T(1.0) + tmp*tmp);
+            cs = tmp*sn;
+        } 
         else
-        {
-            //TODO: norm type problem again!
-            T scale = std::abs(dx) + std::abs(dy);
-            T norm = scale * std::sqrt(std::abs(dx / scale) * std::abs(dx / scale) +
-                                              std::abs(dy / scale) * std::abs(dy / scale));
-            T alpha = dx / std::abs(dx);
-            cs = std::abs(dx) / norm;
-            sn = alpha * conj_(dy) / norm;
-        }
+        {   
+            T tmp = dy / dx;
+            cs = T(1.0) / std::sqrt(T(1.0) + tmp*tmp);
+            sn = tmp*cs;
+        }    
     }
    
 
-    void plane_rotation_(T_vec& H, T_vec& cn, T_vec& sn, T_vec& s, const int i) const
+    void plane_rotation_(T_vec& H, T_vec& cs_, T_vec& sn_, T_vec& s, const int i) const
     {
         for (int k = 0; k < i; k++)
         {
-            apply_plane_rotation_(H[ k*restart_ + i], H[ (k+1)*restart_ + i], cs[k], sn[k]);
+            apply_plane_rotation_(H[ k*restart_ + i], H[ (k+1)*restart_ + i], cs_[k], sn_[k]);
         }
 
-        generate_plane_rotation_(H[ (i)*restart_ + i], H[ (i+1)*restart_ + i], cs[i], sn[i]);
-        apply_plane_rotation_(H[ (i)*restart_ + i], H[ (i+1)*restart_ + i], cs[i], sn[i]);
+        generate_plane_rotation_(H[ (i)*restart_ + i], H[ (i+1)*restart_ + i], cs_[i], sn_[i]);
+        apply_plane_rotation_(H[ (i)*restart_ + i], H[ (i+1)*restart_ + i], cs_[i], sn_[i]);
         H[ (i+1)*restart_ + i] = T(0.0); //remove numerical noice below diagonal
-        apply_plane_rotation_(s[i], s[i + 1], cs[i], sn[i]);
+        apply_plane_rotation_(s[i], s[i + 1], cs_[i], sn_[i]);
     }
     // *** Givens rotations ends ***
 
@@ -302,7 +316,7 @@ public:
         r(buf_r[0]),
         use_precond_resid_(true), 
         resid_recalc_freq_(0), 
-        restart_(2) 
+        restart_(2) //using default restarts
     {
         try
         {
@@ -384,28 +398,29 @@ public:
                     ++i;
                     ++monitor_;
                     vec_ops_->assign(r, w);
-                    calc_Krylov_vector_(A, w, r);                
+                    calc_Krylov_vector_(A, w, r);
                     // Gram-Schmidt with iterative correction
                     for( int k = 0; k <= i; k++)
                     {
                         T alpha = vec_ops_->scalar_prod(V[k], r); // H(k,i) = (V[k],V[i+1])
 
                         vec_ops_->add_mul(-alpha, V[k], r); // V(i+1) -= H(k, i) * V(k)
-                        T c_norm = alpha;
-                        int correction_iterations = 0;
-                        while(c_norm > 1.0e-9) //iterative correction
-                        {
-                            correction_iterations++;
-                            T c = vec_ops_->scalar_prod(V[k], r); // H(k,i) = (V[k],V[i+1])
-                            c_norm = std::abs(c);
-                            vec_ops_->add_mul(-c, V[k], r);
-                            alpha += c;
-                            if(correction_iterations>10)
-                            {
-                                break;
-                                //if we are here, then the method will probably diverge
-                            }
-                        }
+
+                        // T c_norm = alpha;
+                        // int correction_iterations = 0;
+                        // while(c_norm > 1.0e-10*std::sqrt(vec_ops_->sz_)) //iterative correction
+                        // {
+                        //     correction_iterations++;
+                        //     T c = vec_ops_->scalar_prod(V[k], r); // H(k,i) = (V[k],V[i+1])
+                        //     c_norm = std::abs(c);
+                        //     vec_ops_->add_mul(-c, V[k], r);
+                        //     alpha += c;
+                        //     if(correction_iterations>10)
+                        //     {
+                        //         break;
+                        //         //if we are here, then the method will probably diverge
+                        //     }
+                        // }
 
                         H[k*restart_+i] = alpha;
 
@@ -416,14 +431,22 @@ public:
                     
                     plane_rotation_(H, cs, sn, s, i); //QR via Givens rotations
                     
-                    T resid_estimate = std::abs(s[i + 1]);
+                    // TODO: this is bad, converence fails. Think about it!
+                    // T resid_estimate = std::abs(s[i + 1]);
                     
-                    if (resid_estimate < monitor_.rel_tol())
-                    {
-                        // TODO: check real solution? 
-                        // Ritz value may not be acurate in approx arithmetics
-                        break;
-                    }
+                    // if (resid_estimate < monitor_.rel_tol())
+                    // {
+                    //     // TODO: check real solution? 
+                    //     // Ritz value may not be acurate in approx arithmetics
+                    //     solve_triangular_system_(H, i, s);
+
+                    //     construct_solution_(i, x);
+                        
+                    //     calc_residual_(A, x, b, r);   
+                    //     resid_estimate = vec_ops_->norm(r);
+                    //     if(resid_estimate < monitor_.rel_tol())                   
+                    //         break;
+                    // }
 
                 } while( i + 1 < restart_);
                 
