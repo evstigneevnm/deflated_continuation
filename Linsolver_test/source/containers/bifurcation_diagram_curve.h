@@ -157,7 +157,7 @@ public:
             
             //
             // Judas Priest \m/
-            // One shut at glory? =)
+            // One shot at glory? =)
             //
         }
     }

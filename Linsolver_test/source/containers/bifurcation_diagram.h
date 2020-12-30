@@ -12,6 +12,7 @@
 
 #include <vector>
 #include <string>
+#include <iostream>
 //using boost for serialization
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
