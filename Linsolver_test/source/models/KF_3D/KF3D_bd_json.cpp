@@ -68,6 +68,7 @@ int main(int argc, char const *argv[])
     real alpha = parameters.nonlinear_operator.problem_real_parameters_vector.at(0);
     int one_over_alpha = parameters.nonlinear_operator.problem_int_parameters_vector.at(0);
     int nvidia_pci_id = parameters.nvidia_pci_id;
+    bool use_high_precision_reduction = parameters.use_high_precision_reduction;
 
     size_t Nx = parameters.nonlinear_operator.N_size.at(0);
     size_t Ny = parameters.nonlinear_operator.N_size.at(1);
@@ -116,6 +117,13 @@ int main(int argc, char const *argv[])
     vec_ops_real_t vec_ops_R(Nx*Ny*Nz, CUBLAS);
     vec_ops_complex_t vec_ops_C(Nx*Ny*Mz, CUBLAS);
     vec_ops_t vec_ops(Nv, CUBLAS);
+    if(use_high_precision_reduction)
+    {
+        vec_ops_R.use_high_precision();
+        vec_ops_C.use_high_precision();
+        vec_ops.use_high_precision();
+    }
+
     mat_vec_ops_t mat_vec_ops(Nv, m_Krylov, CUBLAS);
 
     files_t file_ops_im( (vec_ops_t*) &vec_ops);    

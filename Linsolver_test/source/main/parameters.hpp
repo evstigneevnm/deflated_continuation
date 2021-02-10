@@ -380,7 +380,7 @@ struct parameters
     };
 
     int nvidia_pci_id;
-    
+    bool use_high_precision_reduction;
     std::string path_to_prject; //relative to the execution root directory
     //for serialization, just the filenames
     std::string bifurcaiton_diagram_file_name;
@@ -395,6 +395,7 @@ struct parameters
     void set_default()
     {
         nvidia_pci_id = -1;
+        use_high_precision_reduction = false;
         path_to_prject = "../KS2D/";
         bifurcaiton_diagram_file_name = "bifurcation_diagram.dat";
         stability_diagram_file_name = "stability_diagram.dat";
@@ -409,6 +410,7 @@ struct parameters
     {
         std::cout << std::endl;
         std::cout << "nvidia_pci_id: " << nvidia_pci_id << std::endl;
+        std::cout << "use_high_precision_reduction: " << use_high_precision_reduction << std::endl;
         std::cout << "path_to_prject: " << path_to_prject << std::endl;
         std::cout << "bifurcaiton_diagram_file_name: " << bifurcaiton_diagram_file_name << std::endl;
         std::cout << "stability_diagram_file_name: " << stability_diagram_file_name << std::endl;
@@ -746,6 +748,7 @@ void from_json(const nlohmann::json &j, parameters_d &params_)
     params_ = parameters_d
     {
         j.at("gpu_pci_id").get< int >(),
+        j.at("use_high_precision_reduction").get< bool >(),
         j.at("path_to_prject").get< std::string >(),
         j.at("bifurcaiton_diagram_file_name").get< std::string >(),
         j.at("stability_diagram_file_name").get< std::string >(),
@@ -762,6 +765,7 @@ void from_json(const nlohmann::json &j, parameters_f &params_)
     params_ = parameters_f
     {
         j.at("gpu_pci_id").get< int >(),
+        j.at("use_high_precision_reduction").get< bool >(),        
         j.at("path_to_prject").get< std::string >(),
         j.at("bifurcaiton_diagram_file_name").get< std::string >(),
         j.at("stability_diagram_file_name").get< std::string >(),
