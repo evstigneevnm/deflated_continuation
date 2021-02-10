@@ -1,10 +1,11 @@
 {
     "gpu_pci_id": -1,
     "path_to_prject": "../KF3Df2D_0-11/",
+    "use_high_precision_reduction": true,
     "bifurcaiton_diagram_file_name": "bifurcation_diagram.dat",
     "stability_diagram_file_name": "stability_diagram.dat",
     "deflation_continuation":{
-        "maximum_continuation_steps": 3000,
+        "maximum_continuation_steps": 4000,
         "step_size": 100.0,
         "max_step_size": 1000.0,
         "deflation_attempts": 10,
@@ -30,7 +31,7 @@
             "save_norms_history": true,
             "verbose": true,
             "tolerance": 1.0e-9,
-            "relax_tolerance_factor": 500.0,
+            "relax_tolerance_factor": 1000.0,
             "relax_tolerance_steps": 5
         },
         "newton_deflation":{
