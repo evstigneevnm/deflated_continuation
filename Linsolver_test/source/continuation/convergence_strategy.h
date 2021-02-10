@@ -109,6 +109,7 @@ public:
         T normFx = vec_ops->norm_l2(Fx);
         //update solution
         vec_ops->assign_mul(T(1.0), x, newton_wight, delta_x, x1);
+        nonlin_op->project(x1); // XXX DEBUG XXX
         T lambda1 = lambda + newton_wight*delta_lambda;
         nonlin_op->F(x1, lambda1, Fx);
         T normFx1 = vec_ops->norm_l2(Fx);
@@ -193,6 +194,15 @@ public:
             }
                      
         }        
+
+        if(finish)
+        {
+            //checks whaterver is needed for nans, errors or whaterver.
+            T solution_quality = nonlin_op->check_solution_quality(x1);
+            log->info_f("continuation::convergence: Newton obtained solution quality = %le.", solution_quality);
+
+        }
+
 
         return finish;
     }

@@ -6,6 +6,8 @@
 *   The class implements explicit template specialization.
 */
 #include <cstdio> //for printf
+#include <cuda_runtime.h>
+#include <cmath>
 
 namespace nonlinear_operators
 {
@@ -96,7 +98,7 @@ private:
     void calculate_cuda_grid()
     {
         
-        printf("Template specialization class:\n");
+        printf("Kolmogorov 3D template specialization class:\n");
         //1D
         dim3 s_dimBlock1(BLOCKSIZE);
         dimBlock1 = s_dimBlock1;
@@ -125,7 +127,7 @@ private:
         unsigned int nblocks = ( NR + nthreads -1 )/nthreads ;
         double db_nblocks = double(nblocks);
         k1 = (unsigned int) double(std::sqrt(db_nblocks) ) ;
-        k2 = (unsigned int) ceil( db_nblocks/( double(k1) )) ;
+        k2 = (unsigned int) std::ceil( db_nblocks/( double(k1) )) ;
 
         dim3 s_dimGridNR( k2, k1, 1 );
         dimGridNR = s_dimGridNR;
@@ -136,7 +138,7 @@ private:
         nblocks = ( NC + nthreads -1 )/nthreads ;
         db_nblocks = double(nblocks);
         k1 = (unsigned int) double(std::sqrt(db_nblocks) ) ;
-        k2 = (unsigned int) ceil( db_nblocks/( double(k1) )) ;  
+        k2 = (unsigned int) std::ceil( db_nblocks/( double(k1) )) ;  
 
         dim3 s_dimGridNC( k2, k1, 1 );  
         dimGridNC = s_dimGridNC;

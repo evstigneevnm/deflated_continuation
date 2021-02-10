@@ -1,5 +1,4 @@
 #include <nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D_impl.cuh>
-
 #include <thrust/complex.h>
 
 

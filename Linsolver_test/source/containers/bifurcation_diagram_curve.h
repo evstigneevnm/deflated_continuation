@@ -50,7 +50,7 @@ private:
 public:
     
 
-    //for bost serialization!
+    //for boost serialization!
     void set_main_refs(VectorOperations* vec_ops_, VectorFileOperations* vec_files_, Log* log_, NonlinearOperator* nlin_op_, Newton* newton_, HelperVectors* helper_vectors_)
     {
         if(!refs_set)

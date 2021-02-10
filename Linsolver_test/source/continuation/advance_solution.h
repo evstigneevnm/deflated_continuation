@@ -189,7 +189,7 @@ public:
 
 
             }
-
+            nonlin_op->project(x1_s); //TEMP FIX!!!
         }
 
         return tangent_obtained;

@@ -347,8 +347,29 @@ void gpu_vector_operations<T, BLOCK_SIZE>::set_value_at_point(scalar_type val_x,
     set_value_at_point_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz_l, val_x, at, x);
 }
 //===
+template<typename T>
+__global__ void get_value_at_point_kernel(size_t N, size_t at, T* x, T* val_x)
+{
+    unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
+    if(j>=N) return;
+    if(at>=N) return;
+    val_x[0] = x[at];
+}
 
 
+template <typename T, int BLOCK_SIZE>
+T gpu_vector_operations<T, BLOCK_SIZE>::get_value_at_point(size_t at, vector_type& x)
+{
+    
+    T* val_x_d;
+    val_x_d = device_allocate<T>(1);
+    get_value_at_point_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, at, x, val_x_d);
+    T val_x = T(0.0);
+    device_2_host_cpy<T>(&val_x, val_x_d, 1);
+    return val_x;
+}
+
+//===
 template <typename T, int BLOCK_SIZE>
 void gpu_vector_operations<T, BLOCK_SIZE>::calculate_cuda_grid()
 {

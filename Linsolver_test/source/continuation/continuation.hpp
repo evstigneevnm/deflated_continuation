@@ -84,7 +84,7 @@ private:
 
 
 public:
-    continuation(VectorOperations*& vec_ops_, VectorFileOperations*& file_ops_, Log*& log_, NonlinearOperations*& nonlin_op_, LinearOperator*& lin_op_, Knots*& knots_, LinearSolver*& SM_, Newton*& newton_):
+    continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, NonlinearOperations* nonlin_op_, LinearOperator* lin_op_, Knots* knots_, LinearSolver* SM_, Newton* newton_):
     vec_ops(vec_ops_),
     file_ops(file_ops_),
     log(log_),

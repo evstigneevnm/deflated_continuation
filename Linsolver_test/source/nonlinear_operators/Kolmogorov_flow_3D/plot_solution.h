@@ -5,7 +5,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <string>
+#include <utils/cuda_support.h>
 #include <common/macros.h>
 
 
@@ -91,7 +92,7 @@ private:
 
         fprintf( stream, "View");
         fprintf( stream, " '");
-        fprintf( stream, f_name.c_str());
+        fprintf( stream, "%s", f_name.c_str() );
         fprintf( stream, "' {\n");
         fprintf( stream, "TIME{0};\n");
 
@@ -187,7 +188,7 @@ private:
 
         fprintf( stream, "View");
         fprintf( stream, " '");
-        fprintf( stream, f_name.c_str());
+        fprintf( stream, "%s", f_name.c_str());
         fprintf( stream, "' {\n");
         fprintf( stream, "TIME{0};\n");
 

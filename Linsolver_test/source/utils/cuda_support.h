@@ -16,7 +16,7 @@
 * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-//#pragma once
+
 #ifndef __CUDA_SUPPORT_H__
 #define __CUDA_SUPPORT_H__
 
@@ -58,7 +58,12 @@ inline int init_cuda(int PCI_ID)
                 printf( "#%i:   %s, pci-bus id:%i %i %i \n", i, (char*)&deviceProp,deviceProp.pciBusID,deviceProp.pciDeviceID,deviceProp.pciDomainID);
             }            
             printf("Device number for it to use>>>\n");
-            scanf("%i", &deviceNumberTemp);
+            int num_scanded = scanf("%i", &deviceNumberTemp);
+            if(num_scanded == 0)
+            {
+                throw(std::runtime_error("incorrect Device number provided!"));
+            }
+            
         }
         else
         {
@@ -150,6 +155,23 @@ T* device_allocate(size_t size)
     return m_device;    
 }
 
+template <class T>
+T* device_allocate_host(int Nx, int Ny, int Nz)
+{
+    T* m_device;
+    int mem_size=sizeof(T)*Nx*Ny*Nz;
+    CUDA_SAFE_CALL(cudaMallocHost((void**)&m_device, mem_size));
+    return m_device;    
+}
+
+
+template <class T>
+T* device_allocate_host(size_t size)
+{
+    T* m_device;
+    CUDA_SAFE_CALL(cudaMallocHost((void**)&m_device, sizeof(T)*size));
+    return m_device;    
+}
 
 template <class T>
 void device_allocate_all(int Nx, int Ny, int Nz, int count, ...)
@@ -172,6 +194,13 @@ void device_deallocate(T* array)
 {
     CUDA_SAFE_CALL(cudaFree(array));
 }
+
+template <class T>
+void device_deallocate_host(T* array)
+{
+    CUDA_SAFE_CALL(cudaFreeHost(array));
+}
+
 
 template <class T>
 void device_deallocate_all(int count, ...)

@@ -75,7 +75,7 @@ public:
             // lambda_1_s = T(0.0);
             T tolerance_local = T(1.0e-7)*vec_ops->get_l2_size();
             SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(tolerance_local);
-            SM_solver->get_linsolver_handle()->monitor().set_temp_max_iterations(5000);
+            SM_solver->get_linsolver_handle()->monitor().set_temp_max_iterations(10000);
             flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, x_1_s, lambda_1_s);
             
             T minimum_resid = SM_solver->get_linsolver_handle()->monitor().resid_norm_out();

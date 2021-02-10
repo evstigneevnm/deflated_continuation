@@ -241,6 +241,9 @@ public:
     //dot product (we use automatic conjugation for complex number, i.e. dot(u,v)=u^C*v)
     template<typename T>
     void dot(size_t vector_size, const T *x, const T *y, T *result, int incx=1, int incy=1);
+    //sbsolute sum of a vector
+    template<typename T>
+    void asum(size_t vector_size, const T *x, typename cublas_real_types::cublas_real_type_hlp<T>::type *result, int incx=1);
     //vector l2 norm.
     template<typename T>
     void norm2(size_t vector_size, const T *x, typename cublas_real_types::cublas_real_type_hlp<T>::type *result, int incx=1);
@@ -271,8 +274,7 @@ private:
                 break;
             default:
                 // invalid operation code throw
-                throw std::runtime_error("switch_operation_real: invalid code for original or transpose operations. Only 'N' or 'T' are defined.");
-                break;                   
+                throw std::runtime_error("switch_operation_real: invalid code for original or transpose operations. Only 'N' or 'T' are defined.");                   
         }  
         return operation;
 
@@ -293,8 +295,7 @@ private:
                 break;    
             default:
                 // invalid operation code throw
-                throw std::runtime_error("switch_operation_complex: invalid code for original or transpose operations. Only 'N' or 'T' (for Hermitian transpose) are defined.");                
-                break;                              
+                throw std::runtime_error("switch_operation_complex: invalid code for original or transpose operations. Only 'N' or 'T' (for Hermitian transpose) are defined.");                                           
         }  
         return operation;
 
@@ -521,6 +522,38 @@ void cublas_wrap::dot(size_t vector_size, const thrust::complex<double> *x, cons
 {
     CUBLAS_SAFE_CALL(cublasZdotc (handle, vector_size, (cuDoubleComplex*)x, incx, (cuDoubleComplex*)y, incy, (cuDoubleComplex*)result));
 }  
+//
+template<> inline
+void cublas_wrap::asum(size_t vector_size, const float *x, float *result, int incx)
+{
+    CUBLAS_SAFE_CALL( cublasSasum(handle, vector_size, x, incx, result) );
+}
+template<> inline
+void cublas_wrap::asum(size_t vector_size, const double *x, double *result, int incx)
+{
+    CUBLAS_SAFE_CALL( cublasDasum(handle, vector_size, x, incx, result) );
+}
+template<> inline
+void cublas_wrap::asum(size_t vector_size, const cuComplex *x, typename cublas_real_types::cublas_real_type_hlp< cuComplex >::type *result, int incx)
+{
+    CUBLAS_SAFE_CALL( cublasScasum(handle, vector_size, x, incx, result) );
+}
+template<> inline
+void cublas_wrap::asum(size_t vector_size, const cuDoubleComplex *x, typename cublas_real_types::cublas_real_type_hlp< cuDoubleComplex >::type *result, int incx)
+{
+    CUBLAS_SAFE_CALL( cublasDzasum(handle, vector_size, x, incx, result) );
+}
+template<> inline
+void cublas_wrap::asum(size_t vector_size, const thrust::complex<float> *x, typename cublas_real_types::cublas_real_type_hlp< thrust::complex<float> >::type *result, int incx)
+{
+    CUBLAS_SAFE_CALL( cublasScasum(handle, vector_size, (cuComplex*)x, incx, result) );
+}
+template<> inline
+void cublas_wrap::asum(size_t vector_size, const thrust::complex<double> *x, typename cublas_real_types::cublas_real_type_hlp< thrust::complex<double> >::type *result, int incx)
+{
+    CUBLAS_SAFE_CALL( cublasDzasum(handle, vector_size, (cuDoubleComplex*)x, incx, result) );
+}
+
 //
 template<> inline
 void cublas_wrap::norm2(size_t vector_size, const float *x, float *result, int incx)

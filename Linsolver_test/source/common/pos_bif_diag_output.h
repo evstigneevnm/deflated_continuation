@@ -145,6 +145,7 @@ void    print_res(FILE *stream, const prooving_algos::taylor_model_operations<De
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <vector>
 
 namespace file_operations
 {

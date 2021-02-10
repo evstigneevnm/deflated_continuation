@@ -34,21 +34,22 @@
 int main(int argc, char const *argv[])
 {
     
-    if(argc != 4)
+    if(argc != 5)
     {
-        std::cout << argv[0] << " alpha R N:\n 0<alpha<=1, R is the Reynolds number, N = 2^n- discretization in one direction\n";
+        std::cout << argv[0] << " alpha R N high_prec:\n 0<alpha<=1, R is the Reynolds number, N = 2^n- discretization in one direction\n high_prec=(0/1) use(1) or not(0) high precision reduciton methods \n";
         return(0);       
     }
 
     real alpha = std::atof(argv[1]);
     real Rey = std::atof(argv[2]);
     size_t N = std::atoi(argv[3]);
+    int high_prec = std::atoi(argv[4]);
     int one_over_alpha = int(1/alpha);
 
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
     size_t Nz = N;
-    std::cout << "Testing deflation.\nUsing alpha = " << alpha << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << std::endl;
+    std::cout << "Testing deflation.\nUsing alpha = " << alpha << ", high precision = " << high_prec << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << std::endl;
 
     
     init_cuda(-1);
@@ -77,6 +78,13 @@ int main(int argc, char const *argv[])
     gpu_vector_operations_real_t *vec_ops_R = new gpu_vector_operations_real_t(Nx*Ny*Nz, CUBLAS);
     gpu_vector_operations_complex_t *vec_ops_C = new gpu_vector_operations_complex_t(Nx*Ny*Mz, CUBLAS);
     gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(Nv, CUBLAS);
+
+    if(high_prec == 1)
+    {
+        vec_ops_R -> use_high_precision();
+        vec_ops_C -> use_high_precision();
+        vec_ops -> use_high_precision();
+    }
 
     KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
 

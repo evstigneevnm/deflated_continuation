@@ -287,6 +287,7 @@ public:
         kern->copy3(U_0.x, U_0.y, U_0.z, dV.x, dV.y, dV.z);
         kern->apply_Laplace(TR(-1.0/(Reynolds_0*Reynolds_0)), Laplace, dV.x, dV.y, dV.z);
 
+
     } 
   
     void jacobian_alpha(const BC_vec& U0, const T& Reynolds_0_, BC_vec& dV)
@@ -304,6 +305,7 @@ public:
         jacobian_alpha(*dV); 
         C2V(*dV, dv);
         pool_BC.release(dV);
+        project(dv);
     }
 
     void jacobian_alpha(const T_vec& u0, const T& Reynolds_0_, T_vec& dv)
@@ -346,9 +348,8 @@ public:
     {
         project(dR);
         kern->apply_iLaplace3_plus_E(Laplace, dR.x, dR.y, dR.z, Reynolds_0, a, b);
+        project(dR);
 
-
-        //project(dR);
     }
     void preconditioner_jacobian_temporal_u(T_vec& dr, T a, T b)
     {
@@ -393,9 +394,9 @@ public:
     void exact_solution_sin_cos(const T& Reynolds, T_vec& u_out)
     {
         BC_vec* UA = pool_BC.take();
-        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.x, UA->x);
-        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.y, UA->y);
-        vec_ops_C->assign_mul(TC(0.5*Reynolds,0), force.z, UA->z);        
+        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), force.x, UA->x);
+        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), force.y, UA->y);
+        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), force.z, UA->z);        
         C2V(*UA, u_out);
         pool_BC.release(UA);        
     }
@@ -508,9 +509,9 @@ public:
         BC_vec* UC0 = pool_BC.take();
         BR_vec* UR0 = pool_BR.take();
 
-        vec_ops_R->assign_random(UR0->x);
-        vec_ops_R->assign_random(UR0->y);
-        vec_ops_R->assign_random(UR0->z);
+        vec_ops_R->assign_random( UR0->x, -T(Nx), T(Nx) );
+        vec_ops_R->assign_random( UR0->y, -T(Ny), T(Ny));
+        vec_ops_R->assign_random( UR0->z, -T(Nz), T(Nz));
         
         //vec_ops_R->assign_scalar(0, UR0->x);
         // vec_ops_R->assign_scalar(0, UR0->z);
@@ -518,7 +519,7 @@ public:
         if(steps_ == -1)
         {
             std::srand(unsigned(std::time(0))); //init new seed
-            steps = std::rand()%12 + 1;     // random from 1 to 12
+            steps = std::rand()%4 + 1;     // random from 1 to 4
 
         }
 
@@ -530,7 +531,10 @@ public:
             smooth(TR(0.1), *UC0);
         }
 
+        project(*UC0);
+        
         C2V(*UC0, u_out);
+
         pool_BC.release(UC0);
         pool_BR.release(UR0);     
 
@@ -538,6 +542,11 @@ public:
         // write_solution_vec("vec_i.pos", u_out);
     }
     
+
+    T check_solution_quality(const T_vec& u_in)
+    {
+        return div_norm(u_in);
+    }
 
     T div_norm(const T_vec& u_in)
     {

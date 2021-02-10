@@ -5,7 +5,9 @@
 #include <utils/cuda_support.h>
 #include <external_libraries/cublas_wrap.h>
 #include <utils/curand_safe_call.h>
+#include <common/testing/gpu_reduction_ogita.h>
 #include <random>
+#include <stdexcept>
 
 //debug for file output!
 #include <iostream>
@@ -67,6 +69,7 @@ struct gpu_vector_operations
     typedef typename gpu_vector_operations_type::vec_ops_cuComplex_type_hlp<T>::norm_type norm_type;
     typedef norm_type Tsc;
     bool location;
+    using gpu_reduction_hp_t = gpu_reduction_ogita<T, vector_type>;
 
     //CONSTRUCTORS!
     gpu_vector_operations(size_t sz_, cublas_wrap *cuBLAS_):
@@ -90,8 +93,33 @@ struct gpu_vector_operations
     ~gpu_vector_operations()
     {
         host_deallocate<scalar_type>(x_host);
-    }
+        if(gpu_reduction_hp != nullptr)
+        {
+            delete gpu_reduction_hp;
+        }
+        if(gpu_reduction_hp_rank1 != nullptr)
+        {
+            delete gpu_reduction_hp_rank1;
+        }
+    }   
 
+    void use_high_precision()
+    {
+        if(gpu_reduction_hp == nullptr)
+        {
+            gpu_reduction_hp = new gpu_reduction_hp_t(sz);    
+        }
+        if(gpu_reduction_hp_rank1 == nullptr)
+        {
+            gpu_reduction_hp_rank1 = new gpu_reduction_hp_t(sz+1);    
+        }
+        
+        use_high_precision_dot = true;
+    }
+    void use_standard_precision()
+    {
+        use_high_precision_dot = false;
+    }
 
     void init_vector(vector_type& x)const 
     {
@@ -153,15 +181,27 @@ struct gpu_vector_operations
     void set(vector_type& x) const
     {
         if(x!=nullptr)
+        {
             host_2_device_cpy<scalar_type>(x, x_host, sz);
+        }
     }
     //sets a vector from a host vector. 
-    void set(vector_type& x_host_, vector_type& x_) const
+    void set(vector_type& x_host_, vector_type& x_)
     {
         if(x_!=nullptr)
+        {
             host_2_device_cpy<scalar_type>(x_, x_host_, sz);
+        }
     }    
 
+    //gets the data from a vector to a host vector
+    void get(vector_type& x_, vector_type& x_host_)
+    {
+        if(x_!=nullptr)
+        {
+            device_2_host_cpy<scalar_type>(x_host_, x_, sz);
+        }
+    }
     //returns a pointer to the allocated host buffer vector. 
     vector_type get_buffer()
     {
@@ -182,7 +222,6 @@ struct gpu_vector_operations
         check_file << std::scientific << std::setprecision(16) << x_host[sz-1];
         check_file.close();
     }
-
     //DEBUG ENDS!
 
     bool check_is_valid_number(const vector_type &x)const;
@@ -190,26 +229,85 @@ struct gpu_vector_operations
     scalar_type scalar_prod(const vector_type &x, const vector_type &y)const
     {
         scalar_type result;
-        cuBLAS->dot<scalar_type>(sz, x, y, &result);
-        
+        if(use_high_precision_dot)
+        {
+            result = gpu_reduction_hp->dot(x, y);
+        }
+        else
+        {        
+            cuBLAS->dot<scalar_type>(sz, x, y, &result);
+        }
         return (result);
     }
     void scalar_prod(const vector_type &x, const vector_type &y, scalar_type *result)
     {
-        cuBLAS->dot<scalar_type>(sz, x, y, result);
+        if(use_high_precision_dot)
+        {
+            result[0] = gpu_reduction_hp->dot(x, y);
+        }
+        else
+        {
+            cuBLAS->dot<scalar_type>(sz, x, y, result);
+        }
     }
+
+    
+    typedef typename cublas_real_types::cublas_real_type_hlp<T>::type redef_type;
+    redef_type absolute_sum(const vector_type &x)const
+    {
+
+        redef_type result;
+        if(use_high_precision_dot)
+        {
+            result = gpu_reduction_hp->asum(x);
+        }
+        else
+        {
+            cuBLAS->asum<scalar_type>(sz, x, &result);    
+        }
+        
+        return (result);
+    }
+    void absolute_sum(const vector_type &x, redef_type *result)
+    {
+        if(use_high_precision_dot)
+        {
+            result[0] = gpu_reduction_hp->asum(x);
+        }
+        else
+        {        
+            cuBLAS->asum<scalar_type>(sz, x, result);
+        }
+    }
+
+    
+    
     //Observe, that for complex type we need template spetialization! vector type is compelx, but norm type is real!
     //for *PU pointer storage with call from *PU
     Tsc norm(const vector_type &x)const
     {
         Tsc result;
-        cuBLAS->norm2<T>(sz, x, &result);
+        if(use_high_precision_dot)
+        {
+            result = gpu_reduction_hp->norm(x);
+        }
+        else
+        {
+            cuBLAS->norm2<T>(sz, x, &result);
+        }
         return result;
     }
     Tsc norm_l2(const vector_type &x)const
     {
         Tsc result;
-        cuBLAS->norm2<T>(sz, x, &result);
+        if(use_high_precision_dot)
+        {
+            result = gpu_reduction_hp->norm(x);
+        }
+        else
+        {     
+            cuBLAS->norm2<T>(sz, x, &result);
+        }
         return result/std::sqrt(Tsc(sz)); //implements l2 norm as sqrt(sum_j (x_j^2) * (1/x_size))
     }
     //norm for a rank 1 updated vector
@@ -221,8 +319,14 @@ struct gpu_vector_operations
         assign(x, y);
         set_value_at_point(val_x, sz, y, sz+1);
         Tsc result;
-        cuBLAS->norm2<T>(sz+1, y, &result);
-
+        if(use_high_precision_dot)
+        {
+            result = gpu_reduction_hp_rank1->norm(y);
+        }
+        else        
+        {
+            cuBLAS->norm2<T>(sz+1, y, &result);
+        }
         stop_use_vector(y); free_vector(y);
         return result;
 
@@ -240,7 +344,14 @@ struct gpu_vector_operations
         assign(x, y);
         set_value_at_point(scalar_type(sz)*val_x, sz, y, sz+1);
         Tsc result;
-        cuBLAS->norm2<T>(sz+1, y, &result);
+        if(use_high_precision_dot)
+        {
+            result = gpu_reduction_hp_rank1->norm(y);
+        }
+        else
+        {
+            cuBLAS->norm2<T>(sz+1, y, &result);
+        }
 
         stop_use_vector(y); free_vector(y);
         return result;
@@ -253,7 +364,13 @@ struct gpu_vector_operations
     //for GPU pointer storage with call from CPU
     void norm(const vector_type &x, Tsc* result)
     {
-        cuBLAS->norm2<T>(sz, x, result);
+        if(use_high_precision_dot)
+        {
+            throw(std::runtime_error("high precision dot product with GPU-allocated result is not yet implemented."));
+        }
+        {
+            cuBLAS->norm2<T>(sz, x, result);
+        }
     } 
     //calc: x := <vector_type with all elements equal to given scalar value> 
     void assign_scalar(const scalar_type scalar, vector_type& x)const;
@@ -323,7 +440,10 @@ struct gpu_vector_operations
     //calc: x[at]=val_x for modified size
     void set_value_at_point(scalar_type val_x, size_t at, vector_type& x, size_t sz_l);
 
-    //calc: x := <pseudo random vector with values in [0,1] > 
+    //return value from the vector x[at]
+    T get_value_at_point(size_t at, vector_type& x);
+
+    //calc: x := <pseudo random vector with values in (0,1] > 
     void assign_random(vector_type& vec)
     {
         //vec is on the device!!!
@@ -334,13 +454,20 @@ struct gpu_vector_operations
         /* Set seed */
         CURAND_SAFE_CALL( curandSetPseudoRandomGeneratorSeed(gen, r()) );
         /* Generate n doubles on device */
+        // function is used to generate uniformly distributed floating point values 
+        // between 0.0 and 1.0, where 0.0 is excluded and 1.0 is included. 
         curandGenerateUniformDistribution(gen, vec, sz);    
         CURAND_SAFE_CALL(curandDestroyGenerator(gen));
         //Tsc v_norm = norm_l2(vec);
         //scale(T(v_norm), vec);
     }
 
-    
+    void assign_random(vector_type& vec, scalar_type a, scalar_type b)
+    {
+        assign_random(vec);
+        // x = a + (b-a)x
+        add_mul_scalar(a, (b-a), vec);
+    }
 
 //*/
 private:
@@ -351,6 +478,9 @@ private:
     dim3 dimGrid;
     void calculate_cuda_grid();
     void curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector, size_t size);
+    gpu_reduction_hp_t* gpu_reduction_hp = nullptr;
+    gpu_reduction_hp_t* gpu_reduction_hp_rank1 = nullptr;
+    bool use_high_precision_dot = false;
 };
 
 
