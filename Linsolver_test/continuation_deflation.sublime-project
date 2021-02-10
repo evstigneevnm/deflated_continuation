@@ -17,7 +17,8 @@
             "-I/usr/local/inlcude",
             "-I$project_base_path/source",
             "-I$project_base_path/Linsolver_test/source",
-			"-I$project_base_path"
+			"-I$project_base_path",
+			"-DSCALAR_TYPE=double",
           ] 
 
     },
