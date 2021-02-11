@@ -46,7 +46,6 @@ public:
     void reset() //can be used to set everything in default state
     {
         predictor->reset_all(); 
-        convergence_newton_extended->reset_relaxted_tolerance();
     }
 
     bool solve(NonlinearOperator* nonlin_op, const T_vec& x0, const T& lambda0, const T_vec& x0_s, const T& lambda0_s, T_vec& x1, T& lambda1, T_vec& x1_s, T& lambda1_s)
@@ -56,7 +55,6 @@ public:
         T lambda_p;
         log->info("continuation::advance_solution::starting point:");
         log->info_f("   ||x0|| = %le, lambda0 = %le, ||x0_s|| = %le, lambda0_s = %le", (double)vec_ops->norm(x0), (double)lambda0, (double)vec_ops->norm(x0_s), (double)lambda0_s);
-        convergence_newton_extended->reset_relaxted_tolerance();
         predictor->reset_tangent_space(x0, lambda0, x0_s, lambda0_s);
         while((!converged)&&(!failed))
         {
@@ -78,13 +76,8 @@ public:
             converged = newton_extended->solve(nonlin_op, x1, lambda1);
             if(!converged)
             {
-                bool do_relaxted = convergence_newton_extended->relax_tolerance(); //this one relaxes tolerance. To be used for hard problems.
-                if(!do_relaxted)
-                {
                     failed = predictor->decrease_ds_adaptive();
                     log->info("continuation::advance_solution failed to converged. Modifiying dS.");
-                }
-
             }
             else
             {

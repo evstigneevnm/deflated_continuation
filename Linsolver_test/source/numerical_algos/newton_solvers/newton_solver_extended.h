@@ -51,22 +51,16 @@ public:
             vec_ops->assign_scalar(T(0.0), delta_x);     
 
             linsolver_converged = system_op->solve(nonlin_op, x, lambda, delta_x, delta_lambda);
-            if(linsolver_converged)
-            {
-                finished = conv_strat->check_convergence(nonlin_op, x, lambda, delta_x, delta_lambda, result_status);
-            }
-            else
-            {
-                finished = true;
-                result_status = 4;
-            }
+
+            finished = conv_strat->check_convergence(nonlin_op, x, lambda, delta_x, delta_lambda, result_status);
+
 
         }
         if(result_status==0)
         {
             converged = true;
         }
-        if((result_status==2)||(result_status==3))
+        if( (result_status == 2)||(result_status == 3) )
         {
             throw std::runtime_error(std::string("newton_method_extended" __FILE__ " " __STR(__LINE__) "invalid number.") );            
         }

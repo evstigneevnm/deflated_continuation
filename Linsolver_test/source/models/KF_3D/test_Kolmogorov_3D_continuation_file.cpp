@@ -259,7 +259,7 @@ int main(int argc, char const *argv[])
     continuate_t continuate(vec_ops, file_ops, (log_t*) &log, KF_3D, lin_op_p, &knots, &SM, newton);
 
     continuate.set_newton(newton_cont_tolerance, newton_cont_maximum_iterations, newton_cont_relax_tolerance_factor, newton_cont_relax_tolerance_steps, newton_cont_update_wight_maximum, newton_cont_save_norms_history, newton_cont_verbose);
-    continuate.set_steps(steps, dS_0, dS_0*50.0, direciton, 0.2, 0.2, 5);
+    continuate.set_steps(steps, dS_0, dS_0*4.0, direciton, 0.2, 0.2, 5);
 
     if (file_name!="none")
     {

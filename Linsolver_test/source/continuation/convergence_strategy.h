@@ -6,6 +6,8 @@ convergence rules for Newton iterator for continuation process
 #include <cmath>
 #include <vector>
 #include <utils/logged_obj_base.h>
+#include <algorithm> // std::min_element
+#include <iterator>  // std::begin, std::end
 
 namespace continuation
 {
@@ -34,16 +36,20 @@ public:
     store_norms_history(store_norms_history_)
     {
         vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
+        vec_ops->init_vector(x1_storage); vec_ops->start_use_vector(x1_storage);
+        lambda1_storage = T(0.0);
         vec_ops->init_vector(Fx); vec_ops->start_use_vector(Fx);
         if(store_norms_history)
         {
             norms_evolution.reserve(maximum_iterations);
         }
+        norms_storage.reserve(maximum_iterations+1);
         stagnation_max = 10;
     }
     ~convergence_strategy()
     {
         vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
+        vec_ops->stop_use_vector(x1_storage); vec_ops->free_vector(x1_storage);
         vec_ops->stop_use_vector(Fx); vec_ops->free_vector(Fx);
     }
 
@@ -64,6 +70,7 @@ public:
         {
             norms_evolution.reserve(maximum_iterations);
         } 
+        norms_storage.reserve(maximum_iterations+1);
         // T d_step = relax_tolerance_factor/T(relax_tolerance_steps);   
         
         d_step = std::log10(relax_tolerance_factor)/T(relax_tolerance_steps);
@@ -72,50 +79,43 @@ public:
 
     }   
 
-    void reset_relaxted_tolerance()
-    {
-        tolerance = tolerance_0;
-        current_relax_step = 0;
-
-    }
 
 
-    bool relax_tolerance()
-    {
-        
-        current_relax_step++;
-        T d_step_log = d_step*(T(current_relax_step));
-        T d_step_exp = std::pow<T>(T(10), d_step_log);
-        tolerance = tolerance_0*d_step_exp;
-        if(current_relax_step > relax_tolerance_steps)
-        {
-            reset_relaxted_tolerance();
-            log->info_f("continuation::convergence: reset tolerance relaxation with step %i to %le", current_relax_step, (double)tolerance);            
-            return(false);
-        }
-        else
-        {
-            log->info_f("continuation::convergence: relaxing tolerance to %le with relaxed tolerance step %le (%le, %le), iteration %i", (double)tolerance, (double)d_step_exp, (double)relax_tolerance_factor, (double)T(relax_tolerance_steps), current_relax_step);
-            return(true);
-        }
-
-
-    }
 
     bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status)
     {
         bool finish = false;
+        bool relaxed_tolerance_reached = false;
         nonlin_op->F(x, lambda, Fx);
         T normFx = vec_ops->norm_l2(Fx);
+        if(norms_storage.size() == 0)
+        {
+            //stores initial norm
+            norms_storage.push_back(normFx);
+        }
         //update solution
         vec_ops->assign_mul(T(1.0), x, newton_wight, delta_x, x1);
         nonlin_op->project(x1); // XXX DEBUG XXX
         T lambda1 = lambda + newton_wight*delta_lambda;
         nonlin_op->F(x1, lambda1, Fx);
         T normFx1 = vec_ops->norm_l2(Fx);
+        auto min_value = *std::min_element(norms_storage.begin(),norms_storage.end());
+        norms_storage.push_back(normFx1);
+        // store this solution point if the norm is the smalles of all
+        if(min_value > normFx1)
+        {
+            vec_ops->assign(x1, x1_storage);
+            lambda1_storage = lambda1;
+            //signal that relaxed tolerance converged
+            if( (normFx1 < tolerance*relax_tolerance_factor )&& (!std::isnan(normFx1)) )
+            {
+                relaxed_tolerance_reached = true;
+            }
+        }
 
         iterations++;
-        log->info_f("continuation::convergence: iteration %i, residuals n: %le, n+1: %le ",iterations, (double)normFx, (double)normFx1);
+        log->info_f("continuation::convergence: iteration %i, residuals n: %le, n+1: %le, min_n: %le ",iterations, (double)normFx, (double)normFx1, double(min_value) );
+
 
         //store norm only if the step is successfull
         if(store_norms_history)
@@ -161,7 +161,7 @@ public:
         {   
             //update solution
             lambda = lambda1;
-            vec_ops->assign(x1,x);
+            vec_ops->assign(x1, x);
         }
         if(normFx1<tolerance)
         {
@@ -184,14 +184,7 @@ public:
         {   
             log->warning_f("continuation::convergence: Newton stagnated at iteration(%i) with norm %le", iterations, (double)normFx1);
             finish = true;     
-            if(normFx1<1.0e-6) //?? threshold tolerance for stagnation?
-            {
-                result_status = 0; 
-            }
-            else
-            {
-                result_status = 1; 
-            }
+            result_status = 1; 
                      
         }        
 
@@ -202,7 +195,17 @@ public:
             log->info_f("continuation::convergence: Newton obtained solution quality = %le.", solution_quality);
 
         }
+        //this sets minimum norm solution that is bellow relaxed tolerance
+        if( finish&relaxed_tolerance_reached&(result_status>0) )
+        {
+            auto min_value = *std::min_element(norms_storage.begin(),norms_storage.end());
+            
+            vec_ops->assign(x1_storage, x);
+            lambda = lambda1_storage;
 
+            log->warning_f("continuation::convergence: Newton is setting relaxed tolerance solution with norm %le", (double)min_value);
+            result_status = 0;     
+        }
 
         return finish;
     }
@@ -215,6 +218,7 @@ public:
         iterations = 0;
         reset_wight();
         norms_evolution.clear();
+        norms_storage.clear();
         stagnation = 0;
     }
     void reset_wight()
@@ -236,10 +240,14 @@ private:
     unsigned int iterations;
     T tolerance;
     T tolerance_0;
-    T_vec x1, Fx;
+    T lambda1_storage;
+    T_vec x1, x1_storage, Fx;
     T newton_wight, newton_wight_initial;
     bool verbose, store_norms_history;
     std::vector<T> norms_evolution;
+
+    std::vector<T> norms_storage;
+
     T relax_tolerance_factor;
     int relax_tolerance_steps;
     T d_step;
