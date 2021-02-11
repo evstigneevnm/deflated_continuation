@@ -195,13 +195,13 @@ int main(int argc, char const *argv[])
     unsigned int newton_cont_max_it = 250;
     T newton_cont_tol = 1.0e-9;
     //extended linsolver control
-    unsigned int extended_lin_solver_max_it = 1000;
+    unsigned int extended_lin_solver_max_it = 300;
     T extended_lin_solver_tol = 5.0e-2;
     unsigned int extended_use_precond_resid = 1;
     unsigned int extended_resid_recalc_freq = 1;
     unsigned int extended_basis_sz = 3;
     //exended newton continuation control
-    unsigned int newton_cont_maximum_iterations =  50;
+    unsigned int newton_cont_maximum_iterations =  15;
     T newton_cont_update_wight_maximum = 1.0;
     bool newton_cont_save_norms_history = true;
     bool newton_cont_verbose  = true;

@@ -44,6 +44,7 @@ public:
             norms_evolution.reserve(maximum_iterations);
         }
         norms_storage.reserve(maximum_iterations+1);
+        relaxed_tolerance_reached.reserve(maximum_iterations);
         stagnation_max = 10;
     }
     ~convergence_strategy()
@@ -71,6 +72,7 @@ public:
             norms_evolution.reserve(maximum_iterations);
         } 
         norms_storage.reserve(maximum_iterations+1);
+        relaxed_tolerance_reached.reserve(maximum_iterations);
         // T d_step = relax_tolerance_factor/T(relax_tolerance_steps);   
         
         d_step = std::log10(relax_tolerance_factor)/T(relax_tolerance_steps);
@@ -85,7 +87,6 @@ public:
     bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status)
     {
         bool finish = false;
-        bool relaxed_tolerance_reached = false;
         nonlin_op->F(x, lambda, Fx);
         T normFx = vec_ops->norm_l2(Fx);
         if(norms_storage.size() == 0)
@@ -106,10 +107,14 @@ public:
         {
             vec_ops->assign(x1, x1_storage);
             lambda1_storage = lambda1;
-            //signal that relaxed tolerance converged
+            //signal that relaxed tolerance converged and put it into vector of signals
             if( (normFx1 < tolerance*relax_tolerance_factor )&& (!std::isnan(normFx1)) )
             {
-                relaxed_tolerance_reached = true;
+                relaxed_tolerance_reached.push_back(true);
+            }
+            else
+            {
+                relaxed_tolerance_reached.push_back(false);
             }
         }
 
@@ -188,23 +193,27 @@ public:
                      
         }        
 
-        if(finish)
-        {
-            //checks whaterver is needed for nans, errors or whaterver.
-            T solution_quality = nonlin_op->check_solution_quality(x1);
-            log->info_f("continuation::convergence: Newton obtained solution quality = %le.", solution_quality);
 
-        }
         //this sets minimum norm solution that is bellow relaxed tolerance
-        if( finish&relaxed_tolerance_reached&(result_status>0) )
+        bool relaxed_tolerance_reached_max = *std::max_element(relaxed_tolerance_reached.begin(),relaxed_tolerance_reached.end());
+        if( finish&&relaxed_tolerance_reached_max&&(result_status>0) )
         {
             auto min_value = *std::min_element(norms_storage.begin(),norms_storage.end());
             
             vec_ops->assign(x1_storage, x);
             lambda = lambda1_storage;
 
-            log->warning_f("continuation::convergence: Newton is setting relaxed tolerance solution with norm %le", (double)min_value);
+            log->warning_f("continuation::convergence: Newton is setting relaxed tolerance = %le,  solution with norm = %le", double(tolerance*relax_tolerance_factor), (double)min_value );
             result_status = 0;     
+        }
+
+        if(finish)
+        {
+            log->info_f("continuation::convergence: finish: %i, relaxed_tolerance_reached: %i, result_status: %i", finish, relaxed_tolerance_reached_max, result_status);
+            //checks whaterver is needed for nans, errors or whaterver.
+            T solution_quality = nonlin_op->check_solution_quality(x);
+            log->info_f("continuation::convergence: Newton obtained solution quality = %le.", solution_quality);
+
         }
 
         return finish;
@@ -219,6 +228,7 @@ public:
         reset_wight();
         norms_evolution.clear();
         norms_storage.clear();
+        relaxed_tolerance_reached.clear();
         stagnation = 0;
     }
     void reset_wight()
@@ -245,7 +255,7 @@ private:
     T newton_wight, newton_wight_initial;
     bool verbose, store_norms_history;
     std::vector<T> norms_evolution;
-
+    std::vector<bool> relaxed_tolerance_reached;
     std::vector<T> norms_storage;
 
     T relax_tolerance_factor;
