@@ -14,6 +14,7 @@
 
 //for the estimaiton of the original eigenvalues
 // #include <thrust/complex.h>
+#include <stdexcept>
 
 namespace stability
 {
