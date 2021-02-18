@@ -509,9 +509,9 @@ public:
         BC_vec* UC0 = pool_BC.take();
         BR_vec* UR0 = pool_BR.take();
 
-        vec_ops_R->assign_random( UR0->x, -T(Nx), T(Nx) );
-        vec_ops_R->assign_random( UR0->y, -T(Ny), T(Ny));
-        vec_ops_R->assign_random( UR0->z, -T(Nz), T(Nz));
+        vec_ops_R->assign_random( UR0->x );
+        vec_ops_R->assign_random( UR0->y );
+        vec_ops_R->assign_random( UR0->z );
         
         //vec_ops_R->assign_scalar(0, UR0->x);
         // vec_ops_R->assign_scalar(0, UR0->z);

@@ -102,11 +102,17 @@ public:
             log->error("deflation::convergence: Newton update caused inf.");
             finish = true;
             result_status = 2;            
+        }
+        else if(normFx1 > 1.0e10)
+        {
+            log->error("deflation::convergence: Newton update went above 1.0e+10, stopping.");
+            finish = true;
+            result_status = 2;            
         }else
         {   
             //update solution
             lambda = lambda1;
-            vec_ops->assign(x1,x);
+            vec_ops->assign(x1, x);
         }
         if(normFx1<tolerance)
         {
@@ -142,8 +148,8 @@ public:
         if(finish)
         {
             //checks whaterver is needed for nans, errors or whaterver.
-            T solution_quality = nonlin_op->check_solution_quality(x1);
-            log->info_f("deflation::convergence: Newton obtained solution quality = %le.", solution_quality);
+            T solution_quality = nonlin_op->check_solution_quality(x);
+            log->info_f("deflation::convergence: Newton obtained solution quality = %le ", (double)solution_quality);
 
         }
         return finish;

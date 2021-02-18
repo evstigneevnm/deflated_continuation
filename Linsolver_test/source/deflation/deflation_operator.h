@@ -8,6 +8,7 @@
 *  -- find and strore - calls find solution and adds it to the storage container;
 *  -- execute all - calls find and store untill all solutions are found.
 */
+#include <exception>
 
 namespace deflation
 {
@@ -58,7 +59,15 @@ public:
         while((retries<max_retries)&&(found_solution==false))
         {
             nonlin_op->randomize_vector(u_in);
-            found_solution = newton->solve(nonlin_op, u_in, lambda_0, u_out, lambda);
+            try
+            {
+                found_solution = newton->solve(nonlin_op, u_in, lambda_0, u_out, lambda);
+            }
+            catch(const std::exception& e)
+            {
+                log->error_f("deflation::find_solution: exception: %s\n", e.what() );
+                found_solution = false;
+            }
             retries++;
             if(!found_solution)
             {

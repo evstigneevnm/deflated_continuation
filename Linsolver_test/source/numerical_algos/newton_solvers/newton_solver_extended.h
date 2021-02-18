@@ -62,7 +62,7 @@ public:
         }
         if( (result_status == 2)||(result_status == 3) )
         {
-            throw std::runtime_error(std::string("newton_method_extended" __FILE__ " " __STR(__LINE__) "invalid number.") );            
+            throw std::runtime_error(std::string("newton_method_extended: " __FILE__ " " __STR(__LINE__) " invalid number returned from update.") );            
         }
 
         return converged;
