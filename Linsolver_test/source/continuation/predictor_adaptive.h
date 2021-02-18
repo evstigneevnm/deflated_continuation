@@ -63,7 +63,7 @@ public:
         // ds_m = ds;     
 
         attempts = 0;
-        log->info_f("predictor::arclength step dS = %le", (double)ds);
+        log->info_f("predictor::arclength.reset: step dS = %le", (double)ds);
     }
     
     //resets all, including ds and advance counters
@@ -73,7 +73,8 @@ public:
         ds_p = ds_0;
         ds_m = ds_0;  
         attempts = 0;
-        attempts_increase = 0;        
+        attempts_increase = 0; 
+        log->info_f("predictor::arclength.reset_all: step dS = %le", (double)ds);
     }
 
     void set_tangent_space(const T_vec& x_0_, const T& lambda_0_, const T_vec& x_s_, const T& lambda_s_)
@@ -176,7 +177,7 @@ public:
         ds = ds*0.2;
         log->info_f("predictor::ds is decreased to %le", (double)ds);
         attempts++;
-        if(ds<ds_0*T(0.0005))
+        if(ds<ds_0*T(0.0001))
         {
             log->info_f("predictor::ds decrease. Max attempts reached with ds = %le", (double)ds);
             return true;

@@ -52,6 +52,7 @@ public:
     {
         bool converged = false;
         bool failed = false;
+        bool any_failed_attempts = false;
         T lambda_p;
         log->info("continuation::advance_solution::starting point:");
         log->info_f("   ||x0|| = %le, lambda0 = %le, ||x0_s|| = %le, lambda0_s = %le", (double)vec_ops->norm(x0), (double)lambda0, (double)vec_ops->norm(x0_s), (double)lambda0_s);
@@ -76,13 +77,17 @@ public:
             converged = newton_extended->solve(nonlin_op, x1, lambda1);
             if(!converged)
             {
-                    failed = predictor->decrease_ds_adaptive();
-                    log->info("continuation::advance_solution failed to converged. Modifiying dS.");
+                log->info("continuation::advance_solution failed to converged. Modifiying dS.");
+                failed = predictor->decrease_ds_adaptive();
+
+                any_failed_attempts = true;
             }
             else
             {
-                predictor->increase_ds();
-                log->info("continuation::advance_solution converged. Attempting to increase dS.");
+                if(any_failed_attempts)
+                    log->info("continuation::advance_solution converged with corrector failed attempts.");
+                else
+                    log->info("continuation::advance_solution converged without corrector failed attempts.");
             }
         }
         if(converged)
@@ -160,7 +165,7 @@ public:
                 {
                     //newton method failed to converge!
                     //throw std::runtime_error(std::string("continuation::initial_tangent " __FILE__ " " __STR(__LINE__) " tangent space couldn't be obtained - Newton method failed to converge.") );
-                    reset(); //resets predictor step!
+                    // reset(); //resets predictor step!
                     log->error("continuation::advance_solution: Newton-Raphson failed to converged. Nothing can be done so far, setting estimation equal to the previous step.");
                     vec_ops->assign(x0_s, x1_s);
                     lambda1_s = lambda0_s;
@@ -183,8 +188,20 @@ public:
 
             }
             nonlin_op->project(x1_s); //TEMP FIX!!!
+            
         }
+        if(any_failed_attempts)
+        {   
+            log->info("continuation::advance_solution: failed corrector attempts detected; reseting predictor steps.");
+            predictor->reset_all();
 
+        }
+        else
+        {
+            log->info("continuation::advance_solution: no failed corrector steps detected, attempting to increase dS.");
+            predictor->increase_ds();
+
+        }
         return tangent_obtained;
     }
 
