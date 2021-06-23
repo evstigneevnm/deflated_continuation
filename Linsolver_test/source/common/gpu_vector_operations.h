@@ -456,7 +456,7 @@ struct gpu_vector_operations
         /* Generate n doubles on device */
         // function is used to generate uniformly distributed floating point values 
         // between 0.0 and 1.0, where 0.0 is excluded and 1.0 is included. 
-        curandGenerateUniformDistribution(gen, vec, sz);    
+        curandGenerateUniformDistribution(gen, vec);    
         CURAND_SAFE_CALL(curandDestroyGenerator(gen));
         //Tsc v_norm = norm_l2(vec);
         //scale(T(v_norm), vec);
@@ -464,9 +464,13 @@ struct gpu_vector_operations
 
     void assign_random(vector_type& vec, scalar_type a, scalar_type b)
     {
-        assign_random(vec);
         // x = a + (b-a)x
-        add_mul_scalar(a, (b-a), vec);
+        // z = a + (b-a)z, z - complex: this is wrong! Needed adapter
+        // assign_random(vec);
+        // add_mul_scalar(a, (b-a), vec);
+        assign_random(vec);
+        scale_adapter(a, b, vec); // this adapter scales complex numbers in a square aXb
+                                          //another adapter is needed to scale in a circle
     }
 
 //*/
@@ -477,7 +481,8 @@ private:
     dim3 dimBlock;
     dim3 dimGrid;
     void calculate_cuda_grid();
-    void curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector, size_t size);
+    void curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector);
+    void scale_adapter(scalar_type a, scalar_type b, vector_type& vec);
     gpu_reduction_hp_t* gpu_reduction_hp = nullptr;
     gpu_reduction_hp_t* gpu_reduction_hp_rank1 = nullptr;
     bool use_high_precision_dot = false;
