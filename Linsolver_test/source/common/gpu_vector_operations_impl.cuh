@@ -9,45 +9,120 @@
 #include <thrust/complex.h>
 
 
-
-template<typename T>
-void curandGenerateUniformDistribution_spec(curandGenerator_t gen, T*& vector, size_t size);
-
-
-template<>
-void curandGenerateUniformDistribution_spec<float>(curandGenerator_t gen, float*& vector, size_t size)
+template<class T, class TC>
+__global__ void set_complex_vector_random_parts(size_t sz, T* vec_real, T* vec_imag, TC* vec)
 {
-    CURAND_SAFE_CALL( curandGenerateUniform(gen, vector, size) );
-}
+    unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
+    if(j>=sz) return;
 
-template<>
-void curandGenerateUniformDistribution_spec<double>(curandGenerator_t gen, double*& vector, size_t size)
-{
-    CURAND_SAFE_CALL( curandGenerateUniformDouble(gen, vector, size) );
-}
+    vec[j] = TC(vec_real[j],vec_imag[j]);
 
-template<>
-void curandGenerateUniformDistribution_spec<thrust::complex<float>>(curandGenerator_t gen, thrust::complex<float>*& vector, size_t size)
-{
-    
-   std::cout << "complex type not supported yet!\n";
 }
-
-template<>
-void curandGenerateUniformDistribution_spec<thrust::complex<double>>(curandGenerator_t gen, thrust::complex<double>*& vector, size_t size)
-{
-    std::cout << "complex type not supported yet!\n";
-}
-
 
 
 template <typename T, int BLOCK_SIZE>
-void gpu_vector_operations<T, BLOCK_SIZE>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector, size_t size)
+void gpu_vector_operations<T, BLOCK_SIZE>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
 {
-    curandGenerateUniformDistribution_spec<T>(gen, vector, size);
 }
 
+template <>
+void gpu_vector_operations<float, 1024>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
+{
+    CURAND_SAFE_CALL( curandGenerateUniform(gen, vector, sz) );
+}
+template <>
+void gpu_vector_operations<double, 1024>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
+{
+    CURAND_SAFE_CALL( curandGenerateUniformDouble(gen, vector, sz) );
+}
+template <>
+void gpu_vector_operations<thrust::complex<float>, 1024>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
+{
+    
+    float* vector_real;
+    float* vector_imag;
+    vector_real = device_allocate<float>(sz);
+    vector_imag = device_allocate<float>(sz);
+    try
+    {
+        CURAND_SAFE_CALL( curandGenerateUniform(gen, vector_real, sz) );
+    }
+    catch(std::runtime_error& e)
+    {
+        device_deallocate(vector_real);
+        device_deallocate(vector_imag);
+        throw std::runtime_error("curandGenerateUniformDistribution<complex float>: error in curandGenerateUniformReal."); 
+    }
+    try
+    {
+        CURAND_SAFE_CALL( curandGenerateUniform(gen, vector_imag, sz) );
+    }
+    catch(std::runtime_error& e)
+    {
+        device_deallocate(vector_real);
+        device_deallocate(vector_imag);
+        throw std::runtime_error("curandGenerateUniformDistribution<complex float>: error in curandGenerateUniformImag."); 
+    }
+    set_complex_vector_random_parts<float, thrust::complex<float> ><<<dimGrid, dimBlock>>>(sz, vector_real, vector_imag, vector);
+    device_deallocate(vector_real);
+    device_deallocate(vector_imag);
+}
+template <>
+void gpu_vector_operations<thrust::complex<double>, 1024>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
+{
+    double* vector_real;
+    double* vector_imag;
+    vector_real = device_allocate<double>(sz);
+    vector_imag = device_allocate<double>(sz);
+    try
+    {
+        CURAND_SAFE_CALL( curandGenerateUniformDouble(gen, vector_real, sz) );
+    }
+    catch(std::runtime_error& e)
+    {
+        device_deallocate(vector_real);
+        device_deallocate(vector_imag);
+        throw std::runtime_error("curandGenerateUniformDistribution<complex float>: error in curandGenerateUniformReal."); 
+    }
+    try
+    {
+        CURAND_SAFE_CALL( curandGenerateUniformDouble(gen, vector_imag, sz) );
+    }
+    catch(std::runtime_error& e)
+    {
+        device_deallocate(vector_real);
+        device_deallocate(vector_imag);
+        throw std::runtime_error("curandGenerateUniformDistribution<complex float>: error in curandGenerateUniformImag."); 
+    }
+    set_complex_vector_random_parts<double, thrust::complex<double> ><<<dimGrid, dimBlock>>>(sz, vector_real, vector_imag, vector);
+    device_deallocate(vector_real);
+    device_deallocate(vector_imag);
+}
 
+template<class T, class T_vec>
+__global__ void scale_complex_vector(size_t sz, T a, T b, T_vec vec)
+{
+    unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
+    if(j>=sz) return;
+
+    vec[j] = T(a.real() + (b.real() - a.real())*vec[j].real(), a.imag() + (b.imag() - a.imag())*vec[j].imag());
+
+}
+template <typename T, int BLOCK_SIZE>
+void gpu_vector_operations<T, BLOCK_SIZE>::scale_adapter(scalar_type a, scalar_type b, vector_type& vec)
+{
+    add_mul_scalar(a, (b-a), vec);
+}
+template <>
+void gpu_vector_operations<thrust::complex<double>, 1024>::scale_adapter(scalar_type a, scalar_type b, vector_type& vec)
+{
+    scale_complex_vector<thrust::complex<double>, vector_type><<<dimGrid, dimBlock>>>(sz, a, b, vec);
+}
+template<>
+void gpu_vector_operations<thrust::complex<float>, 1024>::scale_adapter(scalar_type a, scalar_type b, vector_type& vec)
+{
+    scale_complex_vector<thrust::complex<float>, vector_type><<<dimGrid, dimBlock>>>(sz, a, b, vec);
+}
 
 
 template<typename T>
