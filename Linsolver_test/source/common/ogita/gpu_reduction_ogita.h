@@ -6,7 +6,7 @@
 #include <cmath>
 #include <utils/cuda_support.h>
 #include <thrust/complex.h>
-#include <common/testing/gpu_reduction_ogita_type.h>
+#include <common/ogita/gpu_reduction_ogita_type.h>
 
 
 

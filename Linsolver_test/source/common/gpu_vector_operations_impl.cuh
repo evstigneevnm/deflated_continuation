@@ -247,6 +247,66 @@ void gpu_vector_operations<T, BLOCK_SIZE>::assign_mul(const scalar_type mul_x, c
 {
     assign_mul_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, mul_x, x, y);
 }
+//=== 
+namespace gpu_vector_operatiions_impl
+{
+namespace device_details
+{
+template<class T>
+__device__ __forceinline__ T cuda_abs(T val)
+{
+}
+template<>
+__device__ __forceinline__ double cuda_abs(double val)
+{
+    return( fabs(val) );
+}
+template<>
+__device__ __forceinline__ float cuda_abs(float val)
+{
+    return( fabsf(val) );
+}
+template<>
+__device__ __forceinline__ thrust::complex<double> cuda_abs(thrust::complex<double> val)
+{
+    return( fabs(val.real()) + fabs(val.imag()) );
+}
+template<>
+__device__ __forceinline__ thrust::complex<float> cuda_abs(thrust::complex<float> val)
+{
+    return( fabsf(val.real())+fabsf(val.imag()) );
+}
+}
+}
+
+template<typename T>
+__global__ void make_abs_copy_kernel(size_t N, const T* x, T* y)
+{
+    unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
+    if(j>=N) return;
+
+    y[j]=gpu_vector_operatiions_impl::device_details::cuda_abs<T>(x[j]);
+
+}
+template <typename T, int BLOCK_SIZE>
+void gpu_vector_operations<T, BLOCK_SIZE>::make_abs_copy(const vector_type& x, vector_type& y)const
+{
+    make_abs_copy_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, x, y);
+}
+template<typename T>
+__global__ void make_abs_kernel(size_t N, T* x)
+{
+    unsigned int j = blockIdx.x*blockDim.x + threadIdx.x;
+    if(j>=N) return;
+
+    x[j]=gpu_vector_operatiions_impl::device_details::cuda_abs<T>(x[j]);
+
+}
+template <typename T, int BLOCK_SIZE>
+void gpu_vector_operations<T, BLOCK_SIZE>::make_abs(vector_type& x)const
+{
+    make_abs_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, x);
+}
 //===
 template<typename T>
 __global__ void assign_mul_kernel(size_t N, const T mul_x, const T* x, const T mul_y, const T* y, T* z)

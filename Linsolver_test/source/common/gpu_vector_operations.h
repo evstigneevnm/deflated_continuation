@@ -5,7 +5,7 @@
 #include <utils/cuda_support.h>
 #include <external_libraries/cublas_wrap.h>
 #include <utils/curand_safe_call.h>
-#include <common/testing/gpu_reduction_ogita.h>
+#include <common/ogita/gpu_reduction_ogita.h>
 #include <random>
 #include <stdexcept>
 
@@ -72,7 +72,7 @@ struct gpu_vector_operations
     using gpu_reduction_hp_t = gpu_reduction_ogita<T, vector_type>;
 
     //CONSTRUCTORS!
-    gpu_vector_operations(size_t sz_, cublas_wrap *cuBLAS_):
+    gpu_vector_operations(size_t sz_, cublas_wrap *cuBLAS_ = NULL):
     sz(sz_), 
     cuBLAS(cuBLAS_)
     {
@@ -103,7 +103,7 @@ struct gpu_vector_operations
         }
     }   
 
-    void use_high_precision()
+    void use_high_precision()const
     {
         if(gpu_reduction_hp == nullptr)
         {
@@ -116,9 +116,14 @@ struct gpu_vector_operations
         
         use_high_precision_dot = true;
     }
-    void use_standard_precision()
+    void use_standard_precision()const
     {
         use_high_precision_dot = false;
+    }
+
+    bool get_current_precision()const
+    {
+        return(use_high_precision_dot);
     }
 
     void init_vector(vector_type& x)const 
@@ -150,15 +155,15 @@ struct gpu_vector_operations
     {
         
     }
-    size_t get_vector_size()
+    size_t get_vector_size() const
     {
         return sz;
     }
-    size_t get_l2_size()
+    size_t get_l2_size() const
     {
         return std::sqrt(Tsc(sz));
     }    
-    bool device_location()
+    bool device_location() const
     {
         return location;
     }
@@ -186,7 +191,7 @@ struct gpu_vector_operations
         }
     }
     //sets a vector from a host vector. 
-    void set(vector_type& x_host_, vector_type& x_)
+    void set(const vector_type& x_host_, vector_type& x_)
     {
         if(x_!=nullptr)
         {
@@ -368,6 +373,7 @@ struct gpu_vector_operations
         {
             throw(std::runtime_error("high precision dot product with GPU-allocated result is not yet implemented."));
         }
+        else
         {
             cuBLAS->norm2<T>(sz, x, result);
         }
@@ -378,12 +384,28 @@ struct gpu_vector_operations
     Tsc normalize(vector_type& x)
     {
         Tsc norm;
-        cuBLAS->normalize<T>(sz, x, &norm);
+        if(use_high_precision_dot)
+        {
+            norm = gpu_reduction_hp->norm(x);
+            cuBLAS->scale<T>(sz, 1.0/norm, x);
+        }
+        else 
+        {
+            cuBLAS->normalize<T>(sz, x, &norm);
+        }
+        
         return norm;
     }
     void normalize(vector_type& x, Tsc *norm)
     {
-        cuBLAS->normalize<T>(sz, x, norm);
+        if(use_high_precision_dot)
+        {
+            throw(std::runtime_error("high precision dot product with GPU-allocated result is not yet implemented."));
+        }
+        else
+        {        
+            cuBLAS->normalize<T>(sz, x, norm);
+        }
     }
     void scale(const T alpha, vector_type& x) const
     {
@@ -403,7 +425,11 @@ struct gpu_vector_operations
     void swap(vector_type& x, vector_type& y)const
     {
         cuBLAS->swap<scalar_type>(sz, x, y);
-    }    
+    }   
+    //sets absolute values to a vector y from the vector x
+    void make_abs_copy(const vector_type& x, vector_type& y)const; 
+    //sets absolute values to a vector, overweites it
+    void make_abs(vector_type& x)const;
     //calc: y := mul_x*x
     void assign_mul(const scalar_type mul_x, const vector_type& x, vector_type& y)const;
     //cublas axpy: y=y+mul_x*x;
@@ -483,9 +509,9 @@ private:
     void calculate_cuda_grid();
     void curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector);
     void scale_adapter(scalar_type a, scalar_type b, vector_type& vec);
-    gpu_reduction_hp_t* gpu_reduction_hp = nullptr;
-    gpu_reduction_hp_t* gpu_reduction_hp_rank1 = nullptr;
-    bool use_high_precision_dot = false;
+    mutable gpu_reduction_hp_t* gpu_reduction_hp = nullptr;
+    mutable gpu_reduction_hp_t* gpu_reduction_hp_rank1 = nullptr;
+    mutable bool use_high_precision_dot = false;
 };
 
 

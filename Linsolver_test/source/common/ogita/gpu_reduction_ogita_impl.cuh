@@ -1,9 +1,9 @@
 #ifndef __GPU_REDUCTION_IMPL_OGITA_CUH__
 #define __GPU_REDUCTION_IMPL_OGITA_CUH__
 
-#include <common/testing/gpu_reduction_ogita_impl_shmem.cuh>
-#include <common/testing/gpu_reduction_ogita_impl_functions.cuh>
-#include <common/testing/gpu_reduction_ogita.h>
+#include <common/ogita/gpu_reduction_ogita_impl_shmem.cuh>
+#include <common/ogita/gpu_reduction_ogita_impl_functions.cuh>
+#include <common/ogita/gpu_reduction_ogita.h>
 
 namespace gpu_reduction_ogita_gpu_kernels
 {

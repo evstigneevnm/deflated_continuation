@@ -544,6 +544,162 @@ __global__ void reduce_sum_kernel(const T_vec g_idata, T_vec g_odata, int n)
     }
 }
 
+
+template <class T, class T_vec, unsigned int blockSize, bool nIsPow2>
+__global__ void reduce_sum_kernel_debug(const T_vec g_idata, T_vec g_odata, int n)
+{
+    T *sdata = __GPU_REDUCTION_H__SharedMemory<T>();
+
+    // perform first level of reduction,
+    // reading from global memory, writing to shared memory
+    unsigned int tid = threadIdx.x;
+    unsigned int i = blockIdx.x*blockSize*2 + threadIdx.x;
+    unsigned int gridSize = blockSize*2*gridDim.x;
+    
+    if(i==0)
+    {
+        printf("### blockIdx.x = %i, gridDim = %i, n = %i, blockSize = %i, gridSize = %i\n", blockIdx.x, gridDim.x, n, blockSize, gridSize);
+    }
+
+    T mySum = T(0.0);
+
+    // we reduce multiple elements per thread.  The number is determined by the
+    // number of active thread blocks (via gridDim).  More blocks will result
+    // in a larger gridSize and therefore fewer elements per thread
+    
+    while (i < n)
+    {
+        // printf("mySum[%i] = %i ", blockIdx.x, int(mySum) );
+        T mySum_old = mySum;
+        mySum += g_idata[i];
+        // printf("mySum[%i] = %i\n", blockIdx.x, int(mySum) );
+        // printf("block_size %i, bid %i, tid %i, i %i: %i, %i\n", blockSize, blockIdx.x, tid, i, int(g_idata[i]), int(mySum) );
+        
+        if(tid == 15)
+        {
+            // printf("block_size=%i, bid=%i, tid=%i, i=%i: g_data[%i]=%i, mySum_old=%i, mySum = %i\n", blockSize, blockIdx.x, tid, i, i, int(g_idata[i]), int(mySum_old), int(mySum) );
+        }
+
+        // ensure we don't read out of bounds -- this is optimized away for powerOf2 sized arrays
+        if (nIsPow2 || i + blockSize < n)
+        {
+            
+            T mySum_old = mySum;
+            mySum += g_idata[i+blockSize];
+
+            if(tid == 15)
+            {
+                // printf("*block_size=%i, bid=%i, tid=%i, i=%i: g_data[%i]=%i, mySum_old=%i, mySum = %i\n", blockSize, blockIdx.x, tid, i, i+blockSize, int(g_idata[i+blockSize]), int(mySum_old), int(mySum) );
+            }
+        }
+
+        i += gridSize;
+    }
+
+    // each thread puts its local sum into shared memory
+    sdata[tid] = mySum;
+    __syncthreads();
+    if(tid == 15)
+        printf("sdata[%i] = %i\n", tid, int(mySum) );
+
+
+    // do reduction in shared mem
+    if (blockSize >= 1024)
+    {
+        if (tid < 512)
+        {
+            sdata[tid] = mySum = mySum + sdata[tid + 512];
+            // printf("sdata[%i] = %i\n", tid, int(sdata[tid]) );
+        }
+
+        __syncthreads();
+
+    }
+    if (blockSize >= 512)
+    {
+        if (tid < 256)
+        {
+            sdata[tid] = mySum = mySum + sdata[tid + 256];
+            // printf("sdata[%i] = %i\n", tid, int(sdata[tid]) );            
+        }
+
+        __syncthreads();
+    }
+
+    if (blockSize >= 256)
+    {
+        if (tid < 128)
+        {
+            sdata[tid] = mySum = mySum + sdata[tid + 128];
+            // printf("sdata[%i] = %i\n", tid, int(sdata[tid]) );            
+        }
+
+        __syncthreads();
+    }
+
+    if (blockSize >= 128)
+    {
+        if (tid <  64)
+        {
+            sdata[tid] = mySum = mySum + sdata[tid +  64];
+            // printf("sdata[%i] = %i\n", tid, int(sdata[tid]) );            
+        }
+
+        __syncthreads();
+    }
+
+    if (tid < 32)
+    {
+        // now that we are using warp-synchronous programming (below)
+        // we need to declare our shared memory volatile so that the compiler
+        // doesn't reorder stores to it and induce incorrect behavior.
+        volatile T *smem = sdata;
+
+        if (blockSize >=  64)
+        {
+            smem[tid] = mySum = mySum + smem[tid + 32];
+            // printf("sdata[%i] = %i, mySum = %i\n", tid, int(sdata[tid]), int(mySum) );            
+        }
+
+        if (blockSize >=  32)
+        {
+            smem[tid] = mySum = mySum + smem[tid + 16];
+            // printf("sdata[%i] = %i, mySum = %i\n", tid, int(sdata[tid]), int(mySum) );            
+        }
+
+        if (blockSize >=  16)
+        {
+            smem[tid] = mySum = mySum + smem[tid +  8];
+            // printf("sdata[%i] = %i, mySum = %i\n", tid, int(sdata[tid]), int(mySum) );            
+        }
+
+        if (blockSize >=   8)
+        {
+            smem[tid] = mySum = mySum + smem[tid +  4];
+            // printf("sdata[%i] = %i, mySum = %i\n", tid, int(sdata[tid]), int(mySum) );
+        }
+
+        if (blockSize >=   4)
+        {
+            smem[tid] = mySum = mySum + smem[tid +  2];
+            // printf("sdata[%i] = %i, mySum = %i\n", tid, int(sdata[tid]), int(mySum) );            
+        }
+
+        if (blockSize >=   2)
+        {
+            smem[tid] = mySum = mySum + smem[tid +  1];
+            // printf("sdata[%i] = %i, mySum = %i\n", tid, int(sdata[tid]), int(mySum) );            
+        }
+    }
+
+    // write result for this block to global mem
+    if (tid == 0)
+    {
+        g_odata[blockIdx.x] = sdata[0];
+        printf("-> sdata[%i] = %i, mySum = %i\n", tid, int(sdata[tid]), int(mySum) );  
+    }
+}
+
 template <class T, class T_vec, unsigned int blockSize, bool nIsPow2>
 __global__ void reduce_dot_kernel(const T_vec g_idata1, const T_vec g_idata2, T_vec g_odata, int n)
 {
@@ -743,6 +899,71 @@ void gpu_reduction<T, T_vec, BLOCK_SIZE, threads_r>::wrapper_reduce_sum(int bloc
 }
 
 template<class T, class T_vec, int BLOCK_SIZE, int threads_r>
+void gpu_reduction<T, T_vec, BLOCK_SIZE, threads_r>::wrapper_reduce_sum_debug(int blocks, int threads, int smemSize, const T_vec InputV, T_vec OutputV, int N)
+{
+
+    dim3 dimBlock(threads, 1, 1);
+    dim3 dimGrid(blocks, 1, 1);
+    if(isPow2(N))
+    {
+        switch (threads)
+        {
+            case 1024:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 1024, true><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case 512:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 512, true><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case 256:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 256, true><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case 128:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 128, true><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case 64:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 64, true><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case 32:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 32, true><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case 16:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 16, true><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case  8:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 8, true><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case  4:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 4, true><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case  2:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 2, true><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case  1:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 1, true><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            }       
+    }
+    else
+    {
+        switch (threads)
+        {
+            case 1024:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 1024, false><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case 512:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 512, false><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case 256:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 256, false><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case 128:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 128, false><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case 64:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 64, false><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case 32:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 32, false><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case 16:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 16, false><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case  8:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 8, false><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case  4:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 4, false><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case  2:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 2, false><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+            case  1:
+                gpu_reduction_impl_gpu_kernels::reduce_sum_kernel_debug<T, T_vec, 1, false><<< dimGrid, dimBlock, smemSize >>>(InputV, OutputV, N); break;
+        }       
+    }
+        
+}
+
+template<class T, class T_vec, int BLOCK_SIZE, int threads_r>
 void gpu_reduction<T, T_vec, BLOCK_SIZE, threads_r>::wrapper_reduce_asum(int blocks, int threads, int smemSize, const T_vec InputV, T_vec OutputV, int N)
 {
 
@@ -915,6 +1136,49 @@ T gpu_reduction<T, T_vec, BLOCK_SIZE, threads_r>::reduction_sum(int N, const T_v
     }
     return gpu_result;  
 }
+
+
+
+template<class T, class T_vec, int BLOCK_SIZE, int threads_r>
+T gpu_reduction<T, T_vec, BLOCK_SIZE, threads_r>::reduction_sum_debug(int N, const T_vec InputV, T_vec OutputV, T_vec Output)
+{
+    T gpu_result=0.0;
+    int threads = 0, blocks = 0, smemSize=0;
+
+    get_blocks_threads_shmem(N, maxBlocks, blocks, threads, smemSize);
+
+    //perform reduction
+    //printf("threads=%i, blocks=%i, shmem size=%i\n",threads, blocks, smemSize);
+    wrapper_reduce_sum_debug(blocks, threads, smemSize, InputV, OutputV, N);
+    
+    bool needReadBack=true;
+    int s=blocks;
+    while (s > 1)
+    {
+        get_blocks_threads_shmem(s, maxBlocks, blocks, threads, smemSize);
+        //printf("threads=%i, blocks=%i, shmem size=%i\n",threads, blocks, smemSize);
+        wrapper_reduce_sum_debug(blocks, threads, smemSize, OutputV, OutputV, s);
+        s = (s + (threads*2-1)) / (threads*2);
+    }
+    if (s > 1)
+    {
+        //cudaMemcpy(Output, OutputV, s * sizeof(T), cudaMemcpyDeviceToHost);
+        device_2_host_cpy<T>(Output, OutputV, s);
+
+        for (int i=0; i < s; i++)
+        {
+            gpu_result += Output[i];
+        }
+        needReadBack = false;
+    }
+    if (needReadBack)
+    {
+        //cudaMemcpy(&gpu_result, OutputV, sizeof(T), cudaMemcpyDeviceToHost);
+        device_2_host_cpy<T>(&gpu_result, OutputV, 1);
+    }
+    return gpu_result;  
+}
+
 
 
 template<class T, class T_vec, int BLOCK_SIZE, int threads_r>

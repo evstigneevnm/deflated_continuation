@@ -9,15 +9,20 @@
 #include <mutex>
 #include <memory>
 #include <iostream>
+#include <thrust/complex.h>
+#include <common/complex_real_type_cast.hpp>
+#include <type_traits>
 
 template<class T, class T_vec>
 class threaded_reduction
 {
 private:
     using accumulators = std::pair< T, T >;
+    using TR = typename deduce_real_type_from_complex::recast_type<T>::real;
+
 public:
-    threaded_reduction(size_t vec_size_, int n_ = -1, int use_high_precision_ = 0, T initial_ = T(0.0)):
-    use_high_precision(use_high_precision_),
+    threaded_reduction(size_t vec_size_, int n_ = -1, int use_high_prec_ = 0, T initial_ = T(0.0)):
+    use_high_prec(use_high_prec_),
     parts(n_),
     vec_size(vec_size_)
     {
@@ -53,13 +58,13 @@ public:
 
     }
 
-    void use_high_prec()
+    void use_high_precision()
     {
-        use_high_precision = 1;
+        use_high_prec = 1;
     }
-    void use_normal_prec()
+    void use_standard_precision()
     {
-        use_high_precision = 0;
+        use_high_prec = 0;
     }
 
 private:
@@ -150,6 +155,7 @@ private:
     };
 
 
+
     class dot_product_naive
     {
     public:
@@ -162,7 +168,7 @@ private:
             T partial_sum = 0;
             for(int i = begin; i < end; ++i)
             {
-                partial_sum += x_[i] * y_[i];
+                partial_sum += two_prod(x_[i],y_[i]);
             }
             
             std::lock_guard<std::mutex> lock(*g_lock_);
@@ -171,8 +177,22 @@ private:
     private:
         int begin;
         int end;
+        //trick with D to specilize a templated function inside the class scope
+        template<class T_l, bool D = true>
+        T_l two_prod(T_l a, T_l b) const
+        {
+            
+            return(a*b);
+        }
+        //trick with D to specilize a templated function inside the class scope
+        template<bool D = true>
+        thrust::complex<TR> two_prod(thrust::complex<TR> a, thrust::complex<TR> b) const
+        {   
+            return(conj(a)*b);
+        }
 
     };
+
 
     class dot_product_ogita
     {
@@ -207,22 +227,58 @@ private:
         mutable T pi = T(0.0);
         mutable T t = T(0.0);
 
-        T two_prod(T &t, T a, T b) const // [1], pdf: 71, 169, 198, 
+        //trick with D to specilize a templated function inside the class scope
+        template<class T_l, bool D = true>
+        T_l two_prod(T_l &t, T_l a, T_l b) const // [1], pdf: 71, 169, 198, 
         {
-            T p = a*b;
+            T_l p = a*b;
             t = std::fma(a, b, -p);
             return p;
         }
 
-        T two_sum(T &t, T a, T b) const
+        template<class T_l>
+        T_l two_sum(T_l &t, T_l a, T_l b) const
         {
-            T s = a+b;
-            T bs = s-a;
-            T as = s-bs;
+            T_l s = a+b;
+            T_l bs = s-a;
+            T_l as = s-bs;
             t = (b-bs) + (a-as);
             return s;
         }
+        
+        //trick with D to specilize a templated function inside the class scope
+        template<bool D = true>
+        thrust::complex<TR> two_prod(thrust::complex<TR> &t, thrust::complex<TR> a, thrust::complex<TR> b) const 
+        {
+            using T_real = TR;
+            using TC = typename thrust::complex<T_real>;         
+            T_real a_R = a.real();
+            T_real a_I = a.imag();
+            T_real b_R = b.real();
+            T_real b_I = b.imag();
+
+            T_real p_R1 = a_R*b_R;
+            T_real t_R1 = std::fma<T_real>(a_R, b_R, -p_R1);
+            T_real p_R2 = a_I*b_I;
+            T_real t_R2 = std::fma<T_real>(a_I, b_I, -p_R2);
+            T_real p_I1 = a_R*b_I;
+            T_real t_I1 = std::fma<T_real>(a_R, b_I, -p_I1);
+            T_real p_I2 = -a_I*b_R;
+            T_real t_I2 = std::fma<T_real>(-a_I, b_R, -p_I2);
+
+            T_real t1 = T_real(0.0);
+            T_real t2 = T_real(0.0);
+            T_real p_R = two_sum<T_real>(t1, p_R1, p_R2);
+            T_real p_I = two_sum<T_real>(t2, p_I1, p_I2);
+            
+            TC p = TC(p_R, p_I);
+            t = TC(t_R1 + t_R2 + t1, t_I1 + t_I2 + t2);
+
+            return p;             
+        }
     };
+
+
 
 public:
     T dot(const T_vec& x_, const T_vec& y_) //const
@@ -237,11 +293,11 @@ public:
         for (int j = 0; j < parts; j++) 
         {
             
-            if(use_high_precision == 0)
+            if(use_high_prec == 0)
             {
                 threads.push_back( std::thread( std::ref(dot_naive[j]),  std::ref(x_),  std::ref(y_),  std::ref(result_dot), g_lock_dot) );
             }
-            else if(use_high_precision == 1)
+            else if(use_high_prec == 1)
             {
                 threads.push_back( std::thread( std::ref(dot_ogita[j]),  std::ref(x_),  std::ref(y_),  std::ref(result_dot), std::ref(sigma_dot), g_lock_dot) );
             }
@@ -259,7 +315,7 @@ public:
                 t.join();
         }
 
-        if(use_high_precision == 0)
+        if(use_high_prec == 0)
         {
             return T(result_dot);
         }
@@ -282,11 +338,11 @@ public:
         for (int j = 0; j < parts; j++) 
         {
             
-            if(use_high_precision == 0)
+            if(use_high_prec == 0)
             {
                 threads.push_back( std::thread( std::ref(sum_naive[j]),  std::ref(x_),   std::ref(result_sum), g_lock_sum, use_abs_) );
             }
-            else if(use_high_precision == 1)
+            else if(use_high_prec == 1)
             {
                 threads.push_back( std::thread( std::ref(sum_ogita[j]),  std::ref(x_),   std::ref(result_sum), std::ref(sigma_sum), g_lock_sum, use_abs_) );
             }
@@ -304,7 +360,7 @@ public:
                 t.join();
         }
 
-        if(use_high_precision == 0)
+        if(use_high_prec == 0)
         {
             return T(result_sum);
         }
@@ -322,7 +378,7 @@ public:
 private:
     T result_dot;
     T result_sum;
-    int use_high_precision;
+    int use_high_prec;
     int parts;
     size_t vec_size;
     std::vector<int> array_bounds;
@@ -357,6 +413,9 @@ private:
 
 
 };
+
+
+
 
 
 #endif

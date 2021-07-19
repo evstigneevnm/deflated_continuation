@@ -3,7 +3,7 @@
 
 #include <cuda_runtime_api.h>
 #include <thrust/complex.h>
-#include <common/testing/gpu_reduction_ogita_type.h>
+#include <common/ogita/gpu_reduction_ogita_type.h>
 
 namespace gpu_reduction_ogita_gpu_kernels
 {

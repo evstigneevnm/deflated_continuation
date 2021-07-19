@@ -1,4 +1,4 @@
-#include <common/testing/gpu_reduction_ogita_impl.cuh>
+#include <common/ogita/gpu_reduction_ogita_impl.cuh>
 #include <thrust/complex.h>
 
 
