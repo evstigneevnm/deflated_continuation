@@ -4,44 +4,19 @@
 #include <thrust/complex.h>
 #include <common/macros.h>
 
-#include <utils/cuda_support.h>
-#include <utils/log.h>
-#include <external_libraries/cufft_wrap.h>
-#include <external_libraries/cublas_wrap.h>
-
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D.h>
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/linear_operator_KS_2D.h>
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/preconditioner_KS_2D.h>
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/convergence_strategy.h>
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/system_operator.h>
-
-#include <numerical_algos/lin_solvers/default_monitor.h>
-#include <numerical_algos/lin_solvers/bicgstabl.h>
-#include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
-
-#include <deflation/system_operator_deflation.h>
-#include <deflation/solution_storage.h>
-#include <deflation/convergence_strategy.h>
-#include <deflation/deflation_operator.h>
-
-#include <numerical_algos/newton_solvers/newton_solver.h>
-#include <numerical_algos/newton_solvers/newton_solver_extended.h>
-
-
-#include <common/gpu_file_operations_functions.h>
-#include <common/gpu_vector_operations.h>
 #include <models/KS_2D/test_deflation_typedefs_KS.h>
 
 int main(int argc, char const *argv[])
 {
     
-    init_cuda(1);
+    init_cuda(-1);
     size_t Nx=1024;
     size_t Ny=1024;
     real norm_wight = real(1);//std::sqrt(real(Nx*Ny));
     real size_problem = real(1);//std::sqrt(real(Nx*Ny));
 
     //linsolver control
+    bool use_high_precision = HIGH_PREC;
     unsigned int lin_solver_max_it = 1000;
     real lin_solver_tol = 1.0e-3;
     unsigned int use_precond_resid = 1;
@@ -63,6 +38,12 @@ int main(int argc, char const *argv[])
     vec_ops_real *vec_ops_R = new vec_ops_real(Nx*Ny, CUBLAS);
     vec_ops_complex *vec_ops_C = new vec_ops_complex(Nx*My, CUBLAS);
     vec_ops_real_im *vec_ops_R_im = new vec_ops_real_im(Nx*My-1, CUBLAS);
+    
+    if(use_high_precision)
+    {   vec_ops_R->use_high_precision();
+        vec_ops_C->use_high_precision();
+        vec_ops_R_im->use_high_precision();
+    }
     //CUDA GRIDS
     dim3 Blocks; dim3 Grids; dim3 Grids_F;
     KS_2D *KS2D = new KS_2D(a_val, b_val, Nx, Ny, vec_ops_R, vec_ops_C, vec_ops_R_im, CUFFT_C2R);
@@ -126,10 +107,10 @@ int main(int argc, char const *argv[])
         
         std::ostringstream stringStream;
         stringStream << "u_out_" << (p) << ".dat";
-        gpu_file_operations::write_matrix<real>(stringStream.str(), Nx, Ny, u_out_ph);
+        gpu_file_operations_functions::write_matrix<real>(stringStream.str(), Nx, Ny, u_out_ph);
         std::ostringstream stringStream_vec;
         stringStream_vec << "u_im_out_" << (p) << ".dat";
-        gpu_file_operations::write_vector<real>(stringStream_vec.str(), Nx*My-1, (real_im_vec&)x, 3);
+        gpu_file_operations_functions::write_vector<real>(stringStream_vec.str(), Nx*My-1, (real_im_vec&)x, 3);
         p++;
     }
    

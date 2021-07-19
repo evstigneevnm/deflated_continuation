@@ -103,9 +103,9 @@ public:
             finish = true;
             result_status = 2;            
         }
-        else if(normFx1 > 1.0e10)
+        else if(normFx1 > 1.0e20)
         {
-            log->error("deflation::convergence: Newton update went above 1.0e+10, stopping.");
+            log->error("deflation::convergence: Newton update went above 1.0e+20, stopping.");
             finish = true;
             result_status = 2;            
         }else

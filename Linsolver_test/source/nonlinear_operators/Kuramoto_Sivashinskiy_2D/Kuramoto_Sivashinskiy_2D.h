@@ -157,7 +157,17 @@ public:
         C2R(u_helper_out, v);
 
     }
+ 
+    //just a void function to comply with the convergence_strategy.
+    void project(T_vec_im& v)
+    {
 
+    }
+    //just a void function to comply with convergence_strategy.
+    T check_solution_quality(const T_vec_im& v)
+    {
+        return 0;
+    }
     //sets (u_0, alpha_0) for jacobian linearization
     //stores alpha_0, u_0, u_ext_0, u_x_ext_0, u_y_ext_0
     //NOTE: u_ext_0, u_x_ext_0 and u_y_ext_0 MUST NOT BE CHANGED!!!

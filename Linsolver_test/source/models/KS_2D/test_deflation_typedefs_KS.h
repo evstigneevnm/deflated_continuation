@@ -1,5 +1,33 @@
 #ifndef __TEST_DEFLATION_TYPEDEFS_H__
 #define __TEST_DEFLATION_TYPEDEFS_H__
+
+#include <utils/cuda_support.h>
+#include <utils/log.h>
+#include <external_libraries/cufft_wrap.h>
+#include <external_libraries/cublas_wrap.h>
+
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/linear_operator_KS_2D.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/preconditioner_KS_2D.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/convergence_strategy.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/system_operator.h>
+
+#include <numerical_algos/lin_solvers/default_monitor.h>
+#include <numerical_algos/lin_solvers/bicgstabl.h>
+#include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
+
+#include <deflation/system_operator_deflation.h>
+#include <deflation/solution_storage.h>
+#include <deflation/convergence_strategy.h>
+#include <deflation/deflation_operator.h>
+
+#include <numerical_algos/newton_solvers/newton_solver.h>
+#include <numerical_algos/newton_solvers/newton_solver_extended.h>
+
+
+#include <common/gpu_file_operations_functions.h>
+#include <common/gpu_vector_operations.h>
+
 #define Blocks_x_ 32
 #define Blocks_y_ 16
 

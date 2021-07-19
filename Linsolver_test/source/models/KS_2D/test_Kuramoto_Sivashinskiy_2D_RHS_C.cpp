@@ -5,7 +5,7 @@
 #include <utils/cuda_support.h>
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D.h>
 #include <common/macros.h>
 #include <common/file_operations.h>
 #include <common/gpu_vector_operations.h>
@@ -23,11 +23,12 @@ int main(int argc, char const *argv[])
     typedef gpu_vector_operations<complex> gpu_vector_operations_complex;
     typedef gpu_vector_operations<real> gpu_vector_operations_real_reduced;
     typedef cufft_wrap_R2C<real> cufft_type;
-    typedef Kuramoto_Sivashinskiy_2D<cufft_type, 
+    typedef nonlinear_operators::Kuramoto_Sivashinskiy_2D<cufft_type, 
             gpu_vector_operations_real, 
             gpu_vector_operations_complex, 
             gpu_vector_operations_real_reduced,
             Blocks_x_, Blocks_y_> KS_2D;
+
     typedef typename gpu_vector_operations_real::vector_type real_vec; 
     typedef typename gpu_vector_operations_complex::vector_type complex_vec;
 
