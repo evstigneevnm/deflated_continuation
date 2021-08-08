@@ -287,12 +287,25 @@ private:
 
             return(bools2(true, vectors_coincide));
         }
+        else if(lambda1>lambda_max) // if we somehow magically sliped out?!
+        {
+            log->error_f("continuation::check_intersection: slipped out with lambda_max = %le, lambda_1 = %le.", lambda_max, lambda1);
+            fail_flag = true;
+            return(bools2(true, true));            
+        }
+        else if(lambda1<lambda_min) // if we somehow magically sliped out?!
+        {
+            log->error_f("continuation::check_intersection: slipped out with lambda_min = %le, lambda_1 = %le.", lambda_min, lambda1);
+            fail_flag = true;
+            return(bools2(true, true));
+        }
         else
         {
             return(bools2(false, false));
         }
     
     }
+
 
 
     void check_returning()
@@ -329,6 +342,8 @@ private:
             fail_flag = false;
             continue_next_step = false;
         }
+
+
     }
 
     bool interpolate_all_knots()

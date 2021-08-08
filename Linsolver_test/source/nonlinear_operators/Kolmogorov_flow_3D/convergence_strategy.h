@@ -88,8 +88,14 @@ public:
         {
             newton_wight = T(1.49)*(normFx/normFx1);
             log->warning_f("nonlinear_operators::convergence: adjusting Newton wight to %le and updating...", newton_wight);            
-            vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
-            reset_wight();    
+            vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);    
+            if(newton_wight<T(1.0e-6))
+            {
+                log->error_f("nonlinear_operators::convergence: Newton wight is too small (%le).", newton_wight);   
+                finish = true;
+                result_status = 4;
+            }
+            reset_wight();            
         }
         if((std::abs(normFx1-normFx)/normFx<T(0.05))&&(iterations>maximum_iterations/3))
         {

@@ -108,7 +108,8 @@ public:
             log->error("deflation::convergence: Newton update went above 1.0e+20, stopping.");
             finish = true;
             result_status = 2;            
-        }else
+        }
+        else
         {   
             //update solution
             lambda = lambda1;

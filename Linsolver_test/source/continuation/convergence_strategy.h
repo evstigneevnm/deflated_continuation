@@ -65,7 +65,7 @@ public:
         verbose = verbose_;
         stagnation_max = stagnation_max_;
         relax_tolerance_factor = relax_tolerance_factor_;
-        relax_tolerance_steps = relax_tolerance_steps_;
+        // relax_tolerance_steps = relax_tolerance_steps_;
         current_relax_step = 0;
         if(store_norms_history)
         {
@@ -75,9 +75,10 @@ public:
         relaxed_tolerance_reached.reserve(maximum_iterations);
         // T d_step = relax_tolerance_factor/T(relax_tolerance_steps);   
         
-        d_step = std::log10(relax_tolerance_factor)/T(relax_tolerance_steps);
+        // d_step = std::log10(relax_tolerance_factor)/T(relax_tolerance_steps);
         
-        log->info_f("continuation::convergence: check: relax_tolerance_steps = %i, relax_tolerance_factor = %le, d_step = %le, d_step_exp = %le", relax_tolerance_steps, (double)relax_tolerance_factor, (double)d_step, (double)std::pow<T>(T(10), d_step));
+        // log->info_f("continuation::convergence: check: relax_tolerance_steps = %i, relax_tolerance_factor = %le, d_step = %le, d_step_exp = %le", relax_tolerance_steps, (double)relax_tolerance_factor, (double)d_step, (double)std::pow<T>(T(10), d_step));
+        log->info_f("continuation::convergence: check: relax_tolerance_factor = %le ", (double)relax_tolerance_factor);        
 
     }   
 
