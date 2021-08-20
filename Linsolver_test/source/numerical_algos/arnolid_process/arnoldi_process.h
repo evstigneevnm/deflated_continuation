@@ -46,7 +46,7 @@ public:
     //sutable for both single execution and for the IRA execution
     // for the IRA: 0<=k<m and v_in is set
     // both V_mat and H_mat are on device
-    void execute_arnoldi(size_t& k, T_mat& V_mat, T_mat& H_mat, T_vec v_in = nullptr)
+    void execute_arnoldi(size_t& k, T_mat V_mat, T_mat H_mat, T_vec v_in = nullptr)
     {
         if(k > m)
         {
@@ -80,7 +80,8 @@ public:
             //reorthogonalization ends
             mat_ops_small->set_matrix_value(H_mat, alpha, 0, 0);
         }
-        for(int j=k+1;j<m;j++){ //assemble the whole Krylov basis and Hessenberg matrix
+        for(int j=k+1;j<m;j++) //assemble the whole Krylov basis and Hessenberg matrix
+        { 
             T beta = vec_ops_large->normalize(v_in);
             mat_ops_small->set_matrix_value(H_mat, beta, j, j-1);
             mat_ops_large->set_matrix_column(V_mat, v_in, j);   //sets the j-th vector in the Krylov subspace

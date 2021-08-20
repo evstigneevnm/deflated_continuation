@@ -70,13 +70,21 @@ struct gpu_matrix_vector_operations
     }
 
 
+    // copies a matrices:  from_ ----> to_
+    void assign(const matrix_type from_, matrix_type to_);
 
-    void set_matrix_column(matrix_type& mat, const vector_type& vec, const size_t col_number);
-    void set_matrix_value(matrix_type& mat, const scalar_type& val, const size_t row_number, const size_t col_number);
+
+
+    void set_matrix_column(matrix_type mat, const vector_type vec, const size_t col_number);
+    void get_matrix_column(vector_type vec, const matrix_type mat,  const size_t col_number);
+
+    void set_matrix_value(matrix_type mat, const scalar_type val, const size_t row_number, const size_t col_number);
+
+    void make_zero_columns(const matrix_type matA, size_t col_from, size_t col_to, matrix_type retA);
 
     //general GEMV operation
     //void gemv(const char op, size_t RowA, const T *A, size_t ColA, size_t LDimA, const T alpha, const T *x, const T beta, T *y);
-    void gemv(const char op, const matrix_type& mat, const scalar_type& alpha, const T *x, const scalar_type& beta, vector_type& y)
+    void gemv(const char op, const matrix_type mat, const scalar_type alpha, const T *x, const scalar_type beta, vector_type y)
     {
         cuBLAS->gemv<scalar_type>(op, sz_row, mat, sz_col, sz_row, alpha, x, beta, y);
     }
@@ -85,7 +93,7 @@ struct gpu_matrix_vector_operations
     // dot product of each matrix colums with a vector starting from 0 up till column number max_col-1
     //  vector 'x' should be sized sz_row, 'y' should be the size of max_col at least
     //  y = alpha.*A(:,0:max_col-1)'*x + beta.*y
-    void mat2column_dot_vec(const matrix_type& mat, size_t max_col, const scalar_type& alpha, const T *x, const scalar_type& beta, vector_type& y)
+    void mat2column_dot_vec(const matrix_type mat, size_t max_col, const scalar_type alpha, const T *x, const scalar_type beta, vector_type y)
     {
         if(max_col<=sz_col)
         {
@@ -101,7 +109,7 @@ struct gpu_matrix_vector_operations
     // gemv of a matrix that starts from from 0 up till column number max_col-1
     //  vector 'x' should be sized max_col at least, 'y' should be sized sz_row
     //  y = alpha.*A(:,0:max_col-1)*x + beta.*y
-    void mat2column_mult_vec(const matrix_type& mat, size_t max_col, const scalar_type& alpha, const T *x, const scalar_type& beta, vector_type& y)
+    void mat2column_mult_vec(const matrix_type mat, size_t max_col, const scalar_type alpha, const T *x, const scalar_type beta, vector_type y)
     {
         if(max_col<=sz_col)
         {
@@ -121,7 +129,7 @@ struct gpu_matrix_vector_operations
     //      B: sz_col X max_col
     //      C: sz_row X max_col
     // with max_col <= sz_col
-    void mat2column_mult_mat(const matrix_type& matA, const matrix_type& matB, size_t max_col, const scalar_type& alpha, const scalar_type& beta, matrix_type& matC)
+    void mat2column_mult_mat(const matrix_type matA, const matrix_type matB, size_t max_col, const scalar_type alpha, const scalar_type beta, matrix_type matC)
     {
         if(max_col<=sz_col)
         {        
@@ -132,6 +140,15 @@ struct gpu_matrix_vector_operations
             throw std::runtime_error("mat2column_mult_mat: max_col > sz_col");            
         }
 
+    }
+
+
+    // C = α  A^T B + β C
+    // A \in R^{NXm}, B \in R^{NXk}, C \in R^{mXk}
+    // one can only change the size columns of B and C, i.e. the value of k
+    void mat_T_gemm_mat_N(const matrix_type matA, const matrix_type matB, size_t n_cols_B_C, const scalar_type alpha, const scalar_type beta, matrix_type matC)
+    {
+        cuBLAS->gemm<scalar_type>('T', 'N', sz_col, n_cols_B_C, sz_row , alpha, matA, sz_row, matB, sz_row, beta, matC, sz_col);        
     }
 
 //*/

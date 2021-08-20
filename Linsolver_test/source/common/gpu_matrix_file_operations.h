@@ -24,18 +24,18 @@ public:
 
     }
 
-    void write_matrix(const std::string f_name, T_mat& mat_gpu, unsigned int prec=16) const
+    void write_matrix(const std::string f_name, T_mat mat_gpu, unsigned int prec=16) const
     {
         gpu_file_operations_functions::write_matrix<T>(f_name, sz_row, sz_col, mat_gpu, prec);
     }
 
-    void read_matrix(const std::string &f_name, T_mat& mat_gpu) const
+    void read_matrix(const std::string &f_name, T_mat mat_gpu) const
     {
         
         gpu_file_operations_functions::read_matrix<T>(f_name, sz_row, sz_col, mat_gpu);
     }
 
-
+    
 private:
     MatrixOperations* mat_op;
     size_t sz_row;

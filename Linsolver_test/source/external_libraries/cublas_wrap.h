@@ -315,6 +315,14 @@ public:
 
 
     //===cuBLAS Level-3 Functions=== see: https://docs.nvidia.com/cuda/cublas/index.html#cublas-level-3-function-reference
+// cublasStatus_t cublasSgemm(cublasHandle_t handle,
+//                            cublasOperation_t transa, cublasOperation_t transb,
+//                            int m, int n, int k,
+//                            const float           *alpha,
+//                            const float           *A, int lda,
+//                            const float           *B, int ldb,
+//                            const float           *beta,
+//                            float           *C, int ldc)
     template<typename T>
     void gemm(const char opA, const char opB, size_t RowAC, size_t ColBC, size_t ColARowB, const T alpha, const T* A, size_t LDimA, const T* B, size_t LDimB, const T beta, T* C, size_t LdimC);
 

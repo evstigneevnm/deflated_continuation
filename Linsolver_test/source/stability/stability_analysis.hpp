@@ -19,7 +19,7 @@
 namespace stability
 {
 
-template<class VectorOperations, class MatrixOperations,  class NonlinearOperations, class LinearOperator,  class LinearSolver,class Log, class Newton>
+template<class VectorOperations, class MatrixOperations,  class NonlinearOperations, class LinearOperator,  class LinearSolver, class Log, class Newton>
 class stability_analysis
 {
 
@@ -199,7 +199,8 @@ private:
     T_vec x_p1;
     T_vec x_p2;
 
-    void delete_if_not_null(void* ptr)
+    template<class T>
+    void delete_if_not_null(T* ptr)
     {
         if(ptr!=nullptr)
             delete ptr;

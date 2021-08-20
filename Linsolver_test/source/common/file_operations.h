@@ -51,13 +51,13 @@ void write_matrix(const std::string &f_name, size_t Row, size_t Col, T *matrix, 
     f.close();
 }
 
-int read_matrix_size(const std::string &f_name)
+size_t read_matrix_size(const std::string &f_name)
 {
 
     std::ifstream f(f_name.c_str(), std::ifstream::in);
     if (!f) throw std::runtime_error("read_matrix_size: error while opening file " + f_name);
     std::string line;
-    int matrix_size=0;
+    size_t matrix_size=0;
     while (std::getline(f, line)){
         matrix_size++;
     }

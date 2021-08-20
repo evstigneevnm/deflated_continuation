@@ -1,5 +1,5 @@
-#ifndef __STABILITY__SYSTEM_OPERATOR_STABILITY_H__
-#define __STABILITY__SYSTEM_OPERATOR_STABILITY_H__
+#ifndef __STABILITY__SYSTEM_OPERATOR_SftInv0_H__
+#define __STABILITY__SYSTEM_OPERATOR_SftInv0_H__
     
 
 /**
@@ -109,6 +109,11 @@ public:
             zero_linearization = false;
 
         linearization_set = true;
+    }
+
+    std::string target_eigs()
+    {
+        return "LM";
     }
 
     // // eigenvalues are on the host computer.

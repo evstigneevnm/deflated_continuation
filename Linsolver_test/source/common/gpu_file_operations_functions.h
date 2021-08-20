@@ -17,10 +17,10 @@ namespace gpu_file_operations_functions
     }
 
     template <class T>
-    void read_vector(const std::string &f_name, size_t N, T*& vec_gpu, unsigned int prec=16)
+    void read_vector(const std::string &f_name, size_t N, T* vec_gpu, unsigned int prec=16)
     {
         T* vec_cpu = host_allocate<T>(N);
-        file_operations::read_vector<T>(f_name, N, vec_cpu, prec);
+        file_operations::read_vector<T>(f_name, N, vec_cpu);
         host_2_device_cpy(vec_gpu, vec_cpu, N);
         host_deallocate<T>(vec_cpu);
     }
@@ -34,13 +34,17 @@ namespace gpu_file_operations_functions
     }
 
     template <class T>
-    void read_matrix(const std::string &f_name, size_t Row, size_t Col, T*& matrix_gpu)
+    void read_matrix(const std::string &f_name, size_t Row, size_t Col, T* matrix_gpu)
     {
         T* vec_cpu = host_allocate<T>(Row*Col);
         file_operations::read_matrix<T>(f_name, Row, Col, vec_cpu);
         host_2_device_cpy(matrix_gpu, vec_cpu, Row*Col);   
         host_deallocate<T>(vec_cpu);
  
+    }
+    size_t read_matrix_size(const std::string &f_name)
+    {
+        return gpu_file_operations_functions::read_matrix_size(f_name);
     }
 
 

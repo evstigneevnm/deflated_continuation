@@ -34,6 +34,10 @@ public:
         vec_op->set(vec_gpu);
     }
 
+    size_t read_matrix_size(const std::string &f_name)
+    {
+        return file_operations::read_matrix_size(f_name);
+    }
 
 private:
     VectorOperations* vec_op;
