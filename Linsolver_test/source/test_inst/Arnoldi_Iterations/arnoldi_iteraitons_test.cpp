@@ -10,7 +10,7 @@
 #include <common/gpu_file_operations_functions.h>
 #include <test_inst/IRAM/system_operator_test.h>
 #include <test_inst/IRAM/linear_operator.h>
-#include <stability/IRAM/iram_process.hpp>
+#include <stability/inverse_power_iterations/arnoldi_power_iterations.h>
 
 int main(int argc, char const *argv[])
 {
@@ -25,7 +25,7 @@ int main(int argc, char const *argv[])
     using lin_op_t = stability::linear_operator<vec_ops_t, mat_ops_t>;
     using arnoldi_t = numerical_algos::eigen_solvers::arnoldi_process<vec_ops_t, mat_ops_t, sys_op_t, log_t>;
     using lapack_wrap_t = lapack_wrap<real>;
-    using iram_t = stability::IRAM::iram_process<vec_ops_t, mat_ops_t, lapack_wrap_t, arnoldi_t, sys_op_t, lin_op_t, log_t>;
+    using arnoldi_iter_t = stability::arnoldi_power_iterations<vec_ops_t, mat_ops_t, arnoldi_t, lapack_wrap_t, lin_op_t, log_t>;
 
     if(argc != 3)
     {
@@ -40,13 +40,13 @@ int main(int argc, char const *argv[])
         return 0;
     }
 
-    unsigned int m = 30;
-    unsigned int k0 = 10;
+    size_t m = 70;
 
 
     cublas_wrap CUBLAS(true);
     lapack_wrap_t lapack(m);
     log_t log;
+    log.info("Log initialized");
     vec_ops_t vec_ops_N(N, &CUBLAS);
     vec_ops_t vec_ops_m(m, &CUBLAS);
     mat_ops_t mat_ops_A(N, N, &CUBLAS);
@@ -69,21 +69,22 @@ int main(int argc, char const *argv[])
     lin_op.set_matrix_ptr(A);
     sys_op.set_matrix_ptr(PA);
 
-    iram_t IRAM(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &lapack, &arnoldi, &sys_op, &lin_op, &log);
+    arnoldi_iter_t ArIter(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &log, &arnoldi, &lapack, &lin_op);
         
-    IRAM.set_target_eigs("LR");
-    IRAM.set_number_of_desired_eigenvalues(k0);
-    IRAM.set_tolerance(1.0e-9);
-    IRAM.set_max_iterations(100);
-
-    IRAM.set_verbocity(true);
-    auto eigs = IRAM.execute();
-    std::cout << std::scientific;
+    auto eigs = ArIter.execute();
+    // std::cout << std::scientific;
     for(auto &e: eigs)
     {
-        std::cout << e << std::endl;
+        if( e.imag()<0.0 )
+        {
+            log.info_f("%le%le", (double) e.real(), (double) e.imag() );    
+        }
+        else
+        {
+            log.info_f("%le+%le", (double) e.real(), (double) e.imag() ); 
+        }
+        
     }
-
 
     mat_ops_A.stop_use_matrix(PA); mat_ops_A.free_matrix(PA);
     mat_ops_A.stop_use_matrix(A); mat_ops_A.free_matrix(A);

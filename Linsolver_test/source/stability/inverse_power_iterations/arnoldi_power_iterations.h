@@ -12,16 +12,17 @@
 
 #include <vector>
 #include <algorithm>
-
+#include <complex>
 //debug
 #include <common/gpu_matrix_file_operations.h>
 #include <utils/cuda_support.h>
+#include <stability/Galerkin_projection.h>
 
 namespace stability
 {
 
 
-template<class VectorOperations, class MatrixOperations, class ArnoldiProcess, class LapackOperations, class Log>
+template<class VectorOperations, class MatrixOperations, class ArnoldiProcess, class LapackOperations, class LinearOperator, class Log>
 class arnoldi_power_iterations
 {
 public:
@@ -30,25 +31,28 @@ public:
     typedef typename MatrixOperations::matrix_type T_mat;
     typedef gpu_matrix_file_operations<MatrixOperations> files_mat_t;
     
-    typedef std::vector<std::pair<T,T>> eigs_t;
+    typedef std::vector< std::complex<T> > eigs_t;
 
+    using project_t = stability::Galerkin_projection<VectorOperations, MatrixOperations, LapackOperations, LinearOperator, Log, eigs_t>;
 
-    arnoldi_power_iterations(VectorOperations* vec_ops_l_, MatrixOperations* mat_ops_l_, VectorOperations* vec_ops_s_, MatrixOperations* mat_ops_s_, Log* log_, ArnoldiProcess* arnolid_proc_, LapackOperations* lapack_):
+    arnoldi_power_iterations(VectorOperations* vec_ops_l_, MatrixOperations* mat_ops_l_, VectorOperations* vec_ops_s_, MatrixOperations* mat_ops_s_, Log* log_, ArnoldiProcess* arnolid_proc_, LapackOperations* lapack_, LinearOperator* A_):
     vec_ops_l(vec_ops_l_),
     mat_ops_l(mat_ops_l_),
     vec_ops_s(vec_ops_s_),
     mat_ops_s(mat_ops_s_),    
     log(log_),
     arnolid_proc(arnolid_proc_),
-    lapack(lapack_)
+    lapack(lapack_),
+    A(A_)
     {
         small_rows = mat_ops_s->get_rows();
         small_cols = mat_ops_s->get_cols();
         large_rows = mat_ops_l->get_rows();
         large_cols = mat_ops_l->get_cols();
 
+        project = new project_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, lapack, A, log);
         start_all();
-        
+
 
     }
     
@@ -57,8 +61,11 @@ public:
     ~arnoldi_power_iterations()
     {
 
-        stop_all();
-    
+        if(project != nullptr)
+        {
+            delete project;
+        }
+        stop_all();    
     }
 
     void set_linear_operator_stable_eigenvalues_halfplane(const T sign_) // sign_ = -1  => left half plane
@@ -66,28 +73,31 @@ public:
         sign = -sign_;
     }  
 
-    eigs_t execute()
+    eigs_t execute(std::string which = "LR")
     {
         size_t k = 0;
         arnolid_proc->execute_arnoldi(k, V_mat, H_mat);
-        lapack->hessinberg_eigs_from_gpu(H_mat, small_rows, eig_real, eig_imag);
-        eigs_t eigs;
-        std::vector<T> eigs_magnitude;
-        eigs.reserve(small_rows);
+        project->set_target_eigs(which);
+        // eigs_t eigs(small_cols, 0);
+        auto eigs = project->eigs(V_mat, H_mat, small_cols);
+        // lapack->hessinberg_eigs_from_gpu(H_mat, small_rows, eigs.data() );
+        // eigs_t eigs;
+        // std::vector<T> eigs_magnitude;
+        // eigs.reserve(small_rows);
 
-        T max_re_eig = 0.0; 
-        for(int j=0;j<small_rows;j++)
-        {
-            T eig_real_l = sign*eig_real[j];
-            T eig_imag_l = eig_imag[j];
-            eigs.push_back(std::make_pair(eig_real_l, eig_imag_l ));
-            eigs_magnitude.push_back(eig_real_l*eig_real_l+eig_imag_l*eig_imag_l);
+        // T max_re_eig = 0.0; 
+        // for(int j=0;j<small_rows;j++)
+        // {
+        //     T eig_real_l = sign*eig_real[j];
+        //     T eig_imag_l = eig_imag[j];
+        //     eigs.push_back( {eig_real_l, eig_imag_l} );
+        //     eigs_magnitude.push_back(eig_real_l*eig_real_l+eig_imag_l*eig_imag_l);
 
-            if(max_re_eig<eig_real_l)
-                max_re_eig = eig_real_l;
-        }
+        //     if(max_re_eig<eig_real_l)
+        //         max_re_eig = eig_real_l;
+        // }
         
-        std::sort(eigs.rbegin(), eigs.rend()); //from max to min by the first pair
+        // std::sort(eigs.rbegin(), eigs.rend() ); //from max to min by the first pair
 
 
 //        TODO: temporal checking 
@@ -135,6 +145,8 @@ private:
     MatrixOperations* mat_ops_s;
     ArnoldiProcess* arnolid_proc;
     LapackOperations* lapack;
+    project_t* project = nullptr;
+    LinearOperator* A;
 
     T_mat V_mat;
     T_mat H_mat;

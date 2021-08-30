@@ -18,10 +18,10 @@ LIBFLAGS = --compiler-options -fPIC
 GCCFLAGS = -g -std=c++11
 ICUDA = -I/usr/local/cuda
 IPROJECT = -I source/
-IBOOST = -I/home/noctum/boost_1_70/include/
+IBOOST = -I/usr/local/boost/include
 
 LCUDA = -L/usr/local/cuda/lib64
-LBOOST = -L/home/noctum/boost_1_70/lib/
+LBOOST = -L/usr/local/boost/lib
 LIBS1 = -lcublas -lcurand 
 LIBS2 = -lcufft -lcublas -lcurand 
 LIBBOOST = -lboost_serialization
@@ -39,6 +39,9 @@ iram_simulation:
 
 iram_process:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/test_inst/IRAM/iram_test.cpp $(LIBS1) $(LLAPACK) O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_IRAM.bin	
+
+arnoldi_iters:
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/test_inst/Arnoldi_Iterations/arnoldi_iteraitons_test.cpp $(LIBS1) $(LLAPACK) O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_ArIter.bin	
 
 
 cpu_1st_call_alloc_test: source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp
@@ -120,7 +123,7 @@ stability_newton_Kolmogorov_3D: source/models/KF_3D/test_Kolmogorov_3D_Newton_st
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/test_Kolmogorov_3D_Newton_stability.cpp O/Kolmogorov_3D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LLAPACK) $(LIBS2) -o newton_stability_Kolmogorov_3D.bin 2>results.make
 
 file_stability_newton_Kolmogorov_3D: source/models/KF_3D/test_Kolmogorov_3D_Newton_file_stability.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/test_Kolmogorov_3D_Newton_file_stability.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o O/gpu_reduction_ogita_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LLAPACK) $(LIBS2) -o newton_stability_file_Kolmogorov_3D.bin 2>results.make
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KF_3D/test_Kolmogorov_3D_Newton_file_stability.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o O/gpu_reduction_ogita_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LLAPACK) $(LIBS2) $(LIBBOOST) -o newton_stability_file_Kolmogorov_3D.bin 2>results.make
 
 
 deflation_Kolmogorov_3D: source/models/KF_3D/test_deflation_Kolmogorov_3D.cpp

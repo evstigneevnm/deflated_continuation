@@ -27,7 +27,10 @@
 *    - set_linearization_point(x0, lambda0) sets point of linearization for calculation of Jacobians
 *    - jacobian_u(x) solves Jacobian F_x at (x0, lambda0) for given x using variational formulation
 *    - jacobian_lambda(x) solves Jacobian F_lambda at (x0, lambda0) for given x using variational formulation
+*    - 
 *    - preconditioner_jacobian_u(dr) applies Jacobi preconditioner for the Jacobian F_x at given (x0, lambda0)
+*    - preconditioner_jacobian_temporal_u(T_vec& dr, T a, T b) applies a+b*J preconditioner, where J is the Jacobian F_x at given (x0, lambda0) and the real values 'a' and 'b' are set.
+*    
 *    axillary:
 *    - set_cuda_grid calculates CUDA grid
 *    - get_cuda_grid returns calculated grid

@@ -56,11 +56,15 @@ public:
     }
 
 
-    void set_f()
+    void set_f(bool random_ = false)
     {
         if(debug) log->info("iram_container: initialized f-vector");
         vec_ops_l->assign_scalar(0, f_gpu);
         vec_ops_l->set_value_at_point(1, 0, f_gpu);
+        if(random_)
+        {
+            vec_ops_l->assign_random(f_gpu);
+        }
     }
     void to_gpu()
     {
@@ -135,6 +139,11 @@ public:
         if(debug) log->info("iram_container: ritz vector norms reset.");
         for(int j=0;j<m;j++) ritz.at(j) = T(0);
     }
+    std::vector<T> get_ritz_norms()
+    {
+        return ritz;
+    }
+
     T ritz_norm()
     {
         T norm = 0;
@@ -154,9 +163,9 @@ private:
     T_mat V_gpu = nullptr;
     std::vector<T> V_cpu;
     T_mat H_gpu = nullptr;
-    std::vector<T>  H_cpu;
+    std::vector<T> H_cpu;
     T_vec f_gpu = nullptr;
-    std::vector<T>  f_cpu;
+    std::vector<T> f_cpu;
 
 
     void free_mat_l(T_mat mat_)
