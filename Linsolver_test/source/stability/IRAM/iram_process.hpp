@@ -65,9 +65,6 @@ public:
         container = new container_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, log);
         bulge = new bulge_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, log, lapack);
         bulge->set_target(which_sys_op);
-        // mat_ops_l->init_matrix(V1); mat_ops_l->start_use_matrix(V1);
-        // mat_ops_s->init_matrix(Q_fin_dev); mat_ops_s->start_use_matrix(Q_fin_dev);
-        // mat_ops_s->init_matrix(R_fin_dev); mat_ops_s->start_use_matrix(R_fin_dev);
         project = new project_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, lapack, A, log);
 
 
@@ -76,21 +73,7 @@ public:
     {
         free_chk(project);
         free_chk(bulge);
-        free_chk(container);
-        
-
-        // if(V1 != nullptr)
-        // {
-        //     mat_ops_l->stop_use_matrix(V1); mat_ops_l->free_matrix(V1);
-        // }
-        // if(Q_fin_dev != nullptr)
-        // {
-        //     mat_ops_s->stop_use_matrix(Q_fin_dev); mat_ops_s->free_matrix(Q_fin_dev);
-        // }
-        // if(R_fin_dev != nullptr)
-        // {
-        //     mat_ops_s->stop_use_matrix(R_fin_dev); mat_ops_s->free_matrix(R_fin_dev);
-        // }        
+        free_chk(container);        
     }
     
     void set_target_eigs(const std::string& which_)
@@ -120,7 +103,7 @@ public:
         verbocity = verb_;
     }
 
-    eigs_t execute()
+    eigs_t execute(T_vec v_init = nullptr)
     {
         T ritz_norm = T(1.0);
         unsigned int iters = 0;
@@ -129,7 +112,7 @@ public:
         while( (ritz_norm>tolerance)&&(iters<max_iterations) )
         {
             container->reset_ritz();
-            arnoldi->execute_arnoldi(k, container->ref_V(), container->ref_H(), container->ref_f() ); //(PA) V_j = V_j H_j + beta_j*f_{j+1}*e^T
+            arnoldi->execute_arnoldi(k, container->ref_V(), container->ref_H(), v_init ); //(PA) V_j = V_j H_j + beta_j*f_{j+1}*e^T
             bulge->execute(*container);
             container->to_gpu();
             ritz_norm = container->ritz_norm();
@@ -147,8 +130,6 @@ public:
             iters++;
         }
 
-        // obtaining the original eigenvlaues
-        // TODO: move it to separate class
         auto eigs = project->eigs(container->ref_V(), container->ref_H(), k); 
 
         return eigs;

@@ -1,20 +1,12 @@
 #ifndef __STABILITY_STABILITY_ANALYSIS_HPP__
 #define __STABILITY_STABILITY_ANALYSIS_HPP__
 
-/**
-*   The main stability class that basically assembles everything
-*   and then executes the particular eigensolver to obtain the dim of the unstable manfold
-*   for a provided solution.
-*/
 #include <stdexcept>
 #include <vector>
 #include <string>
 #include <iostream>
 #include <fstream>
-#include <numerical_algos/arnolid_process/arnoldi_process.h>
-#include <external_libraries/lapack_wrap.h>
-#include <stability/inverse_power_iterations/system_operator_stability.h>
-#include <stability/inverse_power_iterations/arnoldi_power_iterations.h>
+#include <algorithm>
 
 namespace stability
 {
@@ -60,12 +52,14 @@ public:
         
         vec_ops->init_vector(x_p1); vec_ops->start_use_vector(x_p1);
         vec_ops->init_vector(x_p2); vec_ops->start_use_vector(x_p2);
+        vec_ops->init_vector(f_0); vec_ops->start_use_vector(f_0);
 
     }
     ~stability_analysis()
     {
         vec_ops->stop_use_vector(x_p1); vec_ops->free_vector(x_p1);
-        vec_ops->stop_use_vector(x_p2); vec_ops->free_vector(x_p2);        
+        vec_ops->stop_use_vector(x_p2); vec_ops->free_vector(x_p2); 
+        vec_ops->stop_use_vector(f_0); vec_ops->free_vector(f_0);        
     }
 
     void set_linear_operator_stable_eigenvalues_halfplane(const T sign_)
@@ -75,9 +69,11 @@ public:
     
     std::pair<int, int> execute(const T_vec& u0_in, const T lambda)
     {
-        nonlin_op->set_linerization_point(u0_in, lambda);
+        nonlin_op->set_linearization_point(u0_in, lambda);
 
-        eigs_t eigs = eig_solver->execute();
+        nonlin_op->randomize_vector(f_0);
+
+        eigs_t eigs = eig_solver->execute(f_0);
 
 
         //std::ofstream myfile;
@@ -92,7 +88,7 @@ public:
         {
             T re = x.real();
             T im = x.imag();
-            if(re>=0.0)
+            // if(re>=0.0)
             {
                 if(im>=0.0)
                     log->info_f("   %.3lf+%.3lfi", double(re), double(im));
@@ -188,6 +184,7 @@ private:
 
     T_vec x_p1;
     T_vec x_p2;
+    T_vec f_0;
 
     template<class T>
     void delete_if_not_null(T* ptr)

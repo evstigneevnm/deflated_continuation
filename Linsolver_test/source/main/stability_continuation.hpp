@@ -29,13 +29,20 @@
 #include <containers/bifurcation_diagram.h>
 
 #include <containers/stability_diagram.h>
+
+#include <external_libraries/lapack_wrap.h>
+
+#include <numerical_algos/arnolid_process/arnoldi_process.h>
+#include <stability/system_operator_Cayley_transform.h>
+#include <stability/IRAM/iram_process.hpp>
 #include <stability/stability_analysis.hpp>
+
 
 
 namespace main_classes
 {
 
-template<class VectorOperations, class MatrixOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, template<class , class , class , class , class > class LinearSolver,  template<class , class , class , class > class SystemOperator, class Parameters>
+template<class VectorOperations, class MatrixOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, class LinearOperatorShifted, class PreconditionerShifted, template<class , class , class , class , class > class LinearSolver, template<class , class , class , class > class SystemOperator, class Parameters>
 class stability_continuation
 {
 private:
@@ -50,7 +57,12 @@ private:
     typedef typename boost::archive::text_iarchive data_input;
 
 
-    typedef LinearSolver<LinearOperator, Preconditioner, VectorOperations, Monitor, Log> lin_slv_t;
+    //linear solver
+    using lin_slv_t = LinearSolver<LinearOperator, Preconditioner, VectorOperations, Monitor, Log>;
+    //shifted linear solver
+    using lin_slv_sh_t = LinearSolver<LinearOperatorShifted, PreconditionerShifted, VectorOperations, Monitor, Log>;
+
+    using lapack_wrap_t = lapack_wrap<T>;
 
     typedef nonlinear_operators::newton_method::convergence_strategy<
         VectorOperations, 
@@ -71,14 +83,20 @@ private:
         convergence_newton_t
         > newton_t;
     
-    typedef stability::stability_analysis<
-        VectorOperations, 
-        MatrixOperations,  
+
+
+    //setting up the eigensolver
+    using Cayley_system_op_t = stability::system_operator_Cayley_transform<VectorOperations, NonlinearOperations, LinearOperatorShifted, lin_slv_sh_t, Log>;
+    using arnoldi_t = numerical_algos::eigen_solvers::arnoldi_process<VectorOperations, MatrixOperations, Cayley_system_op_t, Log>;
+    using iram_t = stability::IRAM::iram_process<VectorOperations, MatrixOperations, lapack_wrap_t, arnoldi_t, Cayley_system_op_t, LinearOperator, Log>;
+
+
+    using stability_t = stability::stability_analysis<
+        VectorOperations,   
         NonlinearOperations, 
-        LinearOperator, 
-        lin_slv_t, 
         Log, 
-        newton_t> stability_t;
+        newton_t,
+        iram_t>;
 
 
     typedef container::curve_helper_container<VectorOperations> container_helper_t;
@@ -138,16 +156,31 @@ public:
         if(!project_dir.empty() && *project_dir.rbegin() != '/')
             project_dir += '/';
 
+        lapack = new lapack_wrap_t(parameters->stability_continuation.Krylov_subspace);
         lin_op = new LinearOperator(nonlin_op);  
         prec = new Preconditioner(nonlin_op);  
 
+        lin_op_sh = new LinearOperatorShifted(vec_ops, nonlin_op);
+        prec_sh = new PreconditionerShifted(nonlin_op);
+
         lin_slv = new lin_slv_t(vec_ops, log_linsolver);
         lin_slv->set_preconditioner(prec);
+
+        lin_slv_sh = new lin_slv_sh_t(vec_ops, log_linsolver);
+        lin_slv_sh->set_preconditioner(prec_sh);
+
         convergence_newton = new convergence_newton_t(vec_ops, log);
         system_operator = new system_operator_t(vec_ops, lin_op, lin_slv);
         newton = new newton_t(vec_ops, system_operator, convergence_newton);
         
-        stab = new stability_t(vec_ops, mat_ops, vec_ops_small_, mat_ops_small_, log, nonlin_op, lin_op, lin_slv, newton);
+
+        
+        Cayley_sys_op = new Cayley_system_op_t(vec_ops, nonlin_op, lin_op_sh, lin_slv_sh, log);
+        arnoldi = new arnoldi_t(vec_ops, vec_ops_small_, mat_ops, mat_ops_small_, Cayley_sys_op, log);
+        iram = new iram_t(vec_ops, mat_ops, vec_ops_small_, mat_ops_small_, lapack, arnoldi, Cayley_sys_op, lin_op, log);
+
+        stab = new stability_t(vec_ops, log, nonlin_op, newton, iram);
+
 
         bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files);
 
@@ -156,7 +189,6 @@ public:
         queue_pointer = new queue_pointer_t(vec_ops->get_vector_size(), 2);
         queue_lambda = new queue_lambda_t();
         queue_dims = new queue_dims_t();
-
 
         vec_ops->init_vector(x_p); vec_ops->start_use_vector(x_p);
         
@@ -168,15 +200,23 @@ public:
         delete queue_pointer;
         delete stability_diagram;
         delete bif_diag;
+        delete Cayley_sys_op;
+        delete arnoldi;
+        delete iram;
         delete stab;        
         delete newton;
         delete system_operator;
         delete convergence_newton;
         delete lin_slv;
+        delete lin_slv_sh;
         delete prec;
         delete lin_op;
-
+        delete prec_sh;
+        delete lin_op_sh;
+        delete lapack;
         
+
+
         vec_ops->stop_use_vector(x_p); vec_ops->free_vector(x_p);
 
     }
@@ -214,6 +254,32 @@ public:
             lin_slv->set_resid_recalc_freq(resid_recalc_freq);
         if(basis_sz > 0)
             lin_slv->set_basis_size(basis_sz);  
+
+        //setup linear system:
+        mon = &lin_slv_sh->monitor();
+
+        mon->init(lin_solver_tol, T(0.0), lin_solver_max_it);
+        mon->set_save_convergence_history(save_convergence_history_);
+        mon->set_divide_out_norms_by_rel_base(divide_out_norms_by_rel_base_);
+        mon->out_min_resid_norm();
+//
+        if(use_precond_resid >= 0)
+            lin_slv_sh->set_use_precond_resid(use_precond_resid);
+        if(resid_recalc_freq >= 0)
+            lin_slv_sh->set_resid_recalc_freq(resid_recalc_freq);
+        if(basis_sz > 0)
+            lin_slv_sh->set_basis_size(basis_sz);  
+       
+        Cayley_sys_op->set_tolerance(1.0e-9); //TODO: to json params?
+        T sigma = parameters->stability_continuation.Cayley_transform_sigma_mu.at(0);
+        T mu = parameters->stability_continuation.Cayley_transform_sigma_mu.at(1);
+        Cayley_sys_op->set_sigma_and_mu(sigma, mu);
+        iram->set_verbocity(true);
+        iram->set_target_eigs("LR");
+        iram->set_number_of_desired_eigenvalues(parameters->stability_continuation.desired_spectrum);
+        iram->set_tolerance(1.0e-6);
+        iram->set_max_iterations(100);
+
 //
     }
 
@@ -421,9 +487,17 @@ private:
     std::string project_dir;
     unsigned int skip_files;
 //created locally:
+    lapack_wrap_t* lapack = nullptr;
     LinearOperator* lin_op = nullptr;
+    LinearOperatorShifted* lin_op_sh = nullptr;
     Preconditioner* prec = nullptr;
+    PreconditionerShifted* prec_sh = nullptr;
     lin_slv_t* lin_slv = nullptr;
+    lin_slv_sh_t* lin_slv_sh = nullptr;
+
+    Cayley_system_op_t* Cayley_sys_op = nullptr;
+    arnoldi_t* arnoldi = nullptr;
+    iram_t* iram = nullptr;
     monitor_t* mon = nullptr;
     newton_t* newton = nullptr;
     convergence_newton_t* convergence_newton = nullptr;

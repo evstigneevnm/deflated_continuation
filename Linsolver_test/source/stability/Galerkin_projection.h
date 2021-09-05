@@ -48,6 +48,8 @@ public:
         mat_ops_s->init_matrix(Q_fin_dev); mat_ops_s->start_use_matrix(Q_fin_dev);
         mat_ops_s->init_matrix(R_fin_dev); mat_ops_s->start_use_matrix(R_fin_dev);
 
+        vec_ops_l->init_vector(v_helper); vec_ops_l->start_use_vector(v_helper);
+
         auto small_rows = mat_ops_s->get_rows();
         auto small_cols = mat_ops_s->get_cols();
         auto large_rows = mat_ops_l->get_rows();
@@ -92,6 +94,10 @@ public:
             mat_ops_s->stop_use_matrix(R_fin_dev); mat_ops_s->free_matrix(R_fin_dev);
             
         }
+        if(v_helper != nullptr)
+        {
+            vec_ops_l->stop_use_vector(v_helper); vec_ops_l->free_vector(v_helper);
+        }
 
 
     }
@@ -124,7 +130,10 @@ public:
         mat_ops_l->mat2column_mult_mat(V0, Q_fin_dev, m, 1.0, 0.0, V1);
         for(int j=0;j<k;j++)
         {
-            A->apply(&V1[j*N], &V0[j*N]);
+            
+            A->apply(&V1[j*N], v_helper);
+            vec_ops_l->assign(v_helper, &V0[j*N]);
+            //&V0[j*N]);
         }
         mat_ops_l->mat_T_gemm_mat_N(V1, V0, m, 1.0, 0.0, R_fin_dev);
         std::vector<T> R_fin(m*m, 0);
@@ -163,6 +172,7 @@ private:
     T_mat Q_fin_dev = nullptr;
     T_mat R_fin_dev = nullptr;
     T_mat H_dev = nullptr;
+    T_vec v_helper = nullptr;
 
     unsigned int m;
     size_t N;

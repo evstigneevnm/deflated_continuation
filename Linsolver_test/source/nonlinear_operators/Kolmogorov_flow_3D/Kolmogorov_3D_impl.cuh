@@ -506,8 +506,59 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_iLapl
 
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
-__global__ void apply_abs_kernel(size_t Nx, size_t Ny, size_t Nz, T_vec ux, T_vec uy, T_vec uz, T_vec v)
+__global__ void apply_abs_kernel(size_t N, T_vec ux, T_vec uy, T_vec uz, T_vec v)
 {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i>=N) return;
+    
+    v[i] = sqrt(ux[i]*ux[i] + uy[i]*uy[i] + uz[i]*uz[i]);
+
+}
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_abs(TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v)
+{
+    size_t NNX = Nx*Ny*Nz;
+    dim3 blocks_x=(NNX+BLOCKSIZE)/BLOCKSIZE;
+    apply_abs_kernel<TR, TR_vec, TC, TC_vec><<<blocks_x, dimBlock1>>>(NNX, ux, uy, uz, v);
+}
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_abs(size_t Nx_l, size_t Ny_l, size_t Nz_l, TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v)
+{
+    size_t NRR = Nx_l*Ny_l*Nz_l;
+    dim3 blocks_x=(NRR+BLOCKSIZE)/BLOCKSIZE;
+    apply_abs_kernel<TR, TR_vec, TC, TC_vec><<<blocks_x, dimBlock1>>>(NRR, ux, uy, uz, v);
+}
+
+
+
+template<typename T, typename T_vec, typename TC, typename TC_vec>
+__global__ void apply_scale_inplace_kernel(size_t N, T scale, T_vec ux, T_vec uy, T_vec uz)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i>=N) return;
+    
+    ux[i]*=scale;
+    uy[i]*=scale;
+    uz[i]*=scale;
+
+}
+
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_scale_inplace(size_t Nx_l, size_t Ny_l, size_t Nz_l, TR scale, TR_vec ux, TR_vec uy, TR_vec uz)
+{
+    size_t NRR = Nx_l*Ny_l*Nz_l;
+    dim3 blocks_x=(NRR+BLOCKSIZE)/BLOCKSIZE;
+    apply_scale_inplace_kernel<TR, TR_vec, TC, TC_vec><<<blocks_x, dimBlock1>>>(NRR, scale, ux, uy, uz);
+}
+
+
+template<typename T, typename T_vec, typename TC, typename TC_vec>
+__global__ void convert_size_kernel(size_t Nx_src, size_t Ny_src, size_t Nz_src, size_t Nx_dest, size_t Ny_dest, size_t Nz_dest, T scale, TC_vec ux_src_hat, TC_vec uy_src_hat, TC_vec uz_src_hat, TC_vec ux_dest_hat, TC_vec uy_dest_hat, TC_vec uz_dest_hat)
+{
+size_t Nx = Nx_src; size_t Ny = Ny_src; size_t Nz = Nz_src;
 unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
 unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
 gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
@@ -520,16 +571,26 @@ if ( index_in < sizeOfData )
     yIndex = t1 - Ny * xIndex ;
     unsigned int j=xIndex, k=yIndex, l=zIndex;
 //  operation starts from here:
+    int jj=j;
     
-    v[I3(j,k,l)] = sqrt(ux[I3(j,k,l)]*ux[I3(j,k,l)] + uy[I3(j,k,l)]*uy[I3(j,k,l)] + uz[I3(j,k,l)]*uz[I3(j,k,l)]);
+    if(j>=Nx_src/2)
+        jj=j+(Nx_dest-Nx_src);
+    int kk=k;
+    if(k>=Ny_src/2)
+        kk=k+(Ny_dest-Ny_src);
+
+    ux_dest_hat[_I3(jj,kk,l,Nx_dest, Ny_dest, Nz_dest)]=scale*ux_src_hat[_I3(j,k,l,Nx_src, Ny_src, Nz_src)];
+    uy_dest_hat[_I3(jj,kk,l,Nx_dest, Ny_dest, Nz_dest)]=scale*uy_src_hat[_I3(j,k,l,Nx_src, Ny_src, Nz_src)];
+    uz_dest_hat[_I3(jj,kk,l,Nx_dest, Ny_dest, Nz_dest)]=scale*uz_src_hat[_I3(j,k,l,Nx_src, Ny_src, Nz_src)];
 
 }
 }
+
+
 template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_abs(TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v)
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::convert_size(size_t Nx_dest, size_t Ny_dest, size_t Mz_dest, TR scale, TC_vec ux_src_hat, TC_vec uy_src_hat, TC_vec uz_src_hat, TC_vec ux_dest_hat, TC_vec uy_dest_hat, TC_vec uz_dest_hat)
 {
-
-    apply_abs_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNR, dimBlockN>>>(Nx, Ny, Nz, ux, uy, uz, v);
+    convert_size_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, Nx_dest, Ny_dest, Mz_dest, scale, ux_src_hat, uy_src_hat, uz_src_hat, ux_dest_hat, uy_dest_hat, uz_dest_hat);
 }
 
 
@@ -543,7 +604,6 @@ __global__ void add_mul3_kernel(size_t N, TC alpha, TC_vec u_x, TC_vec u_y, TC_v
     v_x[i]+=alpha*u_x[i];
     v_y[i]+=alpha*u_y[i];
     v_z[i]+=alpha*u_z[i];
-    
 
 }
 

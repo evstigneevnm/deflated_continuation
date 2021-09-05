@@ -239,14 +239,16 @@ struct parameters
 
         bool linear_operator_stable_eigenvalues_left_halfplane;
         unsigned int Krylov_subspace;
-
+        unsigned int desired_spectrum;
+        std::vector<T> Cayley_transform_sigma_mu;
         linear_solver_s linear_solver;
         newton_s newton;  
 
         void set_default()
         {
             linear_operator_stable_eigenvalues_left_halfplane = true;
-            Krylov_subspace = 15;
+            Krylov_subspace = 25;
+            desired_spectrum = 5;
             linear_solver.set_default();
             newton.set_default();
         }
@@ -254,6 +256,13 @@ struct parameters
         {
             std::cout << "||==linear_operator_stable_eigenvalues_left_halfplane: " << linear_operator_stable_eigenvalues_left_halfplane << std::endl;   
             std::cout << "||==Krylov_subspace: " << Krylov_subspace << std::endl;   
+            std::cout << "||==desired_spectrum: " << desired_spectrum << std::endl; 
+            std::cout << "||==Cayley_transform_sigma_mu: ";
+            for(auto &x_: Cayley_transform_sigma_mu)
+            {
+                std::cout << x_ << " ";
+            } 
+            std::cout << std::endl;
             std::cout << "||==linear_solver: " << std::endl;  
             linear_solver.plot_all();
             std::cout << "||==newton: " << std::endl;  
@@ -624,7 +633,8 @@ void from_json(const nlohmann::json &j, parameters_d::stability_continuation_s &
     {
         j.at("left_halfplane_stable_eigenvalues").get<bool>(),
         j.at("Krylov_subspace_dimension").get<unsigned int>(),
-
+        j.at("desired_spectrum").get<unsigned int>(),
+        j.at("Cayley_transform_sigma_mu").get< std::vector<double> >(),
         j.at("linear_solver").get< parameters_d::stability_continuation_s::linear_solver_s >(),
         j.at("newton").get< parameters_d::stability_continuation_s::newton_s >()
     };
@@ -635,7 +645,8 @@ void from_json(const nlohmann::json &j, parameters_f::stability_continuation_s &
     {
         j.at("left_halfplane_stable_eigenvalues").get<bool>(),
         j.at("Krylov_subspace_dimension").get<unsigned int>(),
-        
+        j.at("desired_spectrum").get<unsigned int>(),
+        j.at("Cayley_transform_sigma_mu").get< std::vector<float> >(),        
         j.at("linear_solver").get< parameters_f::stability_continuation_s::linear_solver_s >(),
         j.at("newton").get< parameters_f::stability_continuation_s::newton_s >()        
     };

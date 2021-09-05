@@ -8,7 +8,7 @@
 */
 #include <utility>
 
-namespace NonlinearOperators
+namespace nonlinear_operators
 {
 
 
@@ -18,6 +18,12 @@ class linear_operator_K_3D_shifted
 public:    
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
+
+    struct ab_t
+    {
+        T a = 0.0;
+        T b = 1.0;
+    };
 
     linear_operator_K_3D_shifted(VectorOperations* vec_ops_, NonlinearOperator* nonlin_op_): 
     vec_ops(vec_ops_),
@@ -33,28 +39,27 @@ public:
     // a+b*A
     void set_bA_plus_a(const T b_, const T a_)
     {
-        a = a_;
-        b = b_;
+        ab.a = a_;
+        ab.b = b_;
     }
 
     void apply(const T_vec& x, T_vec& f)const
     {
         nonlin_op->jacobian_u(x, f);
         //calc: y := mul_x*x + mul_y*y
-        vec_ops->add_mul(a, x, b, f);
+        vec_ops->add_mul(ab.a, x, ab.b, f);
 
     }
 
-    std::pair<T,T> get_a_b()
+    ab_t get_a_b()
     {
-        return {a, b};
+        return ab;
     }
 
 private:
     VectorOperations* vec_ops;
     NonlinearOperator* nonlin_op;
-    T a = T(0.0);
-    T b = T(1.0);
+    ab_t ab;
 
 };
 

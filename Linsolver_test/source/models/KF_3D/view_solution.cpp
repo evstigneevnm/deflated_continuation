@@ -65,6 +65,12 @@ int main(int argc, char const *argv[])
     size_t Mz = CUFFT_C2R->get_reduced_size();
     size_t Nv = real(3*(Nx*Ny*Mz-1));
 
+    size_t scale = 2;
+    size_t Nx_vis = Nx*scale;
+    size_t Ny_vis = Ny*scale;
+    size_t Nz_vis = Nz*scale;
+    cufft_type *CUFFT_C2R_vis = new cufft_type(Nx_vis, Ny_vis, Nz_vis);
+    size_t Mz_vis = CUFFT_C2R_vis->get_reduced_size();
 
     cublas_wrap *CUBLAS = new cublas_wrap(true);
     CUBLAS->set_pointer_location_device(false);
@@ -77,6 +83,8 @@ int main(int argc, char const *argv[])
 
     vec b;
 
+
+
     vec_ops->init_vector(b); vec_ops->start_use_vector(b);
     try
     {
@@ -87,10 +95,15 @@ int main(int argc, char const *argv[])
         std::cout << "wrote " << f_name_vec << std::endl;
         KF_3D->write_solution_abs(f_name_abs, (vec&)b);
         std::cout << "wrote " << f_name_abs << std::endl;
+        
+        KF_3D->write_solution_scaled(CUFFT_C2R_vis, Nx_vis, Ny_vis, Nz_vis, output_file_name_prefix+"_s_vec.pos", output_file_name_prefix+"_s_abs.pos", (vec&)b);
+
+        std::cout << "wrote scaled files: " << output_file_name_prefix+"_s_vec.pos" << " " << output_file_name_prefix+"_s_abs.pos" <<  std::endl;   
     }
     catch(...)
     {
         std::cout << "File " << input_file_name << " not found!" << std::endl;
+        vec_ops->stop_use_vector(b); vec_ops->free_vector(b);
         return 0;
     }
 
@@ -103,7 +116,9 @@ int main(int argc, char const *argv[])
     delete vec_ops_C;
     delete vec_ops;    
     delete CUBLAS;
+    delete CUFFT_C2R_vis;
     delete CUFFT_C2R;
+
 
 
     return 0;

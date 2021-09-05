@@ -18,6 +18,8 @@
 #include <nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D.h>
 #include <nonlinear_operators/Kolmogorov_flow_3D/linear_operator_K_3D.h>
 #include <nonlinear_operators/Kolmogorov_flow_3D/preconditioner_K_3D.h>
+#include <nonlinear_operators/Kolmogorov_flow_3D/linear_operator_K_3D_shifted.h>
+#include <nonlinear_operators/Kolmogorov_flow_3D/preconditioner_K_3D_shifted.h>
 #include <nonlinear_operators/Kolmogorov_flow_3D/convergence_strategy.h>
 #include <nonlinear_operators/Kolmogorov_flow_3D/system_operator.h>
 //problem dependant ends
@@ -96,11 +98,16 @@ int main(int argc, char const *argv[])
             vec_ops_t,
             Blocks_x_, Blocks_y_> KF_3D_t;
 
+    //standard linear operators and preconditioners
     typedef nonlinear_operators::linear_operator_K_3D<
         vec_ops_t, KF_3D_t> lin_op_t;
-    
     typedef nonlinear_operators::preconditioner_K_3D<
         vec_ops_t, KF_3D_t, lin_op_t> prec_t;
+
+    //linear operators and preconditioners with shifts
+    using lin_op_shifted_t = nonlinear_operators::linear_operator_K_3D_shifted<vec_ops_t, KF_3D_t>;
+    using prec_shifted_t = nonlinear_operators::preconditioner_K_3D_shifted<vec_ops_t, KF_3D_t, lin_op_shifted_t>;    
+
 
     typedef container::knots<real> knots_t;
 
@@ -157,7 +164,7 @@ int main(int argc, char const *argv[])
     }
     else if(what_to_execute == 'S')
     {
-        typedef main_classes::stability_continuation<vec_ops_t, mat_vec_ops_t, files_t, log_t, monitor_t, KF_3D_t, lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator, parameters_t> stability_t;
+        typedef main_classes::stability_continuation<vec_ops_t, mat_vec_ops_t, files_t, log_t, monitor_t, KF_3D_t, lin_op_t, prec_t, lin_op_shifted_t, prec_shifted_t, numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator, parameters_t> stability_t;
 
         vec_ops_t vec_ops_small(m_Krylov, CUBLAS);
         mat_vec_ops_t mat_ops_small(m_Krylov, m_Krylov, CUBLAS);

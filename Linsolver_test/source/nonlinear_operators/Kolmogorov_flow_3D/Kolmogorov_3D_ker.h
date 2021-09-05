@@ -59,7 +59,8 @@ struct Kolmogorov_3D_ker
     void imag_vector(TC_vec v_x, TC_vec v_y, TC_vec v_z);
 
     void apply_abs(TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v);
-
+    void apply_abs(size_t Nx, size_t Ny, size_t Nz, TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v);
+    void apply_scale_inplace(size_t Nx_l, size_t Ny_l, size_t Nz_l, TR scale, TR_vec ux, TR_vec uy, TR_vec uz);
     void add_mul3(TR alpha, TR_vec u_x, TR_vec u_y, TR_vec u_z, TR_vec v_x, TR_vec v_y, TR_vec v_z);
 
     void add_mul3(TC alpha, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z);
@@ -78,6 +79,8 @@ struct Kolmogorov_3D_ker
 
     void apply_iLaplace3_plus_E(TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR a, TR b);
     
+    void convert_size(size_t Nx_dest, size_t Ny_dest, size_t Mz_dest, TR scale, TC_vec ux_src_hat, TC_vec uy_src_hat, TC_vec uz_src_hat, TC_vec ux_dest_hat, TC_vec uy_dest_hat, TC_vec uz_dest_hat);
+
 private:
     unsigned int BLOCKSIZE_x, BLOCKSIZE_y, BLOCKSIZE;
     size_t Nx, Ny, Nz, Mz;

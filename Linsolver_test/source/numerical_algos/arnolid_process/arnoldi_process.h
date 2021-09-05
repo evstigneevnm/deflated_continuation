@@ -8,7 +8,7 @@
 */
 
 #include <stdexcept>
-
+#include <cmath>
 
 namespace numerical_algos
 {
@@ -60,6 +60,7 @@ public:
         if(k==0) //constructing the first vector in the V_mat
         {
             T beta = vec_ops_large->normalize(v_in);
+            if (std::isnan(beta) ) throw std::runtime_error("arnoldi_process: initial vector norm is NAN.");
             if (beta < T(1.0e-12)) throw std::runtime_error("arnoldi_process: initial vector norm is too small.");
             
             bool res_flag = sys_op->solve(v_in, v_out);

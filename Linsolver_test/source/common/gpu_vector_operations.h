@@ -416,7 +416,7 @@ struct gpu_vector_operations
     void add_mul_scalar(const scalar_type scalar, const scalar_type mul_x, vector_type& x)const;
 
     //copy: y := x
-    void assign(const vector_type& x, vector_type& y)const
+    void assign(const vector_type x, vector_type y)const
     {
         //std::cout << sz << "\n";
         cuBLAS->copy<scalar_type>(sz, x, y);

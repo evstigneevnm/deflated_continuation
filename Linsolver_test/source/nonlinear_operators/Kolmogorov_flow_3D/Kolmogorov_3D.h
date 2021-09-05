@@ -168,6 +168,10 @@ private:
     int n_z_force;
     T scale_force;
 
+    T Lx;
+    T Ly;
+    T Lz;    
+
 public:
     Kolmogorov_3D(T alpha_, size_t Nx_, size_t Ny_, size_t Nz_,
         vec_R_t* vec_ops_R_, 
@@ -187,9 +191,9 @@ public:
         common_constructor_operation();
         kern = new kern_t(alpha, Nx, Ny, Nz, Mz, BLOCK_SIZE_x, BLOCK_SIZE_y);
         init_all_derivatives();
-        T Lx = (T(1.0)/alpha)*T(2.0)*M_PI;
-        T Ly = T(2.0)*M_PI;
-        T Lz = T(2.0)*M_PI;
+        Lx = (T(1.0)/alpha)*T(2.0)*M_PI;
+        Ly = T(2.0)*M_PI;
+        Lz = T(2.0)*M_PI;
         plot = new plot_t(vec_ops_R_, Nx_, Ny_, Nz_, Lx, Ly, Lz);
     }
 
@@ -450,6 +454,54 @@ public:
 
     }
 
+    //this is basically a hack, and a nasty one.
+    void write_solution_scaled(FFT_type* FFT_vis, size_t Nx_dest, size_t Ny_dest, size_t Nz_dest, const std::string& f_name_vec, const std::string& f_name_abs, const T_vec& u_in)
+    {   
+        BC_vec* UC0 = pool_BC.take();
+        
+        size_t Mz_dest = FFT_vis->get_reduced_size();
+
+        V2C(u_in, *UC0);
+        TC_vec UX_hat = device_allocate<TC>(Nx_dest, Ny_dest, Mz_dest);
+        TC_vec UY_hat = device_allocate<TC>(Nx_dest, Ny_dest, Mz_dest);
+        TC_vec UZ_hat = device_allocate<TC>(Nx_dest, Ny_dest, Mz_dest);
+
+        TR_vec UX = device_allocate<TR>(Nx_dest, Ny_dest, Nz_dest);
+        TR_vec UY = device_allocate<TR>(Nx_dest, Ny_dest, Nz_dest);
+        TR_vec UZ = device_allocate<TR>(Nx_dest, Ny_dest, Nz_dest);
+
+        TR scale=TR(1.0)*Nx_dest*Ny_dest*Nz_dest/(TR(1.0)*Nx*Ny*Nz);
+
+        kern->convert_size(Nx_dest, Ny_dest, Mz_dest, scale, UC0->x, UC0->y, UC0->z, UX_hat, UY_hat, UZ_hat);
+        pool_BC.release(UC0);
+
+        T scale_loc = T(1.0)/(Nx_dest*Ny_dest*Nz_dest);
+
+        FFT_vis->ifft(UX_hat, UX);
+        FFT_vis->ifft(UY_hat, UY);
+        FFT_vis->ifft(UZ_hat, UZ);
+        kern->apply_scale_inplace(Nx_dest, Ny_dest, Nz_dest, scale_loc, UX, UY, UZ);
+        
+        TR_vec U_abs = device_allocate<TR>(Nx_dest, Ny_dest, Nz_dest);
+
+        kern->apply_abs(Nx_dest, Ny_dest, Nz_dest, UX, UY, UZ, U_abs);
+
+        plot_t plot_dest(vec_ops_R, Nx_dest, Ny_dest, Nz_dest, Lx, Ly, Lz);
+        plot_dest.write_to_disk(f_name_abs, U_abs, 2 );
+        plot_dest.write_to_disk(f_name_vec, UX, UY, UZ, 2);
+
+        device_deallocate(UX_hat);
+        device_deallocate(UY_hat);
+        device_deallocate(UZ_hat);
+        device_deallocate(UX);
+        device_deallocate(UY);
+        device_deallocate(UZ);
+        device_deallocate(U_abs);
+
+
+
+    }
+
     void write_solution_abs(const std::string& f_name, const T_vec& u_in)
     {   
         BC_vec* UC0 = pool_BC.take();
@@ -465,8 +517,6 @@ public:
         plot->write_to_disk(f_name, u_out->x, 2 );
 
         pool_R.release(u_out);
-
-
     }
 
     void write_solution_vec(const std::string& f_name, const T_vec& u_in)
