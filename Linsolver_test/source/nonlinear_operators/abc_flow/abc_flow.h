@@ -221,7 +221,7 @@ public:
         // vec_ops_C->assign_scalar(0.0,W.y);
         // vec_ops_C->assign_scalar(0.0,W.z);
         B_V_nabla_F(U, U, W); //W:= (U, nabla) U
-        kern->add_mul3(TC(-1.0,0), forceABC.x, forceABC.y, forceABC.z, W.x, W.y, W.z); // force:= W-force
+        kern->add_mul3(TC(-1.0/Reynolds_,0), forceABC.x, forceABC.y, forceABC.z, W.x, W.y, W.z); // force:= W-force
         project(W); // W:=P[W]??
         kern->negate3(W.x, W.y, W.z); //W:=-W;
         // U := \nabla^2 U
@@ -406,9 +406,9 @@ public:
     void exact_solution_abc(const T& Reynolds, T_vec& u_out)
     {
         BC_vec* UA = pool_BC.take();
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), forceABC.x, UA->x);
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), forceABC.y, UA->y);
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), forceABC.z, UA->z);        
+        vec_ops_C->assign_mul(TC(scale_force,0), forceABC.x, UA->x);
+        vec_ops_C->assign_mul(TC(scale_force,0), forceABC.y, UA->y);
+        vec_ops_C->assign_mul(TC(scale_force,0), forceABC.z, UA->z);        
         C2V(*UA, u_out);
         pool_BC.release(UA);        
     }
