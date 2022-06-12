@@ -65,7 +65,7 @@ int main(int argc, char const *argv[])
 
     //linsolver control
     unsigned int lin_solver_max_it = 1000;
-    real lin_solver_tol = 5.0e-3;
+    real lin_solver_tol = 1.0e-1;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;

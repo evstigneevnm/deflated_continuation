@@ -21,10 +21,10 @@
             gpu_vector_operations_t,
             Blocks_x_, Blocks_y_> abc_flow_t;
 
-    typedef nonlinear_operators::linear_operator_K_3D<
+    typedef nonlinear_operators::linear_operator_abc_flow<
         gpu_vector_operations_t, abc_flow_t> lin_op_t;
     
-    typedef nonlinear_operators::preconditioner_K_3D<
+    typedef nonlinear_operators::preconditioner_abc_flow<
         gpu_vector_operations_t, abc_flow_t, lin_op_t> prec_t;
 
     typedef numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
