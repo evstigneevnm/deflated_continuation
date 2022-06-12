@@ -82,7 +82,7 @@ int main(int argc, char const *argv[])
     
     gpu_vector_operations_real_t *vec_ops_R = new gpu_vector_operations_real_t(Nx*Ny*Nz, CUBLAS);
     gpu_vector_operations_complex_t *vec_ops_C = new gpu_vector_operations_complex_t(Nx*Ny*Mz, CUBLAS);
-    gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(3*(Nx*Ny*Mz-1), CUBLAS);
+    gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(6*(Nx*Ny*Mz-1), CUBLAS);
     
     abc_flow_t *abc_flow = new abc_flow_t(Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
     // linear solver config
