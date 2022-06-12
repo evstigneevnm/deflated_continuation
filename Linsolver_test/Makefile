@@ -173,4 +173,6 @@ abc_flow_rhs: source/models/abc_flow/test_abc_flow_rhs.cpp
 abc_flow_newton: source/models/abc_flow/test_abc_flow_newton.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/test_abc_flow_newton.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_abc_flow_newton.bin 2>results.make
 
+abc_flow_deflation: source/models/abc_flow/test_deflation_abc_flow.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/test_deflation_abc_flow.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_deflation_abc_flow.bin 2>results.make
 
