@@ -104,37 +104,6 @@ void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::vec2complex(TR_v
 
 
 
-template<typename T, typename T_vec, typename TC, typename TC_vec>
-__global__ void force_Fourier_sin_kernel(int n_y, int n_z, T scale_const, size_t Nx, size_t Ny, size_t Nz, size_t scale, TC_vec force_x, TC_vec force_y, TC_vec force_z)
-{
-unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
-unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
-gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
-index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
-if ( index_in < sizeOfData )
-{
-    t1 =  index_in/Nz; 
-    zIndex = index_in - Nz*t1 ;
-    xIndex =  t1/Ny; 
-    yIndex = t1 - Ny * xIndex ;
-    unsigned int j=xIndex, k=yIndex, l=zIndex;
-//  operation starts from here:
-
-    force_x[I3(j,k,l)] = TC(0,0);
-    force_y[I3(j,k,l)] = TC(0,0);
-    force_z[I3(j,k,l)] = TC(0,0);
-
-    force_x[I3(0,n_y,n_z)]=TC(0, T(scale)*scale_const );
-    force_x[I3(0,Ny-n_y,n_z)]=TC(0, -T(scale)*scale_const );
-
-}
-}
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::force_Fourier_sin(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z)
-{
-    force_Fourier_sin_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(n_y, n_z, scale_const, Nx, Ny, Mz, Nx*Ny*Nz, force_x, force_y, force_z);
-}
-
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
 __global__ void force_Fourier_sin_cos_kernel(int n_y, int n_z, T scale_const, size_t Nx, size_t Ny, size_t Nz, size_t scale, TC_vec force_x, TC_vec force_y, TC_vec force_z)
@@ -364,39 +333,39 @@ void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::apply_smooth(TR 
 }
 
 
-template<typename T, typename T_vec, typename TC, typename TC_vec>
-__global__ void imag_vector_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec v_x, TC_vec v_y, TC_vec v_z)
-{
-unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
-unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
-gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
-index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
-if ( index_in < sizeOfData )
-{
-    t1 =  index_in/Nz; 
-    zIndex = index_in - Nz*t1 ;
-    xIndex =  t1/Ny; 
-    yIndex = t1 - Ny * xIndex ;
-    unsigned int j=xIndex, k=yIndex, l=zIndex;
-//  operation starts from here:
+// template<typename T, typename T_vec, typename TC, typename TC_vec>
+// __global__ void imag_vector_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+// {
+// unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+// unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+// gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+// index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+// if ( index_in < sizeOfData )
+// {
+//     t1 =  index_in/Nz; 
+//     zIndex = index_in - Nz*t1 ;
+//     xIndex =  t1/Ny; 
+//     yIndex = t1 - Ny * xIndex ;
+//     unsigned int j=xIndex, k=yIndex, l=zIndex;
+// //  operation starts from here:
     
 
-    v_x[I3(j,k,l)] = TC(0.0, v_x[I3(j,k,l)].imag());
-    v_y[I3(j,k,l)] = TC(0.0, v_y[I3(j,k,l)].imag());
-    v_z[I3(j,k,l)] = TC(0.0, v_z[I3(j,k,l)].imag());
+//     v_x[I3(j,k,l)] = TC(0.0, v_x[I3(j,k,l)].imag());
+//     v_y[I3(j,k,l)] = TC(0.0, v_y[I3(j,k,l)].imag());
+//     v_z[I3(j,k,l)] = TC(0.0, v_z[I3(j,k,l)].imag());
 
-    v_x[0] = TC(0,0);
-    v_y[0] = TC(0,0);
-    v_z[0] = TC(0,0);
-}
-}
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::imag_vector(TC_vec v_x, TC_vec v_y, TC_vec v_z)
-{
+//     v_x[0] = TC(0,0);
+//     v_y[0] = TC(0,0);
+//     v_z[0] = TC(0,0);
+// }
+// }
+// template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+// void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::imag_vector(TC_vec v_x, TC_vec v_y, TC_vec v_z)
+// {
 
-    imag_vector_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, v_x, v_y, v_z);
+//     imag_vector_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, v_x, v_y, v_z);
 
-}
+// }
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
 __global__ void apply_iLaplace_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec Laplace,  TC_vec v, T coeff)
@@ -879,4 +848,4 @@ void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::B_ABC_exact(TR c
 
 
 
-#endif // __KOLMOGOROV_3D_IMPL_CUH__
+#endif

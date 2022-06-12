@@ -40,6 +40,7 @@
 
 
 #include <vector>
+#include <string>
 #include <cmath>
 #include <ctime>
 #include <cstdlib>
@@ -163,8 +164,6 @@ private:
 
     //parameters of the external forcing and its magnitude
     //should be passed as parameters???
-    int n_y_force;
-    int n_z_force;
     T scale_force;
 
     T Lx;
@@ -181,8 +180,6 @@ public:
     vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), vec_ops(vec_ops_),
     FFT(FFT_)
     {
-        n_y_force = 1;
-        n_z_force = 0;
         scale_force = T(1.0);
 
         Mz=FFT->get_reduced_size();
@@ -405,16 +402,7 @@ public:
         C2V(*UA, u_out);
         pool_BC.release(UA);        
     }
-    void exact_solution_sin(const T& Reynolds, T_vec& u_out)
-    {
-        T n = T(n_y_force);
-        BC_vec* UA = pool_BC.take();
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds/(n*n),0), force.x, UA->x);
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds/(n*n),0), force.y, UA->y);
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds/(n*n),0), force.z, UA->z);        
-        C2V(*UA, u_out);
-        pool_BC.release(UA);        
-    }
+
     void exact_solution_abc(const T& Reynolds, T_vec& u_out)
     {
         BC_vec* UA = pool_BC.take();
@@ -584,7 +572,7 @@ public:
         }
 
         fft(*UR0, *UC0);
-        imag_vec(*UC0);
+        // imag_vec(*UC0);
         project(*UC0);
         for(int st=0;st<steps;st++)
         {
@@ -743,7 +731,7 @@ private:
         kern->multiply_advection(VelR->x, VelR->y, VelR->z, RdFx->x, RdFx->y, RdFx->z, RdFy->x, RdFy->y, RdFy->z, RdFz->x, RdFz->y, RdFz->z, resR->x, resR->y, resR->z);
 
         fft(*resR, ret);
-        imag_vec(ret); //make sure it's pure imag after approximate advection!
+        // imag_vec(ret); //make sure it's pure imag after approximate advection!
         
         pool_BR.release(resR);
         pool_BR.release(RdFx);
@@ -794,10 +782,10 @@ private:
 
     }
 
-    void imag_vec(BC_vec& U_in_place)
-    {
-        kern->imag_vector(U_in_place.x, U_in_place.y, U_in_place.z);
-    }
+    // void imag_vec(BC_vec& U_in_place)
+    // {
+    //     kern->imag_vector(U_in_place.x, U_in_place.y, U_in_place.z);
+    // }
 
     void set_gradient_coefficients_low_level()
     {
@@ -841,12 +829,8 @@ private:
    
     void set_force()
     {
-        //kern->force_Fourier_cos_sin(n_y_force, n_z_force, scale_force, force.x, force.y, force.z);
-        // kern->force_Fourier_sin(n_y_force, n_z_force, scale_force, force.x, force.y, force.z);
-        
         kern->force_ABC(forceABC_R.x, forceABC_R.y, forceABC_R.z);
         fft(forceABC_R, forceABC);
-
     }
 
     void V2C(const T_vec& u_in, BC_vec& U_out)

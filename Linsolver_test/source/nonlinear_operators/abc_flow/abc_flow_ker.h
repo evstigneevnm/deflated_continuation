@@ -21,7 +21,7 @@ struct abc_flow_ker
         BLOCKSIZE = BLOCKSIZE_x*BLOCKSIZE_y;
         NR = Nx*Ny*Nz;
         NC = Nx*Ny*Mz;
-        N = 3*(NC - 1);
+        N = 6*(NC - 1);
         calculate_cuda_grid();
     }
 
@@ -31,8 +31,6 @@ struct abc_flow_ker
     }
 
     void Laplace_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace);
-
-    void force_Fourier_sin(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z);    
 
     void force_Fourier_sin_cos(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z);    
 
