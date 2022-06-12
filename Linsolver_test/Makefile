@@ -161,3 +161,16 @@ KF3D_1_bd: source/models/KF_3D/KF3D_1_bd.cpp
 
 test_Kolmogorov_3D_continuation_file: source/models/KF_3D/test_Kolmogorov_3D_continuation_file.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/test_Kolmogorov_3D_continuation_file.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o O/gpu_reduction_ogita_kernels.o $(LIBS2) -o test_Kolmogorov_3D_continuation_file.bin 2>results.make	
+
+# abc_flow
+abc_flow_ker: source/nonlinear_operators/abc_flow/abc_flow_ker.cu
+	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(ICUDA) $(IPROJECT) source/nonlinear_operators/abc_flow/abc_flow_ker.cu -c -o O/abc_flow_ker.o 2>results.make
+
+
+abc_flow_rhs: source/models/abc_flow/test_abc_flow_rhs.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/test_abc_flow_rhs.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_abc_flow_rhs.bin 2>results.make
+
+abc_flow_newton: source/models/abc_flow/test_abc_flow_newton.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/test_abc_flow_newton.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_abc_flow_newton.bin 2>results.make
+
+
