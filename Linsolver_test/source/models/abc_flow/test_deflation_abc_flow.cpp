@@ -54,10 +54,10 @@ int main(int argc, char const *argv[])
 
     //linsolver control
     unsigned int lin_solver_max_it = 2000;
-    real lin_solver_tol = 1.0e-1;
+    real lin_solver_tol = 1.0e-3;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 3;
+    unsigned int basis_sz = 4;
     //newton deflation control
     unsigned int newton_def_max_it = 2000;
     real newton_def_tol = 1.0e-9;

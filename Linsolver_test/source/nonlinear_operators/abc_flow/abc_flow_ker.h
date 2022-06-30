@@ -8,6 +8,10 @@
 #include <cstdio> //for printf
 #include <cuda_runtime.h>
 #include <cmath>
+#include <tuple>
+
+//for low level operations
+#include <utils/cuda_support.h>
 
 namespace nonlinear_operators
 {
@@ -23,11 +27,21 @@ struct abc_flow_ker
         NC = Nx*Ny*Mz;
         N = 6*(NC - 1);
         calculate_cuda_grid();
+        index_keys_d = device_allocate<int>(NC);
+        index_vals_d = device_allocate<int>(NC);
+
     }
 
     ~abc_flow_ker()
     {
-
+        if(index_keys_d != nullptr)
+        {
+            device_deallocate(index_keys_d);
+        }
+        if(index_vals_d != nullptr)
+        {
+            device_deallocate(index_vals_d);
+        }
     }
 
     void Laplace_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace);
@@ -79,6 +93,13 @@ struct abc_flow_ker
     
     void convert_size(size_t Nx_dest, size_t Ny_dest, size_t Mz_dest, TR scale, TC_vec ux_src_hat, TC_vec uy_src_hat, TC_vec uz_src_hat, TC_vec ux_dest_hat, TC_vec uy_dest_hat, TC_vec uz_dest_hat);
 
+    void make_hermitian_symmetric(TC_vec u_src_hat, TC_vec u_dest_hat);
+
+    void apply_translate(TC_vec u_in, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TR varphi_x, TR varphi_y, TR varphi_z, TC_vec u_out);
+
+    min_nonzero_ind_s get_minimum_nonzero_indices(TC_vec u_in);
+
+
 private:
     unsigned int BLOCKSIZE_x, BLOCKSIZE_y, BLOCKSIZE;
     size_t Nx, Ny, Nz, Mz;
@@ -93,6 +114,16 @@ private:
     dim3 dimBlockN;
     dim3 dimGridNR;
     dim3 dimGridNC;
+
+    int* index_keys_d = nullptr, index_vals_d = nullptr;
+
+    struct min_nonzero_ind_s
+    {
+        
+        size_t j1, k1, l1, j2, k2, j2, j3, k3, l3;
+        TR arg1, arg2, arg3;
+    };
+    min_nonzero_ind_s min_nonzero_ind;
 
 
 

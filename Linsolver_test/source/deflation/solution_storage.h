@@ -27,12 +27,15 @@ public:
         container.reserve(number_of_solutions_);
         vec_ops->init_vector(distance_help); vec_ops->start_use_vector(distance_help);
         //norm_weight = T(1); //overide norm weight due to norm_l2 operator in vector operations.
+        vec_ops->init_vector(distance_help_translate); vec_ops->start_use_vector(distance_help_translate);
+
     }
     ~solution_storage()
     {
         
         container.clear();
         elements_number = 0;
+        vec_ops->stop_use_vector(distance_help_translate); vec_ops->free_vector(distance_help_translate);
         vec_ops->stop_use_vector(distance_help); vec_ops->free_vector(distance_help);
 
     }
@@ -62,16 +65,51 @@ public:
     }
 
 
+    void calc_distance(const T_vec& x, const T_vec& x_translate, T& beta, T_vec& c)
+    {
+        calc_distance_norms(x, x_translate, c, P);
+        beta = distance;
+    }
+
 
 private:
     T distance = 1;
     T_vec distance_help;
+    T_vec distance_help_translate;
     T norm_weight;
     T P; //power of the distance
 
     unsigned int elements_number = 0;
     VectorOperations* vec_ops;
     
+    void calc_distance_norms(const T_vec& x, const T_vec& x_translate, T_vec& c, const T p)
+    {
+        T distance_der;
+
+        distance = T(1)/(std::pow(vec_ops->norm_l2(x),p)*(elements_number+1)); //distance to zero
+        distance_der = T(p)/(std::pow(vec_ops->norm_l2(x), p+T(2.0))*(elements_number+1)); //distance to zero
+        //calc: y := mul_x*x
+        // c = distance_der*(x-0)
+        vec_ops->assign_mul(distance_der/norm_weight, x, c);
+        //xxx vec_ops->assign_scalar(0.0, c);
+        for(int j=0;j<elements_number;j++)
+        {
+            //calc: z := mul_x*x + mul_y*y
+            //distance_help := x - container[j].get_ref()
+            vec_ops->assign_mul(T(1), x, T(-1), container[j].get_ref(), distance_help);
+            
+            vec_ops->assign_mul(T(1), x_translate, T(-1), container[j].get_ref(), distance_help_translate);
+
+            distance += T(1)/(std::pow(vec_ops->norm_l2(distance_help_translate),p)*(elements_number+1));
+            distance_der = T(p)/(std::pow(vec_ops->norm_l2(distance_help_translate),p+T(2.0))*(elements_number+1));
+            //calc: y := mul_x*x + mul_y*y
+            //c := c + distance_der*distance_help
+            vec_ops->add_mul(distance_der/norm_weight, distance_help, T(1), c);
+        }
+        distance+=T(1);
+
+    }
+
     void calc_distance_norms(const T_vec& x, T_vec& c, const T p)
     {
         T distance_der;
@@ -97,6 +135,7 @@ private:
         distance+=T(1);
 
     }
+
 
     //  XXX
     //  nested class started!

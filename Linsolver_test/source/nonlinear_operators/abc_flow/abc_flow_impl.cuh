@@ -4,6 +4,7 @@
 
 #include <common/macros.h>
 #include <nonlinear_operators/abc_flow/abc_flow_ker.h>
+#include <cassert>
 
 
 template<typename TC, typename TC_vec>
@@ -844,6 +845,107 @@ void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::B_ABC_exact(TR c
 {
 
     B_ABC_exact_kernel<TR, TR_vec><<<dimGridNR, dimBlockN>>>(Nx, Ny, Nz, coeff, ux, uy, uz);
+}
+
+template<typename T, typename T_vec>
+__global__ void make_hermitian_symmetric_kernel(size_t Nx, size_t Ny, size_t Nz, T_vec u_in, T_vec u_out)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+//  assume that Z-direction is a reduced one.
+    u_out[I3(j,k,l)] = u_in[I3(j,k,l)];
+    if(j>Nx/2)
+        u_out[I3(j,0,0)] = conj(u_in[I3(Nx-j,0,0)]);
+    if(k>Ny/2)
+        u_out[I3(0,k,0)] = conj(u_in[I3(0,Ny-k,0)]);
+
+    if( (j>Nx/2)&&(k>Ny/2) )
+        u_out[I3(j,k,0)] = conj(u_in[I3(Nx-j,Ny-k,0)]);
+
+    if( (j<Nx/2)&&(k>Ny/2) )
+        u_out[I3(Nx-j,k,0)] = conj(u_in[I3(j, Ny-k,0)]);
+
+}
+}
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::make_hermitian_symmetric(TC_vec u_src, TC_vec u_dest)
+{
+    make_hermitian_symmetric_kernel<TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, u_src, u_dest);
+}
+
+
+
+template<typename TR, typename TC, typename TC_vec>
+__global__ void apply_translate_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec u_in, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TR varphi_x, TR varphi_y, TR varphi_z, TC_vec u_out)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+    u_out[I3(j,k,l)] = exp(-grad_x[j]*varphi_x)*exp(-grad_y[k]*varphi_y)*exp(-grad_z[l]*varphi_z)*u_in[I3(j,k,l)];
+
+
+}
+}
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::apply_translate(TC_vec u_src, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TR varphi_x, TR varphi_y, TR varphi_z, TC_vec u_dest)
+{
+    apply_translate_kernel<TR, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, u_src, grad_x, grad_y, grad_z, varphi_x, varphi_y, varphi_z, u_dest);
+}
+
+
+
+template<typename TC_vec>
+__global__ void init_ind_keys_vals_kernel(size_t Nx, size_t Ny, TC_vec u_src, int* index_keys_d, int* index_vals_d)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+    index_keys_d[index_in] = 
+
+
+}
+}
+
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+min_nonzero_ind_s nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::get_minimum_nonzero_indices(TC_vec u_src)
+{
+    
+    init_ind_keys_vals_kernel<TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, u_src, index_keys_d, index_vals_d);
+
+
+
 }
 
 

@@ -52,6 +52,7 @@
 #include <common/vector_wrap.h>
 #include <common/vector_pool.h>
 
+#include <tuple>
 
 
 namespace nonlinear_operators
@@ -624,8 +625,50 @@ public:
         pool_BC.release(UC0);          
     }
 
+    //finds sutable harmonics and uses them to translate the solution is such way 
+    //that imaginary part of the selected harminics is zero.
+    void translation_fix(const T_vec& u_in_, T_vec& u_out_)
+    {
+        BC_vec* UC0 = pool_BC.take();
+        BC_vec* UC1 = pool_BC.take();
+        V2C(u_in_, *UC0);  
+        auto res = index_selector(*UC0);
+        auto varphi_x = std::get<0>(res);
+        auto varphi_y = std::get<1>(res);
+        auto varphi_z = std::get<2>(res);
+        translate_solution(*UC0, varphi_x, varphi_y, varphi_z, *UC1);
+        C2V(*UC1, u_out_);
+        pool_BC.release(UC1);
+        pool_BC.release(UC0);
+
+    }
 
 
+    //translates the whole vector solution in direction, given by varphi_x, varphi_y, varphi_z
+    //returns x_translate_ vector that is transalted
+    void translate_solution(const T_vec& x_, TR varphi_x, TR varphi_y, TR varphi_z, T_vec& x_translate_)
+    {
+        BC_vec* UC0 = pool_BC.take();
+        BC_vec* UC1 = pool_BC.take();
+        V2C(x_, *UC0);  
+        translate_solution(*UC0, varphi_x, varphi_y, varphi_z, *UC1);
+        C2V(*UC1, x_translate_);
+        pool_BC.release(UC1);
+        pool_BC.release(UC0);
+    }
+
+    //enforces hermitian_symmetry (for real-valued functions in Fourier domain)
+    void hermitian_symmetry(const T_vec& x_, T_vec& x_symm_)
+    {
+        BC_vec* UC0 = pool_BC.take();
+        BC_vec* UC1 = pool_BC.take();
+        V2C(x_, *UC0);  
+        hermitian_symmetry(*UC0, *UC1);
+        C2V(*UC1, x_symm_);
+        pool_BC.release(UC1); 
+        pool_BC.release(UC0);        
+
+    }
 
 private:
     
@@ -875,7 +918,29 @@ private:
     }
 
 
+    std::tuple<TR,TR,TR> index_selector(BC_vec& U_in)
+    {
+
+
+        return {0,0,0};
+    }
     
+    void translate_solution(BC_vec& U_in, TR varphi_x, TR varphi_y, TR varphi_z, BC_vec& U_out)
+    {
+
+        kern->apply_translate(U_in.x, grad_x, grad_y, grad_z, varphi_x, varphi_y, varphi_z, U_out.x);
+        kern->apply_translate(U_in.y, grad_x, grad_y, grad_z, varphi_x, varphi_y, varphi_z, U_out.y);
+        kern->apply_translate(U_in.z, grad_x, grad_y, grad_z, varphi_x, varphi_y, varphi_z, U_out.z);
+        hermitian_symmetry(U_out, U_out);
+        
+    }
+
+    void hermitian_symmetry(BC_vec& U, BC_vec& U_sym)
+    {
+        kern->make_hermitian_symmetric(U.x, U_sym.x);
+        kern->make_hermitian_symmetric(U.y, U_sym.y);
+        kern->make_hermitian_symmetric(U.z, U_sym.z);
+    }
 
 
 };
