@@ -29,7 +29,10 @@ struct abc_flow_ker
         calculate_cuda_grid();
         index_keys_d = device_allocate<int>(NC);
         index_vals_d = device_allocate<int>(NC);
-
+        index_vals_part = host_allocate<int>(save_ammount);
+        values_vals_part = host_allocate<TR>(save_ammount);
+        values_vals_part_d = device_allocate<TR>(save_ammount);
+        
     }
 
     ~abc_flow_ker()
@@ -41,6 +44,18 @@ struct abc_flow_ker
         if(index_vals_d != nullptr)
         {
             device_deallocate(index_vals_d);
+        }
+        if(values_vals_part_d != nullptr)
+        {
+            device_deallocate(values_vals_part_d);
+        }
+        if(index_vals_part != nullptr)
+        {
+            free(index_vals_part);
+        }
+        if(values_vals_part != nullptr)
+        {
+            free(values_vals_part);
         }
     }
 
@@ -97,7 +112,7 @@ struct abc_flow_ker
 
     void apply_translate(TC_vec u_in, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TR varphi_x, TR varphi_y, TR varphi_z, TC_vec u_out);
 
-    min_nonzero_ind_s get_minimum_nonzero_indices(TC_vec u_in);
+    std::tuple<TR, TR, TR> get_minimum_nonzero_indices(TC_vec u_in);
 
 
 private:
@@ -115,15 +130,23 @@ private:
     dim3 dimGridNR;
     dim3 dimGridNC;
 
-    int* index_keys_d = nullptr, index_vals_d = nullptr;
+    // translation fixing data
+    int* index_keys_d = nullptr;
+    int* index_vals_d = nullptr;
 
-    struct min_nonzero_ind_s
-    {
+    const size_t save_ammount = 20;
+    int* index_vals_part = nullptr;
+    TR* values_vals_part = nullptr;
+    TR* values_vals_part_d = nullptr;
+    
+
+    // struct min_nonzero_ind_s
+    // {
         
-        size_t j1, k1, l1, j2, k2, j2, j3, k3, l3;
-        TR arg1, arg2, arg3;
-    };
-    min_nonzero_ind_s min_nonzero_ind;
+    //     size_t j1, k1, l1, j2, k2, j2, j3, k3, l3;
+    //     TR arg1, arg2, arg3;
+    // };
+    // min_nonzero_ind_s min_nonzero_ind;
 
 
 
@@ -178,6 +201,70 @@ private:
         printf("    Complex grids: dimGrid: %dX%dX%d, dimBlock: %dX%dX%d. \n", dimGridNC.x, dimGridNC.y, dimGridNC.z, dimBlockN.x, dimBlockN.y, dimBlockN.z);
     }
 
+
+    //some helper functions on 3X3 matrix operations
+    
+
+
+    void solve_system(TR A[3][3+1], TR solution[3])
+    {
+        //just a stupid G-J elimination
+        //TODO: change for SPD system matrix algo, i.e. Cholesky.
+        //can use direct methods since matrix size is limited by 5 X 5
+
+        for (int i=0;i<3;i++)
+        {
+            for (int k=i+1;k<3;k++)
+            {
+                if (std::abs<TR>(A[i][i]) < std::abs<TR>(A[k][i]))
+                {
+                    for (int j=0;j<=3;j++) 
+                    {
+                        TR temp = A[i][j];
+                        A[i][j] = A[k][j];
+                        A[k][j] = temp;
+                    }
+                }
+            }
+        }
+        for (int i=0;i<3-1;i++)
+        {
+            for (int k=i+1;k<3;k++)
+            {
+                TR t = A[k][i]/A[i][i];
+                for (int j=0;j<=3;j++)
+                {
+                    A[k][j] = A[k][j]-t*A[i][j];
+                }
+            }
+        }
+
+        check_matrix_condition();
+        
+        for (int i=3-1;i>=0;i--)
+        {                
+            solution[i]=A[i][3];               
+            for (int j=i+1;j<3;j++)
+            {
+                if (j != i)
+                {
+                    solution[i] = solution[i]-A[i][j]*solution[j];
+                }
+            }
+            solution[i] = solution[i]/A[i][i];
+        }
+
+    }
+    void check_matrix_condition(const TR A[3][3+1])
+    {
+        TR det=1.0;
+        for(int j=0;j<3;j++)
+            det*=A[j][j];
+
+        if( std::abs<TR>(det) > 1.0e-12 )
+            throw std::runtime_error("abc_flow_ker::check_matrix_condition: matrix determinant is zero.");
+
+    }
 
 
 };

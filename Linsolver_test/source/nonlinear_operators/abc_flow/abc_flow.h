@@ -920,9 +920,8 @@ private:
 
     std::tuple<TR,TR,TR> index_selector(BC_vec& U_in)
     {
-
-
-        return {0,0,0};
+        auto varphis = kern->get_minimum_nonzero_indices(U_in.x); //test
+        return varphis;
     }
     
     void translate_solution(BC_vec& U_in, TR varphi_x, TR varphi_y, TR varphi_z, BC_vec& U_out)

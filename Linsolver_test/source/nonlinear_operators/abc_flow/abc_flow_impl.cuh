@@ -6,6 +6,9 @@
 #include <nonlinear_operators/abc_flow/abc_flow_ker.h>
 #include <cassert>
 
+#include <thrust/sort.h>
+#include <thrust/execution_policy.h>
+
 
 template<typename TC, typename TC_vec>
 __global__ void Laplace_Fourier_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace)
@@ -916,7 +919,7 @@ void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::apply_translate(
 
 
 template<typename TC_vec>
-__global__ void init_ind_keys_vals_kernel(size_t Nx, size_t Ny, TC_vec u_src, int* index_keys_d, int* index_vals_d)
+__global__ void init_ind_keys_vals_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec u_src, int* index_keys_d, int* index_vals_d)
 {
 unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
 unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
@@ -930,19 +933,96 @@ if ( index_in < sizeOfData )
     yIndex = t1 - Ny * xIndex ;
     unsigned int j=xIndex, k=yIndex, l=zIndex;
 //  operation starts from here:
+    
+    int q,m,n;
+    q=l; //Z-coord
+    m=j; //Y-coord
+    if(j>=Nx/2)
+        m=j-Nx;    
+    n=k; //X-coord
+    if(k>=Ny/2)
+        n=k-Ny;   
 
-    index_keys_d[index_in] = 
-
+    index_keys_d[index_in] = abs(q)+abs(m)+abs(n); //L1 norm
+    if( abs(u_src[I3(j,k,l)])<1.0e-7 )
+    {
+        index_keys_d[index_in] = Nx*Ny*Nz;
+    } 
+    index_vals_d[index_in] = I3(j,k,l);
 
 }
+}
+
+
+template<typename TR, typename TC_vec>
+__global__ void init_values_by_indexes_kernel(const size_t save_ammount, TC_vec u_src, int* index_vals_d, TR* values_vals_part_d)
+{
+    unsigned int idx = blockIdx.x * gridDim.x + threadIdx.x;
+    if(idx >= save_ammount) return;
+    values_vals_part_d[idx] = arg(u_src[index_vals_d[idx]]);
+
 }
 
 
 template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-min_nonzero_ind_s nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::get_minimum_nonzero_indices(TC_vec u_src)
+std::tuple<TR,TR,TR> nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::get_minimum_nonzero_indices(TC_vec u_src)
 {
     
+
+
     init_ind_keys_vals_kernel<TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, u_src, index_keys_d, index_vals_d);
+
+    //if it fails, have to use thrust::stable_sort_by_key
+    thrust::sort_by_key(thrust::device, index_keys_d, index_keys_d + NC, index_vals_d); 
+
+    device_2_host_cpy(index_vals_part, index_vals_d, save_ammount);
+
+
+    int blocks_=(save_ammount+BLOCKSIZE)/BLOCKSIZE;
+    dim3 dimGrid1_(blocks_);
+    init_values_by_indexes_kernel<TR, TC_vec><<<dimGrid1_, dimBlock1>>>(save_ammount, u_src, index_vals_d, values_vals_part_d);
+
+    device_2_host_cpy(values_vals_part, values_vals_part_d, save_ammount);
+
+    auto get_index = [Nx, Ny, Nz](int lexico_index) -> std::tuple<int, int, int>
+    {
+        Ord l = (lexico_index)/(Nx*Ny);
+        Ord jk = lexico_index-l*(Nx*Ny);
+        Ord k = (jk)/(Nx);
+        Ord j = jk - k*(Nx);
+        return {j,k,l};
+    };
+
+
+    auto index0 = get_index( index_vals_part[0] );
+    for(int j = 1; j<save_ammount; j+=2)
+    {
+        auto index1 = get_index( index_vals_part[j] );
+        auto index2 = get_index( index_vals_part[j+1] );
+
+        TR A[3][] = {{std::get<0>(index0), std::get<1>(index0), std::get<2>(index0), index_vals_part[0]},
+                     {std::get<0>(index1), std::get<1>(index1), std::get<2>(index1), index_vals_part[j]},
+                     {std::get<0>(index2), std::get<1>(index2), std::get<2>(index2), index_vals_part[j+1]}};
+        TR solution[3] = {0,0,0};
+        bool failed = true;
+        try
+        {
+            solve_system(A, solution);
+            failed = false;
+        }
+        catch (const std::exception& e) 
+        {
+            std::cout << e.what();
+        }
+        if(!failed)
+        {
+            break;
+        }
+    }
+    if(failed)
+    {
+
+    }
 
 
 
