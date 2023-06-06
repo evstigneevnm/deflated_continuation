@@ -66,7 +66,7 @@ int main(int argc, char const *argv[])
 
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
     size_t Mz = CUFFT_C2R->get_reduced_size();
-    size_t Nv = real(6*(Nx*Ny*Mz-1));
+    size_t Nv = 6*(Nx*Ny*Mz-1);
     real norm_wight = std::sqrt(Nv);
 
 
@@ -140,7 +140,7 @@ int main(int argc, char const *argv[])
         std::string f_name_abs("abs_" + std::to_string(p) + ".pos");      
         ABC->write_solution_vec(f_name_vec, (vec&)x);
         ABC->write_solution_abs(f_name_abs, (vec&)x);
-
+        printf( "norm = %.17le\n", ABC->norm( (vec&)x ) );
         p++;
     }
    

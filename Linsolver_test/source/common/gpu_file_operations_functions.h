@@ -42,10 +42,10 @@ namespace gpu_file_operations_functions
         host_deallocate<T>(vec_cpu);
  
     }
-    size_t read_matrix_size(const std::string &f_name)
-    {
-        return gpu_file_operations_functions::read_matrix_size(f_name);
-    }
+    // size_t read_matrix_size(const std::string &f_name)
+    // {
+    //     return gpu_file_operations_functions::read_matrix_size(f_name);
+    // }
 
 
 }

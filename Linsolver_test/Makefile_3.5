@@ -18,10 +18,10 @@ LIBFLAGS = --compiler-options -fPIC
 GCCFLAGS = -g -std=c++11
 ICUDA = -I/usr/local/cuda
 IPROJECT = -I source/
-IBOOST = -I/home/noctum/boost_1_70/include/
+IBOOST = -I/usr/local/boost/include
 
 LCUDA = -L/usr/local/cuda/lib64
-LBOOST = -L/home/noctum/boost_1_70/lib/
+LBOOST = -L/usr/local/boost/lib
 LIBS1 = -lcublas -lcurand 
 LIBS2 = -lcufft -lcublas -lcurand 
 LIBBOOST = -lboost_serialization

@@ -11,8 +11,27 @@
 
 namespace file_operations
 {
+
+template <class T, class T_vec>
+void write_2_vectors_by_side(const std::string &f_name, size_t N, const T_vec& vec1,  const T_vec& vec2, unsigned int prec=16, char sep = ' ')
+{
+    std::ofstream f(f_name.c_str(), std::ofstream::out);
+    if (!f) throw std::runtime_error("print_vector: error while opening file " + f_name);
+
+    for (size_t i = 0; i < N-1; ++i)
+    {
+        if (!(f << std::scientific << std::setprecision(prec) << vec1[i] << sep << vec2[i] <<  std::endl))
+            throw std::runtime_error("print_vector: error while writing to file " + f_name);
+    }
+    if (!(f << std::scientific << std::setprecision(prec) << vec1[N-1] << sep << vec2[N-1] ))
+        throw std::runtime_error("print_vector: error while writing to file " + f_name);
+    
+    f.close();
+}
+
+
 template <class T>
-void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec=17)
+void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec=19)
 {
         std::ofstream f(f_name.c_str(), std::ofstream::out);
         if (!f) throw std::runtime_error("print_vector: error while opening file " + f_name);
@@ -22,7 +41,7 @@ void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec
             if (!(f << std::scientific << std::setprecision(prec) << vec[i] <<  std::endl))
                 throw std::runtime_error("print_vector: error while writing to file " + f_name);
         }
-        if (!(f << std::setprecision(prec) << vec[N-1]))
+        if (!(f << std::scientific << std::setprecision(prec) << vec[N-1]))
             throw std::runtime_error("print_vector: error while writing to file " + f_name);
         
         f.close();
@@ -30,7 +49,7 @@ void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec
 
 
 template <class T>
-void write_matrix(const std::string &f_name, size_t Row, size_t Col, T *matrix, unsigned int prec=17)
+void write_matrix(const std::string &f_name, size_t Row, size_t Col, T *matrix, unsigned int prec=19)
 {
     size_t N=Col;
     std::ofstream f(f_name.c_str(), std::ofstream::out);
@@ -40,9 +59,9 @@ void write_matrix(const std::string &f_name, size_t Row, size_t Col, T *matrix, 
         for(size_t j=0;j<Col;j++)
         {
             if(j<Col-1)
-                f << std::setprecision(prec) << matrix[I2_R(i,j,Row)] << " ";
+                f << std::scientific << std::setprecision(prec) << matrix[I2_R(i,j,Row)] << " ";
             else
-                f << std::setprecision(prec) << matrix[I2_R(i,j,Row)];
+                f << std::scientific << std::setprecision(prec) << matrix[I2_R(i,j,Row)];
 
         }
         f << std::endl;
@@ -51,7 +70,7 @@ void write_matrix(const std::string &f_name, size_t Row, size_t Col, T *matrix, 
     f.close();
 }
 
-size_t read_matrix_size(const std::string &f_name)
+inline size_t read_matrix_size(const std::string &f_name)
 {
 
     std::ifstream f(f_name.c_str(), std::ifstream::in);
@@ -101,6 +120,19 @@ int read_vector(const std::string &f_name,  size_t N,  T *vec){
     return 0;
 }
 
+inline size_t read_vector_size(const std::string &f_name){
+
+    std::ifstream f(f_name.c_str(), std::ifstream::in);
+    if (!f) throw std::runtime_error("read_vector: error while opening file " + f_name);
+    std::string line;
+    size_t vector_size=0;
+    while (std::getline(f, line))
+    {
+        vector_size++;
+    }
+    f.close();
+    return vector_size;
+}
 
 }
 

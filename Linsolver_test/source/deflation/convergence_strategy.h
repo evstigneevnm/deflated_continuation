@@ -81,6 +81,8 @@ public:
         iterations++;
         log->info_f("deflation::convergence: iteration %i, residuals n: %le, n+1: %le",iterations, (double)normFx, (double)normFx1);
 
+        const T max_norm_Fx = 1.0e12;
+
         if(std::isnan(normFx))
         {
             log->error("deflation::convergence: Newton initial vector caused nan.");
@@ -103,9 +105,9 @@ public:
             finish = true;
             result_status = 2;            
         }
-        else if(normFx1 > 1.0e20)
+        else if(normFx1 > max_norm_Fx)
         {
-            log->error("deflation::convergence: Newton update went above 1.0e+20, stopping.");
+            log->error_f("deflation::convergence: Newton update went above %le, stopping.", double(max_norm_Fx) );
             finish = true;
             result_status = 2;            
         }

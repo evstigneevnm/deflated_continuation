@@ -327,7 +327,26 @@ public:
     void gemm(const char opA, const char opB, size_t RowAC, size_t ColBC, size_t ColARowB, const T alpha, const T* A, size_t LDimA, const T* B, size_t LDimB, const T beta, T* C, size_t LdimC);
 
     //===cuBLAS BLAS-like EXTENSIONS=== see: https://docs.nvidia.com/cuda/cublas/index.html#blas-like-extension
-    //TODO: to be inplemented on demand.
+    
+    // This function solves the triangular linear system with multiple right-hand-sides
+    // op ( A ) X = α B if  side == CUBLAS_SIDE_LEFT X op ( A ) = α B if  side == CUBLAS_SIDE_RIGHT
+    // where A is a triangular matrix stored in lower or upper mode with or without the main diagonal, X and B are m × n matrices, and α is a scalar. Also, for matrix A
+    // op ( A ) = A if  transa == CUBLAS_OP_N A T if  transa == CUBLAS_OP_T A H if  transa == CUBLAS_OP_C
+    // The solution X overwrites the right-hand-sides B on exit.
+    // No test for singularity or near-singularity is included in this function.
+
+    // m: number of rows of matrix B, with matrix A sized accordingly. 
+    // n: number of columns of matrix B, with matrix A is sized accordingly. 
+    // A: device, input, <type> array of dimension lda x m with lda>=max(1,m) if side == CUBLAS_SIDE_LEFT and lda x n with lda>=max(1,n) otherwise. 
+    // B: device, in/out, <type> array. It has dimensions ldb x n with ldb>=max(1,m). 
+
+    template<typename T>
+    void trsm(const char sideA, const char isA_UorL, const char opA, bool unit_diag_A, size_t RowBColA, size_t ColsB, const T alpha, const T* A, size_t LDimA, T* B, size_t LDimB);
+
+
+
+    template<typename T>
+    void geam(const char opA, size_t RowAC, size_t ColBC, const T alpha, const T* A, size_t LDimA, const T beta, T* B, size_t LDimB, T* C, size_t LDimC);
 
 private:
     cublasHandle_t handle;
@@ -856,5 +875,239 @@ void cublas_wrap::gemm(const char opA, const char opB, size_t RowA, size_t ColBC
                            (cuDoubleComplex*)C, LDimC) );  
 
 }
+
+
+template<> inline
+void cublas_wrap::trsm(const char sideA, const char isA_UorL, const char opA, bool unit_diag_A, size_t RowBColA, size_t ColsB, const double alpha, const double* A, size_t LDimA, double* B, size_t LDimB)
+{
+
+    cublasSideMode_t side = CUBLAS_SIDE_LEFT;
+    if((sideA == 'r')||(sideA == 'R'))
+    {
+        side = CUBLAS_SIDE_RIGHT;
+    }
+    cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;
+    if((isA_UorL == 'u')||(isA_UorL == 'U'))
+    {
+        uplo = CUBLAS_FILL_MODE_UPPER;
+    }
+    cublasDiagType_t diag = CUBLAS_DIAG_NON_UNIT;
+    if(unit_diag_A)
+    {
+        diag = CUBLAS_DIAG_UNIT;
+    }
+
+    CUBLAS_SAFE_CALL
+    (
+        cublasDtrsm
+        (
+            handle,
+            side, uplo,
+            switch_operation_real(opA), diag,
+            int(RowBColA), int(ColsB),
+            &alpha,
+            A, int(LDimA),
+            B, int(LDimB)
+        )
+
+    );
+}
+template<> inline
+void cublas_wrap::trsm(const char sideA, const char isA_UorL, const char opA, bool unit_diag_A, size_t RowBColA, size_t ColsB, const float alpha, const float* A, size_t LDimA, float* B, size_t LDimB)
+{
+
+    cublasSideMode_t side = CUBLAS_SIDE_LEFT;
+    if((sideA == 'r')||(sideA == 'R'))
+    {
+        side = CUBLAS_SIDE_RIGHT;
+    }
+    cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;
+    if((isA_UorL == 'u')||(isA_UorL == 'U'))
+    {
+        uplo = CUBLAS_FILL_MODE_UPPER;
+    }
+    cublasDiagType_t diag = CUBLAS_DIAG_NON_UNIT;
+    if(unit_diag_A)
+    {
+        diag = CUBLAS_DIAG_UNIT;
+    }
+
+    CUBLAS_SAFE_CALL
+    (
+        cublasStrsm
+        (
+            handle,
+            side, uplo,
+            switch_operation_real(opA), diag,
+            int(RowBColA), int(ColsB),
+            &alpha,
+            A, int(LDimA),
+            B, int(LDimB)
+        )
+
+    );
+}
+template<> inline
+void cublas_wrap::trsm(const char sideA, const char isA_UorL, const char opA, bool unit_diag_A, size_t RowBColA, size_t ColsB, const thrust::complex<float> alpha, const thrust::complex<float>* A, size_t LDimA, thrust::complex<float>* B, size_t LDimB)
+{
+
+    cublasSideMode_t side = CUBLAS_SIDE_LEFT;
+    if((sideA == 'r')||(sideA == 'R'))
+    {
+        side = CUBLAS_SIDE_RIGHT;
+    }
+    cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;
+    if((isA_UorL == 'u')||(isA_UorL == 'U'))
+    {
+        uplo = CUBLAS_FILL_MODE_UPPER;
+    }
+    cublasDiagType_t diag = CUBLAS_DIAG_NON_UNIT;
+    if(unit_diag_A)
+    {
+        diag = CUBLAS_DIAG_UNIT;
+    }
+
+    CUBLAS_SAFE_CALL
+    (
+        cublasCtrsm
+        (
+            handle,
+            side, uplo,
+            switch_operation_real(opA), diag,
+            int(RowBColA), int(ColsB),
+            (const cuComplex*)&alpha,
+            (const cuComplex*)A, int(LDimA),
+            (cuComplex*)B, int(LDimB)
+        )
+
+    );
+}
+template<> inline
+void cublas_wrap::trsm(const char sideA, const char isA_UorL, const char opA, bool unit_diag_A, size_t RowBColA, size_t ColsB, const thrust::complex<double> alpha, const thrust::complex<double>* A, size_t LDimA, thrust::complex<double>* B, size_t LDimB)
+{
+
+    cublasSideMode_t side = CUBLAS_SIDE_LEFT;
+    if((sideA == 'r')||(sideA == 'R'))
+    {
+        side = CUBLAS_SIDE_RIGHT;
+    }
+    cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;
+    if((isA_UorL == 'u')||(isA_UorL == 'U'))
+    {
+        uplo = CUBLAS_FILL_MODE_UPPER;
+    }
+    cublasDiagType_t diag = CUBLAS_DIAG_NON_UNIT;
+    if(unit_diag_A)
+    {
+        diag = CUBLAS_DIAG_UNIT;
+    }
+
+    CUBLAS_SAFE_CALL
+    (
+        cublasZtrsm
+        (
+            handle,
+            side, uplo,
+            switch_operation_real(opA), diag,
+            int(RowBColA), int(ColsB),
+            (const cuDoubleComplex*)&alpha,
+            (const cuDoubleComplex*)A, int(LDimA),
+            (cuDoubleComplex*)B, int(LDimB)
+        )
+
+    );
+}
+
+
+template<> inline
+void cublas_wrap::geam(const char opA, size_t RowAC, size_t ColBC, const float alpha, const float* A, size_t LDimA, const float beta, float* B, size_t LDimB, float* C, size_t LDimC)
+{
+
+    CUBLAS_SAFE_CALL
+    (        
+        cublasSgeam(handle,
+            switch_operation_real(opA),
+            CUBLAS_OP_N,
+            int(RowAC), int(ColBC),
+            (const float*)&alpha,
+            (const float*)A, 
+            int(LDimA),
+            (const float*)&beta,
+            (const float*)B,
+            int(LDimB),
+            C,
+            int(LDimC))
+    );
+
+}
+
+template<> inline
+void cublas_wrap::geam(const char opA, size_t RowAC, size_t ColBC, const double alpha, const double* A, size_t LDimA, const double beta, double* B, size_t LDimB, double* C, size_t LDimC)
+{
+
+    CUBLAS_SAFE_CALL
+    (        
+        cublasDgeam(handle,
+            switch_operation_real(opA),
+            CUBLAS_OP_N,
+            int(RowAC), int(ColBC),
+            (const double*)&alpha,
+            (const double*)A, 
+            int(LDimA),
+            (const double*)&beta,
+            (const double*)B,
+            int(LDimB),
+            C,
+            int(LDimC))
+    );
+
+}
+
+template<> inline
+void cublas_wrap::geam(const char opA, size_t RowAC, size_t ColBC, const thrust::complex<float> alpha, const thrust::complex<float>* A, size_t LDimA, const thrust::complex<float> beta, thrust::complex<float>* B, size_t LDimB, thrust::complex<float>* C, size_t LDimC)
+{
+
+    CUBLAS_SAFE_CALL
+    (        
+        cublasCgeam(handle,
+            switch_operation_real(opA),
+            CUBLAS_OP_N,
+            int(RowAC), int(ColBC),
+            (const cuComplex*)&alpha,
+            (const cuComplex*)A, 
+            int(LDimA),
+            (const cuComplex*)&beta,
+            (const cuComplex*)B,
+            int(LDimB),
+            (cuComplex*)C,
+            int(LDimC))
+    );
+
+}
+
+template<> inline
+void cublas_wrap::geam(const char opA, size_t RowAC, size_t ColBC, const thrust::complex<double> alpha, const thrust::complex<double>* A, size_t LDimA, const thrust::complex<double> beta, thrust::complex<double>* B, size_t LDimB, thrust::complex<double>* C, size_t LDimC)
+{
+
+    CUBLAS_SAFE_CALL
+    (        
+        cublasZgeam(handle,
+            switch_operation_real(opA),
+            CUBLAS_OP_N,
+            int(RowAC), int(ColBC),
+            (const cuDoubleComplex*)&alpha,
+            (const cuDoubleComplex*)A, 
+            int(LDimA),
+            (const cuDoubleComplex*)&beta,
+            (const cuDoubleComplex*)B,
+            int(LDimB),
+            (cuDoubleComplex*) C,
+            int(LDimC))
+    );
+
+}
+
+
+
 
 #endif

@@ -32,7 +32,7 @@ struct abc_flow_ker
         index_vals_part = host_allocate<int>(save_ammount);
         values_vals_part = host_allocate<TR>(save_ammount);
         values_vals_part_d = device_allocate<TR>(save_ammount);
-        
+        index_keys_part = host_allocate<int>(save_ammount);
     }
 
     ~abc_flow_ker()
@@ -56,6 +56,10 @@ struct abc_flow_ker
         if(values_vals_part != nullptr)
         {
             free(values_vals_part);
+        }
+        if(index_keys_part != nullptr)
+        {
+            free(index_keys_part);
         }
     }
 
@@ -112,7 +116,7 @@ struct abc_flow_ker
 
     void apply_translate(TC_vec u_in, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TR varphi_x, TR varphi_y, TR varphi_z, TC_vec u_out);
 
-    std::tuple<TR, TR, TR> get_minimum_nonzero_indices(TC_vec u_in);
+    std::tuple<TR, TR, TR> get_shift_phases(TC_vec u_in);
 
 
 private:
@@ -134,11 +138,11 @@ private:
     int* index_keys_d = nullptr;
     int* index_vals_d = nullptr;
 
-    const size_t save_ammount = 20;
+    size_t save_ammount = std::min(size_t(20), NC);
     int* index_vals_part = nullptr;
     TR* values_vals_part = nullptr;
     TR* values_vals_part_d = nullptr;
-    
+    int* index_keys_part = nullptr;
 
     // struct min_nonzero_ind_s
     // {
@@ -216,7 +220,7 @@ private:
         {
             for (int k=i+1;k<3;k++)
             {
-                if (std::abs<TR>(A[i][i]) < std::abs<TR>(A[k][i]))
+                if (std::abs(A[i][i]) < std::abs(A[k][i]))
                 {
                     for (int j=0;j<=3;j++) 
                     {
@@ -239,7 +243,7 @@ private:
             }
         }
 
-        check_matrix_condition();
+        check_matrix_condition(A);
         
         for (int i=3-1;i>=0;i--)
         {                
@@ -261,8 +265,11 @@ private:
         for(int j=0;j<3;j++)
             det*=A[j][j];
 
-        if( std::abs<TR>(det) > 1.0e-12 )
-            throw std::runtime_error("abc_flow_ker::check_matrix_condition: matrix determinant is zero.");
+        std::cout << "det = " << det << std::endl;
+        if(( std::abs(det) < 1.0e-12 )||( !std::isfinite(det) ))
+        {
+            throw std::runtime_error("abc_flow_ker::check_matrix_condition: matrix determinant is zero or not finite, det = " + std::to_string(det) + "\n");
+        }
 
     }
 

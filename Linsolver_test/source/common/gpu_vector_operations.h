@@ -7,6 +7,8 @@
 #include <utils/curand_safe_call.h>
 #include <common/ogita/gpu_reduction_ogita.h>
 #include <random>
+#include <initializer_list>
+#include <utility>
 #include <stdexcept>
 
 //debug for file output!
@@ -72,7 +74,7 @@ struct gpu_vector_operations
     using gpu_reduction_hp_t = gpu_reduction_ogita<T, vector_type>;
 
     //CONSTRUCTORS!
-    gpu_vector_operations(size_t sz_, cublas_wrap *cuBLAS_ = NULL):
+    gpu_vector_operations(size_t sz_, cublas_wrap *cuBLAS_ = nullptr):
     sz(sz_), 
     cuBLAS(cuBLAS_)
     {
@@ -131,15 +133,27 @@ struct gpu_vector_operations
         x = NULL;
         //x = device_allocate<scalar_type>(sz);
     }
+    template<class ...Args>
+    void init_vectors(Args&&...args) const
+    {
+        std::initializer_list<int>{((void)init_vector(std::forward<Args>(args)), 0 )...};
+    }
+
     void init_vector_rank1(vector_type& x)const 
     {
         x = NULL;
         // x = device_allocate<scalar_type>(sz+1);
-    }    
+    }
+
     void free_vector(vector_type& x)const 
     {
         if (x != NULL) 
             cudaFree(x);
+    }
+    template<class ...Args>
+    void free_vectors(Args&&...args) const
+    {
+        std::initializer_list<int>{((void)free_vector(std::forward<Args>(args)), 0 )...};
     }
     void start_use_vector(vector_type& x)const
     {
@@ -151,10 +165,20 @@ struct gpu_vector_operations
         if (x == NULL) 
            x = device_allocate<scalar_type>(sz+1);
     }    
+    template<class ...Args>
+    void start_use_vectors(Args&&...args)const
+    {
+        std::initializer_list<int>{((void)start_use_vector(std::forward<Args>(args)), 0 )...};
+    }     
     void stop_use_vector(vector_type& x)const
     {
-        
     }
+    template<class ...Args>
+    void stop_use_vectors(Args&&...args)const
+    {
+        std::initializer_list<int>{((void)stop_use_vector(std::forward<Args>(args)), 0 )...};
+    }
+
     size_t get_vector_size() const
     {
         return sz;
@@ -200,7 +224,7 @@ struct gpu_vector_operations
     }    
 
     //gets the data from a vector to a host vector
-    void get(vector_type& x_, vector_type& x_host_)
+    void get(const vector_type& x_, vector_type x_host_)
     {
         if(x_!=nullptr)
         {
@@ -316,7 +340,7 @@ struct gpu_vector_operations
         return result/std::sqrt(Tsc(sz)); //implements l2 norm as sqrt(sum_j (x_j^2) * (1/x_size))
     }
     //norm for a rank 1 updated vector
-    Tsc norm_rank1(const vector_type &x, const scalar_type val_x)
+    Tsc norm_rank1(const vector_type &x, const scalar_type val_x) const
     {
         vector_type y;
         init_vector_rank1(y); start_use_vector_rank1(y); //this is not good, but it will do for now.
@@ -334,14 +358,13 @@ struct gpu_vector_operations
         }
         stop_use_vector(y); free_vector(y);
         return result;
-
     }
     // Tsc norm_rank1_l2(const vector_type &x, const scalar_type val_x)
     // {
     //     return( norm_rank1(x, val_x)/std::sqrt(Tsc(sz)) );
     // }
     //norm for a rank 1 updated vector with weight
-    Tsc norm_rank1_(const vector_type &x, const scalar_type val_x)
+    Tsc norm_rank1_(const vector_type &x, const scalar_type val_x) const
     {
         vector_type y;
         init_vector_rank1(y); start_use_vector(y); //this is not good, but it will do for now.
@@ -362,12 +385,12 @@ struct gpu_vector_operations
         return result;
 
     }
-    Tsc norm_rank1_l2(const vector_type &x, const scalar_type val_x)
+    Tsc norm_rank1_l2(const vector_type &x, const scalar_type val_x) const
     {
         return( norm_rank1_(x, val_x)/std::sqrt(Tsc(sz)) );
     }
     //for GPU pointer storage with call from CPU
-    void norm(const vector_type &x, Tsc* result)
+    void norm(const vector_type &x, Tsc* result) const
     {
         if(use_high_precision_dot)
         {
@@ -381,7 +404,7 @@ struct gpu_vector_operations
     //calc: x := <vector_type with all elements equal to given scalar value> 
     void assign_scalar(const scalar_type scalar, vector_type& x)const;
     //calc: ||x||_2=norm, x=x/norm, return norm.
-    Tsc normalize(vector_type& x)
+    Tsc normalize(vector_type& x)const
     {
         Tsc norm;
         if(use_high_precision_dot)
@@ -396,7 +419,7 @@ struct gpu_vector_operations
         
         return norm;
     }
-    void normalize(vector_type& x, Tsc *norm)
+    void normalize(vector_type& x, Tsc *norm)const
     {
         if(use_high_precision_dot)
         {
@@ -433,7 +456,7 @@ struct gpu_vector_operations
     //calc: y := mul_x*x
     void assign_mul(const scalar_type mul_x, const vector_type& x, vector_type& y)const;
     //cublas axpy: y=y+mul_x*x;
-    void add_mul(scalar_type mul_x, const vector_type& x, vector_type& y)const
+    void add_mul(const scalar_type mul_x, const vector_type& x, vector_type& y)const
     {   
         cuBLAS->axpy<scalar_type>(sz, mul_x, x, y);
     }
@@ -462,12 +485,12 @@ struct gpu_vector_operations
     void assign_mul(scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                                         scalar_type mul_v, const vector_type& v, const scalar_type mul_w, const vector_type& w, vector_type& z)const;
     //calc: x[at]=val_x
-    void set_value_at_point(scalar_type val_x, size_t at, vector_type& x);
+    void set_value_at_point(scalar_type val_x, size_t at, vector_type& x) const;
     //calc: x[at]=val_x for modified size
-    void set_value_at_point(scalar_type val_x, size_t at, vector_type& x, size_t sz_l);
+    void set_value_at_point(scalar_type val_x, size_t at, vector_type& x, size_t sz_l) const;
 
     //return value from the vector x[at]
-    T get_value_at_point(size_t at, vector_type& x);
+    T get_value_at_point(size_t at, vector_type& x) const;
 
     //calc: x := <pseudo random vector with values in (0,1] > 
     void assign_random(vector_type& vec)
@@ -497,6 +520,11 @@ struct gpu_vector_operations
         assign_random(vec);
         scale_adapter(a, b, vec); // this adapter scales complex numbers in a square aXb
                                           //another adapter is needed to scale in a circle
+    }
+
+    cublas_wrap* get_cublas_ref()
+    {
+        return cuBLAS;
     }
 
 //*/

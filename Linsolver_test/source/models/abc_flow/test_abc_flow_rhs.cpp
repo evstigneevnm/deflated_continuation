@@ -33,7 +33,7 @@ std::string check_test_to_eps(const T val)
     {
         std::cout << "WARNING: eps is set to 0 for unsupported floating point type" << std::endl;
     }
-    if(std::abs(val)>eps_)
+    if((std::abs(val)>eps_)||( !std::isfinite(val) ))
     {
         return "FAIL";
     }
@@ -175,8 +175,8 @@ int main(int argc, char const *argv[])
     real varphi_y = -0.425;
     real varphi_z = 2.134;
     abc_flow->translate_solution(x0, varphi_x, varphi_y, varphi_z, x1);
-    abc_flow->write_solution_vec("exact_solution_vec_translate.pos", x1);
-    abc_flow->write_solution_abs("exact_solution_abs_translate.pos", x1);
+    // abc_flow->write_solution_vec("exact_solution_vec_translate.pos", x1);
+    // abc_flow->write_solution_abs("exact_solution_abs_translate.pos", x1);
     abc_flow->translate_solution(x1, -varphi_x, -varphi_y, -varphi_z, x2);
     vec_ops->add_mul( -1.0, x0, x2);
     printf("translation symmetry test  = %le, %s\n", double( vec_ops->norm_l2(x2) ), check_test_to_eps(vec_ops->norm_l2(x2)).c_str()  );
@@ -185,9 +185,9 @@ int main(int argc, char const *argv[])
     abc_flow->exact_solution(R, x0);
     abc_flow->translate_solution(x0, varphi_x, varphi_y, varphi_z, x1);
     abc_flow->translate_solution(x0, -varphi_x/10.0, varphi_y/12.0, -varphi_z/8.0, x2);
-    abc_flow->translation_fix(x1, x0);
+    // abc_flow->translation_fix(x1, x0);
     abc_flow->translation_fix(x2, x3);
-    vec_ops->add_mul( -1.0, x0, x3);
+    // vec_ops->add_mul( -1.0, x0, x3);
     printf("translation symmetry fix test  = %le, %s\n", double( vec_ops->norm_l2(x3) ), check_test_to_eps(vec_ops->norm_l2(x3)).c_str()  );
 
 

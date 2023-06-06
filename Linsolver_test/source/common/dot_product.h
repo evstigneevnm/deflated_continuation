@@ -70,10 +70,10 @@ public:
         return(a*b);
     }
 
-    T dot_naive(const T* X, const T* Y) const
+    T dot_naive(const size_t sz_l, const T* X, const T* Y) const
     {
         T s = T(0.0);
-        for(size_t j=0; j<sz; j++)
+        for(size_t j=0; j<sz_l; j++)
         {
             s += prod_H<T>(X[j],Y[j]);
         }
@@ -82,18 +82,17 @@ public:
 
 
 
-    T dot_ogita(const T* X, const T* Y) const
+    T dot_ogita(const size_t sz_l, const T* X, const T* Y) const
     {
         T s = T(0.0), c = T(0.0), p = T(0.0);
         pi = T(0.0);
         t = T(0.0);
-        for (size_t j=0; j<sz; j++) 
+        for (size_t j=0; j<sz_l; j++) 
         {
             p = two_prod<T>(pi, X[j], Y[j]);
             s = two_sum(t, s, p);
             c = c + pi + t;
         }
-
         return s+c;
     }
 
@@ -102,7 +101,7 @@ public:
         T res = T(0.0);
         if(use_ogita == 1)
         {
-            res = dot_ogita(X,Y);
+            res = dot_ogita(sz, X,Y);
         }
         else if(use_ogita == 2)
         {
@@ -110,7 +109,7 @@ public:
         }
         else if(use_ogita == 0)
         {
-            res = dot_naive(X,Y);
+            res = dot_naive(sz, X,Y);
         }
         else
         {

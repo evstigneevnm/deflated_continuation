@@ -2,43 +2,6 @@
 #define __ABC_FLOW_H__
 
 
-/**
-*    Problem class for the ABC flow:
-*    (1)    (U, \nabla U) + \nabla p - \nu \nabla^2 U - f = 0,
-*    (2)    \nabla \cdot U = 0,
-*    where U=(ux, uy, uz)^T is a 3D vector-function, p is a scalar-function and f is a given vector-funciton RHS: 
-*    (3)    f = ( sin(z) + cos(y); sin(x)+cos(z); sin(y)+cos(x) )^T.
-*    Computaitonal domain is: 
-*    (4)    \Omega := [0;2\pi]\times[0;2\pi]\time[0;2\pi].
-*    Parameter \lambda: Reynolds number R = (\nu)^{-1}.
-*    
-*    WARNING: pressure is used as a gauge so no explicit pressure is avaliable in the system.
-*             therefore the system being solved in reality is:
-*    (5)      P[ (U, \nabla U) - \nu \nabla^2 U - f ] = 0,
-*             where P is the projection operator to div. free vector field:
-*    (6)      P:= (id - \nabla (\nabla)^{-1}) \nabla \cdot)
-*
-*    solves using Fourier method via FFT
-*    includes the following methods:
-*    - project(u, v) projects a vector 'U' and returns vector 'V', s.t. \nabla \cdot V = 0, where u is an 
-*  augmented vector, U is a full block vector, i.e. u->U: U={ux,uy,uz}.
-* 
-*    - F(x,lambda) solves (1) for given (x,lambda)
-*    - set_linearization_point(x0, lambda0) sets point of linearization for calculation of Jacobians
-*    - jacobian_u(x) solves Jacobian F_x at (x0, lambda0) for given x using variational formulation
-*    - jacobian_lambda(x) solves Jacobian F_lambda at (x0, lambda0) for given x using variational formulation
-*    - 
-*    - preconditioner_jacobian_u(dr) applies Jacobi preconditioner for the Jacobian F_x at given (x0, lambda0)
-*    - preconditioner_jacobian_temporal_u(T_vec& dr, T a, T b) applies a+b*J preconditioner, where J is the Jacobian F_x at given (x0, lambda0) and the real values 'a' and 'b' are set.
-*    
-*    axillary:
-*    - set_cuda_grid calculates CUDA grid
-*    - get_cuda_grid returns calculated grid
-*
-*
-*/
-
-
 #include <vector>
 #include <string>
 #include <cmath>
@@ -111,7 +74,48 @@ public:
 };
 
 
-//VecOpsR sized Nx*Ny*Nz;VecOpsC sized Nx*Ny*Mz; VecOps is the main vector operations sized 3*(Nx*Ny*Mz-1)
+// VecOpsR sized Nx*Ny*Nz;VecOpsC sized Nx*Ny*Mz; VecOps is the main vector
+// operations sized 3*(Nx*Ny*Mz-1)
+//
+// @tparam     FFT_type      { description }
+// @tparam     VecOpsR       { description }
+// @tparam     VecOpsC       { description }
+// @tparam     VecOps        { description }
+// @tparam     BLOCK_SIZE_x  { description }
+// @tparam     BLOCK_SIZE_y  { description }
+/*
+*    Problem class for the ABC flow:
+*    (1)    $(U, \nabla U) + \nabla p - \nu \nabla^2 U - f = 0$,
+*    (2)    $\nabla \cdot U = 0$,
+*    where U=(ux, uy, uz)^T is a 3D vector-function, p is a scalar-function and f is a given vector-funciton RHS: 
+*    (3)    $f = ( sin(z) + cos(y); sin(x)+cos(z); sin(y)+cos(x) )^T$.
+*    Computaitonal domain is: 
+*    (4)    $\Omega := [0;2\pi]\times[0;2\pi]\time[0;2\pi]$.
+*    Parameter \lambda: Reynolds number $R = (\nu)^{-1}$.
+*    
+*    WARNING: pressure is used as a gauge so no explicit pressure is avaliable in the system.
+*             therefore the system being solved in reality is:
+*    (5)      $P[ (U, \nabla U) - \nu \nabla^2 U - f ] = 0$,
+*             where P is the projection operator to div. free vector field:
+*    (6)      $P:= (id - \nabla (\nabla)^{-1}) \nabla \cdot)$
+*
+*    solves using Fourier method via FFT
+*    includes the following methods:
+*    - project(u, v) projects a vector 'U' and returns vector 'V', s.t. \nabla \cdot V = 0, where u is an 
+*  augmented vector, U is a full block vector, i.e. u->U: U={ux,uy,uz}.
+* 
+*    - F(x,lambda) solves (1) for given (x,lambda)
+*    - set_linearization_point(x0, lambda0) sets point of linearization for calculation of Jacobians
+*    - jacobian_u(x) solves Jacobian F_x at (x0, lambda0) for given x using variational formulation
+*    - jacobian_lambda(x) solves Jacobian F_lambda at (x0, lambda0) for given x using variational formulation
+*    - 
+*    - preconditioner_jacobian_u(dr) applies Jacobi preconditioner for the Jacobian F_x at given (x0, lambda0)
+*    - preconditioner_jacobian_temporal_u(T_vec& dr, T a, T b) applies a+b*J preconditioner, where J is the Jacobian F_x at given (x0, lambda0) and the real values 'a' and 'b' are set.
+*    
+*    axillary:
+*    - set_cuda_grid calculates CUDA grid
+*    - get_cuda_grid returns calculated grid
+*/
 template<class FFT_type, class VecOpsR, class VecOpsC, class VecOps,  
 unsigned int BLOCK_SIZE_x = 32, unsigned int BLOCK_SIZE_y = 16>
 class abc_flow
@@ -222,7 +226,7 @@ public:
         // vec_ops_C->assign_scalar(0.0,W.y);
         // vec_ops_C->assign_scalar(0.0,W.z);
         B_V_nabla_F(U, U, W); //W:= (U, nabla) U
-        kern->add_mul3(TC(-1.0/Reynolds_,0), forceABC.x, forceABC.y, forceABC.z, W.x, W.y, W.z); // force:= W-force
+        kern->add_mul3(TC(-1,0), forceABC.x, forceABC.y, forceABC.z, W.x, W.y, W.z); // force:= W-force
         project(W); // W:=P[W]??
         kern->negate3(W.x, W.y, W.z); //W:=-W;
         // U := \nabla^2 U
@@ -289,7 +293,7 @@ public:
     {
         kern->copy3(U_0.x, U_0.y, U_0.z, dV.x, dV.y, dV.z);
         kern->apply_Laplace(TR(-1.0/(Reynolds_0*Reynolds_0)), Laplace, dV.x, dV.y, dV.z);
-
+        //kern->add_mul3(TC(1.0/(Reynolds_0*Reynolds_0),0), forceABC.x, forceABC.y, forceABC.z, dV.x, dV.y, dV.z);
 
     } 
   
@@ -298,6 +302,7 @@ public:
           
         kern->copy3(U0.x, U0.y, U0.z, dV.x, dV.y, dV.z);
         kern->apply_Laplace(TR(-1.0/(Reynolds_0_*Reynolds_0_)), Laplace, dV.x, dV.y, dV.z);
+        //kern->add_mul3(TC(1.0/(Reynolds_0_*Reynolds_0_),0), forceABC.x, forceABC.y, forceABC.z, dV.x, dV.y, dV.z);
 
     }
 
@@ -380,14 +385,22 @@ public:
         T val3 = physical_host[I3(int(Nx/4.0), int(Ny/5.0), int(Nz/5.0))];
         T val4 = physical_host[I3(int(Nx/2.0)-1, int(Ny/2.0)-1, int(Nz/2)-1)];
         T val5 = vec_ops->norm_l2(u_in);
-        
+        T val6 = norm(u_in);
+        T val7 = vec_ops_R->norm_l2(uR0->x);
+        // T val7_x = vec_ops_R->norm_l2(uR0->x);
+        // T val7_y = vec_ops_R->norm_l2(uR0->y);
+        // T val7_z = vec_ops_R->norm_l2(uR0->z);
+        // T val7 = std::sqrt(val7_x*val7_x+val7_y*val7_y+val7_z*val7_z);
+
         res.clear();
-        res.reserve(5);
-        res.push_back(val1);
-        res.push_back(val2);
-        res.push_back(val3);
-        res.push_back(val4);
-        res.push_back(val5);
+        res.reserve(7);
+        res.push_back(val1); //2
+        res.push_back(val2); //3
+        res.push_back(val3); //4
+        res.push_back(val4); //5
+        res.push_back(val5); //6
+        res.push_back(val6); //7
+        res.push_back(val7); //8
 
         pool_R.release(uR0);
     }
@@ -407,9 +420,9 @@ public:
     void exact_solution_abc(const T& Reynolds, T_vec& u_out)
     {
         BC_vec* UA = pool_BC.take();
-        vec_ops_C->assign_mul(TC(scale_force,0), forceABC.x, UA->x);
-        vec_ops_C->assign_mul(TC(scale_force,0), forceABC.y, UA->y);
-        vec_ops_C->assign_mul(TC(scale_force,0), forceABC.z, UA->z);        
+        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), forceABC.x, UA->x);
+        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), forceABC.y, UA->y);
+        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), forceABC.z, UA->z);        
         C2V(*UA, u_out);
         pool_BC.release(UA);        
     }
@@ -568,7 +581,7 @@ public:
         if(steps_ == -1)
         {
             std::srand(unsigned(std::time(0))); //init new seed
-            steps = std::rand()%4 + 1;     // random from 1 to 4
+            steps = std::rand()%10 + 1;     // random from 1 to 10
 
         }
 
@@ -632,7 +645,7 @@ public:
         BC_vec* UC0 = pool_BC.take();
         BC_vec* UC1 = pool_BC.take();
         V2C(u_in_, *UC0);  
-        auto res = index_selector(*UC0);
+        auto res = shift_phases(*UC0);
         auto varphi_x = std::get<0>(res);
         auto varphi_y = std::get<1>(res);
         auto varphi_z = std::get<2>(res);
@@ -670,6 +683,17 @@ public:
 
     }
 
+
+    TR norm(const T_vec& u_in_)
+    {
+        BC_vec* UC1 = pool_BC.take();
+        V2C(u_in_, *UC1);  
+        auto norm_ = norm(*UC1);
+        pool_BC.release(UC1);
+        return norm_;
+
+    }
+    
 private:
     
     //WARNING!
@@ -887,9 +911,9 @@ private:
 
     TR norm(const BC_vec& U_in)
     {
-        T norm_x = vec_ops->norm_l2(U_in.x);
-        T norm_y = vec_ops->norm_l2(U_in.y);
-        T norm_z = vec_ops->norm_l2(U_in.z);
+        T norm_x = vec_ops_C->norm_l2(U_in.x);
+        T norm_y = vec_ops_C->norm_l2(U_in.y);
+        T norm_z = vec_ops_C->norm_l2(U_in.z);
         return(std::sqrt(norm_x*norm_x+norm_y*norm_y+norm_z*norm_z));
     }
 
@@ -918,9 +942,9 @@ private:
     }
 
 
-    std::tuple<TR,TR,TR> index_selector(BC_vec& U_in)
+    std::tuple<TR,TR,TR> shift_phases(BC_vec& U_in)
     {
-        auto varphis = kern->get_minimum_nonzero_indices(U_in.x); //test
+        auto varphis = kern->get_shift_phases(U_in.z); //test
         return varphis;
     }
     

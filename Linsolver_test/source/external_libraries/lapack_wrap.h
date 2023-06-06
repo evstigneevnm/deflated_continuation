@@ -443,7 +443,7 @@ void lapack_wrap<double>::hessinberg_eigs(const double* H, size_t Nl, double* ei
     
     if(INFO!=0)
     {
-        throw std::runtime_error("hessinberg_eigs: dhseqr_ returned INFO!=0.");
+        throw std::runtime_error("hessinberg_eigs: dhseqr_ returned INFO!=0:" + std::to_string(INFO) );
     }
 
 }
@@ -481,7 +481,7 @@ void lapack_wrap<float>::hessinberg_eigs(const float* H, size_t Nl, float* eig_r
     
     if(INFO!=0)
     {
-        throw std::runtime_error("hessinberg_eigs: shseqr_ returned INFO!=0.");
+        throw std::runtime_error("hessinberg_eigs: shseqr_ returned INFO!=0: " + std::to_string(INFO) );
     }
 
 }
@@ -532,8 +532,9 @@ void lapack_wrap<double>::hessinberg_schur(const double* H, size_t Nl, double* Q
     copy_square_1_to_2(A_, R, Nl);
     if(INFO!=0)
     {
-        throw std::runtime_error("hessinberg_eigs: dhseqr_ returned INFO!=0.");
+        throw std::runtime_error("hessinberg_schur: dhseqr_ returned INFO!=0:" + std::to_string(INFO) );
     }
+    
     if(use_internal_eigs)
     {
         delete [] eig_real;
@@ -584,7 +585,7 @@ void lapack_wrap<float>::hessinberg_schur(const float* H, size_t Nl, float* Q, f
     copy_square_1_to_2(A_, R, Nl);
     if(INFO!=0)
     {
-        throw std::runtime_error("hessinberg_eigs: dhseqr_ returned INFO!=0.");
+        throw std::runtime_error("hessinberg_eigs: shseqr_ returned INFO!=0: " + std::to_string(INFO) );
     }
     if(use_internal_eigs)
     {
@@ -628,7 +629,7 @@ void lapack_wrap<double>::eigs(const double* A, size_t Nl, double* eig_real, dou
 
      if(INFO!=0)
     {
-        throw std::runtime_error("hessinberg_eigs: shseqr_ returned INFO!=0.");
+        throw std::runtime_error("hessinberg_eigs: shseqr_ returned INFO!=0: " + std::to_string(INFO) );
     }  
 
 }
@@ -666,7 +667,7 @@ void lapack_wrap<float>::eigs(const float* A, size_t Nl, float* eig_real, float*
 
      if(INFO!=0)
     {
-        throw std::runtime_error("eigs: dgeev_ returned INFO!=0.");
+        throw std::runtime_error("eigs: dgeev_ returned INFO!=0: " + std::to_string(INFO) );
     }  
 
 }
@@ -704,7 +705,7 @@ void lapack_wrap<double>::eigsv(const double* A, size_t Nl, double* eig_real, do
 
      if(INFO!=0)
     {
-        throw std::runtime_error("eigsv: dgeev_ returned INFO!=0.");
+        throw std::runtime_error("eigsv: dgeev_ returned INFO!=0:" + std::to_string(INFO) );
     }  
 
 }
@@ -741,7 +742,7 @@ void lapack_wrap<float>::eigsv(const float* A, size_t Nl, float* eig_real, float
 
      if(INFO!=0)
     {
-        throw std::runtime_error("eigsv: dgeev_ returned INFO!=0.");
+        throw std::runtime_error("eigsv: dgeev_ returned INFO!=0: " + std::to_string(INFO) );
     }  
 
 }

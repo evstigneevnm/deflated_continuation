@@ -23,7 +23,7 @@ struct gpu_matrix_vector_operations
     bool location;
 
     //CONSTRUCTORS!
-    gpu_matrix_vector_operations(size_t sz_row_, size_t sz_col_, cublas_wrap *cuBLAS_):
+    gpu_matrix_vector_operations(size_t sz_row_, size_t sz_col_, cublas_wrap *cuBLAS_ = nullptr):
     sz_row(sz_row_),
     sz_col(sz_col_),
     cuBLAS(cuBLAS_)
@@ -35,30 +35,55 @@ struct gpu_matrix_vector_operations
     //DISTRUCTOR!
     ~gpu_matrix_vector_operations()
     {
+    }
 
+    void set_cublas(cublas_wrap *cuBLAS_p)
+    {
+        cuBLAS = cuBLAS_p;
     }
 
 
-
+    cublas_wrap* get_cublas_ref()
+    {
+        return cuBLAS;
+    }
     void init_matrix(matrix_type& x)const 
     {
         x = NULL;
         //x = device_allocate<scalar_type>(sz);
     } 
+    template<class ...Args>
+    void init_matrices(Args&&...args) const
+    {
+        std::initializer_list<int>{((void)init_matrix(std::forward<Args>(args)), 0 )...};
+    }
     void start_use_matrix(matrix_type& x)const
     {
         if (x == NULL) 
            x = device_allocate<T>(sz_row*sz_col);
-    }    
+    }  
+    template<class ...Args>
+    void start_use_matrices(Args&&...args) const
+    {
+        std::initializer_list<int>{((void)start_use_matrix(std::forward<Args>(args)), 0 )...};
+    }      
     void free_matrix(matrix_type& x)const 
     {
         if (x != NULL) 
             cudaFree(x);
-    }    
-    void stop_use_matrix(matrix_type& x)const
+    }   
+    template<class ...Args>
+    void free_matrices(Args&&...args) const
     {
-        
-    }
+        std::initializer_list<int>{((void)free_matrix(std::forward<Args>(args)), 0 )...};
+    }       
+    void stop_use_matrix(matrix_type& x)const
+    {}
+    template<class ...Args>
+    void stop_use_matrices(Args&&...args) const
+    {
+        std::initializer_list<int>{((void)stop_use_matrix(std::forward<Args>(args)), 0 )...};
+    }      
     size_t get_rows()
     {
         return sz_row;
@@ -84,6 +109,7 @@ struct gpu_matrix_vector_operations
 
     //general GEMV operation
     //void gemv(const char op, size_t RowA, const T *A, size_t ColA, size_t LDimA, const T alpha, const T *x, const T beta, T *y);
+    // y <- alpha op(mat)x + beta y
     void gemv(const char op, const matrix_type mat, const scalar_type alpha, const T *x, const scalar_type beta, vector_type y)
     {
         cuBLAS->gemv<scalar_type>(op, sz_row, mat, sz_col, sz_row, alpha, x, beta, y);
@@ -149,6 +175,12 @@ struct gpu_matrix_vector_operations
     void mat_T_gemm_mat_N(const matrix_type matA, const matrix_type matB, size_t n_cols_B_C, const scalar_type alpha, const scalar_type beta, matrix_type matC)
     {
         cuBLAS->gemm<scalar_type>('T', 'N', sz_col, n_cols_B_C, sz_row , alpha, matA, sz_row, matB, sz_row, beta, matC, sz_col);        
+    }
+
+    // C = α op(A) + β B
+    void geam(const char opA, size_t RowAC, size_t ColBC, const scalar_type alpha, const scalar_type* A, const scalar_type beta, scalar_type* B, scalar_type* C)
+    {
+        cuBLAS->geam<scalar_type>(opA, RowAC, ColBC, alpha, A, RowAC,  beta, B, RowAC, C, ColBC);
     }
 
 //*/

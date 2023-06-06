@@ -39,6 +39,7 @@ public:
         vec_ops_l->init_vector(f_gpu); vec_ops_l->start_use_vector(f_gpu);
         N = mat_ops_l->get_rows();
         m = mat_ops_l->get_cols();
+        // std::cout << "iram_container: N = " << N << " m = " << m << std::endl;
         H_cpu = std::vector<T>(m*m,0);
         ritz = std::vector<T>(m,0);
         if(debug)

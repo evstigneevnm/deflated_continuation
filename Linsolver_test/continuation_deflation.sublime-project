@@ -15,6 +15,7 @@
         "ecc_common_flags" : [
             "-I/usr/local/cuda/include",
             "-I/usr/local/inlcude",
+ 	    "-I/usr/local/boost/include",
             "-I$project_base_path/source",
             "-I$project_base_path/Linsolver_test/source",
 			"-I$project_base_path",

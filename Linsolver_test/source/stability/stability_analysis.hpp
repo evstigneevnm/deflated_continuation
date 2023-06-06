@@ -49,7 +49,6 @@ public:
     newton(newton_),
     eig_solver(eig_solver_)
     {
-        
         vec_ops->init_vector(x_p1); vec_ops->start_use_vector(x_p1);
         vec_ops->init_vector(x_p2); vec_ops->start_use_vector(x_p2);
         vec_ops->init_vector(f_0); vec_ops->start_use_vector(f_0);

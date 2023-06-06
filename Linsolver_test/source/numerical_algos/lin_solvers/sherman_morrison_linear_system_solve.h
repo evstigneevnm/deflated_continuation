@@ -27,6 +27,7 @@ v is a scalar
 #define __SHERMAN_MORRISON_LINEAR_SYSTEM_SOLVE_H__
 
 #include <numerical_algos/detail/vectors_arr_wrap_static.h>
+#include <utils/logged_obj_base.h>
 
 namespace numerical_algos
 {
@@ -37,7 +38,7 @@ using numerical_algos::detail::vectors_arr_wrap_static;
 
 
 template<class LinearOperator, class Preconditioner, class VectorOperations, class Monitor, class Log, template<class , class , class , class , class > class LinearSolver>
-class sherman_morrison_linear_system_solve
+class sherman_morrison_linear_system_solve: public utils::logged_obj_base<Log>
 {
 public:
     typedef typename VectorOperations::scalar_type  scalar_type;
@@ -50,7 +51,8 @@ public:
 
 private:
     typedef vectors_arr_wrap_static<VectorOperations, 1> buf_t;
-
+    typedef utils::logged_obj_base<Log>                  logged_obj_t;
+    
     // let's use nested classes?!
 
     // modified Linear Operator for extended system
@@ -63,23 +65,29 @@ private:
 
         mutable vector_type z;
         mutable bool small_alpha=false;
-        mutable bool use_small_alpha = false;
+        mutable bool use_small_alpha = true;
+        const scalar_type alpha_threshold_;
 
-        LinearOperator_SM(const vector_operations_type *vector_operations_)
+        LinearOperator_SM(const vector_operations_type *vector_operations_, const scalar_type alpha_threshold_p):
+        alpha_threshold_(alpha_threshold_p)
         {
             vector_operations=vector_operations_;
-            vector_operations->init_vector(z); vector_operations->start_use_vector(z);
+            vector_operations->init_vectors(z); vector_operations->start_use_vectors(z);
 
         }
 
         ~LinearOperator_SM()
         {
-            vector_operations->stop_use_vector(z); vector_operations->free_vector(z);
+            vector_operations->stop_use_vectors(z); vector_operations->free_vectors(z);
         }
 
         void set_inherited_linear_operator(const linear_operator_type *inherited_linear_operator_) const
         {
             inherited_linear_operator=inherited_linear_operator_;
+        }
+        const linear_operator_type* get_inherited_linear_operator() const
+        {
+            return inherited_linear_operator;
         }
         
         void set_vectors(const vector_type& c_, const vector_type& d_, const scalar_type& alpha_, const vector_type& b_, const scalar_type& beta_) const
@@ -91,7 +99,7 @@ private:
             beta = beta_;
             gamma = scalar_type(1);
             v=0.0;
-            if((use_small_alpha)&&(alpha<1.0e-3))
+            if((use_small_alpha)&&(alpha<alpha_threshold_))
             {
                 std::cout << "\n==============SMALL ALPHA===========\n";
                 small_alpha=true;
@@ -104,7 +112,7 @@ private:
             alpha = alpha_;
             gamma = gamma_;
             v=0.0;
-            if((use_small_alpha)&&(alpha<1.0e-3))
+            if((use_small_alpha)&&(alpha<alpha_threshold_))
             {
                 std::cout << "\n==============SMALL ALPHA===========\n";
                 small_alpha=true;
@@ -118,10 +126,15 @@ private:
             }
         }
 
+        bool is_small_alpha_used() const
+        {
+            return small_alpha;
+        }
+
         scalar_type get_scalar(vector_type &u) const
         {
-            scalar_type cTu_over_alpha=(vector_operations->scalar_prod(c, u))/alpha;
-            v=beta/alpha-cTu_over_alpha;
+            scalar_type cTu_over_alpha=(vector_operations->scalar_prod(c, u));
+            v=(beta-cTu_over_alpha)/alpha;
             return v;
         }
 
@@ -146,9 +159,7 @@ private:
                         
             if(small_alpha)
             {
-                scalar_type cTu = vector_operations->scalar_prod(c, u);
                 inherited_linear_operator->apply(u, f);
-                vector_operations->add_mul(-cTu, d, alpha*gamma, f);
             }
             else
             {
@@ -171,14 +182,17 @@ private:
         mutable const LinearOperator_SM *op;
         mutable const preconditioner_type *inherited_preconditioner;
 
-        mutable vector_type c, d;
+        mutable vector_type c, d, b_;
         mutable vector_type g;
         mutable scalar_type alpha;
-        mutable scalar_type beta;
+        mutable scalar_type beta_;
+        mutable scalar_type gamma_;
         mutable bool small_alpha = false;
-        mutable bool use_small_alpha = false;
+        mutable bool use_small_alpha = true;
+        const scalar_type alpha_threshold_;
 
-        Preconditioner_SM(const vector_operations_type *vector_operations_)
+        Preconditioner_SM(const vector_operations_type *vector_operations_, const scalar_type alpha_threshold_p):
+        alpha_threshold_(alpha_threshold_p)
         {
             vector_operations = vector_operations_;
             
@@ -193,25 +207,33 @@ private:
         void set_operator(const LinearOperator_SM *op_) const
         {
             op = op_;
+            if(inherited_preconditioner != nullptr)
+            {
+                inherited_preconditioner->set_operator( op->get_inherited_linear_operator() ); 
+            }
         }
-        void set_vectors(const vector_type& c_, const vector_type& d_, const scalar_type& alpha_) const
+        void set_vectors(const vector_type& c_, const vector_type& d_, const scalar_type& alpha_, const vector_type& b_p, const scalar_type& beta_p) const
         {
+            b_ = b_p;
             c = c_;
             d = d_;
+            beta_ = beta_p;
             alpha = alpha_;
-            beta = scalar_type(1);
-            if((alpha<1.0e-3)&&(use_small_alpha))
+            gamma_ = scalar_type(1.0);
+            if((alpha<alpha_threshold_)&&(use_small_alpha))
             {
                 small_alpha=true;
             } 
         }
-        void set_vectors(const scalar_type& beta_, const vector_type& c_, const vector_type& d_, const scalar_type& alpha_) const
+        void set_vectors(const scalar_type& gamma_p, const vector_type& c_, const vector_type& d_, const scalar_type& alpha_, const vector_type& b_p) const
         {
+            b_ = b_p;
             c = c_;
             d = d_;
+            beta_ = 0;
             alpha = alpha_;
-            beta = beta_;
-            if((alpha<1.0e-3)&&(use_small_alpha))
+            gamma_ = gamma_p;
+            if((alpha<alpha_threshold_)&&(use_small_alpha))
             {
                 small_alpha=true;
             } 
@@ -219,33 +241,29 @@ private:
         void set_inherited_preconditioner(const preconditioner_type *inherited_preconditioner_) const
         {
             inherited_preconditioner = inherited_preconditioner_;
+
         }
         void apply(vector_type& x)const
         {
             if(small_alpha)
             {
                 inherited_preconditioner->apply(x);
-                inherited_preconditioner->apply(d);
-                scalar_type dot_prod_num = vector_operations->scalar_prod(c, x)/alpha;
-                scalar_type dot_prod_din = vector_operations->scalar_prod(c, d)/alpha;
-                scalar_type mul_g=-dot_prod_num/(beta+dot_prod_din);
-                vector_operations->add_mul(mul_g/beta, d, scalar_type(1/beta), x);
-
             }
             else
             {
                 //calc: y := mul_x*x
-                vector_operations->assign_mul(-1.0/alpha, d, g); // g=-1/alpha*d
+                vector_operations->assign_mul(-1.0, d, g); // g=-1/alpha*d
                 inherited_preconditioner->apply(x); // inv(A)u=>x
                 inherited_preconditioner->apply(g); // inv(A)g=>g
                 
-                scalar_type dot_prod_num = vector_operations->scalar_prod(c, x); // (c,Au):=(c,x)=>cx
-                scalar_type dot_prod_din = vector_operations->scalar_prod(c, g); // (c,Ag):=(c,g)=>cg
-                scalar_type mul_g=-dot_prod_num/(beta+dot_prod_din);
+                scalar_type dot_prod_num = vector_operations->scalar_prod(c, x)/gamma_; // (c,Au):=(c,x)=>cx
+                scalar_type dot_prod_din = vector_operations->scalar_prod(c, g)/gamma_; // (c,Ag):=(c,g)=>cg
+                scalar_type mul_g=-dot_prod_num/(alpha+dot_prod_din);
                 // ( x/beta - g/beta*(cx)/(beta+cg) ) -> x
 
                 //calc: y := mul_x*x + mul_y*y
-                vector_operations->add_mul(mul_g/beta, g, scalar_type(1/beta), x);
+                vector_operations->add_mul(mul_g/gamma_, g, scalar_type(1.0)/gamma_, x);
+
             }
         }
 
@@ -265,23 +283,29 @@ public:
                         VectorOperations,
                         Monitor, Log>           linear_solver_original_type;
 
-    sherman_morrison_linear_system_solve(Preconditioner* prec_, const VectorOperations* vec_ops_, Log *log_): 
-    linear_solver(vec_ops_,log_), 
-    prec(vec_ops_), 
-    oper(vec_ops_),
-    linear_solver_original(vec_ops_,log_)
+    sherman_morrison_linear_system_solve(Preconditioner* prec_, const VectorOperations* vec_ops_p, Log *log_p = nullptr, int obj_log_lev = 0): 
+    linear_solver(vec_ops_p, log_p), 
+    prec(vec_ops_p, alpha_threshold_), 
+    oper(vec_ops_p, alpha_threshold_),
+    linear_solver_original(vec_ops_p, log_p),
+    vec_ops_(vec_ops_p),
+    utils::logged_obj_base<Log>(log_p, obj_log_lev, "sherman_morrison:") 
     {
         
         linear_solver.set_preconditioner(&prec);
         prec.set_inherited_preconditioner(prec_);
-        //sets preconditioner for the progonal linear solver
-        
+        //sets preconditioner for the original linear solver
         linear_solver_original.set_preconditioner(prec_);
+        //init_residual_vector
+        vec_ops_->init_vector(r_);
+        vec_ops_->start_use_vector(r_);
+
     }
 
     ~sherman_morrison_linear_system_solve()
     {
-
+        vec_ops_->stop_use_vector(r_);
+        vec_ops_->free_vector(r_);
     }
 
 
@@ -297,33 +321,76 @@ public:
     {
         oper.use_small_alpha = use_small_alpha_;
         prec.use_small_alpha = use_small_alpha_;
+        small_alpha = use_small_alpha_;
     }
 
     //solves full extended system with rank 1 update
     bool solve(const LinearOperator &A, const vector_type &c, const vector_type &d, const scalar_type &alpha, const vector_type &b, const scalar_type &beta, vector_type &u, scalar_type &v) const
     {
         bool flag = false;
-        
         oper.set_inherited_linear_operator(&A);
         oper.set_vectors(c, d, alpha, b, beta);
-        prec.set_vectors(c, d, alpha);
-        flag = linear_solver.solve(oper, oper.get_rhs(), u);
-        v = oper.get_scalar(u);
-        //oper.scale_solution(u);
+        prec.set_vectors(c, d, alpha, b, beta);
+
+        if( oper.is_small_alpha_used() )
+        {
+            bool flag1 = linear_solver.solve(oper, b, u);
+            bool flag2 = linear_solver.solve(oper, d, r_);
+            scalar_type aa = vec_ops_->scalar_prod(c, r_);
+            scalar_type ba = vec_ops_->scalar_prod(c, u);
+            v = (beta-ba)/(-aa+alpha);
+            // std::cout << "(-aa+alpha*gamma) = " << (-aa+alpha*gamma) << " v = " << v << std::endl;
+            vec_ops_->add_mul(-v, r_, 1.0, u);
+            flag = flag2&flag1;
+        }
+        else
+        {
+            flag = linear_solver.solve(oper, oper.get_rhs(), u);
+            v = oper.get_scalar(u);
+        }
+        vec_ops_->assign_scalar(0.0, r_);
+        A.apply(u, r_);
+        vec_ops_->add_mul(-1.0, b, v, d, 1.0, r_);
+        scalar_type cTu = vec_ops_->scalar_prod(c, u);
+        scalar_type r_sc_ = -beta+alpha*v+cTu;
+        scalar_type residual_norm = vec_ops_->norm_rank1(r_, r_sc_);
+        // std::cout << "actual residual = " << residual_norm << std::endl;
+        logged_obj_t::info_f("actual residual = %e, alpha = %e, beta = %e", residual_norm, alpha, beta );
         return flag;
     }
 
     //solves Sherman - Morrison version as: 
-    //    (beta A - 1/alpha d c^t)u=b
-    bool solve(const scalar_type &beta, const LinearOperator &A, const scalar_type &alpha, const vector_type &c, const vector_type &d,  const vector_type &b, vector_type &u) const
+    //    (gamma A - 1/alpha d c^t)u=b
+    bool solve(const scalar_type &gamma, const LinearOperator &A, const scalar_type &alpha, const vector_type &c, const vector_type &d,  const vector_type &b, vector_type &u) const
     {
         bool flag = false;
-        
         oper.set_inherited_linear_operator(&A);
-        oper.set_vectors(beta, c, d, alpha);
-        prec.set_vectors(beta, c, d, alpha);
-        flag = linear_solver.solve(oper, b, u);
-        oper.scale_solution(u);
+        oper.set_vectors(gamma, c, d, alpha);
+        prec.set_vectors(gamma, c, d, alpha, b); 
+
+        if( oper.is_small_alpha_used() )
+        {
+            bool flag1 = linear_solver.solve(oper, b, u);
+            bool flag2 = linear_solver.solve(oper, d, r_);
+            scalar_type aa = vec_ops_->scalar_prod(c, r_);
+            scalar_type ba = vec_ops_->scalar_prod(c, u);
+            scalar_type v = -ba/(-aa+alpha*gamma);
+            // std::cout << "(-aa+alpha*gamma) = " << (-aa+alpha*gamma) << " v = " << v << std::endl;
+            vec_ops_->add_mul(-v/gamma, r_, 1.0/gamma, u);  
+            flag = flag2&flag1;
+        }
+        else
+        {
+            flag = linear_solver.solve(oper, b, u);
+            oper.scale_solution(u);
+        }    
+        A.apply(u, r_);
+        vec_ops_->add_mul(-1.0, b, gamma, r_);
+        scalar_type cTu = vec_ops_->scalar_prod(c, u);
+        vec_ops_->add_mul(-cTu, d, static_cast<scalar_type>(alpha), r_);
+        scalar_type residual_norm = vec_ops_->norm(r_);
+        logged_obj_t::info_f("actual residual = %e, gamma = %e, alpha = %e", residual_norm, gamma, alpha );
+
         return flag;
     }
 
@@ -341,9 +408,14 @@ public:
 private:
     linear_solver_type linear_solver;
     linear_solver_original_type linear_solver_original;
+    const scalar_type alpha_threshold_ = 1.0e1;
 
     LinearOperator_SM_t oper;
     Preconditioner_SM_t prec;
+    mutable bool small_alpha = true;
+    mutable vector_type r_;
+    mutable const vector_operations_type* vec_ops_;
+    mutable Log* log_;
 
 
 };

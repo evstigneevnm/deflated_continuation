@@ -21,8 +21,8 @@ private:
     using TR = typename deduce_real_type_from_complex::recast_type<T>::real;
 
 public:
-    threaded_reduction(size_t vec_size_, int n_ = -1, int use_high_prec_ = 0, T initial_ = T(0.0)):
-    use_high_prec(use_high_prec_),
+    threaded_reduction(size_t vec_size_, int n_ = -1, int use_high_prec_p = 0, T initial_ = T(0.0)):
+    use_high_prec_(use_high_prec_p),
     parts(n_),
     vec_size(vec_size_)
     {
@@ -58,13 +58,13 @@ public:
 
     }
 
-    void use_high_precision()
+    void use_high_prec()
     {
-        use_high_prec = 1;
+        use_high_prec_ = 1;
     }
-    void use_standard_precision()
+    void use_normal_prec()
     {
-        use_high_prec = 0;
+        use_high_prec_ = 0;
     }
 
 private:
@@ -293,11 +293,11 @@ public:
         for (int j = 0; j < parts; j++) 
         {
             
-            if(use_high_prec == 0)
+            if(use_high_prec_ == 0)
             {
                 threads.push_back( std::thread( std::ref(dot_naive[j]),  std::ref(x_),  std::ref(y_),  std::ref(result_dot), g_lock_dot) );
             }
-            else if(use_high_prec == 1)
+            else if(use_high_prec_ == 1)
             {
                 threads.push_back( std::thread( std::ref(dot_ogita[j]),  std::ref(x_),  std::ref(y_),  std::ref(result_dot), std::ref(sigma_dot), g_lock_dot) );
             }
@@ -315,7 +315,7 @@ public:
                 t.join();
         }
 
-        if(use_high_prec == 0)
+        if(use_high_prec_ == 0)
         {
             return T(result_dot);
         }
@@ -338,11 +338,11 @@ public:
         for (int j = 0; j < parts; j++) 
         {
             
-            if(use_high_prec == 0)
+            if(use_high_prec_ == 0)
             {
                 threads.push_back( std::thread( std::ref(sum_naive[j]),  std::ref(x_),   std::ref(result_sum), g_lock_sum, use_abs_) );
             }
-            else if(use_high_prec == 1)
+            else if(use_high_prec_ == 1)
             {
                 threads.push_back( std::thread( std::ref(sum_ogita[j]),  std::ref(x_),   std::ref(result_sum), std::ref(sigma_sum), g_lock_sum, use_abs_) );
             }
@@ -360,7 +360,7 @@ public:
                 t.join();
         }
 
-        if(use_high_prec == 0)
+        if(use_high_prec_ == 0)
         {
             return T(result_sum);
         }
@@ -378,7 +378,7 @@ public:
 private:
     T result_dot;
     T result_sum;
-    int use_high_prec;
+    int use_high_prec_;
     int parts;
     size_t vec_size;
     std::vector<int> array_bounds;

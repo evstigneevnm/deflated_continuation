@@ -79,7 +79,7 @@ public:
         }
         
 
-        if(ts_scheme == "RK3")
+        if(ts_scheme == "RK3ssp")
         {
             //step1
             nonlin_op->F(in_, param, f_helper);
@@ -106,8 +106,8 @@ private:
     T_vec v1_helper = nullptr;
     T_vec f_helper = nullptr;
 
-    std::string ts_scheme = "RK3";
-    const std::vector<std::string> ts_scheme_permisive = {"RK3", "RK4", "RK4ssp", "DP8"};
+    std::string ts_scheme = "RK3ssp";
+    const std::vector<std::string> ts_scheme_permisive = {"RK3ssp", "RK4", "RK4ssp", "DP8", "RK3exp"};
 
     VectorOperations* vec_ops;
     NonlinearOperator* nonlin_op;

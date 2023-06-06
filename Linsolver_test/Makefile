@@ -1,31 +1,40 @@
-#once i was framed by autoconf (found two different gcc's for different libraries, cost me 2 days), 
-#so now i use all by hand
+# this Makefile is configured by the 'config.inc' that describes your system env.
 
-#update for comiling with CUDA-8.
-#	set gcc-4.8.
-#	comile *_ker
-#	set gcc-X, X>=5
-#	comile target
-# this is a damn nighmare
+ifndef CONFIG_FILE
+CONFIG_FILE = config.inc
+endif
 
-#set these variables for your local machine
-SCALAR_TYPE =-DSCALAR_TYPE=double
-NVCC = /usr/local/cuda/bin/nvcc
-GCC = /usr/bin/gcc
+ifeq (,$(wildcard $(CONFIG_FILE)))
+$(info config file $(CONFIG_FILE) does not exist.)
+$(error Create $(CONFIG_FILE) from example or specify another config via: make <target> CONFIG_FILE=<config_filename> )
+endif
 
-NVCCFLAGS = -Wno-deprecated-gpu-targets -g -arch=sm_35 -std=c++11 -ccbin=g++-8
+-include $(CONFIG_FILE)
+
+
+#these variables for your local machine are set from the config file
+NVCC = $(CUDA_ROOT_PATH)/bin/nvcc
+NVCC_CHECK_REGS = -Xptxas -v 
+NVCCFLAGS = -Wno-deprecated-gpu-targets -arch=$(CUDA_ARCH) -std=$(CPPSTD)
+NVCCDEB = -g -G
+NVCCREL = -O3
+OPENMP = -fopenmp -lpthread
+NVOPENMP = -Xcompiler $(OPENMP)
+
+G++ = $(GCC_ROOT_PATH)/g++
 LIBFLAGS = --compiler-options -fPIC
-GCCFLAGS = -g -std=c++11
-ICUDA = -I/usr/local/cuda
+G++FLAGS = -g -std=$(CPPSTD)
+ICUDA = -I$(CUDA_ROOT_PATH)/include
 IPROJECT = -I source/
-IBOOST = -I/usr/local/boost/include
+IBOOST = -I$(BOOST_ROOT_PATH)/include
 
-LCUDA = -L/usr/local/cuda/lib64
-LBOOST = -L/usr/local/boost/lib
+LCUDA = -L$(CUDA_ROOT_PATH)/lib64
+LBOOST = -L$(BOOST_ROOT_PATH)/lib
 LIBS1 = -lcublas -lcurand 
-LIBS2 = -lcufft -lcublas -lcurand 
+LIBS2 = -lcufft $(LIBS1)
+LIBS3 = -lcusolver $(LIBS1)
 LIBBOOST = -lboost_serialization
-LLAPACK = -L/opt/OpenBLAS/lib -lopenblas
+LLAPACK = -L$(OPENBLAS_ROOT_PATH)/lib -lopenblas
 
 #all targets
 lapack_test:
@@ -45,13 +54,16 @@ arnoldi_iters:
 
 
 cpu_1st_call_alloc_test: source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp
-	$(GCC) $(GCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp -o cpu_1st_call_alloc_test_float.bin
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp -o cpu_1st_call_alloc_test_float.bin
 
-SM_test: source/models/tests/SM_test.cpp
-	$(GCC) $(GCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/models/tests/SM_test.cpp -o SM_test.bin 2>results.make
+sm_test: source/numerical_algos/lin_solvers/tests/sm_test.cpp
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/numerical_algos/lin_solvers/tests/sm_test.cpp -o sm_test.bin 2>results.make $(OPENMP)
+
+exact_linsolver_test: source/numerical_algos/lin_solvers/tests/exact_solver_test.cpp
+	$(NVCC) $(NVCCDEB) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/numerical_algos/lin_solvers/tests/exact_solver_test.cpp O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o exact_solver_test.bin 2>results.make 
 
 lin_solvers_test: source/models/tests/linear_solvers_test.cpp
-	$(NVCC) $(GCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/models/tests/linear_solvers_test.cpp -o linear_solvers_test.bin 2>results.make
+	$(NVCC) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/models/tests/linear_solvers_test.cpp -o linear_solvers_test.bin 2>results.make
 
 cufft_test: source/models/tests/cufft_test.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)  source/models/tests/cufft_test_kernels.cu -c -o O/cufft_test_kernels.o 2>results.make
@@ -175,4 +187,38 @@ abc_flow_newton: source/models/abc_flow/test_abc_flow_newton.cpp
 
 abc_flow_deflation: source/models/abc_flow/test_deflation_abc_flow.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/test_deflation_abc_flow.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_deflation_abc_flow.bin 2>results.make
+
+abc_bd_deb: source/models/abc_flow/abc_bd_json.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IBOOST) $(IPROJECT) source/models/abc_flow/abc_bd_json.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBS2) $(LLAPACK) -o abc_bd_json.bin 2>results.make	
+
+abc_bd: source/models/abc_flow/abc_bd_json.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IBOOST) $(IPROJECT) source/models/abc_flow/abc_bd_json.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBS2) $(LLAPACK) -o abc_bd_json.bin 2>results.make	
+
+abc_view: source/models/abc_flow/view_solution.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/view_solution.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBS2) -o abc_view_solution.bin 2>results.make
+
+
+#overscreening breakdown
+ob_ker: source/nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.cu
+	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(ICUDA) $(IPROJECT) source/nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.cu -c -o O/overscreening_breakdown_ker.o 2>results.make
+
+test_ob_kernels:
+	$(NVCC) $(NVCCDEB) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/overscreening_breakdown/test_kernels.cpp O/overscreening_breakdown_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o test_ob_kernels.bin 2>results.make
+
+test_ob_problem:
+	$(NVCC) $(NVCCDEB) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/overscreening_breakdown/test_problem.cpp O/overscreening_breakdown_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o test_ob_problem.bin 2>results.make
+
+ob_view:
+	$(NVCC) $(NVCCDEB) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/overscreening_breakdown/view_solution.cpp O/overscreening_breakdown_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o ob_view_solution.bin 2>results.make
+
+
+test_ob_newton:
+	$(NVCC) $(NVCCDEB) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/overscreening_breakdown/test_newton.cpp O/overscreening_breakdown_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) $(LLAPACK) -o test_ob_newton.bin 2>results.make
+
+ob_json:
+	$(NVCC) $(NVCCDEB) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/overscreening_breakdown/ob_bd_json.cpp O/overscreening_breakdown_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) $(LLAPACK) $(LBOOST) $(LIBBOOST) -o ob_bd_json.bin 2>results.make
+
+# make all common kernels
+ker:
+	make gpu_matrix_vector_operations_ker gpu_vector_operations_ker gpu_reduction_ogita_ker abc_flow_ker
 

@@ -471,13 +471,13 @@ __global__ void set_value_at_point_kernel(size_t N, T val_x, size_t at, T* x)
 
 
 template <typename T, int BLOCK_SIZE>
-void gpu_vector_operations<T, BLOCK_SIZE>::set_value_at_point(scalar_type val_x, size_t at, vector_type& x)
+void gpu_vector_operations<T, BLOCK_SIZE>::set_value_at_point(scalar_type val_x, size_t at, vector_type& x) const
 {
     set_value_at_point_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, val_x, at, x);
 }
 
 template <typename T, int BLOCK_SIZE>
-void gpu_vector_operations<T, BLOCK_SIZE>::set_value_at_point(scalar_type val_x, size_t at, vector_type& x, size_t sz_l)
+void gpu_vector_operations<T, BLOCK_SIZE>::set_value_at_point(scalar_type val_x, size_t at, vector_type& x, size_t sz_l) const
 {
     set_value_at_point_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz_l, val_x, at, x);
 }
@@ -493,7 +493,7 @@ __global__ void get_value_at_point_kernel(size_t N, size_t at, T* x, T* val_x)
 
 
 template <typename T, int BLOCK_SIZE>
-T gpu_vector_operations<T, BLOCK_SIZE>::get_value_at_point(size_t at, vector_type& x)
+T gpu_vector_operations<T, BLOCK_SIZE>::get_value_at_point(size_t at, vector_type& x) const
 {
     
     T* val_x_d;

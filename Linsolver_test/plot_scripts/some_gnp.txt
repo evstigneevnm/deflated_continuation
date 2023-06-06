@@ -1,1 +1,55 @@
 splot "./0/debug_curve_all.dat" u 1:2:6 w l, "./1/debug_curve_all.dat" u 1:2:6 w p pt 7, "./2/debug_curve_all.dat" u 1:2:6 w p pt 7, "./3/debug_curve_all.dat" u 1:2:6 w p pt 7, "./4/debug_curve_all.dat" u 1:2:6 w p pt 7, "./5/debug_curve_all.dat" u 1:2:6 w p pt 7, "./6/debug_curve_all.dat" u 1:2:6 w p pt 7, "./7/debug_curve.dat" u 1:2:6 w p pt 7
+
+
+
+set term postscript eps color blacktext "Helvetica" 18
+set key default
+set key left
+set grid
+set xlabel "R"
+set ylabel "g_1"
+set output "BD_g1.eps"
+plot "./regular_curve_0.dat" u 1:2 w p pt 7 title "0: u0", "./regular_curve_1.dat" u 1:2 w p pt 7 title "1: connected1", "./regular_curve_2.dat" u 1:2 w p pt 7 title "2: connected2", "./regular_curve_3.dat" u 1:2 w p pt 7 title "3: disconneted1", "./regular_curve_4.dat" u 1:2 w p pt 7 title "4: disconnected2", "./regular_curve_5.dat" u 1:2 w p pt 7 title "5: disconnected3", "./regular_curve_6.dat" u 1:2 w p pt 7 title "6: disconnected4"
+set term qt
+
+
+set term postscript eps color blacktext "Helvetica" 18
+set key default
+set key left
+set grid
+set xlabel "R"
+set ylabel "||U||_{L_2}
+set output "BD_L2.eps"
+plot "./regular_curve_0.dat" u 1:6 w p pt 7 title "0: u0", "./regular_curve_1.dat" u 1:6 w p pt 7 title "1: connected1", "./regular_curve_2.dat" u 1:6 w p pt 7 title "2: connected2", "./regular_curve_3.dat" u 1:6 w p pt 7 title "3: disconneted1", "./regular_curve_4.dat" u 1:6 w p pt 7 title "4: disconnected2", "./regular_curve_5.dat" u 1:6 w p pt 7 title "5: disconnected3", "./regular_curve_6.dat" u 1:6 w p pt 7 title "6: disconnected4"
+set term qt
+
+
+
+plot "./regular_curve_0.dat" u 3:5 w p pt 7 title "0: u0", "./regular_curve_1.dat" u 3:5 w p pt 7 title "1: connected1", "./regular_curve_2.dat" u 3:5 w p pt 7 title "2: connected2", "./regular_curve_3.dat" u 3:5 w p pt 7 title "3: disconneted1", "./regular_curve_4.dat" u 3:5 w p pt 7 title "4: disconnected2", "./regular_curve_5.dat" u 3:5 w p pt 7 title "5: disconnected3", "./regular_curve_6.dat" u 3:5 w p pt 7 title "6: disconnected4"
+
+
+plot "./regular_curve_0.dat" u 1:6 w p pt 7 title "0: u0", "./regular_curve_1.dat" u 1:6 w p pt 7 title "1: connected1", "./regular_curve_2.dat" u 1:6 w p pt 7 title "2: connected2", "./regular_curve_3.dat" u 1:6 w p pt 7 ps 0.1 title "3: disconneted1", "./regular_curve_4.dat" u 1:6 w p pt 7 ps 0.1 title "4: disconnected2", "./regular_curve_5.dat" u 1:6 w p pt 7 ps 0.1 title "5: disconnected3", "./regular_curve_6.dat" u 1:6 w p pt 7 ps 0.1 title "6: disconnected4", "./singular_curve_0.dat" u 1:6 w p pt 7 ps 2 lc 7 title "", "./singular_curve_1.dat" u 1:6 w p pt 7 ps 2 lc 1 title "", "./singular_curve_2.dat" u 1:6 w p pt 7 ps 2 lc 1 title ""
+
+
+set term postscript eps color blacktext "Helvetica" 18
+set key default
+unset key
+set size ratio 0.4
+set grid
+set xlabel "R"
+set ylabel "||U||_{L_2}
+set output "dim_BD_connected_L2.eps"
+plot "./regular_curve_0.dat" u 1:6:7 w p pt 7 palette title "0: u0", "./regular_curve_1.dat" u 1:6:7 w p pt 7 palette title "1: connected1", "./regular_curve_2.dat" u 1:6:7 w p pt 7 palette title "2: connected2", "./singular_curve_0.dat" u 1:6 w p pt 7 ps 2 lc 7 title "", "./singular_curve_1.dat" u 1:6 w p pt 7 ps 2 lc 1 title "", "./singular_curve_2.dat" u 1:6 w p pt 7 ps 2 lc 1 title ""
+set term qt
+
+set term postscript eps color blacktext "Helvetica" 18
+set key default
+unset key
+set size ratio 0.4
+set grid
+set xlabel "R"
+set ylabel "g_4"
+set output "dim_BD_disconnected_L2.eps"
+set xrange [4:5]
+plot "./regular_curve_0.dat" u 1:5:7 w p pt 7 ps 0.1 palette title "0: u0", "./regular_curve_1.dat" u 1:5:7 w p pt 7 ps 0.1 palette title "1: connected1", "./regular_curve_2.dat" u 1:5:7 w p pt 7 ps 0.1 palette title "2: connected2", "./regular_curve_4.dat" u 1:5:7 w p pt 7 ps 0.5 palette title "1: connected1", "./regular_curve_5.dat" u 1:5:7 w p pt 7 ps 0.5 palette title "2: connected2", "./regular_curve_6.dat" u 1:5:7 w p pt 7 ps 0.5 palette title "2: connected2",  "./singular_curve_4.dat" u 1:5 w p pt 7 ps 1 lc 7 title "", "./singular_curve_5.dat" u 1:5 w p pt 7 ps 1 lc 7 title "", "./singular_curve_6.dat" u 1:5 w p pt 7 ps 1 lc 7 title "", "./regular_curve_3.dat" u 1:5:7 w p pt 7 ps 0.5 palette title "0: u0", "./singular_curve_3.dat" u 1:5 w p pt 7 ps 1 lc 7 title ""
+set term qt

@@ -9,6 +9,7 @@
 #include <thrust/sort.h>
 #include <thrust/execution_policy.h>
 
+#include <fstream>
 
 template<typename TC, typename TC_vec>
 __global__ void Laplace_Fourier_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace)
@@ -160,10 +161,12 @@ if ( index_in < sizeOfData )
     T x = T(j)*T(2.0*M_PI)/T(Nx);
     T y = T(k)*T(2.0*M_PI)/T(Ny);
     T z = T(l)*T(2.0*M_PI)/T(Nz);
-
-    force_x[I3(j,k,l)] = sin(z)+cos(y);
-    force_y[I3(j,k,l)] = sin(x)+cos(z);
-    force_z[I3(j,k,l)] = sin(y)+cos(x);
+    const T A = static_cast<T>(1.0);
+    const T B = static_cast<T>(1.0);
+    const T C = static_cast<T>(2.0);
+    force_x[I3(j,k,l)] = A*sin(z)+C*cos(y);
+    force_y[I3(j,k,l)] = B*sin(x)+A*cos(z);
+    force_z[I3(j,k,l)] = C*sin(y)+B*cos(x);
 
 }
 }
@@ -946,7 +949,7 @@ if ( index_in < sizeOfData )
     index_keys_d[index_in] = abs(q)+abs(m)+abs(n); //L1 norm
     if( abs(u_src[I3(j,k,l)])<1.0e-7 )
     {
-        index_keys_d[index_in] = Nx*Ny*Nz;
+        index_keys_d[index_in] = Nx*Ny*Nz+1;
     } 
     index_vals_d[index_in] = I3(j,k,l);
 
@@ -955,7 +958,7 @@ if ( index_in < sizeOfData )
 
 
 template<typename TR, typename TC_vec>
-__global__ void init_values_by_indexes_kernel(const size_t save_ammount, TC_vec u_src, int* index_vals_d, TR* values_vals_part_d)
+__global__ void init_values_by_indexes_kernel(size_t save_ammount, TC_vec u_src, int* index_vals_d, TR* values_vals_part_d)
 {
     unsigned int idx = blockIdx.x * gridDim.x + threadIdx.x;
     if(idx >= save_ammount) return;
@@ -963,50 +966,102 @@ __global__ void init_values_by_indexes_kernel(const size_t save_ammount, TC_vec 
 
 }
 
+template<class T>
+void write_file_debug(const std::string& f_name, size_t N, T* data_d)
+{
+    T* data = (T*) malloc( N*sizeof(T) );
+
+    device_2_host_cpy(data, data_d, N);
+
+    std::fstream s(f_name.c_str(), std::ios_base::out);
+    for(int j = 0; j<N;j++)
+    {
+        s << data[j] << std::endl;
+    }
+    s.close();
+
+    free(data);
+}
 
 template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-std::tuple<TR,TR,TR> nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::get_minimum_nonzero_indices(TC_vec u_src)
+std::tuple<TR,TR,TR> nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::get_shift_phases(TC_vec u_src)
 {
     
 
 
     init_ind_keys_vals_kernel<TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, u_src, index_keys_d, index_vals_d);
 
+
+    // write_file_debug("debug_index_keys_d.dat", NC, index_keys_d);
+    // write_file_debug("debug_index_vals_d.dat", NC, index_vals_d);
+
+
     //if it fails, have to use thrust::stable_sort_by_key
     thrust::sort_by_key(thrust::device, index_keys_d, index_keys_d + NC, index_vals_d); 
 
-    device_2_host_cpy(index_vals_part, index_vals_d, save_ammount);
+    // write_file_debug("debug_index_keys_d_sort.dat", NC, index_keys_d);
+    // write_file_debug("debug_index_vals_d_sort.dat", NC, index_vals_d);
 
+
+    device_2_host_cpy(index_keys_part, index_keys_d, save_ammount);
+    device_2_host_cpy(index_vals_part, index_vals_d, save_ammount);
 
     int blocks_=(save_ammount+BLOCKSIZE)/BLOCKSIZE;
     dim3 dimGrid1_(blocks_);
     init_values_by_indexes_kernel<TR, TC_vec><<<dimGrid1_, dimBlock1>>>(save_ammount, u_src, index_vals_d, values_vals_part_d);
 
     device_2_host_cpy(values_vals_part, values_vals_part_d, save_ammount);
+    
 
-    auto get_index = [Nx, Ny, Nz](int lexico_index) -> std::tuple<int, int, int>
+    auto get_index = [&](int lexico_index) -> std::tuple<int, int, int>
     {
-        Ord l = (lexico_index)/(Nx*Ny);
-        Ord jk = lexico_index-l*(Nx*Ny);
-        Ord k = (jk)/(Nx);
-        Ord j = jk - k*(Nx);
+        int t1 =  lexico_index/Mz; 
+        int l = lexico_index - Mz*t1 ;
+        int j =  t1/Ny; 
+        int k = t1 - Ny * j ;
+
         return {j,k,l};
     };
 
-
-    auto index0 = get_index( index_vals_part[0] );
-    for(int j = 1; j<save_ammount; j+=2)
+    auto get_fourier_index = [&](int lexico_index) -> std::tuple<int, int, int>
     {
-        auto index1 = get_index( index_vals_part[j] );
-        auto index2 = get_index( index_vals_part[j+1] );
+        auto res = get_index(lexico_index);
+        auto j = std::get<0>(res);
+        auto k = std::get<1>(res);
+        auto l = std::get<2>(res);
+        auto q=l; //Z-coord
+        auto m=j; //Y-coord
+        if(j>=Nx/2)
+            m=j-Nx;    
+        auto n=k; //X-coord
+        if(k>=Ny/2)
+            n=k-Ny; 
 
-        TR A[3][] = {{std::get<0>(index0), std::get<1>(index0), std::get<2>(index0), index_vals_part[0]},
-                     {std::get<0>(index1), std::get<1>(index1), std::get<2>(index1), index_vals_part[j]},
-                     {std::get<0>(index2), std::get<1>(index2), std::get<2>(index2), index_vals_part[j+1]}};
-        TR solution[3] = {0,0,0};
-        bool failed = true;
+        return {m,n,q};
+    };
+
+    bool failed = true;
+    auto index0 = get_fourier_index( index_vals_part[0] );
+    TR solution[3] = {0,0,0};
+    for(int j = 1; j<save_ammount-1; j++)
+    {
+        if(index_keys_part[j+1] > Nx*Ny*Mz ) break;
+
+        auto index1 = get_fourier_index( index_vals_part[j] );
+        auto index2 = get_fourier_index( index_vals_part[j+1] );
+
+        TR A[][4] = {{TR(std::get<0>(index0)),TR(std::get<1>(index0)), TR(std::get<2>(index0)), values_vals_part[0]},
+                     {TR(std::get<0>(index1)), TR(std::get<1>(index1)), TR(std::get<2>(index1)), values_vals_part[j]},
+                     {TR(std::get<0>(index2)), TR(std::get<1>(index2)), TR(std::get<2>(index2)), values_vals_part[j+1]}};
+        
+        
         try
         {
+            // std::cout << "varphi_x = " << solution[0] << " varphi_y = " << solution[1] << " varphi_z = " << solution[2] << std::endl;
+            std::cout  << "index[0] = " << index_vals_part[0] << " index[j] = " << index_vals_part[j] << " index[j+1] = " << index_vals_part[j+1] << std::endl;
+            std::cout << TR(std::get<0>(index0)) << " " << TR(std::get<1>(index0)) << " " << TR(std::get<2>(index0)) << " "  << values_vals_part[0] << std::endl;
+            std::cout << TR(std::get<0>(index1)) << " " << TR(std::get<1>(index1)) << " " << TR(std::get<2>(index1)) << " "  << values_vals_part[1] << std::endl;
+            std::cout << TR(std::get<0>(index2)) << " " << TR(std::get<1>(index2)) << " " << TR(std::get<2>(index2)) << " "  << values_vals_part[2] << std::endl;                        
             solve_system(A, solution);
             failed = false;
         }
@@ -1021,11 +1076,12 @@ std::tuple<TR,TR,TR> nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::
     }
     if(failed)
     {
+        // use manual selection of frequencies.
 
     }
 
 
-
+    return {solution[0], solution[1], solution[2]};
 }
 
 

@@ -3,7 +3,6 @@
 
 #include <common/gpu_file_operations_functions.h>
 
-
 template<class MatrixOperations>
 class gpu_matrix_file_operations
 {

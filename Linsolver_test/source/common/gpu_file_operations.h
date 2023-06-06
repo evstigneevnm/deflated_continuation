@@ -2,7 +2,7 @@
 #define __GPU_FILE_OPERATIONS_H__
 
 #include <common/file_operations.h>
-
+#include <vector>
 
 template<class VectorOperations>
 class gpu_file_operations
@@ -34,10 +34,19 @@ public:
         vec_op->set(vec_gpu);
     }
 
-    size_t read_matrix_size(const std::string &f_name)
+    void write_2_vectors_by_side(const std::string &f_name, const T_vec& vec1_gpu,  const T_vec& vec2_gpu, unsigned int prec=16, char sep = ' ') const
     {
-        return file_operations::read_matrix_size(f_name);
+        std::vector<T> vec1(sz);
+        std::vector<T> vec2(sz);
+        vec_op->get(vec1_gpu, vec1.data() );
+        vec_op->get(vec2_gpu, vec2.data() );
+        file_operations::write_2_vectors_by_side< T, std::vector<T> >(f_name, sz, vec1, vec2, prec, sep);
     }
+
+    // size_t read_matrix_size(const std::string &f_name)
+    // {
+    //     return file_operations::read_matrix_size(f_name);
+    // }
 
 private:
     VectorOperations* vec_op;
