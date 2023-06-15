@@ -17,6 +17,7 @@
 #include <common/gpu_file_operations.h>
 //vector dependant ends
 //problem dependant
+#include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_params.h>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown.h>
 #include <nonlinear_operators/overscreening_breakdown/linear_operator_overscreening_breakdown.h>
 #include <nonlinear_operators/overscreening_breakdown/preconditioner_overscreening_breakdown.h>
@@ -33,42 +34,6 @@
 #include <main/plot_diagram_to_pos.hpp>
 #include <main/parameters.hpp>
 
-template<class T>
-struct params_s
-{
-    size_t N = 10;
-    T sigma = 1.0;
-    T L = 1.0;
-    T gamma = 1.0;
-    T delta = 1.0;    
-    T mu = 1.0;
-    T u0 = 1.0;
-
-    void print_data() const
-    {
-        std::cout << "=== params_s: " << std::endl;
-        std::cout << "=   N = " << N << std::endl;
-        std::cout << "=   sigma = " << sigma << std::endl;
-        std::cout << "=   L = " << L << std::endl;
-        std::cout << "=   gamma = " << gamma << std::endl;
-        std::cout << "=   delta = " << delta << std::endl;
-        std::cout << "=   mu = " << mu << std::endl;
-        std::cout << "=   u0 = " << u0 << std::endl;
-        std::cout << "=   .........." << std::endl;
-    }
-    params_s(size_t N_p, T sigma_p, const std::vector<T>& other_params_p):
-    N(N_p),
-    sigma(sigma_p)
-    {
-        L = other_params_p.at(0);
-        gamma = other_params_p.at(1);
-        delta = other_params_p.at(2);
-        mu = other_params_p.at(3);
-        u0 = other_params_p.at(4);
-
-        print_data();
-    }
-};
 
 int main(int argc, char const *argv[])
 {
@@ -102,7 +67,8 @@ int main(int argc, char const *argv[])
     bool use_high_precision_reduction = parameters.use_high_precision_reduction;
 
     size_t N = parameters.nonlinear_operator.N_size.at(0);
-    params_st problem_params(N, 0.05, parameters.nonlinear_operator.problem_real_parameters_vector);
+    int bifurcation_parameter_number_in_vector = parameters.nonlinear_operator.problem_int_parameters_vector.at(0);
+    params_st problem_params(N, bifurcation_parameter_number_in_vector, parameters.nonlinear_operator.problem_real_parameters_vector);
     
     using log_t = utils::log_std ;
 
@@ -143,7 +109,7 @@ int main(int argc, char const *argv[])
 
     log_t log;
     log_t log_linsolver;
-    log_linsolver.set_verbosity(1);
+    log_linsolver.set_verbosity(0);
        
 
     if( (what_to_execute=='D')||(what_to_execute == 'E') )
@@ -173,12 +139,12 @@ int main(int argc, char const *argv[])
     }
     else if(what_to_execute == 'P')
     {
-        // typedef main_classes::plot_diagram_to_pos<vec_ops_t, mat_vec_ops_t, files_t, log_t, monitor_t, KF_3D_t, lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator, parameters_t> plot_diagram_t;       
+        using plot_diagram_t = main_classes::plot_diagram_to_pos<vec_ops_t, mat_ops_t, files_t, log_t, monitor_t, ob_prob_t, lin_op_t, prec_t, numerical_algos::lin_solvers::exact_wrapper, nonlinear_operators::system_operator, parameters_t>;       
         
-        // plot_diagram_t PD( (vec_ops_t*) &vec_ops, (files_t*) &file_ops_im, (log_t*) &log, (log_t*) &log_linsolver, (KF_3D_t*) &KF3D, (parameters_t*) &parameters);
+        plot_diagram_t PD( (vec_ops_t*) &vec_ops, (files_t*) &vec_file_ops, (log_t*) &log, (log_t*) &log_linsolver, (ob_prob_t*) &ob_prob, (parameters_t*) &parameters);
         
-        // PD.set_parameters();
-        // PD.execute();
+        PD.set_parameters();
+        PD.execute();
     }
     else
     {

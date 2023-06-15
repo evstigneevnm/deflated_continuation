@@ -5,16 +5,16 @@
     "bifurcaiton_diagram_file_name": "bifurcation_diagram.dat",
     "stability_diagram_file_name": "stability_diagram.dat",
     "deflation_continuation":{
-        "maximum_continuation_steps": 1000,
-        "step_size": 0.05,
-        "max_step_size": 0.05,
+        "maximum_continuation_steps": 10000,
+        "step_size": 0.005,
+        "max_step_size": 0.005,
         "deflation_attempts": 10,
         "continuation_fail_attempts": 35,
         "initial_direciton": -1,
         "minimum_step_multiplier": 0.8,
         "maximum_step_multiplier": 0.0777,
         "skip_file_output": 40,
-        "deflation_knots": [0.05, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 15.0, 17.0, 20.0, 30.0],
+        "deflation_knots": [0.001, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
         "linear_solver_extended":{
             "maximum_iterations": 2000,
             "use_preconditioned_residual": 1,
@@ -29,14 +29,14 @@
             "maximum_iterations": 30,
             "update_wight_maximum": 1.0,
             "save_norms_history": true,
-            "verbose": true,
+            "verbose": false,
             "tolerance": 5.0e-8,
-            "relax_tolerance_factor": 500.0,
+            "relax_tolerance_factor": 10.0,
             "relax_tolerance_steps": 2
         },
         "newton_deflation":{
-            "maximum_iterations": 500,
-            "update_wight_maximum": 0.8,
+            "maximum_iterations": 1000,
+            "update_wight_maximum": 1.0,
             "save_norms_history": true,
             "verbose": true,
             "tolerance": 5.0e-8
@@ -65,9 +65,9 @@
         }
     },
     "nonlinear_operator":{
-        "discrete_problem_dimensions": [75],
-        "problem_real_parameters_vector": [5.0, 0.5, 1.0, 1.0, 0.1],
-        "problem_int_parameters_vector": [0],
+        "discrete_problem_dimensions": [60],
+        "problem_real_parameters_vector": [10.0, 6.0, 0.5, 10.0, 1.0, 0.001],
+        "problem_int_parameters_vector": [4],
         "linear_solver":{
             "maximum_iterations": 3000,
             "use_preconditioned_residual": 1,
@@ -82,7 +82,7 @@
             "update_wight_maximum": 1.0,
             "save_norms_history": true,
             "verbose": true,
-            "tolerance": 5.0e-6
+            "tolerance": 5.0e-8
         }
     },
     "plot_solutions":

@@ -128,7 +128,7 @@ public:
     void set_newton(T tolerance_, unsigned int maximum_iterations_, T relax_tolerance_factor_, int relax_tolerance_steps_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true)
     {
         conv_newton_cont->set_convergence_constants(tolerance_, maximum_iterations_, relax_tolerance_factor_, relax_tolerance_steps_, newton_wight_, store_norms_history_,  verbose_);
-        epsilon = T(5.0)*tolerance_; //tolerance to check distance between vectors in curves.
+        epsilon = T(1000.0)*tolerance_; //tolerance to check distance between vectors in curves.
     }
 
 
@@ -196,7 +196,7 @@ protected: //changed to protected for inheritance
     int direction = -1;
     int initial_direciton = 1;
     unsigned int max_S;
-    T epsilon = T(1.0e-6);
+    T epsilon = T(1.0e-5);
 
 
     void change_direction()
@@ -264,11 +264,19 @@ private:
     {
 
         vec_ops->assign_mul(T(1), x_start, T(-1), x1, x_check);
+        T norm_distance_ref = vec_ops->norm_l2(x_start);
         T norm_distance = vec_ops->norm_l2(x_check);
-        if(norm_distance < epsilon)
+        T epsilon_l = epsilon*((norm_distance_ref>1.0)?norm_distance_ref:1.0);
+        if(norm_distance < epsilon_l)
+        {
+            log->info_f("continuation::check_intersection::check_vector_distances: vectors coincide with distance = %le, distance reference norm = %le and epsilon = %le", norm_distance, norm_distance_ref, epsilon_l);
             return(true);
+        }
         else
+        {
+            log->warning_f("continuation::check_intersection::check_vector_distances: failed with distance = %le, distance reference norm = %le and epsilon = %le", norm_distance, norm_distance_ref, epsilon_l);
             return(false);
+        }
     }
 
     bools2 check_intersection(T lambda_star) //check current interseciton with the parameter value lambda_star
@@ -280,6 +288,7 @@ private:
             bool ret = interpolate_solutions(lambda_star, lambda0, x0, lambda1, x1);
             if(!ret)
             {
+                log->warning_f("continuation::check_intersection::interpolate_solutions: returned failed for lambda_star = %le, lambda_0 = %le, lambda_1 = %le", lambda_star, lambda0, lambda1);
                 fail_flag = true;
                 return(bools2(true, true));
             }
@@ -311,7 +320,11 @@ private:
     void check_returning()
     {
         bools2 returned = check_intersection(lambda_start);
+        std::string bool1_l = (returned.first?"true":"false");
+        std::string bool2_l = (returned.second?"true":"false");
 
+        log->info_f("continuation::check_returning: returned (%s,%s)", bool1_l.c_str(), bool2_l.c_str() );
+        
         if(returned.second) //intersecting a starting point
         {
             if(fail_flag)

@@ -70,13 +70,38 @@ public:
 
     struct problem_s
     {
-        problem_s(size_t N_p, T L_p, T gamma_p, T mu_p, T u0_p ):
-        N(N_p), L(L_p), gamma(gamma_p), mu(mu_p), u0(u0_p), sigma(0.0), which(0)
+        problem_s(size_t N_p, int parameter_number_p, T sigma_p, T L_p, T delta_p, T gamma_p, T mu_p, T u0_p ):
+        N(N_p), parameter_number_(parameter_number_p), L(L_p), delta(delta_p), gamma(gamma_p), mu(mu_p), u0(u0_p), sigma(sigma_p), which(0)
         {}
 
-        void set_state(T sigma_p)
+    // T sigma = 1.0; //0
+    // T L = 1.0;
+    // T gamma = 1.0; //1
+    // T delta = 1.0; //2  
+    // T mu = 1.0;    //3
+    // T u0 = 1.0;    //4 
+
+        void set_state(T parameter_p)
         {
-            sigma = sigma_p;
+            switch(parameter_number_)
+            {
+                case 0:
+                    sigma = parameter_p;
+                    break;
+                case 1:
+                    gamma = parameter_p;
+                    break;
+                case 2:
+                    delta = parameter_p;
+                    break;
+                case 3:
+                    mu = parameter_p;
+                    break;
+                case 4:
+                    u0 = parameter_p;
+                    break;
+            }
+
         }
 
         __DEVICE_TAG__ inline T g_func(T x)
@@ -91,13 +116,6 @@ public:
             }
         }
 
-        __DEVICE_TAG__ inline T right_hand_side_linearization(T x, T u)
-        {
-            T num = (2.0*(gamma + cosh(u) - gamma*cosh(u)) + (exp(u)*(-1.0 + gamma) - gamma)*mu*g_func(x));
-            T din = 2.0*(1.0 - gamma + gamma*cosh(u))*(1.0 - gamma + gamma*cosh(u));
-            return num/din;
-        }
-
         __DEVICE_TAG__ inline T right_hand_side(T x, T u)
         {
             T num = sinh(u) - g_func(x)*0.5*mu*exp(u);
@@ -105,8 +123,18 @@ public:
             return num/din;
 
         }
-        __DEVICE_TAG__ inline T right_hand_side_parameter_derivative(T x, T u)
+
+        __DEVICE_TAG__ inline T right_hand_side_linearization(T x, T u)
         {
+            T num = (2.0*(gamma + cosh(u) - gamma*cosh(u)) + (exp(u)*(-1.0 + gamma) - gamma)*mu*g_func(x));
+            T din = 2.0*(1.0 - gamma + gamma*cosh(u))*(1.0 - gamma + gamma*cosh(u));
+            return num/din;
+        }
+
+
+        __DEVICE_TAG__ inline T right_hand_side_parameter_derivative_sigma(T x, T u)
+        {
+            // printf("sigma = %e\n", sigma);
             if(sigma > 0)
             {
                 return -((exp(u-x*x/(2.0*sigma*sigma))*x*x*mu)/(2.0*sqrt(2.0*M_PI)*sigma*sigma*sigma*(1.0+2.0*gamma*sinh(0.5*u)*sinh(0.5*u))));
@@ -116,6 +144,57 @@ public:
                 return -0.0;
             }
         }
+        __DEVICE_TAG__ inline T right_hand_side_parameter_derivative_gamma(T x, T u)
+        {
+            return -((2*sinh(u/2)*sinh(u/2)*(-((exp(u-x*x/(2*sigma*sigma))*mu)/(2*sqrt(2*M_PI)))+sinh(u)))/((1+2*gamma*sinh(u/2)*sinh(u/2))*(1+2*gamma*sinh(u/2)*sinh(u/2))));
+        } 
+        
+        __DEVICE_TAG__ inline T right_hand_side_parameter_derivative_delta(T x, T u)
+        {
+            return 1;
+        } 
+        __DEVICE_TAG__ inline T right_hand_side_parameter_derivative_mu(T x, T u)
+        {
+            return -(exp(u-x*x/(2*sigma*sigma))/(2*sqrt(2*M_PI)*(1+2*gamma*sinh(u/2)*sinh(u/2))));
+        }  
+        __DEVICE_TAG__ inline T right_hand_side_parameter_derivative_u0(T x, T u)
+        {
+            if(parameter_number_ == 4)
+                return 1;
+            else
+                return 0;
+        }               
+    // T sigma = 1.0; //0
+    // T L = 1.0;
+    // T gamma = 1.0; //1
+    // T delta = 1.0; //2  
+    // T mu = 1.0;    //3
+    // T u0 = 1.0;    //4 
+
+        __DEVICE_TAG__ inline T right_hand_side_parameter_derivative(T x, T u)
+        {
+            switch(parameter_number_)
+            {
+                case 0:
+                    return right_hand_side_parameter_derivative_sigma(x, u);
+                    break;
+                case 1:
+                    return right_hand_side_parameter_derivative_gamma(x, u);
+                    break;
+                case 2:
+                    return right_hand_side_parameter_derivative_delta(x, u);
+                    break;      
+                case 3:
+                    return right_hand_side_parameter_derivative_mu(x, u);
+                    break;                                    
+                case 4: // u0
+                    return 0;
+                    break;              
+            }
+
+
+        }
+
         void rotate_initial_function()
         {
             which++;
@@ -213,10 +292,11 @@ public:
             return -(4.0/(15.0*L*L*L))*m1degk*(1.0*k*1.0*k)*(23.0 + 20.0*k*k + 2*k*k*k*k);
         }
 
-        T L, gamma, mu, u0, sigma;
+        T L, gamma, mu, u0, sigma, delta;
         size_t N;
         char which;
-        const T delta_threshold = 1.0;
+        const T delta_threshold = 0.001;
+        int parameter_number_;
     };
 
 
@@ -229,7 +309,6 @@ public:
     {
         cusolver_->set_cublas(vec_ops_->get_cublas_ref() );
         N = vec_ops_->get_vector_size();
-        delta = params.delta;
         mat_file_ops_ = new mat_file_ops_t(mat_ops_);
         vec_file_ops_ = new vec_file_ops_t(vec_ops_);
 
@@ -241,7 +320,7 @@ public:
         iD = new matrix_device_s(N, N);
         iDA = new matrix_device_s(N, N);
 
-        problem = new problem_s(N, params.L, params.gamma, params.mu, params.u0);
+        problem = new problem_s(N, params.param_number, params.sigma, params.L, params.delta, params.gamma, params.mu, params.u0);
         
         mat_ops_->init_matrices(linear_operator->data, mass_matrix->data, stiffness_matrix->data, shifted_linear_operator->data, eye->data, iD->data, iDA->data);
         mat_ops_->start_use_matrices(linear_operator->data, mass_matrix->data, stiffness_matrix->data, shifted_linear_operator->data, eye->data, iD->data, iDA->data);
@@ -258,8 +337,8 @@ public:
         dim_grid_1d = dim3(kx);
 
         form_mass_matrix(N, *problem, *mass_matrix);
-        form_stiffness_matrix(N, delta, *problem, *stiffness_matrix, *iD);
-        form_rhs_linearization_matrix(N, *problem, delta, u_solution, *linear_operator);
+        form_stiffness_matrix(N, *problem, *stiffness_matrix, *iD);
+        form_rhs_linearization_matrix(N, *problem, u_solution, *linear_operator);
         set_identity_matrix(N, *eye);
         
 
@@ -300,7 +379,7 @@ public:
         mat_ops_->gemv('N', mass_matrix->data, 1.0, u, 0.0, u_solution);
         reformulate_bcs(N, *problem, u_solution);
         problem->set_state(sigma);
-        form_rhs_linearization_matrix(N, *problem, sigma, u_solution, *linear_operator);
+        form_rhs_linearization_matrix(N, *problem, u_solution, *linear_operator);
         // mat_file_ops_->write_matrix("N.dat", linear_operator->data); 
         mat_ops_->geam('N', N, N, 1.0, stiffness_matrix->data, -1.0, linear_operator->data, linear_operator->data);
         // mat_file_ops_->write_matrix("J.dat", linear_operator->data);
@@ -322,7 +401,7 @@ public:
         mat_ops_->gemv('N', mass_matrix->data, 1.0, u, 0.0, u_solution);
         reformulate_bcs(N, *problem, u_solution);
         problem->set_state(sigma_p);  
-        form_right_hand_side(N, *problem, sigma_p, u_solution, res);
+        form_right_hand_side(N, *problem, u_solution, res);
         mat_ops_->gemv('N', stiffness_matrix->data, 1.0, u, 1.0, res);
         // vec_file_ops_->write_vector("Fu.dat", res);
 
@@ -334,11 +413,10 @@ public:
 //  -((exp(u-x*x/(2.0*sigma*sigma))*x*x*mu)/(2.0*sqrt(2.0*M_PI)*sigma*sigma*sigma*(1.0+2.0*gamma*sinh(0.5*u)*sinh(0.5*u))))
     void form_operator_parameter_derivative(const T_vec u, const T sigma_p, T_vec res)
     {
-        
         mat_ops_->gemv('N', mass_matrix->data, 1.0, u, 0.0, u_solution);
         reformulate_bcs(N, *problem, u_solution);
         problem->set_state(sigma_p);
-        form_right_hand_parameter_derivative(N, *problem, sigma_p, u_solution, res);
+        form_right_hand_parameter_derivative(N, *problem, u_solution, res);
         // vec_file_ops_->write_vector("Fu_sigma.dat", res);
     }
 
@@ -409,7 +487,8 @@ public:
 
     void set_random_smoothed_data(T_vec coeffs, int steps)
     {
-        vec_ops_->assign_random(coeffs, 0.5, 1.5);
+        vec_ops_->assign_random(coeffs, 0.1, 2.0);
+        // vec_ops_->assign_scalar(1.0, coeffs);
         smooth_random_data(N, coeffs, steps);
         calucalte_function_at_basis(coeffs, true);
         expend_function(coeffs);
@@ -448,17 +527,16 @@ private:
     mat_file_ops_t* mat_file_ops_;
     dim3 dim_grid, dim_block;
     dim3 dim_grid_1d, dim_block_1d;
-    T delta;
     size_t N;
 
-    void form_stiffness_matrix(size_t N, T delta, problem_s problem, matrix_device_s A, matrix_device_s iD);
-    void form_rhs_linearization_matrix(size_t N, problem_s problem, T delta, T_vec u_solution, matrix_device_s B);
+    void form_stiffness_matrix(size_t N, problem_s problem, matrix_device_s A, matrix_device_s iD);
+    void form_rhs_linearization_matrix(size_t N, problem_s problem, T_vec u_solution, matrix_device_s B);
     void form_mass_matrix(size_t N, problem_s problem, matrix_device_s mass_matrix);
-    void form_jacobian_matrix(size_t N, T delta, problem_s problem, matrix_device_s A);
+    void form_jacobian_matrix(size_t N, problem_s problem, matrix_device_s A);
     void calucalte_function_at_basis(size_t N, problem_s problem, bool mult, T_vec res);
     void reformulate_bcs(size_t N, problem_s problem, T_vec res);
-    void form_right_hand_parameter_derivative(size_t N, problem_s problem, T delta, T_vec u, T_vec res);
-    void form_right_hand_side(size_t N, problem_s problem, T delta, T_vec u, T_vec res);
+    void form_right_hand_parameter_derivative(size_t N, problem_s problem, T_vec u, T_vec res);
+    void form_right_hand_side(size_t N, problem_s problem, T_vec u, T_vec res);
     void smooth_random_data(size_t N, T_vec res, int smooth_steps);
     void fill_points_at_basis(size_t N,  problem_s problem, T_vec res);
     void fill_points_at_domain(size_t N,  problem_s problem, T_vec res);

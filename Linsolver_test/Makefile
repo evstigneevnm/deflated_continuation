@@ -197,6 +197,11 @@ abc_bd: source/models/abc_flow/abc_bd_json.cpp
 abc_view: source/models/abc_flow/view_solution.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/view_solution.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBS2) -o abc_view_solution.bin 2>results.make
 
+abc_flow_time_stepping: source/models/abc_flow/abc_flow_time_stepping.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_time_stepping.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o abc_flow_time_stepping.bin 2>results.make
+
+test_butcher_tables: source/time_stepper/tests/butcher_tables.cpp
+	$(G++) $(G++FLAGS) $(IPROJECT) source/time_stepper/tests/butcher_tables.cpp -o test_butcher_tables.bin 2>results.make
 
 #overscreening breakdown
 ob_ker: source/nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.cu
@@ -217,6 +222,10 @@ test_ob_newton:
 
 ob_json:
 	$(NVCC) $(NVCCDEB) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/overscreening_breakdown/ob_bd_json.cpp O/overscreening_breakdown_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) $(LLAPACK) $(LBOOST) $(LIBBOOST) -o ob_bd_json.bin 2>results.make
+
+# test Van der Pol time stepper test:
+test_vdp_time_stepping:
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/time_stepper/tests/vdp_1.cpp $(OPENMP) -o test_vdp.bin 2>results.make
 
 # make all common kernels
 ker:

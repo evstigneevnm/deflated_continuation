@@ -283,7 +283,7 @@ public:
                         VectorOperations,
                         Monitor, Log>           linear_solver_original_type;
 
-    sherman_morrison_linear_system_solve(Preconditioner* prec_, const VectorOperations* vec_ops_p, Log *log_p = nullptr, int obj_log_lev = 0): 
+    sherman_morrison_linear_system_solve(Preconditioner* prec_, const VectorOperations* vec_ops_p, Log *log_p = nullptr, int obj_log_lev = 2): 
     linear_solver(vec_ops_p, log_p), 
     prec(vec_ops_p, alpha_threshold_), 
     oper(vec_ops_p, alpha_threshold_),

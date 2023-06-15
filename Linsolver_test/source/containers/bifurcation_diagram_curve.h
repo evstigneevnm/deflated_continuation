@@ -278,7 +278,7 @@ public:
     }
 
     //intersect solutions
-    bool find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)
+    void find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)
     {
         int N = container.size();
         for(int j=0;j<N-1;j++)

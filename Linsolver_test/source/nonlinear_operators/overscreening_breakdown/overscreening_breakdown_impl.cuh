@@ -11,7 +11,7 @@ namespace nonlinear_operators
 {
 
 template<typename T, typename T_vec, class Problem, typename Matrix>
-__global__ void form_stiffness_matrix_kernel(size_t N, T delta, Problem problem, Matrix A, Matrix iD)
+__global__ void form_stiffness_matrix_kernel(size_t N, Problem problem, Matrix A, Matrix iD)
 {
     size_t j=blockDim.x * blockIdx.x + threadIdx.x;
     size_t k=blockDim.y * blockIdx.y + threadIdx.y;
@@ -33,13 +33,13 @@ __global__ void form_stiffness_matrix_kernel(size_t N, T delta, Problem problem,
     else
     {
         auto t_point = problem.point_in_basis(j);
-        if(delta>problem.delta_threshold)
+        if(problem.delta>problem.delta_threshold)
         {
-            A(j,k) = problem.ddpsi_map(k, t_point)/delta/delta - problem.ddddpsi_map(k, t_point);
+            A(j,k) = problem.ddpsi_map(k, t_point)/problem.delta/problem.delta - problem.ddddpsi_map(k, t_point);
         }
         else
         {
-            A(j,k) = problem.ddpsi_map(k, t_point) - delta*delta*problem.ddddpsi_map(k, t_point);
+            A(j,k) = problem.ddpsi_map(k, t_point) - problem.delta*problem.delta*problem.ddddpsi_map(k, t_point);
         }
         
     }
@@ -59,7 +59,7 @@ __global__ void form_stiffness_matrix_kernel(size_t N, T delta, Problem problem,
 
 
 template<typename T, typename T_vec, class Problem, typename Matrix>
-__global__ void form_rhs_linearization_matrix_kernel(size_t N,  Problem problem, T delta, T_vec u_solution, Matrix B)
+__global__ void form_rhs_linearization_matrix_kernel(size_t N,  Problem problem, T_vec u_solution, Matrix B)
 {
     size_t j=blockDim.x * blockIdx.x + threadIdx.x;
     size_t k=blockDim.y * blockIdx.y + threadIdx.y;
@@ -84,9 +84,9 @@ __global__ void form_rhs_linearization_matrix_kernel(size_t N,  Problem problem,
         auto x_point = problem.point_in_domain(j);
         auto u_point = u_solution[j];
         B(j,k) = problem.psi(k, t_point)*problem.right_hand_side_linearization(x_point, u_point);
-        if(delta>problem.delta_threshold)
+        if(problem.delta>problem.delta_threshold)
         {
-            B(j,k) /= (delta*delta);
+            B(j,k) /= (problem.delta*problem.delta);
         }
     }
 
@@ -224,7 +224,7 @@ __global__ void reformulate_bcs_kernel(size_t N,  Problem problem, T_vec res)
 
 
 template<typename T, typename T_vec, class Problem>
-__global__ void form_right_hand_side_kernel(size_t N, Problem problem, T delta, T_vec u_solution, T_vec res)
+__global__ void form_right_hand_side_kernel(size_t N, Problem problem, T_vec u_solution, T_vec res)
 {
     size_t j=blockDim.x * blockIdx.x + threadIdx.x;
     if(j>=N) return;
@@ -245,9 +245,9 @@ __global__ void form_right_hand_side_kernel(size_t N, Problem problem, T delta, 
         auto x_point = problem.point_in_domain(j);
         auto u_point = u_solution[j];
         res[j] = -problem.right_hand_side(x_point, u_point); //we assume that the form is Lu-rhs=0, hence '-'
-        if(delta>problem.delta_threshold)
+        if(problem.delta>problem.delta_threshold)
         {
-            res[j] /= (delta*delta);
+            res[j] /= (problem.delta*problem.delta);
         }
     }
 }
@@ -255,7 +255,7 @@ __global__ void form_right_hand_side_kernel(size_t N, Problem problem, T delta, 
 
 
 template<typename T, typename T_vec, class Problem>
-__global__ void form_right_hand_parameter_derivative_kernel(size_t N, Problem problem, T delta, T_vec u_solution, T_vec res)
+__global__ void form_right_hand_parameter_derivative_kernel(size_t N, Problem problem, T_vec u_solution, T_vec res)
 {
     size_t j=blockDim.x * blockIdx.x + threadIdx.x;
     if(j>=N) return;
@@ -265,7 +265,7 @@ __global__ void form_right_hand_parameter_derivative_kernel(size_t N, Problem pr
     }
     else if(j == N-2)
     {
-        res[j] = 0;//problem.u0; //u bc at zero
+        res[j] = -problem.right_hand_side_parameter_derivative_u0(0, 0);
     }
     else if(j == N-1)
     {
@@ -276,9 +276,9 @@ __global__ void form_right_hand_parameter_derivative_kernel(size_t N, Problem pr
         auto x_point = problem.point_in_domain(j);
         auto u_point = u_solution[j];
         res[j] = -problem.right_hand_side_parameter_derivative(x_point, u_point); //we assume that the form is Lu-rhs=0, hence '-'
-        if(delta>problem.delta_threshold)
+        if(problem.delta>problem.delta_threshold)
         {
-            res[j] /= (delta*delta);
+            res[j] /= (problem.delta*problem.delta);
         }
     }    
 }
@@ -297,7 +297,7 @@ __global__ void smooth_random_data_kernel(size_t N, T_vec res)
     }
     else if(j == N-2)
     {
-        res[j] = 1;//problem.u0; //u bc at zero
+        res[j] = 1; //u bc at zero
     }
     else if(j == N-1)
     {
@@ -306,6 +306,10 @@ __global__ void smooth_random_data_kernel(size_t N, T_vec res)
     else
     {
         res[j] = w*res[j-1] + wc*res[j]+w*res[j+1];
+        // if(j<N/3)
+        // {
+        //     res[j] = 0;
+        // }
     }    
 }
 
@@ -341,15 +345,15 @@ __global__ void set_identity_matrix_kernel(size_t N, Matrix E)
 
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::form_stiffness_matrix(size_t N, T delta, problem_s problem, matrix_device_s A, matrix_device_s iD)
+void overscreening_breakdown_ker<VecOps, MatOps>::form_stiffness_matrix(size_t N, problem_s problem, matrix_device_s A, matrix_device_s iD)
 {
-    form_stiffness_matrix_kernel<T, T_vec, problem_s, matrix_device_s><<<dim_grid, dim_block>>>(N, delta, problem, A, iD);
+    form_stiffness_matrix_kernel<T, T_vec, problem_s, matrix_device_s><<<dim_grid, dim_block>>>(N, problem, A, iD);
 }
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::form_rhs_linearization_matrix(size_t N, problem_s problem, T delta, T_vec u_solution, matrix_device_s B)
+void overscreening_breakdown_ker<VecOps, MatOps>::form_rhs_linearization_matrix(size_t N, problem_s problem, T_vec u_solution, matrix_device_s B)
 {
-    form_rhs_linearization_matrix_kernel<T, T_vec, problem_s, matrix_device_s><<<dim_grid, dim_block>>>(N, problem, delta, u_solution, B);
+    form_rhs_linearization_matrix_kernel<T, T_vec, problem_s, matrix_device_s><<<dim_grid, dim_block>>>(N, problem, u_solution, B);
 }
 
 
@@ -382,16 +386,16 @@ void overscreening_breakdown_ker<VecOps, MatOps>::reformulate_bcs(size_t N, prob
 
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::form_right_hand_side(size_t N, problem_s problem, T delta, T_vec u, T_vec res)
+void overscreening_breakdown_ker<VecOps, MatOps>::form_right_hand_side(size_t N, problem_s problem, T_vec u, T_vec res)
 {
-    form_right_hand_side_kernel<T, T_vec, problem_s><<<dim_grid_1d, dim_block_1d>>>(N, problem, delta, u, res);
+    form_right_hand_side_kernel<T, T_vec, problem_s><<<dim_grid_1d, dim_block_1d>>>(N, problem, u, res);
 }
 
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::form_right_hand_parameter_derivative(size_t N, problem_s problem, T delta, T_vec u, T_vec res)
+void overscreening_breakdown_ker<VecOps, MatOps>::form_right_hand_parameter_derivative(size_t N, problem_s problem, T_vec u, T_vec res)
 {
-    form_right_hand_parameter_derivative_kernel<T, T_vec, problem_s><<<dim_grid_1d, dim_block_1d>>>(N, problem, delta, u, res);
+    form_right_hand_parameter_derivative_kernel<T, T_vec, problem_s><<<dim_grid_1d, dim_block_1d>>>(N, problem, u, res);
 }
 
 template<class VecOps, class MatOps>

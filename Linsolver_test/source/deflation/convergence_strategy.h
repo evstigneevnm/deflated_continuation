@@ -40,6 +40,8 @@ public:
             norms_evolution.reserve(maximum_iterations);
         }
         stagnation_max = 10;
+        maximum_norm_increase_ = 0.0;
+        newton_wight_threshold_ = 1.0e-7;
     }
     ~convergence_strategy()
     {
@@ -51,7 +53,8 @@ public:
     {
         tolerance = tolerance_;
         maximum_iterations = maximum_iterations_;
-        newton_wight = newton_wight_;
+        newton_wight_initial = newton_wight_;
+
         store_norms_history = store_norms_history_;
         verbose = verbose_;
         stagnation_max = stagnation_max_;
@@ -61,27 +64,54 @@ public:
         }        
     }
 
+    T inline update_solution(NonlinearOperator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, T_vec& x1, T& lambda1)
+    {
+        vec_ops->assign_mul(static_cast<T>(1.0), x, newton_wight, delta_x, x1);
+        nonlin_op->project(x1); // project to invariant solution subspace. Should be blank if nothing is needed to be projected.
+        lambda1 = lambda + newton_wight*delta_lambda;
+        nonlin_op->F(x1, lambda1, Fx);
+        T normFx1 = vec_ops->norm_l2(Fx);
+        return normFx1;
+    }
+
+
     bool check_convergence(NonlinearOperator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status)
     {
     
         bool finish = false;
+        reset_wight();
         nonlin_op->F(x, lambda, Fx);
         T normFx = vec_ops->norm_l2(Fx);
         //update solution
-        vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
-        T lambda1 = lambda + newton_wight*delta_lambda;
-        nonlin_op->project(x1); // XXX DEBUG XXX
-        nonlin_op->F(x1, lambda1, Fx);
-        T normFx1 = vec_ops->norm_l2(Fx);
+        T lambda1 = lambda;
+        T normFx1 = update_solution(nonlin_op, x, lambda, delta_x, delta_lambda, x1, lambda1);
+        
+        if(normFx<1.0)
+        {
+            while( (normFx1 - normFx) > maximum_norm_increase_ )
+            {
+                newton_wight *= 0.5;
+                normFx1 = update_solution(nonlin_op, x, lambda, delta_x, delta_lambda, x1, lambda1);
+                if(newton_wight < newton_wight_threshold_)
+                {
+                    result_status = 4;
+                    finish = true;
+                }
+                // log->info_f("deflation::convergence:wight_update: iteration %i, residuals n: %le, n+1: %le, wight: %le",iterations, (double)normFx, (double)normFx1, (double)newton_wight );
+            }
+        }
+
         if(store_norms_history)
         {
             norms_evolution.push_back(normFx1);
         }
 
+
         iterations++;
-        log->info_f("deflation::convergence: iteration %i, residuals n: %le, n+1: %le",iterations, (double)normFx, (double)normFx1);
+        log->info_f("deflation::convergence: iteration %i, residuals n: %le, n+1: %le, wight: %le",iterations, (double)normFx, (double)normFx1, (double)newton_wight );
 
         const T max_norm_Fx = 1.0e12;
+        reset_wight();
 
         if(std::isnan(normFx))
         {
@@ -189,7 +219,8 @@ private:
     T newton_wight, newton_wight_initial;
     bool verbose, store_norms_history;
     std::vector<T> norms_evolution;
-
+    T maximum_norm_increase_;
+    T newton_wight_threshold_;
 };
 
 

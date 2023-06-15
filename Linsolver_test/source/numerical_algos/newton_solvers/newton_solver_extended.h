@@ -54,13 +54,12 @@ public:
 
             finished = conv_strat->check_convergence(nonlin_op, x, lambda, delta_x, delta_lambda, result_status);
 
-
         }
         if(result_status==0)
         {
             converged = true;
         }
-        if( (result_status == 2)||(result_status == 3) )
+        if( (result_status == 2)||(result_status == 3) ) //inf or nan
         {
             throw std::runtime_error(std::string("newton_method_extended: " __FILE__ " " __STR(__LINE__) " invalid number returned from update.") );            
         }

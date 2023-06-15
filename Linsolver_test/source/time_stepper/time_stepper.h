@@ -33,13 +33,6 @@ public:
 
     }
     
-
-    void set_time(const T& time_)
-    {
-        time = time_;
-        time_set = true;
-    }
-
     void set_skip(unsigned int skip_)
     {
         skip = skip_;
@@ -54,8 +47,8 @@ public:
     void set_initial_conditions(const T_vec x_, T perturbations_ = 0.0)
     {
         vec_ops->assign(x_, v_in);
-        nonlin_op->randomize_vector(v_helper);
-        vec_ops->add_mul(perturbations_, v_helper, v_in);
+        // nonlin_op->randomize_vector(v_helper);
+        // vec_ops->add_mul(perturbations_, v_helper, v_in);
         vec_ops->assign(v_in, v_out); //as initialization
         initials_set = true;
     }
@@ -70,7 +63,6 @@ public:
     {
         // check logic
         if(!param_set) throw std::logic_error("time_stepper::execute: parameter value not set.");
-        if(!time_set) throw std::logic_error("time_stepper::execute: exevcution time not set.");
         if(!initials_set) throw std::logic_error("time_stepper::execute: initial conditions not set.");
         
 
@@ -81,23 +73,15 @@ public:
         while(!finish)
         {
             iteraiton++;
-            stepper->execute(v_in, v_out);
+            finish = stepper->execute(v_in, v_out);
+
             T norm_out = vec_ops->norm(v_out);
             if(std::isnan(norm_out))
             {
                 throw std::runtime_error("time_stepper::execute: nan returned at iteration " + std::to_string(iteraiton));
             }
-            T dt = stepper->get_time_step();
-            simulated_time += dt;
-            if(simulated_time > time)
-            {
-                T dt_ = simulated_time - time;
-                stepper->override_single_time_step(dt_);
-                simulated_time = simulated_time - dt + dt_;
-                dt = dt_;
-                stepper->execute(v_in, v_out);
-                finish = true;
-            }
+            auto dt = stepper->get_dt();
+            simulated_time = stepper->get_time();
             std::vector<T> bif_norms_at_t_;
             nonlin_op->norm_bifurcation_diagram(v_out, bif_norms_at_t_);
             solution_norms.push_back(bif_norms_at_t_);
@@ -108,7 +92,6 @@ public:
                 bif_priv = bif_now;
             }
             vec_ops->assign(v_out, v_in);
-            
         } 
 
     }

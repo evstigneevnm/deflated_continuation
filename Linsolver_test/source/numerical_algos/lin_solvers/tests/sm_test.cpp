@@ -115,7 +115,7 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int max_iters = std::atoi(args[1]);
+    int max_iters = std::stoi(args[1]);
     real rel_tol = std::stof(args[2]);
     bool use_precond_resid = std::atoi(args[3]);
     int resid_recalc_freq = std::atoi(args[4]);

@@ -12,6 +12,7 @@
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/exact_wrapper.h>
 
+#include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_params.h>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown.h>
 #include <nonlinear_operators/overscreening_breakdown/linear_operator_overscreening_breakdown.h>
 #include <nonlinear_operators/overscreening_breakdown/preconditioner_overscreening_breakdown.h>
@@ -78,32 +79,10 @@ int main(int argc, char const *argv[])
         return(0);       
     }
     
-    struct params_s
-    {
-        size_t N = 10;
-        real sigma = 1.0;
-        real L = 1.0;
-        real gamma = 1.0;
-        real delta = 1.0;    
-        real mu = 1.0;
-        real u0 = 1.0;
-
-        void print_data() const
-        {
-            std::cout << "=== params_s: " << std::endl;
-            std::cout << "=   N = " << N << std::endl;
-            std::cout << "=   sigma = " << sigma << std::endl;
-            std::cout << "=   L = " << L << std::endl;
-            std::cout << "=   gamma = " << gamma << std::endl;
-            std::cout << "=   delta = " << delta << std::endl;
-            std::cout << "=   mu = " << mu << std::endl;
-            std::cout << "=   u0 = " << u0 << std::endl;
-            std::cout << "=   .........." << std::endl;
-        }
-    };
+    using params_st = params_s<real>;    
     
     std::string file_name(argv[2]);
-    params_s params;
+    params_st params;
     params.L = std::stof(argv[1]);
     size_t N = file_operations::read_vector_size(file_name);
     params.N = N;
@@ -124,9 +103,15 @@ int main(int argc, char const *argv[])
 
     vec_file_ops.read_vector(file_name, x0);    
     ob_prob.physical_solution(x0, x1);
+    //fix the boundary condition on the 3-d derivative for visualization
+    T_vec x_host = vec_ops.view(x1);
+    x_host[N-1] = x_host[N-2];
+    vec_ops.set(x1);
+
     std::stringstream ss;
     ss << "view_" << get_file_name(file_name) << ".dat";
     vec_file_ops.write_vector(ss.str(), x1);
+
 
     printf("||x|| = %le \n", vec_ops.norm(x0));
 

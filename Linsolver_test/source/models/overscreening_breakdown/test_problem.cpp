@@ -1,7 +1,10 @@
 #include <iostream>
+#include <string>
+#include <sstream>
 #include <external_libraries/cublas_wrap.h>
 #include <common/gpu_vector_operations.h>
 #include <common/gpu_matrix_vector_operations.h>
+#include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_params.h>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown.h>
 
 int main(int argc, char const *argv[])
@@ -14,17 +17,10 @@ int main(int argc, char const *argv[])
     using ob_prob_t = nonlinear_operators::overscreening_breakdown<vec_ops_t, mat_ops_t>;
     using vec_file_ops_t = gpu_file_operations<vec_ops_t>;
     using mat_file_ops_t = gpu_matrix_file_operations<mat_ops_t>;
+    using params_t = params_s<real>;
 
-    struct params_s
-    {
-        real L = 1.0;
-        real gamma = 1.0;
-        real delta = 1.0;    
-        real mu = 1.0;
-        real u0 = 1.0;
-    };
-    size_t N = 10;
-    params_s params;
+    size_t N = 100;
+    params_t params(N, 0, {1.0, 5.0, 0.5, 5.0, 1.0, 0.1});
     cublas_wrap cublas(true);
     vec_ops_t vec_ops(N, &cublas);
     mat_ops_t mat_ops(vec_ops.get_vector_size(), vec_ops.get_vector_size(), vec_ops.get_cublas_ref() );
@@ -36,8 +32,18 @@ int main(int argc, char const *argv[])
     vec_ops.init_vectors(u_sol, u_coeff, f_u_coeff, df_alpha_coeff);
     vec_ops.start_use_vectors(u_sol, u_coeff, f_u_coeff, df_alpha_coeff);
     
-    ob_prob.randomize_vector(u_coeff);
-    vec_file_ops.write_vector("initial_coeffs.dat", u_coeff);
+    
+    std::stringstream ss1,ss2;
+    for(int j=0;j<10;j++)
+    {    
+        ss1 << "initial_coeffs_" << j << ".dat";
+        ss2 << "initial_u_" << j << ".dat";
+        ob_prob.randomize_vector(u_coeff);
+        ob_prob.write_solution_basis(ss2.str(), u_coeff);
+        vec_file_ops.write_vector(ss1.str(), u_coeff);
+        ss1.str(std::string());
+        ss2.str(std::string());
+    }
 
     ob_prob.F(u_coeff, 2.0, f_u_coeff);
     vec_file_ops.write_vector("fu.dat", u_coeff);
