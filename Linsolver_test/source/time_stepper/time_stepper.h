@@ -66,15 +66,14 @@ public:
         if(!initials_set) throw std::logic_error("time_stepper::execute: initial conditions not set.");
         
 
-        int iteraiton = 0;
         bool finish = false;
         log->info_f("time_stepper::execute: starting time stepper execution with total time = %f and parameter value = %e", time, param);
-        T bif_priv = T(0.0);
+        T bif_priv = 0.0;
         while(!finish)
         {
-            iteraiton++;
-            finish = stepper->execute(v_in, v_out);
 
+            finish = stepper->execute(v_in, v_out);
+            auto iteraiton = stepper->get_iteration();
             T norm_out = vec_ops->norm(v_out);
             if(std::isnan(norm_out))
             {
@@ -83,12 +82,14 @@ public:
             auto dt = stepper->get_dt();
             simulated_time = stepper->get_time();
             std::vector<T> bif_norms_at_t_;
+            bif_norms_at_t_.push_back(simulated_time);
             nonlin_op->norm_bifurcation_diagram(v_out, bif_norms_at_t_);
+            
             solution_norms.push_back(bif_norms_at_t_);
             T bif_now = bif_norms_at_t_.back();
             if(iteraiton%skip == 0)
             {
-                log->info_f("time_stepper::execute: step %i, time %.2f, dt %.2e, norm %.2e, d_norm %.2e", iteraiton, simulated_time, dt, bif_now, (bif_now - bif_priv) );
+                log->info_f("time_stepper::execute: step %d, time %.2f, dt %.2e, norm %.2e, d_norm %.2e", iteraiton, simulated_time, dt, bif_now, (bif_now - bif_priv) );
                 bif_priv = bif_now;
             }
             vec_ops->assign(v_out, v_in);

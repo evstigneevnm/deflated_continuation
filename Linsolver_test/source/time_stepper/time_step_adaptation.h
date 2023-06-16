@@ -2,6 +2,7 @@
 #define __TIME_STEPPER_TIME_STEP_ADAPTATION_H__
 
 #include <utility>
+#include <time_stepper/detail/positive_preserving_dummy.h>
 
 namespace time_steppers
 {
@@ -12,21 +13,22 @@ namespace time_steppers
 // class time_step_adaptation_error_control //<-used for normal ode integration
 // class time_step_adaptation_globalization //<-used for globalization process in steady state solvers
 
-template<class VectorOperations, class Log>
+template<class VectorOperations, class Log, class PositivePreservingCheck= detail::positive_preserving_dummy<VectorOperations> >
 class time_step_adaptation
 {
 public:
     using T = typename VectorOperations::scalar_type;
     using T_vec = typename VectorOperations::vector_type;
 
-    time_step_adaptation(VectorOperations* vec_ops_p, Log* log_p, std::pair<T,T> time_interval_p = {0,1},  T dt_p = 1.0):
+    time_step_adaptation(VectorOperations* vec_ops_p, Log* log_p, std::pair<T,T> time_interval_p = {0,1},  T dt_p = 1.0, PositivePreservingCheck* positive_check_p = new detail::positive_preserving_dummy<VectorOperations>() ):
     vec_ops_(vec_ops_p),
     log_(log_p),
     time_interval_(time_interval_p),
     dt_(dt_p),
     dt_initial_(dt_p),
     current_step_(0),
-    fail_flag_(false)
+    fail_flag_(false),
+    positive_check_(positive_check_p)
     {
         current_time_ = time_interval_.first;
         T final_time = time_interval_.second;
@@ -40,6 +42,7 @@ public:
         {
             dt_min_ = static_cast<T>(16.0)*std::numeric_limits<T>::epsilon();
         }
+        
     }
     
     virtual ~time_step_adaptation()
@@ -53,7 +56,7 @@ public:
     {
         return current_time_;
     }
-    size_t get_step()const
+    size_t get_iteration()const
     {
         return current_step_;
     }
@@ -84,7 +87,16 @@ public:
 
     }
 
-    virtual bool estimate_timestep(const T_vec& x_p, const T_vec& x_new_p, const T_vec& f_err_p)const = 0;
+    bool check_solution_consistency(const T_vec& sol_p)const
+    {
+        return positive_check_->apply(sol_p);
+    }
+
+
+    virtual void init_step(const T_vec& x_p) = 0;
+
+
+    virtual bool estimate_timestep(const T_vec& x_p, const T_vec& x_new_p, const T_vec& f_err_p) = 0;
 
 
 protected:
@@ -94,6 +106,7 @@ protected:
     std::pair<T,T> time_interval_;
     mutable T current_time_;
     VectorOperations* vec_ops_;
+    PositivePreservingCheck* positive_check_;
     Log* log_;
     size_t current_step_;
     bool fail_flag_;

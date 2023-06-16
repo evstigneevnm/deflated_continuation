@@ -25,7 +25,7 @@ public:
     using method_type = detail::methods;
     using table_t = time_steppers::detail::tableu;
 
-    explicit_time_step(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_, TimeStepAdaptation* time_step_adapt_p, Log* log_, T param_p = 1.0,  method_type method_p = method_type::EXPLICIT_EULER):
+    explicit_time_step(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_, TimeStepAdaptation* time_step_adapt_p, Log* log_, T param_p = 1.0,  method_type method_p = method_type::RKDP45):
     vec_ops_(vec_ops_p), 
     nonlin_op_(nonlin_op_), 
     time_step_adapt_(time_step_adapt_p),
@@ -66,11 +66,16 @@ public:
     {
         return (time_step_adapt_->get_time());
     }
+    auto get_iteration()const
+    {
+        return (time_step_adapt_->get_iteration());
+    }
 
 
     bool execute(const T_vec in_p, T_vec out_p) 
     {
         bool finish = false;
+        
         while(true)
         {
             auto dt = time_step_adapt_->get_dt();
@@ -178,7 +183,7 @@ private:
         {
             vec_ops_->stop_use_vector(x);
             vec_ops_->free_vector(x);
-            std::cout << "deleted T_vec" << std::endl;
+            // std::cout << "deleted T_vec" << std::endl;
         }
         fk_storage_.clear();
     }

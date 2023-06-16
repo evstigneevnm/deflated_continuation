@@ -34,11 +34,11 @@ struct vdp
     vdp() = default;
     ~vdp() = default;
 
-    void F(const T time_p, const T_vec& in_p, const T param_p, T_vec& out_p ) const
+    void F(const T time_p, const T_vec& in_p, const T param_p, T_vec& out_p )const
     {
         // dydt = [y(2); mu*(1-y(1)^2)*y(2)-y(1)];
         out_p[0] = in_p[1];
-        out_p[1] = param_p*(1-in_p[0])*(1-in_p[0])*in_p[1]-in_p[0];
+        out_p[1] = param_p*(1-in_p[0]*in_p[0])*in_p[1]-in_p[0];
     }
 
     void set_initial(T_vec& x0)const
@@ -47,11 +47,12 @@ struct vdp
         x0[1] = 0.0;
     }
 
-    void norm_bifurcation_diagram(const T_vec& x0, std::vector<T>& norm_vec)
+    void norm_bifurcation_diagram(const T_vec& x0, std::vector<T>& norm_vec)const
     {
         norm_vec.push_back(x0[0]);
         norm_vec.push_back(x0[1]);
     }
+
 
 };
 }
@@ -73,14 +74,16 @@ int main(int argc, char const *argv[])
     using single_step_t = time_steppers::explicit_time_step<vec_ops_t, nlin_op_t, log_t, time_step_t>;
     using time_stepper_t = time_steppers::time_stepper<vec_ops_t, nlin_op_t, single_step_t,log_t>;
 
-    if(argc != 3)
+    if(argc != 4)
     {
-        std::cout << argv[0] << " mu time\n  mu - parameter, time - simulation time.";
+        std::cout << argv[0] << " mu time name\n  mu - parameter, time - simulation time,\n";
+        std::cout << "   name - name of the scheme: EE, HE, RK33SSP, RK43SSP, RKDP45, RK64SSP" << std::endl;
         return(0);       
     }    
     real mu = std::stof(argv[1]);
     real simulation_time = std::stof(argv[2]);
-    
+    std::string scheme_name(argv[3]);
+
     log_t log;
 
     vec_ops_t vec_ops(2);
@@ -94,8 +97,39 @@ int main(int argc, char const *argv[])
     vdp.set_initial(x0);
 
     
-    time_step_t time_step(&vec_ops, &log, {0.0, simulation_time}, 1.0e-4);
-    single_step_t explicit_step(&vec_ops, &vdp, &time_step, &log, mu, time_steppers::detail::methods::EXPLICIT_EULER);
+    time_step_t time_step(&vec_ops, &log, {0.0, simulation_time}, 5.0e-3);
+    auto method = time_steppers::detail::methods::EXPLICIT_EULER;
+    if(scheme_name == "EE")
+    {
+        method = time_steppers::detail::methods::EXPLICIT_EULER;
+    }
+    else if(scheme_name == "RKDP45")
+    {
+        method = time_steppers::detail::methods::RKDP45;
+    }
+    else if(scheme_name == "RK33SSP")
+    {
+        method = time_steppers::detail::methods::RK33SSP;
+    }    
+    else if(scheme_name == "RK43SSP")
+    {
+        method = time_steppers::detail::methods::RK43SSP;
+    } 
+    else if(scheme_name == "RK64SSP")
+    {
+        method = time_steppers::detail::methods::RK64SSP;
+    }     
+    else if(scheme_name == "HE")
+    {
+        method = time_steppers::detail::methods::HEUN_EULER;
+    }  
+    else
+    {
+        throw std::logic_error("incorrect method string type provided.");
+    }
+
+
+    single_step_t explicit_step(&vec_ops, &vdp, &time_step, &log, mu, method);
     time_stepper_t time_stepper(&vec_ops, &vdp, &explicit_step, &log);
     
 
@@ -103,7 +137,9 @@ int main(int argc, char const *argv[])
     time_stepper.set_parameter(mu);
     time_stepper.set_initial_conditions(x0, 0.0);
     time_stepper.execute();
-
+    std::stringstream ss;
+    ss << "vdp_result_" << scheme_name << ".dat";
+    time_stepper.save_norms( ss.str() );
     // std::stringstream ss;
     // ss << "x_" << simulation_time << "_sim.pos";
   

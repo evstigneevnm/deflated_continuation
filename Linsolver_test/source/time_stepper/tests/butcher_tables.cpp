@@ -9,9 +9,13 @@ int main(int argc, char const *argv[])
     time_steppers::detail::butcher_tables tables;
     using table_t = time_steppers::detail::tableu;
 
-    auto table_Euler = tables.set_table(time_steppers::detail::methods::EXPLICIT_EULER);
-    auto table_RK45 = tables.set_table(time_steppers::detail::methods::RKDP45);
-
+    auto table_EULER = tables.set_table(time_steppers::detail::methods::EXPLICIT_EULER);
+    auto table_HEUN_EULER = tables.set_table(time_steppers::detail::methods::HEUN_EULER);
+    auto table_RKDP45 = tables.set_table(time_steppers::detail::methods::RKDP45);
+    auto table_RK33SSP = tables.set_table(time_steppers::detail::methods::RK33SSP);
+    auto table_RK43SSP = tables.set_table(time_steppers::detail::methods::RK43SSP);
+    auto table_RK64SSP = tables.set_table(time_steppers::detail::methods::RK64SSP);
+    
     auto print_mat = [](const table_t& table_p)
     {
         size_t sz = table_p.get_size();
@@ -54,13 +58,31 @@ int main(int argc, char const *argv[])
             std::cout << std::endl;            
         }
 
-    };    
+    }; 
+
     std::cout << "Explicit Euler: " << std::endl;
-    print_mat(table_Euler);
-    print_vecs(table_Euler);
-    std::cout << "RK45: " << std::endl;
-    print_mat(table_RK45);
-    print_vecs(table_RK45);
+    print_mat(table_EULER);
+    print_vecs(table_EULER);
+
+    std::cout << "Heun Euler: " << std::endl;
+    print_mat(table_HEUN_EULER);
+    print_vecs(table_HEUN_EULER);
+
+    std::cout << "RKDP45: " << std::endl;
+    print_mat(table_RKDP45);
+    print_vecs(table_RKDP45);
+
+    std::cout << "RK33SSP: " << std::endl;
+    print_mat(table_RK33SSP);
+    print_vecs(table_RK33SSP);   
+
+    std::cout << "RK43SSP: " << std::endl;
+    print_mat(table_RK43SSP);
+    print_vecs(table_RK43SSP);     
+
+    std::cout << "RK64SSP: " << std::endl;
+    print_mat(table_RK64SSP);
+    print_vecs(table_RK64SSP);       
 //  to be continued...
 
     
