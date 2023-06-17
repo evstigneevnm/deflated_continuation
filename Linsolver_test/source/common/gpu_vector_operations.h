@@ -401,6 +401,12 @@ struct gpu_vector_operations
             cuBLAS->norm2<T>(sz, x, result);
         }
     } 
+    Tsc norm_inf(const vector_type& x) const
+    {
+        Tsc result = 0;
+        throw std::logic_error("to be implemented using thrust?!");
+        return result;
+    }
     //calc: x := <vector_type with all elements equal to given scalar value> 
     void assign_scalar(const scalar_type scalar, vector_type& x)const;
     //calc: ||x||_2=norm, x=x/norm, return norm.
@@ -453,6 +459,16 @@ struct gpu_vector_operations
     void make_abs_copy(const vector_type& x, vector_type& y)const; 
     //sets absolute values to a vector, overweites it
     void make_abs(vector_type& x)const;
+    // y_j = max(x_j,y_j,sc)
+    void max_pointwise(const scalar_type sc, const vector_type& x, vector_type& y)const
+    {
+        throw std::logic_error("to be implemented.");
+    }
+    // y_j = min(x_j,y_j,sc)
+    void min_pointwise(const scalar_type sc, const vector_type& x, vector_type& y)const
+    {
+        throw std::logic_error("to be implemented.");
+    }
     //calc: y := mul_x*x
     void assign_mul(const scalar_type mul_x, const vector_type& x, vector_type& y)const;
     //cublas axpy: y=y+mul_x*x;

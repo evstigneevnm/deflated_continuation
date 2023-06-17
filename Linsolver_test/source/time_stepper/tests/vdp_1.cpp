@@ -18,6 +18,7 @@
 #include <common/cpu_vector_operations.h>
 
 #include <time_stepper/time_step_adaptation_constant.h>
+#include <time_stepper/time_step_adaptation_error_control.h>
 #include <time_stepper/explicit_time_step.h>
 #include <time_stepper/time_stepper.h>
 
@@ -70,9 +71,15 @@ int main(int argc, char const *argv[])
 
     using nlin_op_t = nonlinear_operators::vdp<vec_ops_t>;
     
-    using time_step_t = time_steppers::time_step_adaptation_constant<vec_ops_t, log_t>;
-    using single_step_t = time_steppers::explicit_time_step<vec_ops_t, nlin_op_t, log_t, time_step_t>;
-    using time_stepper_t = time_steppers::time_stepper<vec_ops_t, nlin_op_t, single_step_t,log_t>;
+    using time_step_const_t = time_steppers::time_step_adaptation_constant<vec_ops_t, log_t>;
+    using time_step_err_ctrl_t = time_steppers::time_step_adaptation_error_control<vec_ops_t, log_t>;
+    
+    using single_step_const_t = time_steppers::explicit_time_step<vec_ops_t, nlin_op_t, log_t, time_step_const_t>;
+    using single_step_err_ctrl_t = time_steppers::explicit_time_step<vec_ops_t, nlin_op_t, log_t, time_step_err_ctrl_t>;
+    
+    using time_stepper_const_t = time_steppers::time_stepper<vec_ops_t, nlin_op_t, single_step_const_t,log_t>;
+    using time_stepper_err_ctrl_t = time_steppers::time_stepper<vec_ops_t, nlin_op_t, single_step_err_ctrl_t,log_t>;
+
 
     if(argc != 4)
     {
@@ -97,7 +104,9 @@ int main(int argc, char const *argv[])
     vdp.set_initial(x0);
 
     
-    time_step_t time_step(&vec_ops, &log, {0.0, simulation_time}, 5.0e-3);
+    time_step_const_t time_step_const(&vec_ops, &log, {0.0, simulation_time}, 5.0e-3);
+    time_step_err_ctrl_t time_step_err_ctrl(&vec_ops, &log, {0.0, simulation_time});
+
     auto method = time_steppers::detail::methods::EXPLICIT_EULER;
     if(scheme_name == "EE")
     {
@@ -129,17 +138,19 @@ int main(int argc, char const *argv[])
     }
 
 
-    single_step_t explicit_step(&vec_ops, &vdp, &time_step, &log, mu, method);
-    time_stepper_t time_stepper(&vec_ops, &vdp, &explicit_step, &log);
+    single_step_const_t explicit_step_const(&vec_ops, &vdp, &time_step_const, &log, mu, method);
+    single_step_err_ctrl_t explicit_step_err_control(&vec_ops, &vdp, &time_step_err_ctrl, &log, mu, method);
     
+    time_stepper_const_t time_stepper_const(&vec_ops, &vdp, &explicit_step_const, &log);
+    time_stepper_err_ctrl_t time_stepper_err_ctrl(&vec_ops, &vdp, &explicit_step_err_control, &log);
 
     log.info_f("executing time stepper with time = %.2le", simulation_time);
-    time_stepper.set_parameter(mu);
-    time_stepper.set_initial_conditions(x0, 0.0);
-    time_stepper.execute();
+    time_stepper_err_ctrl.set_parameter(mu);
+    time_stepper_err_ctrl.set_initial_conditions(x0, 0.0);
+    time_stepper_err_ctrl.execute();
     std::stringstream ss;
     ss << "vdp_result_" << scheme_name << ".dat";
-    time_stepper.save_norms( ss.str() );
+    time_stepper_err_ctrl.save_norms( ss.str() );
     // std::stringstream ss;
     // ss << "x_" << simulation_time << "_sim.pos";
   

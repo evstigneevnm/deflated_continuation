@@ -66,16 +66,30 @@ public:
     {
         return (time_step_adapt_->get_time());
     }
+    void pre_execte_step()
+    {
+        time_step_adapt_->pre_execte_step();
+    }
+
     auto get_iteration()const
     {
         return (time_step_adapt_->get_iteration());
     }
 
+    void init_steps(const T_vec& in_p)
+    {
+        nonlin_op_->F( get_time(), in_p, param_, f_helper_ );
+        time_step_adapt_->init_steps(in_p, f_helper_);
+    }
+    bool check_reject_step()const
+    {
+        return time_step_adapt_->check_reject_step();
+    }
 
     bool execute(const T_vec in_p, T_vec out_p) 
     {
         bool finish = false;
-        
+
         while(true)
         {
             auto dt = time_step_adapt_->get_dt();
@@ -100,7 +114,7 @@ public:
                 
                 nonlin_op_->F(t1, v1_helper_, param_, fk_storage_.at(j) );
             }
-
+            
             vec_ops_->assign(in_p, v1_helper_);
             for(size_t j=0;j<n_stages_;j++)
             {

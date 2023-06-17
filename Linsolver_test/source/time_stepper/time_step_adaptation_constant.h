@@ -27,11 +27,18 @@ public:
     {}
         
 
-    void init_step(const T_vec& x_p)
+    void init_steps(const T_vec& x_p, const T_vec& fx_p)
     {
         //do nothing here
     }
-
+    void pre_execte_step()const
+    {
+        //do nothing here
+    }
+    bool check_reject_step()const
+    {
+        return false;
+    }
     bool estimate_timestep(const T_vec& x_p, const T_vec& x_new_p, const T_vec& f_err_p)
     {
         //this implements timestep strategy adaptation. It is void for the constant time step.
@@ -56,7 +63,8 @@ protected:
     using parent_t::vec_ops_;
     using parent_t::log_;
     using parent_t::fail_flag_;
-
+    using parent_t::dt_max_;
+    using parent_t::dt_min_;
 
 
 };

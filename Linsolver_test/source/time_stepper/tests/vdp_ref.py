@@ -39,8 +39,10 @@ def main(mu, t1, rtol, atol, f_name, do_print):
     
     all_t = []
     all_y = []
-    dt = file_data[0][0]
+    dt = file_data[0][1] - file_data[0][0]
     cnt = 0
+    all_t.append(0)
+    all_y.append(y0)
     while r.successful() and r.t < t1:
         r.integrate(r.t+dt)
         all_t.append(r.t)
@@ -51,9 +53,9 @@ def main(mu, t1, rtol, atol, f_name, do_print):
     
     if(do_print):
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(5, 3))
-        axes[0].plot(all_t, np.transpose(np.transpose(all_y)[1]),'.' )
+        axes[0].plot(all_t, np.transpose(np.transpose(all_y)[1]),'*' )
         axes[0].plot(file_data[0],file_data[2],'.')
-        axes[1].plot(all_t, np.transpose(np.transpose(all_y)[0]),'.' )
+        axes[1].plot(all_t, np.transpose(np.transpose(all_y)[0]),'*' )
         axes[1].plot(file_data[0],file_data[1],'.')
         axes[0].legend(['python native','cpp'])
         axes[1].legend(['python native','cpp'])

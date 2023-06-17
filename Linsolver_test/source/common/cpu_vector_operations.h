@@ -200,6 +200,15 @@ struct cpu_vector_operations
     {
         return scalar_prod(x, x);
     }    
+    scalar_type norm_inf(const vector_type& x)const
+    {
+        scalar_type max_val = 0.0;
+        for(int j=0;j<sz_;j++)
+        {
+            max_val = (max_val<std::abs(x[j]))?std::abs(x[j]):max_val;
+        }
+        return max_val;
+    }
     scalar_type norm_rank1(const vector_type &x, const scalar_type val_x) const
     {
         vector_type y;
@@ -270,6 +279,73 @@ struct cpu_vector_operations
         for (int i = 0;i < sz_;++i) 
             z[i] = mul_x*x[i] + mul_y*y[i] + mul_z*z[i];
     }
+    void make_abs_copy(const vector_type& x, vector_type& y)const
+    {
+        for(size_t j = 0;j<sz_;j++)
+        {
+            y[j] = std::abs(x[j]);
+        }
+    }
+    void make_abs(vector_type& x)const
+    {
+        for(size_t j=0;j<sz_;j++)
+        {
+            auto xa = std::abs(x[j]);
+            x[j] = xa;
+        }
+    }
+    // y_j = max(x_j,y_j,sc)
+    void max_pointwise(const scalar_type sc, const vector_type& x, vector_type& y)const
+    {
+        for(size_t j=0;j<sz_;j++)
+        {
+            y[j] = (x[j]>y[j])?(x[j]>sc?x[j]:sc):(y[j]>sc?y[j]:sc);
+        }
+    }
+    // y_j = min(x_j,y_j,sc)
+    void min_pointwise(const scalar_type sc, const vector_type& x, vector_type& y)const
+    {
+        for(size_t j=0;j<sz_;j++)
+        {
+            y[j] = (x[j]<y[j])?( (x[j]<sc)?x[j]:sc):( (y[j]<sc)?y[j]:sc);
+        }
+    }    
+    //calc: x := x*mul_y*y
+    void mul_pointwise(vector_type& x, const scalar_type mul_y, const vector_type& y)const
+    {
+        for(size_t j=0;j<sz_;j++)
+        {
+            x[j] *= mul_y*y[j];
+        }        
+    }   
+    //calc: z := mul_x*x*mul_y*y
+    void mul_pointwise(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
+                        vector_type& z)const
+    {
+        for(size_t j=0;j<sz_;j++)
+        {
+            z[j] = (mul_x*x[j])*(mul_y*y[j]);
+        }         
+    }
+    //calc: z := (mul_x*x)/(mul_y*y)
+    void div_pointwise(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
+                        vector_type& z)const
+    {
+        for(size_t j=0;j<sz_;j++)
+        {
+            z[j] = (mul_x*x[j])/(mul_y*y[j]);
+        }
+    }
+    //calc: x := x/(mul_y*y)
+    void div_pointwise(vector_type& x, const scalar_type mul_y, const vector_type& y)const
+    {
+        for(size_t j=0;j<sz_;j++)
+        {
+            x[j] /= static_cast<scalar_type>(1.0)/(mul_y*y[j]);
+        }
+    }  
+
+
 };
 
 

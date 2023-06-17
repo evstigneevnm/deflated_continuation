@@ -44,7 +44,7 @@ public:
         param_set = true;
     }
     
-    void set_initial_conditions(const T_vec x_, T perturbations_ = 0.0)
+    void set_initial_conditions(const T_vec& x_, T perturbations_ = 0.0)
     {
         vec_ops->assign(x_, v_in);
         // nonlin_op->randomize_vector(v_helper);
@@ -53,7 +53,7 @@ public:
         initials_set = true;
     }
 
-    void get_results(T_vec x_)
+    void get_results(T_vec& x_)
     {
         vec_ops->assign(v_out, x_);
     }
@@ -65,14 +65,24 @@ public:
         if(!param_set) throw std::logic_error("time_stepper::execute: parameter value not set.");
         if(!initials_set) throw std::logic_error("time_stepper::execute: initial conditions not set.");
         
+        {
+            std::vector<T> bif_norms_at_t_;
+            bif_norms_at_t_.push_back(simulated_time);
+            nonlin_op->norm_bifurcation_diagram(v_in, bif_norms_at_t_);
+            solution_norms.push_back(bif_norms_at_t_);
+        }
 
         bool finish = false;
         log->info_f("time_stepper::execute: starting time stepper execution with total time = %f and parameter value = %e", time, param);
         T bif_priv = 0.0;
+        
+        stepper->init_steps(v_in);
+
         while(!finish)
         {
-
+            stepper->pre_execte_step();
             finish = stepper->execute(v_in, v_out);
+
             auto iteraiton = stepper->get_iteration();
             T norm_out = vec_ops->norm(v_out);
             if(std::isnan(norm_out))
