@@ -43,13 +43,13 @@ def main(mu, t1, rtol, atol, f_name, do_print):
     cnt = 0
     all_t.append(0)
     all_y.append(y0)
+    print("total number of points = ", len(file_data[0]) )
     while r.successful() and r.t < t1:
         r.integrate(r.t+dt)
         all_t.append(r.t)
         all_y.append(r.y)
         cnt = cnt + 1
-        dt = file_data[0][cnt] - file_data[0][cnt-1]
-    
+        dt = file_data[0][cnt+1] - file_data[0][cnt]
     
     if(do_print):
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(5, 3))
@@ -63,8 +63,20 @@ def main(mu, t1, rtol, atol, f_name, do_print):
     
     y_res_0 = np.transpose(np.transpose(all_y)[0])
     y_res_1 = np.transpose(np.transpose(all_y)[1])
+    error_pointwise_t = np.array(all_t - np.array(file_data[0][0:len(y_res_0) ]))
     error_pointwise_0 = np.array(y_res_0-np.array(file_data[1][0:len(y_res_0) ]))
     error_pointwise_1 = np.array(y_res_1-np.array(file_data[2][0:len(y_res_1) ]))
+
+    if(do_print):
+        fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(5, 3))
+        axes[0].plot(all_t, error_pointwise_t,'.' )
+        axes[1].plot(all_t, error_pointwise_0,'.' )
+        axes[2].plot(all_t, error_pointwise_1,'.' )
+        axes[0].legend(['err timesteps'])
+        axes[1].legend(['err y(0)'])
+        axes[2].legend(['err y(1)'])        
+        plt.show()
+
     error_L_2 =  np.sqrt(np.sum(error_pointwise_0**2 + error_pointwise_1**2))/np.sqrt(t1) 
     error_max_0 = (np.abs(error_pointwise_0)).max()
     error_max_1 = (np.abs(error_pointwise_1)).max()

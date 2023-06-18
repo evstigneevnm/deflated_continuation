@@ -20,16 +20,15 @@ private:
     using parent_t = time_step_adaptation<VectorOperations, Log>;
 
 public:
-    time_step_adaptation_error_control(VectorOperations* vec_ops_p, Log* log_p, std::pair<T,T> time_interval_p = {0.0,1.0},  T dt_p = 0.1, PositivePreservingCheck* positive_check_p = new detail::positive_preserving_dummy<VectorOperations>() ):
+    time_step_adaptation_error_control(VectorOperations* vec_ops_p, Log* log_p, std::pair<T,T> time_interval_p = {0.0,1.0},  T dt_p = 1.0, PositivePreservingCheck* positive_check_p = new detail::positive_preserving_dummy<VectorOperations>() ):
     parent_t(vec_ops_p, log_p, time_interval_p, dt_p, positive_check_p),
     relative_tolerance_(1.0e-6), //default values
     absolute_tolerance_(1.0e-12), //default values
-    norm_control_(false),
+    norm_control_(true),
     nofailed_(true),
     reject_step_(false),
     nfailed_(0),
-    converged_(true),
-    dt_prev_(dt_p)
+    converged_(true)
     {
         vec_ops_->init_vectors(f_help_, x_help_); vec_ops_->start_use_vectors(f_help_, x_help_);
         threshold_ = absolute_tolerance_/relative_tolerance_;
@@ -37,6 +36,7 @@ public:
     
     ~time_step_adaptation_error_control()
     {
+        log_->info_f("~time_step_adaptation(): total number of failed restarts = %d", nfailed_);
         vec_ops_->stop_use_vectors(f_help_, x_help_); vec_ops_->free_vectors(f_help_, x_help_);
     }
         
@@ -52,6 +52,7 @@ public:
         threshold_ = absolute_tolerance_/relative_tolerance_;
     }
 
+    //accepts initial conditions and initial tanget
     void init_steps(const T_vec& x_p, const T_vec& fx_p)
     {
         
@@ -67,8 +68,8 @@ public:
         else
         {
             vec_ops_->make_abs_copy(x_p, x_help_); 
-            vec_ops_->add_mul_scalar(threshold_, 1.0, x_help_); // |x_p|+threshold_
-            vec_ops_->div_pointwise(1.0,fx_p,1.0,x_help_,f_help_); // f_help = fx_p/ (|x_p| + threshold)
+            vec_ops_->max_pointwise(threshold_, x_help_); // max(|x_p|,threshold_)
+            vec_ops_->div_pointwise(1.0,fx_p,1.0,x_help_,f_help_); // f_help = fx_p/ (max(|x_p|,threshold))
             T norm_f_inf_sc = vec_ops_->norm_inf(f_help_);
             rh = norm_f_inf_sc/dinum;
         }
@@ -77,30 +78,31 @@ public:
             abst = 1.0/rh;
         }
         dt_ = std::max(abst, dt_min_);
+        dt_accepted_ = dt_;
         log_->info_f("time_step_adaptation::init_steps: rel tol = %le, abs tol = %le, initial timestep = %e", relative_tolerance_, absolute_tolerance_, dt_);
     }
-
 
     void pre_execte_step()const
     {
         parent_t::calcualte_dt_min();
         T dt_min_l = dt_min_*current_time_;
         dt_ = std::min(dt_max_, std::max(dt_min_l, dt_));  
+        dt_accepted_ = dt_;
         nofailed_ = true; 
         reject_step_ = false;
         converged_ = true;
     }
+
     bool check_reject_step()const
     {
         return reject_step_;
     }
 
-
     bool estimate_timestep(const T_vec& x_p, const T_vec& x_new_p, const T_vec& f_err_p)
     {
 
         estimate_error_matlab(x_p, x_new_p, f_err_p);
-        if(converged_||reject_step_)
+        if(converged_ || reject_step_ || fail_flag_)
         {
             return true;
         }
@@ -113,7 +115,7 @@ public:
 
 protected:
     using parent_t::dt_;
-    T dt_prev_;
+    using parent_t::dt_accepted_;
     using parent_t::time_interval_;
     using parent_t::current_time_;
     using parent_t::current_step_;
@@ -123,7 +125,7 @@ protected:
     using parent_t::dt_max_;
     using parent_t::dt_min_;
     bool norm_control_; //equivalent to the matlab's definition: Control error relative to the norm of the solution. When NormControl is 'on' (true), the solvers control the error e at each step using the norm of the solution rather than its absolute value: norm(e(i)) <= max(RelTol*norm(y(i)),AbsTol(i)). If the NormControl if 'off' (false), the solvers control the error e using the absolute value: 
-    T power_ = 0.2; // matlab predefined
+    const T power_ = 0.2; // matlab predefined
     T relative_tolerance_;
     T absolute_tolerance_;
     T threshold_;
@@ -151,7 +153,7 @@ private:
             T norm_x_new = vec_ops_->norm(x_new_p);
             T norm_f_err = vec_ops_->norm(f_err_p);
 
-            T errwt = std::max(std::max(norm_x,norm_x_new),threshold_);
+            T errwt = std::max(std::max(norm_x,norm_x_new), threshold_);
             err = dt_*( norm_f_err/errwt);
         }
         else
@@ -159,7 +161,7 @@ private:
             vec_ops_->make_abs_copy(x_p, x_help_); 
             vec_ops_->make_abs_copy(x_new_p, f_help_); 
             vec_ops_->max_pointwise(threshold_, f_help_, x_help_);
-            vec_ops_->div_pointwise(1.0, f_err_p, 1.0, x_help_, f_help_);
+            vec_ops_->div_pointwise(static_cast<T>(1.0), f_err_p, static_cast<T>(1.0), x_help_, f_help_);
             T norm_f_inf_sc = vec_ops_->norm_inf(f_help_);
             err = dt_*norm_f_inf_sc;
         }
@@ -188,13 +190,11 @@ private:
             {
                 dt_ = std::max(dt_min_, static_cast<T>(0.5)*dt_);    
             }
-                        
-
         }
         else
         {
             converged_ = true;
-            dt_prev_ = dt_;
+            dt_accepted_ = dt_;
             if(nofailed_)
             {
                 T temp = static_cast<T>(1.25)*std::pow((err/relative_tolerance_), power_);
@@ -204,7 +204,7 @@ private:
                 }
                 else
                 {
-                    dt_ = 5.0*dt_;
+                    dt_ = static_cast<T>(5.0)*dt_;
                 }
             }
         }

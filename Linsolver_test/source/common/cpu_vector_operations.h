@@ -299,9 +299,16 @@ struct cpu_vector_operations
     {
         for(size_t j=0;j<sz_;j++)
         {
-            y[j] = (x[j]>y[j])?(x[j]>sc?x[j]:sc):(y[j]>sc?y[j]:sc);
+            y[j] = (x[j]>y[j])?( (x[j]>sc)?x[j]:sc):( (y[j]>sc)?y[j]:sc);
         }
     }
+    void max_pointwise(const scalar_type sc, vector_type& y)const
+    {
+        for(size_t j=0;j<sz_;j++)
+        {
+            y[j] = (y[j]>sc)?y[j]:sc;
+        }
+    }    
     // y_j = min(x_j,y_j,sc)
     void min_pointwise(const scalar_type sc, const vector_type& x, vector_type& y)const
     {
@@ -309,7 +316,14 @@ struct cpu_vector_operations
         {
             y[j] = (x[j]<y[j])?( (x[j]<sc)?x[j]:sc):( (y[j]<sc)?y[j]:sc);
         }
-    }    
+    }  
+    void min_pointwise(const scalar_type sc, vector_type& y)const
+    {
+        for(size_t j=0;j<sz_;j++)
+        {
+            y[j] = (y[j]<sc)?y[j]:sc;
+        }
+    }        
     //calc: x := x*mul_y*y
     void mul_pointwise(vector_type& x, const scalar_type mul_y, const vector_type& y)const
     {

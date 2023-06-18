@@ -74,6 +74,7 @@ int main(int argc, char const *argv[])
 
     vec_ops_R->add_mul(2.0, u1_d, 2.0, u3_d);
 
+    printf("||u3||_{inf} = ", vec_ops_R->norm_inf(u3_d) );
 
     printf("result real vector norm=%le\n",(double) vec_ops_R->normalize(u3_d));
     printf("after normalization=%le\n",(double) vec_ops_R->norm(u3_d));

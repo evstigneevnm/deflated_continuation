@@ -25,7 +25,7 @@ public:
     log_(log_p),
     time_interval_(time_interval_p),
     dt_(dt_p),
-    dt_prev_(dt_p),
+    dt_accepted_(dt_p),
     dt_initial_(dt_p),
     current_step_(0),
     fail_flag_(false),
@@ -45,7 +45,7 @@ public:
       
     T get_dt()const
     {
-        return dt_prev_;
+        return dt_;
     }
     T get_time()const
     {
@@ -58,9 +58,9 @@ public:
     }
     time_step_adaptation& operator++()
     {
-        current_time_ += dt_prev_;
+        current_time_ += dt_accepted_;
         current_step_++;
-        if((current_time_+dt_)>time_interval_.second)
+        if((current_time_+dt_accepted_)>time_interval_.second)
         {
             dt_ = time_interval_.second - current_time_;
         }
@@ -96,7 +96,7 @@ public:
 
 protected:
     mutable T dt_;
-    mutable T dt_prev_;
+    mutable T dt_accepted_;
     mutable T dt_min_;
     T dt_initial_;
     std::pair<T,T> time_interval_;

@@ -17,8 +17,8 @@ public:
     using T = typename VectorOperations::scalar_type;
     using T_vec = typename VectorOperations::vector_type;
 
-    time_stepper(VectorOperations* vec_ops_, NonlinearOperator* nonlin_op_, SingleStepper* stepper_, Log* log_):
-    vec_ops(vec_ops_), nonlin_op(nonlin_op_), stepper(stepper_), log(log_)
+    time_stepper(VectorOperations* vec_ops_, NonlinearOperator* nonlin_op_, SingleStepper* stepper_, Log* log_, unsigned int skip_p = 1000):
+    vec_ops(vec_ops_), nonlin_op(nonlin_op_), stepper(stepper_), log(log_), skip_(skip_p)
     {
         vec_ops->init_vector(v_in); vec_ops->start_use_vector(v_in);
         vec_ops->init_vector(v_out); vec_ops->start_use_vector(v_out);
@@ -33,9 +33,9 @@ public:
 
     }
     
-    void set_skip(unsigned int skip_)
+    void set_skip(unsigned int skip_p)
     {
-        skip = skip_;
+        skip_ = skip_p;
     }
     void set_parameter(const T param_)
     {
@@ -65,41 +65,38 @@ public:
         if(!param_set) throw std::logic_error("time_stepper::execute: parameter value not set.");
         if(!initials_set) throw std::logic_error("time_stepper::execute: initial conditions not set.");
         
-        {
-            std::vector<T> bif_norms_at_t_;
-            bif_norms_at_t_.push_back(simulated_time);
-            nonlin_op->norm_bifurcation_diagram(v_in, bif_norms_at_t_);
-            solution_norms.push_back(bif_norms_at_t_);
-        }
-
         bool finish = false;
         log->info_f("time_stepper::execute: starting time stepper execution with total time = %f and parameter value = %e", time, param);
         T bif_priv = 0.0;
         
         stepper->init_steps(v_in);
+        
+        {
+            auto dt = stepper->get_dt();
+            std::vector<T> bif_norms_at_t_;
+            bif_norms_at_t_.push_back(simulated_time);
+            nonlin_op->norm_bifurcation_diagram(v_in, bif_norms_at_t_);
+            bif_norms_at_t_.push_back(dt);
+            solution_norms.push_back(bif_norms_at_t_);
+        }
 
         while(!finish)
         {
             stepper->pre_execte_step();
             finish = stepper->execute(v_in, v_out);
-
             auto iteraiton = stepper->get_iteration();
-            T norm_out = vec_ops->norm(v_out);
-            if(std::isnan(norm_out))
-            {
-                throw std::runtime_error("time_stepper::execute: nan returned at iteration " + std::to_string(iteraiton));
-            }
             auto dt = stepper->get_dt();
+            T simulated_time_p = simulated_time;
             simulated_time = stepper->get_time();
             std::vector<T> bif_norms_at_t_;
             bif_norms_at_t_.push_back(simulated_time);
             nonlin_op->norm_bifurcation_diagram(v_out, bif_norms_at_t_);
-            
+            bif_norms_at_t_.push_back(simulated_time-simulated_time_p);
             solution_norms.push_back(bif_norms_at_t_);
             T bif_now = bif_norms_at_t_.back();
-            if(iteraiton%skip == 0)
+            if(iteraiton%skip_ == 0)
             {
-                log->info_f("time_stepper::execute: step %d, time %.2f, dt %.2e, norm %.2e, d_norm %.2e", iteraiton, simulated_time, dt, bif_now, (bif_now - bif_priv) );
+                log->info_f("time_stepper::execute: step %d, time %.2f, dt %le, norm %.2le, d_norm %.2le", iteraiton, simulated_time, dt, bif_now, (bif_now - bif_priv) );
                 bif_priv = bif_now;
             }
             vec_ops->assign(v_out, v_in);
@@ -142,7 +139,7 @@ private:
     bool param_set = false;
     bool time_set = false;
     bool initials_set = false;
-    unsigned int skip = 1000;
+    unsigned int skip_;
 
     T_vec v_in = nullptr;
     T_vec v_out = nullptr;

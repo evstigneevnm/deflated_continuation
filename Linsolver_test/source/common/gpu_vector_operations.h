@@ -11,6 +11,10 @@
 #include <utility>
 #include <stdexcept>
 
+//for reduction
+#include <thrust/extrema.h>
+#include <thrust/execution_policy.h>
+
 //debug for file output!
 #include <iostream>
 #include <fstream>
@@ -81,6 +85,7 @@ struct gpu_vector_operations
         calculate_cuda_grid();
         location=true;
         x_host = host_allocate<scalar_type>(sz);
+        x_device = device_allocate<scalar_type>(sz);
     }
 
     gpu_vector_operations(size_t sz_, dim3 dimBlock_, dim3 dimGrid_): 
@@ -90,11 +95,13 @@ struct gpu_vector_operations
     {
         location=true;
         x_host = host_allocate<scalar_type>(sz);
+        x_device = device_allocate<scalar_type>(sz);
     }
     //DISTRUCTOR!
     ~gpu_vector_operations()
     {
         host_deallocate<scalar_type>(x_host);
+        cudaFree(x_device);
         if(gpu_reduction_hp != nullptr)
         {
             delete gpu_reduction_hp;
@@ -244,7 +251,7 @@ struct gpu_vector_operations
     {
         vector_type x_host = view(vec);
         std::ofstream check_file(f_name);
-        for(int j=0; j<sz-1; j++)
+        for(size_t j=0; j<sz-1; j++)
         {
             check_file << std::scientific << std::setprecision(16) << x_host[j] << std::endl;
         }
@@ -403,9 +410,14 @@ struct gpu_vector_operations
     } 
     Tsc norm_inf(const vector_type& x) const
     {
-        Tsc result = 0;
-        throw std::logic_error("to be implemented using thrust?!");
-        return result;
+        assign(x, x_device);
+        make_abs(x_device);
+        Tsc *result_device;
+        result_device = thrust::max_element(thrust::device, x, x + sz);
+        Tsc *result_host;
+        device_2_host_cpy<Tsc>(result_host, result_device, 1);
+        // throw std::logic_error("to be implemented using thrust?!");
+        return result_host[0];
     }
     //calc: x := <vector_type with all elements equal to given scalar value> 
     void assign_scalar(const scalar_type scalar, vector_type& x)const;
@@ -460,15 +472,13 @@ struct gpu_vector_operations
     //sets absolute values to a vector, overweites it
     void make_abs(vector_type& x)const;
     // y_j = max(x_j,y_j,sc)
-    void max_pointwise(const scalar_type sc, const vector_type& x, vector_type& y)const
-    {
-        throw std::logic_error("to be implemented.");
-    }
+    void max_pointwise(const scalar_type sc, const vector_type& x, vector_type& y)const;
     // y_j = min(x_j,y_j,sc)
-    void min_pointwise(const scalar_type sc, const vector_type& x, vector_type& y)const
-    {
-        throw std::logic_error("to be implemented.");
-    }
+    void min_pointwise(const scalar_type sc, const vector_type& x, vector_type& y)const;
+    // y_j = max(y_j,sc)
+    void max_pointwise(const scalar_type sc, vector_type& y)const;
+    // y_j = min(y_j,sc)
+    void min_pointwise(const scalar_type sc, vector_type& y)const;    
     //calc: y := mul_x*x
     void assign_mul(const scalar_type mul_x, const vector_type& x, vector_type& y)const;
     //cublas axpy: y=y+mul_x*x;
@@ -545,7 +555,7 @@ struct gpu_vector_operations
 
 //*/
 private:
-    vector_type x_host;
+    vector_type x_host, x_device;
     cublas_wrap *cuBLAS;
     size_t sz;
     dim3 dimBlock;
