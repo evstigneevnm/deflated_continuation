@@ -124,7 +124,7 @@ protected:
     using parent_t::fail_flag_;
     using parent_t::dt_max_;
     using parent_t::dt_min_;
-    bool norm_control_; //equivalent to the matlab's definition: Control error relative to the norm of the solution. When NormControl is 'on' (true), the solvers control the error e at each step using the norm of the solution rather than its absolute value: norm(e(i)) <= max(RelTol*norm(y(i)),AbsTol(i)). If the NormControl if 'off' (false), the solvers control the error e using the absolute value: 
+    bool norm_control_; //equivalent to the matlab's definition: Control error relative to the norm of the solution. When NormControl is 'on' (true), the solvers control the error e at each step using the norm of the solution rather than its absolute value: norm(e(i)) <= max(RelTol*norm(y(i)),AbsTol(i)). If the NormControl if 'off' (false), the solvers control the error e using the absolute value
     const T power_ = 0.2; // matlab predefined
     T relative_tolerance_;
     T absolute_tolerance_;

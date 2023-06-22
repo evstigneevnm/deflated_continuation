@@ -98,6 +98,16 @@ private:
         bool intersect_min = false;
         bool intersect_max = false;
 
+        if(!std::isfinite(parent_t::lambda0))
+        {
+            throw std::runtime_error("continuation_analytical::check_interval: fatal nonfinite value of lambda0 = " + std::to_string(parent_t::lambda0) );
+        }
+        if(!std::isfinite(parent_t::lambda1))
+        {
+            throw std::runtime_error("continuation_analytical::check_interval: fatal nonfinite value of lambda1 = " + std::to_string(parent_t::lambda1) );
+        }
+
+
         if( (parent_t::lambda_min - parent_t::lambda1)*(parent_t::lambda_min - parent_t::lambda0)<=T(0.0) )
         {
             parent_t::lambda1 = parent_t::lambda_min;

@@ -101,7 +101,7 @@ private:
             v=0.0;
             if((use_small_alpha)&&(alpha<alpha_threshold_))
             {
-                std::cout << "\n==============SMALL ALPHA===========\n";
+                // std::cout << "\n==============SMALL ALPHA===========\n";
                 small_alpha=true;
             }
         }
@@ -114,7 +114,7 @@ private:
             v=0.0;
             if((use_small_alpha)&&(alpha<alpha_threshold_))
             {
-                std::cout << "\n==============SMALL ALPHA===========\n";
+                // std::cout << "\n==============SMALL ALPHA===========\n";
                 small_alpha=true;
             }            
         }        
@@ -408,7 +408,7 @@ public:
 private:
     linear_solver_type linear_solver;
     linear_solver_original_type linear_solver_original;
-    const scalar_type alpha_threshold_ = 1.0e1;
+    const scalar_type alpha_threshold_ = 1.0e-4;
 
     LinearOperator_SM_t oper;
     Preconditioner_SM_t prec;

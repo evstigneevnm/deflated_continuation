@@ -26,9 +26,12 @@
 namespace utils
 {
 
+#define LOG_BUFFER_SIZE 500
+
 class log
 {
-    char    buf[200];
+
+    char    buf[LOG_BUFFER_SIZE];
 public:
     //INFO_ALL refers to multi-process applications (like MPI) and means message, that must be said distintly by each process (like, 'i'm 1st; i'm second etc')
     enum t_msg_type { INFO, INFO_ALL, WARNING, ERROR };
@@ -54,7 +57,7 @@ public:
     
 
     #define LOG__FORMATTED_OUT_V__(METHOD_NAME,LOG_LEV)   \
-        vsprintf(buf, s.c_str(), arguments);              \
+        std::vsnprintf(buf, LOG_BUFFER_SIZE, s.c_str(), arguments);              \
         METHOD_NAME(std::string(buf), LOG_LEV);
     void v_info_f(int _log_lev, const std::string &s, va_list arguments)
     {
@@ -94,7 +97,7 @@ public:
     #define LOG__FORMATTED_OUT__(METHOD_NAME,LOG_LEV)   \
         va_list arguments;                              \
         va_start ( arguments, s );                      \
-        vsprintf(buf, s.c_str(), arguments);            \
+        std::vsnprintf(buf, LOG_BUFFER_SIZE, s.c_str(), arguments);            \
         METHOD_NAME(std::string(buf), LOG_LEV);         \
         va_end ( arguments );   
     void info_f(int _log_lev, const std::string &s, ...)

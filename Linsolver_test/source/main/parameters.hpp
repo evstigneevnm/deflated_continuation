@@ -70,6 +70,9 @@ struct parameters
             T tolerance;
             T relax_tolerance_factor;
             int relax_tolerance_steps;
+            unsigned int stagnation_max;
+            T maximum_norm_increase;
+            T newton_wight_threshold;
             void set_default()
             {
                 newton_max_it = 300;
@@ -78,7 +81,10 @@ struct parameters
                 verbose = true;            
                 tolerance = 1.0e-9;   
                 relax_tolerance_factor = 10;
-                relax_tolerance_steps = 1;       
+                relax_tolerance_steps = 1;     
+                stagnation_max = 10;
+                maximum_norm_increase = 2.0;
+                newton_wight_threshold = 1.0e-12;
             }
             void plot_all()
             {
@@ -89,6 +95,9 @@ struct parameters
                 std::cout << "||  |==tolerance: " << tolerance << std::endl;
                 std::cout << "||  |==relax_tolerance_factor: " << relax_tolerance_factor << std::endl;
                 std::cout << "||  |==relax_tolerance_steps: " << relax_tolerance_steps << std::endl;
+                std::cout << "||  |==stagnation_max: " << stagnation_max << std::endl;
+                std::cout << "||  |==maximum_norm_increase: " << maximum_norm_increase << std::endl;
+                std::cout << "||  |==newton_wight_threshold: " << newton_wight_threshold << std::endl;
             }             
         };
         struct newton_extended_deflation_s
@@ -481,7 +490,10 @@ void from_json(const nlohmann::json &j, parameters_d::deflation_continuation_s::
         j.at("verbose").get<bool>(),
         j.at("tolerance").get<double>(),
         j.at("relax_tolerance_factor").get<double>(),
-        j.at("relax_tolerance_steps").get<int>()
+        j.at("relax_tolerance_steps").get<int>(),
+        j.at("stagnation_max").get<unsigned int>(),
+        j.at("maximum_norm_increase").get<double>(),
+        j.at("newton_wight_threshold").get<double>()
         
     };
 }
@@ -495,7 +507,10 @@ void from_json(const nlohmann::json &j, parameters_f::deflation_continuation_s::
         j.at("verbose").get<bool>(),
         j.at("tolerance").get<float>(),
         j.at("relax_tolerance_factor").get<float>(),
-        j.at("relax_tolerance_steps").get<int>()        
+        j.at("relax_tolerance_steps").get<int>(),
+        j.at("stagnation_max").get<unsigned int>(),
+        j.at("maximum_norm_increase").get<float>(),
+        j.at("newton_wight_threshold").get<float>()              
         
     };
 }

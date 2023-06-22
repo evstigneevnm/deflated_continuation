@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <string>
 #include <sstream>
-
+#include <array>
 // #include <utils/init_cuda.h>
 
 #include <utils/log.h>
@@ -27,36 +27,45 @@ namespace nonlinear_operators
 {
 
 template<class VectorOperations>
-struct vdp
+struct rossler //https://en.wikipedia.org/wiki/R%C3%B6ssler_attractor
 {
     using T = typename VectorOperations::scalar_type;
     using T_vec = typename VectorOperations::vector_type;
 
-    vdp() = default;
-    ~vdp() = default;
+    rossler(unsigned int used_param_number, T a_init, T b_init, T c_init):
+    used_param_number_(used_param_number), param{a_init, b_init, c_init}
+    {}
+    ~rossler() = default;
 
     void F(const T time_p, const T_vec& in_p, const T param_p, T_vec& out_p )const
     {
-        // dydt = [y(2); mu*(1-y(1)^2)*y(2)-y(1)];
-        out_p[0] = in_p[1];
-        out_p[1] = param_p*(1-in_p[0]*in_p[0])*in_p[1]-in_p[0];
+        param[used_param_number_] = param_p;
+
+        out_p[0] = -in_p[1]-in_p[2];
+        out_p[1] = in_p[0]+param[0]*in_p[1];
+        out_p[2] = param[1] + in_p[2]*(out_p[0]-param[2]);
     }
 
     void set_initial(T_vec& x0)const
     {
         x0[0] = 2.0;
         x0[1] = 0.0;
+        x0[2] = 0.0;
     }
 
     void norm_bifurcation_diagram(const T_vec& x0, std::vector<T>& norm_vec)const
     {
         norm_vec.push_back(x0[0]);
         norm_vec.push_back(x0[1]);
+        norm_vec.push_back(x0[2]);
     }
     T check_solution_quality(const T_vec& x)const
     {
-        return 0.0;
+        return std::isfinite(x);
     }
+private:
+    unsigned int used_param_number_;
+    std::array<T, 3> param;
 
 };
 }
@@ -72,7 +81,7 @@ int main(int argc, char const *argv[])
     using vec_ops_t = cpu_vector_operations<real>;
     using vec_t = typename vec_ops_t::vector_type;
 
-    using nlin_op_t = nonlinear_operators::vdp<vec_ops_t>;
+    using nlin_op_t = nonlinear_operators::rossler<vec_ops_t>;
     
     using time_step_const_t = time_steppers::time_step_adaptation_constant<vec_ops_t, log_t>;
     using time_step_err_ctrl_t = time_steppers::time_step_adaptation_error_control<vec_ops_t, log_t>;
@@ -103,8 +112,8 @@ int main(int argc, char const *argv[])
     vec_ops.init_vector(x0); vec_ops.start_use_vector(x0);
 
 
-    nlin_op_t vdp;
-    vdp.set_initial(x0);
+    nlin_op_t rossler(2, 0.2, 0.2, 1.0); //use second parameter as a bifurcation parameter.
+    rossler.set_initial(x0);
 
     
     time_step_const_t time_step_const(&vec_ops, &log, {0.0, simulation_time}, 5.0e-3);
@@ -141,18 +150,18 @@ int main(int argc, char const *argv[])
     }
 
 
-    single_step_const_t explicit_step_const(&vec_ops, &vdp, &time_step_const, &log, mu, method);
-    single_step_err_ctrl_t explicit_step_err_control(&vec_ops, &vdp, &time_step_err_ctrl, &log, mu, method);
+    single_step_const_t explicit_step_const(&vec_ops, &rossler, &time_step_const, &log, mu, method);
+    single_step_err_ctrl_t explicit_step_err_control(&vec_ops, &rossler, &time_step_err_ctrl, &log, mu, method);
     
-    time_stepper_const_t time_stepper_const(&vec_ops, &vdp, &explicit_step_const, &log);
-    time_stepper_err_ctrl_t time_stepper_err_ctrl(&vec_ops, &vdp, &explicit_step_err_control, &log);
+    time_stepper_const_t time_stepper_const(&vec_ops, &rossler, &explicit_step_const, &log);
+    time_stepper_err_ctrl_t time_stepper_err_ctrl(&vec_ops, &rossler, &explicit_step_err_control, &log);
 
     log.info_f("executing time stepper with time = %.2le", simulation_time);
     time_stepper_err_ctrl.set_parameter(mu);
     time_stepper_err_ctrl.set_initial_conditions(x0, 0.0);
     time_stepper_err_ctrl.execute();
     std::stringstream ss;
-    ss << "vdp_result_" << scheme_name << ".dat";
+    ss << "rossler_result_" << scheme_name << ".dat";
     time_stepper_err_ctrl.save_norms( ss.str() );
     // std::stringstream ss;
     // ss << "x_" << simulation_time << "_sim.pos";

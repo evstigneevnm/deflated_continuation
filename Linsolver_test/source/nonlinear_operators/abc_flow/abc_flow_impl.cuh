@@ -143,7 +143,7 @@ void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::force_Fourier_si
 
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
-__global__ void force_ABC_kernel(size_t Nx, size_t Ny, size_t Nz, T_vec force_x, T_vec force_y, T_vec force_z)
+__global__ void force_ABC_kernel(size_t Nx, size_t Ny, size_t Nz, T A, T B, T C, T_vec force_x, T_vec force_y, T_vec force_z)
 {
 unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
 unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
@@ -161,9 +161,6 @@ if ( index_in < sizeOfData )
     T x = T(j)*T(2.0*M_PI)/T(Nx);
     T y = T(k)*T(2.0*M_PI)/T(Ny);
     T z = T(l)*T(2.0*M_PI)/T(Nz);
-    const T A = static_cast<T>(1.0);
-    const T B = static_cast<T>(1.0);
-    const T C = static_cast<T>(2.0);
     force_x[I3(j,k,l)] = A*sin(z)+C*cos(y);
     force_y[I3(j,k,l)] = B*sin(x)+A*cos(z);
     force_z[I3(j,k,l)] = C*sin(y)+B*cos(x);
@@ -173,7 +170,7 @@ if ( index_in < sizeOfData )
 template <typename TR, typename TR_vec, typename TC, typename TC_vec>
 void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::force_ABC(TR_vec force_x, TR_vec force_y, TR_vec force_z)
 {
-    force_ABC_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNR, dimBlockN>>>(Nx, Ny, Nz, force_x, force_y, force_z);
+    force_ABC_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNR, dimBlockN>>>(Nx, Ny, Nz, A_, B_, C_, force_x, force_y, force_z);
 }
 
 
@@ -572,6 +569,37 @@ template <typename TR, typename TR_vec, typename TC, typename TC_vec>
 void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::convert_size(size_t Nx_dest, size_t Ny_dest, size_t Mz_dest, TR scale, TC_vec ux_src_hat, TC_vec uy_src_hat, TC_vec uz_src_hat, TC_vec ux_dest_hat, TC_vec uy_dest_hat, TC_vec uz_dest_hat)
 {
     convert_size_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, Nx_dest, Ny_dest, Mz_dest, scale, ux_src_hat, uy_src_hat, uz_src_hat, ux_dest_hat, uy_dest_hat, uz_dest_hat);
+}
+
+
+
+
+template<typename TC, typename TC_vec>
+__global__ void mul_scalar_kernel(size_t N, TC alpha, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i>=N) return;
+    
+    v_x[i]+=alpha;
+    v_y[i]+=alpha;
+    v_z[i]+=alpha;
+
+}
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::mul_scalar(TC alpha, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+{
+
+    mul_scalar_kernel<TC, TC_vec><<<dimGrid1C, dimBlock1>>>(Nx*Ny*Mz, alpha, v_x, v_y, v_z);
+
+}
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::mul_scalar(TR alpha, TR_vec v_x, TR_vec v_y, TR_vec v_z)
+{
+
+    mul_scalar_kernel<TR, TR_vec><<<dimGrid1R, dimBlock1>>>(Nx*Ny*Nz, alpha, v_x, v_y, v_z);
+
 }
 
 

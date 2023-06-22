@@ -16,6 +16,8 @@
 #include <boost/archive/text_iarchive.hpp>
 // #include <boost/archive/binary_oarchive.hpp>
 // #include <boost/archive/binary_iarchive.hpp>
+// #include <boost/archive/xml_oarchive.hpp>
+// #include <boost/archive/xml_iarchive.hpp>
 
 #include <containers/curve_helper_container.h>
 #include <containers/bifurcation_diagram_curve.h>
@@ -55,7 +57,8 @@ private:
 
     typedef typename boost::archive::text_oarchive data_output;
     typedef typename boost::archive::text_iarchive data_input;
-
+    // typedef typename boost::archive::xml_oarchive data_output;
+    // typedef typename boost::archive::xml_iarchive data_input;
 
     //linear solver
     using lin_slv_t = LinearSolver<LinearOperator, Preconditioner, VectorOperations, Monitor, Log>;

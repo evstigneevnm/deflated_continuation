@@ -17,8 +17,8 @@ public:
     using T = typename VectorOperations::scalar_type;
     using T_vec = typename VectorOperations::vector_type;
 
-    time_stepper(VectorOperations* vec_ops_, NonlinearOperator* nonlin_op_, SingleStepper* stepper_, Log* log_, unsigned int skip_p = 1000):
-    vec_ops(vec_ops_), nonlin_op(nonlin_op_), stepper(stepper_), log(log_), skip_(skip_p)
+    time_stepper(VectorOperations* vec_ops_, NonlinearOperator* nonlin_op_p, SingleStepper* stepper_, Log* log_, unsigned int skip_p = 1000):
+    vec_ops(vec_ops_), nonlin_op_(nonlin_op_p), stepper(stepper_), log(log_), skip_(skip_p)
     {
         vec_ops->init_vector(v_in); vec_ops->start_use_vector(v_in);
         vec_ops->init_vector(v_out); vec_ops->start_use_vector(v_out);
@@ -47,7 +47,7 @@ public:
     void set_initial_conditions(const T_vec& x_, T perturbations_ = 0.0)
     {
         vec_ops->assign(x_, v_in);
-        // nonlin_op->randomize_vector(v_helper);
+        // nonlin_op_->randomize_vector(v_helper);
         // vec_ops->add_mul(perturbations_, v_helper, v_in);
         vec_ops->assign(v_in, v_out); //as initialization
         initials_set = true;
@@ -75,7 +75,7 @@ public:
             auto dt = stepper->get_dt();
             std::vector<T> bif_norms_at_t_;
             bif_norms_at_t_.push_back(simulated_time);
-            nonlin_op->norm_bifurcation_diagram(v_in, bif_norms_at_t_);
+            nonlin_op_->norm_bifurcation_diagram(v_in, bif_norms_at_t_);
             bif_norms_at_t_.push_back(dt);
             solution_norms.push_back(bif_norms_at_t_);
         }
@@ -90,13 +90,14 @@ public:
             simulated_time = stepper->get_time();
             std::vector<T> bif_norms_at_t_;
             bif_norms_at_t_.push_back(simulated_time);
-            nonlin_op->norm_bifurcation_diagram(v_out, bif_norms_at_t_);
+            nonlin_op_->norm_bifurcation_diagram(v_out, bif_norms_at_t_);
             bif_norms_at_t_.push_back(simulated_time-simulated_time_p);
             solution_norms.push_back(bif_norms_at_t_);
-            T bif_now = bif_norms_at_t_.back();
+            T bif_now = bif_norms_at_t_.at(2);
             if(iteraiton%skip_ == 0)
             {
-                log->info_f("time_stepper::execute: step %d, time %.2f, dt %le, norm %.2le, d_norm %.2le", iteraiton, simulated_time, dt, bif_now, (bif_now - bif_priv) );
+                T solution_quality = nonlin_op_->check_solution_quality(v_out);
+                log->info_f("time_stepper::execute: step %d, time %.2f, dt %.2le, norm %.2le, d_norm %.2le, quality %.2le", iteraiton, simulated_time, dt, bif_now, (bif_now - bif_priv), solution_quality );
                 bif_priv = bif_now;
             }
             vec_ops->assign(v_out, v_in);
@@ -134,7 +135,7 @@ private:
     std::vector< std::vector<T> > solution_norms;
     VectorOperations* vec_ops;
     SingleStepper* stepper;
-    NonlinearOperator* nonlin_op;
+    NonlinearOperator* nonlin_op_;
     Log* log;
     bool param_set = false;
     bool time_set = false;

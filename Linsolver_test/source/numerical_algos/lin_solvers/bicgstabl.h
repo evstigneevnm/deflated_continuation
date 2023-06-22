@@ -89,7 +89,7 @@ private:
             prec_->apply(r);
         }
     }
-    int     normalize_(vector_type &v)const
+    void     normalize_(vector_type &v)const
     {
         T norm2 = std::sqrt( vec_ops_->scalar_prod(v, v) );
         vec_ops_->assign_mul(T(1.f)/norm2, v, v);

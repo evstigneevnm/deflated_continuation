@@ -175,7 +175,6 @@ public:
         bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files);
         sol_storage_def = new sol_storage_def_t(vec_ops, 50, vec_ops->get_l2_size(), 2.0 );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
         deflate = new deflate_t(vec_ops, file_ops, log, nonlin_op, lin_op, SM, sol_storage_def);
-
     }
     ~deflation_continuation()
     {
@@ -291,7 +290,10 @@ public:
 
         int relax_tolerance_steps_ = parameters->deflation_continuation.newton_extended_continuation.relax_tolerance_steps;
 
-        continuate->set_newton(tolerance_, maximum_iterations_, relax_tolerance_factor_, relax_tolerance_steps_, newton_wight_, store_norms_history_, verbose_);
+        auto stagnation_max_l = parameters->deflation_continuation.newton_extended_continuation.stagnation_max;
+        auto maximum_norm_increase_l = parameters->deflation_continuation.newton_extended_continuation.maximum_norm_increase;
+        auto newton_wight_threshold_l = parameters->deflation_continuation.newton_extended_continuation.newton_wight_threshold;
+        continuate->set_newton(tolerance_, maximum_iterations_, relax_tolerance_factor_, relax_tolerance_steps_, newton_wight_, store_norms_history_, verbose_, stagnation_max_l, maximum_norm_increase_l, newton_wight_threshold_l);
 
     }
 
@@ -350,7 +352,14 @@ public:
             {
                 log->info_f("MAIN:deflation_continuation: reading data for the bifurcaiton diagram from %s ...", (project_dir + file_name_).c_str() );
                 data_input ia(load_file);
-                ia >> (*bif_diag);
+                try
+                {
+                    ia >> (*bif_diag);
+                }
+                catch(const boost::archive::archive_exception& e)
+                {
+                    log->error_f("MAIN:deflation_continuation: reading boost serialization failed: %s", e.what() );
+                }
                 load_file.close();
                 log->info_f("MAIN:deflation_continuation: read data for the bifurcaiton diagram from %s", (project_dir + file_name_).c_str() );
                 file_exists = true;
@@ -371,7 +380,14 @@ public:
             log->info_f("MAIN:deflation_continuation: saving data for the bifurcaiton diagram in %s ...", (project_dir + file_name_).c_str() );
             std::ofstream save_file( (project_dir + file_name_).c_str() );
             data_output oa(save_file);
-            oa << (*bif_diag);
+            try
+            {
+                oa << (*bif_diag);
+            }
+            catch(const boost::archive::archive_exception& e)
+            {
+                log->error_f("MAIN:deflation_continuation: writing boost serialization failed: %s", e.what() );
+            }
             save_file.close();
             log->info_f("MAIN:deflation_continuation: saved data for the bifurcaiton diagram in %s", (project_dir + file_name_).c_str() );
         }        
@@ -468,6 +484,11 @@ public:
             sol_storage_def->clear();
             log->info_f("MAIN:deflation_continuation: currently having %i curves.", bif_diag->current_curve() );
 
+            vec_ops->init_vector(x_deflation); vec_ops->start_use_vector(x_deflation);
+            nonlin_op->exact_solution(lambda, x_deflation);
+            sol_storage_def->set_known_solution(x_deflation);
+            vec_ops->stop_use_vector(x_deflation); vec_ops->free_vector(x_deflation);
+            
             bif_diag->find_intersection(lambda, sol_storage_def);
 
             bool is_new_solution = deflate->find_solution(lambda);

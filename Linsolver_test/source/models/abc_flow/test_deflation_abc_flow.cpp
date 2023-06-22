@@ -54,15 +54,15 @@ int main(int argc, char const *argv[])
 
     //linsolver control
     unsigned int lin_solver_max_it = 2000;
-    real lin_solver_tol = 1.0e-3;
+    real lin_solver_tol = 1.0e-2;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 4;
     //newton deflation control
-    unsigned int newton_def_max_it = 2000;
+    unsigned int newton_def_max_it = 500;
     real newton_def_tol = 1.0e-9;
     real Power = 2.0;
-
+    real newton_wight = 1.0;
 
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
     size_t Mz = CUFFT_C2R->get_reduced_size();
@@ -86,6 +86,12 @@ int main(int argc, char const *argv[])
 
     abc_flow_t *ABC = new abc_flow_t(Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
 
+    vec x0;
+    vec_ops->init_vector(x0); vec_ops->start_use_vector(x0);
+    ABC->randomize_vector(x0);
+    ABC->write_solution_abs("abs_initial.pos", x0);
+    vec_ops->stop_use_vector(x0); vec_ops->free_vector(x0);
+
 
     log_t *log = new log_t();
     log->set_verbosity(1);
@@ -106,7 +112,7 @@ int main(int argc, char const *argv[])
     SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle()->set_basis_size(basis_sz);
 
-    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops, log, newton_def_tol, newton_def_max_it, real(0.5), true );
+    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops, log, newton_def_tol, newton_def_max_it, newton_wight, true );
 
     sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops, 50, norm_wight, Power);
     system_operator_def_t *system_operator_def = new system_operator_def_t(vec_ops, Ax, SM, sol_storage_def);
@@ -127,10 +133,15 @@ int main(int argc, char const *argv[])
   
     deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops, log, newton_def, 5);
 
-    
+    ABC->exact_solution(Rey, x0);
+    sol_storage_def->set_known_solution(x0);
+
     deflation_op->execute_all(Rey, ABC, sol_storage_def);
     //deflation_op->find_add_solution(Rey, ABC, sol_storage_def);
     
+
+    ABC->write_solution_vec("vec_initial.pos", (vec&)x0);
+    ABC->write_solution_abs("abs_initial.pos", (vec&)x0);
 
     unsigned int p=0;
     for(auto &x: *sol_storage_def)
@@ -143,10 +154,7 @@ int main(int argc, char const *argv[])
         printf( "norm = %.17le\n", ABC->norm( (vec&)x ) );
         p++;
     }
-   
-
-
-    
+        
     delete deflation_op;
     delete ABC;
     delete prec;

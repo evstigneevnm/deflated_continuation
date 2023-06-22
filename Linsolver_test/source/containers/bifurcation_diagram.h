@@ -61,6 +61,12 @@ public:
     bifurcation_diagram()
     {
         //void default constructor for boost serialization
+        log = nullptr;
+    }
+
+    Log* get_log()const
+    {
+        return log;
     }
 
     ~bifurcation_diagram()

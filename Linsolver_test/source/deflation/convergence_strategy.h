@@ -21,6 +21,7 @@ private:
     typedef typename VectorOperations::vector_type  T_vec;
 //    typedef utils::logged_obj_base<Logging> logged_obj_t;
 
+    const T max_norm_Fx_ = 1.0e5;
 public:    
     convergence_strategy(VectorOperations*& vec_ops_, Logging*& log_, T tolerance_ = 1.0e-6, unsigned int maximum_iterations_ = 100, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true):
     vec_ops(vec_ops_),
@@ -40,7 +41,7 @@ public:
             norms_evolution.reserve(maximum_iterations);
         }
         stagnation_max = 10;
-        maximum_norm_increase_ = 0.0;
+        maximum_norm_increase_ = 10.0;
         newton_wight_threshold_ = 1.0e-7;
     }
     ~convergence_strategy()
@@ -110,7 +111,7 @@ public:
         iterations++;
         log->info_f("deflation::convergence: iteration %i, residuals n: %le, n+1: %le, wight: %le",iterations, (double)normFx, (double)normFx1, (double)newton_wight );
 
-        const T max_norm_Fx = 1.0e12;
+        
         reset_wight();
 
         if(std::isnan(normFx))
@@ -135,9 +136,9 @@ public:
             finish = true;
             result_status = 2;            
         }
-        else if(normFx1 > max_norm_Fx)
+        else if(normFx1 > max_norm_Fx_)
         {
-            log->error_f("deflation::convergence: Newton update went above %le, stopping.", double(max_norm_Fx) );
+            log->error_f("deflation::convergence: Newton update went above %le, stopping.", double(max_norm_Fx_) );
             finish = true;
             result_status = 2;            
         }
@@ -159,7 +160,7 @@ public:
             result_status = 1;
             finish = true;
         }
-        if( std::abs(normFx-normFx1)<1.0e-6)
+        if( std::abs(normFx-normFx1)/normFx<1.0e-6)
         {
             stagnation++;
         }

@@ -16,11 +16,17 @@
 #include <common/vector_pool.h>
 
 #include <tuple>
+#include <limits>
+#include <utility>
 
 
 namespace nonlinear_operators
 {
 
+// 0: fft->scale->ifft
+// 1: fft->ifft->scale
+// 2: fft->sqrt(scale)->ifft->sqrt(scale)
+const char abc_flow_fft_rescale = 0;
 
 template<class VecOps> //it is assumed either over C or over R
 class block_vec //axilary class for block vectors
@@ -183,18 +189,32 @@ public:
         FFT_type* FFT_): 
     Nx(Nx_), Ny(Ny_), Nz(Nz_), 
     vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), vec_ops(vec_ops_),
-    FFT(FFT_)
+    FFT(FFT_),
+    A_(1.0),
+    B_(1.0),
+    C_(1.0)
     {
         scale_force = T(1.0);
 
         Mz=FFT->get_reduced_size();
         common_constructor_operation();
-        kern = new kern_t(Nx, Ny, Nz, Mz, BLOCK_SIZE_x, BLOCK_SIZE_y);
+        kern = new kern_t(Nx, Ny, Nz, Mz, A_, B_, C_, BLOCK_SIZE_x, BLOCK_SIZE_y);
         init_all_derivatives();
         Lx = T(2.0)*M_PI;
         Ly = T(2.0)*M_PI;
         Lz = T(2.0)*M_PI;
         plot = new plot_t(vec_ops_R_, Nx_, Ny_, Nz_, Lx, Ly, Lz);
+
+        std::cout << "abc_flow===> nonlinear problem class self-testing:" << std::endl;
+        for(unsigned int j=0;j<1;j++)
+        {   
+            auto manufactured_norm = manufactured_solution(j);
+            std::cout << "abc_flow===> manufactured solution number: " << j <<  ", solution norm = "<< manufactured_norm.first << ", residual norm = " << manufactured_norm.second << std::endl;
+            if( !std::isfinite(manufactured_norm.second) ||(manufactured_norm.second > std::numeric_limits<T>::epsilon()*1000.0 ))
+            {
+                throw std::runtime_error("manufactures solution number: " + std::to_string(j) + " returned bad residual norm!" );
+            }
+        }
     }
 
 
@@ -207,7 +227,7 @@ public:
 
     void F(const T time_p, const T_vec& u, const T Reynolds_, T_vec& v)
     {
-        //for generall call to the time stepper.
+        //for general call to the time stepper.
         F(u, Reynolds_, v);
     }
 
@@ -232,7 +252,7 @@ public:
         // vec_ops_C->assign_scalar(0.0,W.y);
         // vec_ops_C->assign_scalar(0.0,W.z);
         B_V_nabla_F(U, U, W); //W:= (U, nabla) U
-        kern->add_mul3(TC(-1,0), forceABC.x, forceABC.y, forceABC.z, W.x, W.y, W.z); // force:= W-force
+        kern->add_mul3(TC(-1.0/Reynolds_,0), forceABC.x, forceABC.y, forceABC.z, W.x, W.y, W.z); // force:= W-force
         project(W); // W:=P[W]??
         kern->negate3(W.x, W.y, W.z); //W:=-W;
         // U := \nabla^2 U
@@ -275,7 +295,6 @@ public:
         // vec_ops_C->assign_scalar(0.0,dV.z);
         kern->apply_Laplace(TR(1.0/Reynolds_0), Laplace, dU.x, dU.y, dU.z); // dU:=nu*\nabla^2 dU
         kern->add_mul3(TC(1.0,0), dU.x, dU.y, dU.z, dV.x, dV.y, dV.z); // dV:=dU+dV
- 
         pool_BC.release(dW); 
     }
 
@@ -298,17 +317,16 @@ public:
     void jacobian_alpha(BC_vec& dV)
     {
         kern->copy3(U_0.x, U_0.y, U_0.z, dV.x, dV.y, dV.z);
-        kern->apply_Laplace(TR(-1.0/(Reynolds_0*Reynolds_0)), Laplace, dV.x, dV.y, dV.z);
-        //kern->add_mul3(TC(1.0/(Reynolds_0*Reynolds_0),0), forceABC.x, forceABC.y, forceABC.z, dV.x, dV.y, dV.z);
-
+        kern->apply_Laplace(TR(1.0/(Reynolds_0*Reynolds_0)), Laplace, dV.x, dV.y, dV.z);
+        kern->add_mul3(TC(1.0/(Reynolds_0*Reynolds_0),0), forceABC.x, forceABC.y, forceABC.z, dV.x, dV.y, dV.z);
     } 
   
     void jacobian_alpha(const BC_vec& U0, const T& Reynolds_0_, BC_vec& dV)
     {
           
         kern->copy3(U0.x, U0.y, U0.z, dV.x, dV.y, dV.z);
-        kern->apply_Laplace(TR(-1.0/(Reynolds_0_*Reynolds_0_)), Laplace, dV.x, dV.y, dV.z);
-        //kern->add_mul3(TC(1.0/(Reynolds_0_*Reynolds_0_),0), forceABC.x, forceABC.y, forceABC.z, dV.x, dV.y, dV.z);
+        kern->apply_Laplace(TR(1.0/(Reynolds_0_*Reynolds_0_)), Laplace, dV.x, dV.y, dV.z);
+        kern->add_mul3(TC(1.0/(Reynolds_0_*Reynolds_0_),0), forceABC.x, forceABC.y, forceABC.z, dV.x, dV.y, dV.z);
 
     }
 
@@ -378,7 +396,7 @@ public:
 
     //funciton that returns std::vector with different bifurcatoin norms
 
-    void norm_bifurcation_diagram(const T_vec& u_in, std::vector<T>& res)
+    void norm_bifurcation_diagram(const T_vec& u_in, std::vector<T>& res, bool clear_vector = false)
     {
         R_vec* uR0 = pool_R.take();
 
@@ -397,9 +415,11 @@ public:
         // T val7_y = vec_ops_R->norm_l2(uR0->y);
         // T val7_z = vec_ops_R->norm_l2(uR0->z);
         // T val7 = std::sqrt(val7_x*val7_x+val7_y*val7_y+val7_z*val7_z);
-
-        res.clear();
-        res.reserve(7);
+        if(clear_vector)
+        {
+            res.clear();
+            res.reserve(7);
+        }
         res.push_back(val1); //2
         res.push_back(val2); //3
         res.push_back(val3); //4
@@ -416,9 +436,9 @@ public:
     void exact_solution_sin_cos(const T& Reynolds, T_vec& u_out)
     {
         BC_vec* UA = pool_BC.take();
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), force.x, UA->x);
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), force.y, UA->y);
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), force.z, UA->z);        
+        vec_ops_C->assign_mul(TC(scale_force,0), force.x, UA->x);
+        vec_ops_C->assign_mul(TC(scale_force,0), force.y, UA->y);
+        vec_ops_C->assign_mul(TC(scale_force,0), force.z, UA->z);        
         C2V(*UA, u_out);
         pool_BC.release(UA);        
     }
@@ -426,9 +446,9 @@ public:
     void exact_solution_abc(const T& Reynolds, T_vec& u_out)
     {
         BC_vec* UA = pool_BC.take();
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), forceABC.x, UA->x);
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), forceABC.y, UA->y);
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), forceABC.z, UA->z);        
+        vec_ops_C->assign_mul(TC(scale_force,0), forceABC.x, UA->x);
+        vec_ops_C->assign_mul(TC(scale_force,0), forceABC.y, UA->y);
+        vec_ops_C->assign_mul(TC(scale_force,0), forceABC.z, UA->z);        
         C2V(*UA, u_out);
         pool_BC.release(UA);        
     }
@@ -596,11 +616,10 @@ public:
         project(*UC0);
         for(int st=0;st<steps;st++)
         {
-            smooth(TR(0.1), *UC0);
+            smooth(TR(0.05), *UC0);
         }
-
         project(*UC0);
-        
+
         C2V(*UC0, u_out);
 
         pool_BC.release(UC0);
@@ -610,10 +629,32 @@ public:
         // write_solution_vec("vec_i.pos", u_out);
     }
     
+    
+    //tests the method with the some pre-defined manufactured solutions
+    //a particular solution is selected by the prived number
+    //returns a residual norm
+    std::pair<T,T> manufactured_solution(unsigned int solution_number = 0)
+    {
+        T resid_norm = -1.0;
+        T solution_norm = 0.0;
+        if(solution_number == 0)
+        {
+            T Reynolds = 5.0;
+            T_vec u_manufactured, resid;
+            vec_ops->init_vectors(u_manufactured, resid); vec_ops->start_use_vectors(u_manufactured, resid); 
+            exact_solution(Reynolds, u_manufactured);
+            solution_norm = vec_ops->norm_l2(u_manufactured);
+            F(u_manufactured, Reynolds, resid);
+            resid_norm = vec_ops->norm_l2(resid)/solution_norm;
+            vec_ops->stop_use_vectors(u_manufactured, resid); vec_ops->free_vectors(u_manufactured, resid); 
+        }
+        return {solution_norm, resid_norm};
+    }
+
 
     T check_solution_quality(const T_vec& u_in)
     {
-        return div_norm(u_in);
+        return div_norm(u_in)/std::max(norm(u_in), 1.0);
     }
 
     T div_norm(const T_vec& u_in)
@@ -697,7 +738,6 @@ public:
         auto norm_ = norm(*UC1);
         pool_BC.release(UC1);
         return norm_;
-
     }
     
 private:
@@ -727,7 +767,7 @@ private:
     BR_vec forceABC_R;
 
     TC_vec mask23;
-
+    TR A_, B_, C_; //ABC flow constants
 
     void common_distructor_operations()
     {
@@ -936,15 +976,35 @@ private:
         fft(U.y, U_hat.y);
         fft(U.z, U_hat.z);
     }
+    //use '1' or '2'
     void ifft(const TC_vec& u_hat_, TR_vec& u_)
     {
         FFT->ifft(u_hat_, u_);
-        T scale = T(1.0)/(Nx*Ny*Nz);
-        vec_ops_R->scale(scale, u_);
+        if(abc_flow_fft_rescale == 1)
+        {
+            T scale = T(1.0)/(Nx*Ny*Nz); //1
+            vec_ops_R->scale(scale, u_); //1
+        }
+        if(abc_flow_fft_rescale == 2)
+        {
+            T scale = T(1.0)/std::sqrt(static_cast<T>(Nx*Ny*Nz)); //1
+            vec_ops_R->scale(scale, u_); //1
+        }
     }
     void fft(const TR_vec& u_, TC_vec& u_hat_)
     {
+        
         FFT->fft(u_, u_hat_);
+        if(abc_flow_fft_rescale == 0)
+        {
+            T scale = T(1.0)/(Nx*Ny*Nz); 
+            vec_ops_C->scale(scale, u_hat_);
+        }
+        if(abc_flow_fft_rescale == 2)
+        {
+            T scale = T(1.0)/std::sqrt(static_cast<T>(Nx*Ny*Nz)); 
+            vec_ops_C->scale(scale, u_hat_);
+        }
     }
 
 

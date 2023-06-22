@@ -11,9 +11,6 @@
 #include <utility>
 #include <stdexcept>
 
-//for reduction
-#include <thrust/extrema.h>
-#include <thrust/execution_policy.h>
 
 //debug for file output!
 #include <iostream>
@@ -24,43 +21,86 @@
 namespace gpu_vector_operations_type{
 
 template<typename T>
-struct vec_ops_cuComplex_type_hlp
+struct vec_ops_scalar_complex_type_help
 {
 };
 
 
 template<>
-struct vec_ops_cuComplex_type_hlp<float>
+struct vec_ops_scalar_complex_type_help<float>
 {
     typedef float norm_type;
 };
 
 template<>
-struct vec_ops_cuComplex_type_hlp<double>
+struct vec_ops_scalar_complex_type_help<double>
 {
     typedef double norm_type;
 };
 
 template<>
-struct vec_ops_cuComplex_type_hlp<cuComplex>
+struct vec_ops_scalar_complex_type_help<cuComplex>
 {
     typedef float norm_type;
 };
 template<>
-struct vec_ops_cuComplex_type_hlp<cuDoubleComplex>
-{
-    typedef double norm_type;
-};    
-template<>
-struct vec_ops_cuComplex_type_hlp< thrust::complex<float> >
-{
-    typedef float norm_type;
-};
-template<>
-struct vec_ops_cuComplex_type_hlp< thrust::complex<double> >
+struct vec_ops_scalar_complex_type_help<cuDoubleComplex>
 {
     typedef double norm_type;
 };    
+template<>
+struct vec_ops_scalar_complex_type_help< thrust::complex<float> >
+{
+    typedef float norm_type;
+};
+template<>
+struct vec_ops_scalar_complex_type_help< thrust::complex<double> >
+{
+    typedef double norm_type;
+};    
+
+
+
+// vector type helper
+template<typename T>
+struct vec_ops_vector_complex_type_help
+{
+};
+
+template<>
+struct vec_ops_vector_complex_type_help<float*>
+{
+    using vec_type = float*;
+};
+
+template<>
+struct vec_ops_vector_complex_type_help<double*>
+{
+    using vec_type = double*;
+};
+
+template<>
+struct vec_ops_vector_complex_type_help<cuComplex*>
+{
+    using vec_type = float*;
+};
+template<>
+struct vec_ops_vector_complex_type_help<cuDoubleComplex*>
+{
+    using vec_type = double*;
+};    
+template<>
+struct vec_ops_vector_complex_type_help< thrust::complex<float>* >
+{
+    using vec_type = float*;
+};
+template<>
+struct vec_ops_vector_complex_type_help< thrust::complex<double>* >
+{
+    using vec_type = double*;
+};    
+
+
 
 }
 
@@ -69,11 +109,12 @@ struct vec_ops_cuComplex_type_hlp< thrust::complex<double> >
 template <typename T, int BLOCK_SIZE = 1024>
 struct gpu_vector_operations
 {
-    typedef T  scalar_type;
-    typedef T* vector_type;
-    //typedef typename gpu_vector_operations_type::vec_ops_cuComplex_type_hlp<T>::norm_type Tsc;
-    typedef typename gpu_vector_operations_type::vec_ops_cuComplex_type_hlp<T>::norm_type norm_type;
-    typedef norm_type Tsc;
+    using scalar_type = T;
+    using vector_type = T*;
+    //typedef typename gpu_vector_operations_type::vec_ops_scalar_complex_type_help<T>::norm_type Tsc;
+    using norm_type = typename gpu_vector_operations_type::vec_ops_scalar_complex_type_help<scalar_type>::norm_type;
+    using vector_type_real = typename gpu_vector_operations_type::vec_ops_vector_complex_type_help<vector_type>::vec_type;
+    using Tsc = norm_type ;
     bool location;
     using gpu_reduction_hp_t = gpu_reduction_ogita<T, vector_type>;
 
@@ -85,7 +126,7 @@ struct gpu_vector_operations
         calculate_cuda_grid();
         location=true;
         x_host = host_allocate<scalar_type>(sz);
-        x_device = device_allocate<scalar_type>(sz);
+        x_device_real = device_allocate<Tsc>(sz);
     }
 
     gpu_vector_operations(size_t sz_, dim3 dimBlock_, dim3 dimGrid_): 
@@ -95,13 +136,13 @@ struct gpu_vector_operations
     {
         location=true;
         x_host = host_allocate<scalar_type>(sz);
-        x_device = device_allocate<scalar_type>(sz);
+        x_device_real = device_allocate<Tsc>(sz);
     }
     //DISTRUCTOR!
     ~gpu_vector_operations()
     {
         host_deallocate<scalar_type>(x_host);
-        cudaFree(x_device);
+        cudaFree(x_device_real);
         if(gpu_reduction_hp != nullptr)
         {
             delete gpu_reduction_hp;
@@ -344,7 +385,7 @@ struct gpu_vector_operations
         {     
             cuBLAS->norm2<T>(sz, x, &result);
         }
-        return result/std::sqrt(Tsc(sz)); //implements l2 norm as sqrt(sum_j (x_j^2) * (1/x_size))
+        return result;//std::sqrt(sz); //implements l2 norm as sqrt(sum_j (x_j^2) * (1/x_size))
     }
     //norm for a rank 1 updated vector
     Tsc norm_rank1(const vector_type &x, const scalar_type val_x) const
@@ -408,16 +449,16 @@ struct gpu_vector_operations
             cuBLAS->norm2<T>(sz, x, result);
         }
     } 
-    Tsc norm_inf(const vector_type& x) const
+
+    Tsc max_element(vector_type_real& x)const;
+
+    Tsc norm_inf(const vector_type x)const
     {
-        assign(x, x_device);
-        make_abs(x_device);
-        Tsc *result_device;
-        result_device = thrust::max_element(thrust::device, x, x + sz);
-        Tsc *result_host;
-        device_2_host_cpy<Tsc>(result_host, result_device, 1);
+        make_abs_copy(x, (vector_type_real&)x_device_real); //TODO! Complex type roblem again!
+        //TODO! error: static assertion failed: unimplemented for this system
+        Tsc result = max_element((vector_type_real&)x_device_real);   
         // throw std::logic_error("to be implemented using thrust?!");
-        return result_host[0];
+        return result;
     }
     //calc: x := <vector_type with all elements equal to given scalar value> 
     void assign_scalar(const scalar_type scalar, vector_type& x)const;
@@ -468,17 +509,17 @@ struct gpu_vector_operations
         cuBLAS->swap<scalar_type>(sz, x, y);
     }   
     //sets absolute values to a vector y from the vector x
-    void make_abs_copy(const vector_type& x, vector_type& y)const; 
+    void make_abs_copy(const vector_type& x, vector_type_real& y)const; 
     //sets absolute values to a vector, overweites it
-    void make_abs(vector_type& x)const;
+    void make_abs(vector_type_real& x)const;
     // y_j = max(x_j,y_j,sc)
-    void max_pointwise(const scalar_type sc, const vector_type& x, vector_type& y)const;
+    void max_pointwise(const Tsc sc, const vector_type_real& x, vector_type_real& y)const;
     // y_j = min(x_j,y_j,sc)
-    void min_pointwise(const scalar_type sc, const vector_type& x, vector_type& y)const;
+    void min_pointwise(const Tsc sc, const vector_type_real& x, vector_type_real& y)const;
     // y_j = max(y_j,sc)
-    void max_pointwise(const scalar_type sc, vector_type& y)const;
+    void max_pointwise(const Tsc sc, vector_type_real& y)const;
     // y_j = min(y_j,sc)
-    void min_pointwise(const scalar_type sc, vector_type& y)const;    
+    void min_pointwise(const Tsc sc, vector_type_real& y)const;    
     //calc: y := mul_x*x
     void assign_mul(const scalar_type mul_x, const vector_type& x, vector_type& y)const;
     //cublas axpy: y=y+mul_x*x;
@@ -555,7 +596,8 @@ struct gpu_vector_operations
 
 //*/
 private:
-    vector_type x_host, x_device;
+    vector_type x_host;
+    vector_type_real x_device_real;
     cublas_wrap *cuBLAS;
     size_t sz;
     dim3 dimBlock;

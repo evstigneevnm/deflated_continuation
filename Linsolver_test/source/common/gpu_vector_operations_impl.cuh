@@ -252,8 +252,8 @@ namespace gpu_vector_operatiions_impl
 {
 namespace device_details
 {
-template<class T>
-__device__ __forceinline__ T cuda_abs(T val)
+template<class Tsc, class T>
+__device__ __forceinline__ Tsc cuda_abs(T val)
 {
 }
 template<>
@@ -267,31 +267,31 @@ __device__ __forceinline__ float cuda_abs(float val)
     return( fabsf(val) );
 }
 template<>
-__device__ __forceinline__ thrust::complex<double> cuda_abs(thrust::complex<double> val)
+__device__ __forceinline__ double cuda_abs(thrust::complex<double> val)
 {
     return( fabs(val.real()) + fabs(val.imag()) );
 }
 template<>
-__device__ __forceinline__ thrust::complex<float> cuda_abs(thrust::complex<float> val)
+__device__ __forceinline__ float cuda_abs(thrust::complex<float> val)
 {
     return( fabsf(val.real())+fabsf(val.imag()) );
 }
 }
 }
 
-template<typename T>
-__global__ void make_abs_copy_kernel(size_t N, const T* x, T* y)
+template<typename T, typename Tsc>
+__global__ void make_abs_copy_kernel(size_t N, const T* x, Tsc* y)
 {
     size_t j = blockIdx.x*blockDim.x + threadIdx.x;
     if(j>=N) return;
 
-    y[j]=gpu_vector_operatiions_impl::device_details::cuda_abs<T>(x[j]);
+    y[j]=gpu_vector_operatiions_impl::device_details::cuda_abs<Tsc, T>(x[j]);
 
 }
 template <typename T, int BLOCK_SIZE>
-void gpu_vector_operations<T, BLOCK_SIZE>::make_abs_copy(const vector_type& x, vector_type& y)const
+void gpu_vector_operations<T, BLOCK_SIZE>::make_abs_copy(const vector_type& x, vector_type_real& y)const
 {
-    make_abs_copy_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, x, y);
+    make_abs_copy_kernel<scalar_type, Tsc><<<dimGrid, dimBlock>>>(sz, x, y);
 }
 template<typename T>
 __global__ void make_abs_kernel(size_t N, T* x)
@@ -299,13 +299,13 @@ __global__ void make_abs_kernel(size_t N, T* x)
     size_t j = blockIdx.x*blockDim.x + threadIdx.x;
     if(j>=N) return;
 
-    x[j]=gpu_vector_operatiions_impl::device_details::cuda_abs<T>(x[j]);
+    x[j]=gpu_vector_operatiions_impl::device_details::cuda_abs<T,T>(x[j]);
 
 }
 template <typename T, int BLOCK_SIZE>
-void gpu_vector_operations<T, BLOCK_SIZE>::make_abs(vector_type& x)const
+void gpu_vector_operations<T, BLOCK_SIZE>::make_abs(vector_type_real& x)const
 {
-    make_abs_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, x);
+    make_abs_kernel<Tsc><<<dimGrid, dimBlock>>>(sz, x);
 }
 //===
 template<typename T>
@@ -539,26 +539,55 @@ __global__ void min_max_pointwise_kernel(size_t N, T sc, T_vec y)
 
 
 template <typename T, int BLOCK_SIZE>
-void gpu_vector_operations<T, BLOCK_SIZE>::max_pointwise(const scalar_type sc, const vector_type& x, vector_type& y) const
+void gpu_vector_operations<T, BLOCK_SIZE>::max_pointwise(const Tsc sc, const vector_type_real& x, vector_type_real& y) const
 {
-    min_max_pointwise_kernel<scalar_type, vector_type, true><<<dimGrid, dimBlock>>>(sz, sc, x, y);
+    min_max_pointwise_kernel<Tsc, vector_type_real, true><<<dimGrid, dimBlock>>>(sz, sc, x, y);
 }
 template <typename T, int BLOCK_SIZE>
-void gpu_vector_operations<T, BLOCK_SIZE>::min_pointwise(const scalar_type sc, const vector_type& x, vector_type& y) const
+void gpu_vector_operations<T, BLOCK_SIZE>::min_pointwise(const Tsc sc, const vector_type_real& x, vector_type_real& y) const
 {
-    min_max_pointwise_kernel<scalar_type, vector_type, false><<<dimGrid, dimBlock>>>(sz, sc, x, y);
+    min_max_pointwise_kernel<Tsc, vector_type_real, false><<<dimGrid, dimBlock>>>(sz, sc, x, y);
 }
 
 
 template <typename T, int BLOCK_SIZE>
-void gpu_vector_operations<T, BLOCK_SIZE>::max_pointwise(const scalar_type sc, vector_type& y) const
+void gpu_vector_operations<T, BLOCK_SIZE>::max_pointwise(const Tsc sc, vector_type_real& y) const
 {
-    min_max_pointwise_kernel<scalar_type, vector_type, true><<<dimGrid, dimBlock>>>(sz, sc, y);
+    min_max_pointwise_kernel<Tsc, vector_type_real, true><<<dimGrid, dimBlock>>>(sz, sc, y);
 }
 template <typename T, int BLOCK_SIZE>
-void gpu_vector_operations<T, BLOCK_SIZE>::min_pointwise(const scalar_type sc, vector_type& y) const
+void gpu_vector_operations<T, BLOCK_SIZE>::min_pointwise(const Tsc sc, vector_type_real& y) const
 {
-    min_max_pointwise_kernel<scalar_type, vector_type, false><<<dimGrid, dimBlock>>>(sz, sc, y);
+    min_max_pointwise_kernel<Tsc, vector_type_real, false><<<dimGrid, dimBlock>>>(sz, sc, y);
+}
+
+//===
+//thrust wrappers
+
+//for reduction
+#include <thrust/device_ptr.h>
+#include <thrust/reduce.h>
+#include <thrust/functional.h>
+#include <thrust/execution_policy.h>
+#include <thrust/extrema.h>     
+
+template<class T, class T_vec>
+T thrust_wrappers_max_element(size_t sz, T_vec x)
+{
+    T result = *(::thrust::max_element(thrust::device, ::thrust::device_pointer_cast(x), ::thrust::device_pointer_cast(x) + sz) );
+    return result;
+}
+// Tsc result = thrust::reduce(thrust::device,
+                    // ::thrust::device_pointer_cast(x_device_real), 
+                    // ::thrust::device_pointer_cast(x_device_real) + sz,
+                    // static_cast<Tsc>(-1.0),
+                    // thrust::maximum<Tsc>()) ;
+
+
+template <typename T, int BLOCK_SIZE>
+typename gpu_vector_operations_type::vec_ops_scalar_complex_type_help<T>::norm_type gpu_vector_operations<T, BLOCK_SIZE>::max_element(vector_type_real& y) const
+{
+    return thrust_wrappers_max_element<Tsc, vector_type_real>(sz, y);
 }
 
 

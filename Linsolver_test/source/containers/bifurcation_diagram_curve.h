@@ -31,9 +31,16 @@ private:
     void serialize(Archive & ar, const unsigned int version)
     {
         ar & lambda;
+        // std::cout << "serialize: lambda = " << lambda << std::endl;
         ar & is_data_avaliable;
+        // std::cout << "serialize: is_data_avaliable = " << is_data_avaliable << std::endl;
         ar & vector_norms;
+        // for(auto &x: vector_norms)
+        // {
+        //     std::cout << "serialize: vector_norms = " << x << std::endl;
+        // }
         ar & id_file_name;                        
+        // std::cout << "serialize: id_file_name = " << id_file_name << std::endl;
     }
 
 };

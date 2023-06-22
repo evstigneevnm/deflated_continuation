@@ -19,8 +19,9 @@ namespace nonlinear_operators
 template<typename TR, typename TR_vec, typename TC, typename TC_vec>
 struct abc_flow_ker
 {
-    abc_flow_ker(size_t Nx_, size_t Ny_, size_t Nz_, size_t Mz_, unsigned int BLOCKSIZE_x_, unsigned int BLOCKSIZE_y_):
-    Nx(Nx_),Ny(Ny_),Nz(Nz_),Mz(Mz_), BLOCKSIZE_x(BLOCKSIZE_x_), BLOCKSIZE_y(BLOCKSIZE_y_)
+    abc_flow_ker(size_t Nx_, size_t Ny_, size_t Nz_, size_t Mz_, TR A_p, TR B_p, TR C_p, unsigned int BLOCKSIZE_x_, unsigned int BLOCKSIZE_y_):
+    Nx(Nx_),Ny(Ny_),Nz(Nz_),Mz(Mz_), BLOCKSIZE_x(BLOCKSIZE_x_), BLOCKSIZE_y(BLOCKSIZE_y_),
+    A_(A_p), B_(B_p), C_(C_p)
     {
         BLOCKSIZE = BLOCKSIZE_x*BLOCKSIZE_y;
         NR = Nx*Ny*Nz;
@@ -92,8 +93,11 @@ struct abc_flow_ker
     void apply_abs(TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v);
     void apply_abs(size_t Nx, size_t Ny, size_t Nz, TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v);
     void apply_scale_inplace(size_t Nx_l, size_t Ny_l, size_t Nz_l, TR scale, TR_vec ux, TR_vec uy, TR_vec uz);
-    void add_mul3(TR alpha, TR_vec u_x, TR_vec u_y, TR_vec u_z, TR_vec v_x, TR_vec v_y, TR_vec v_z);
+    
+    void mul_scalar(TR scalar, TR_vec u_x, TR_vec u_y, TR_vec u_z);
+    void mul_scalar(TC scalar, TC_vec u_x, TC_vec u_y, TC_vec u_z);
 
+    void add_mul3(TR alpha, TR_vec u_x, TR_vec u_y, TR_vec u_z, TR_vec v_x, TR_vec v_y, TR_vec v_z);
     void add_mul3(TC alpha, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z);
 
     void apply_mask(TC_vec mask_2_3);
@@ -123,6 +127,7 @@ private:
     unsigned int BLOCKSIZE_x, BLOCKSIZE_y, BLOCKSIZE;
     size_t Nx, Ny, Nz, Mz;
     size_t N, NR, NC;
+    TR A_, B_, C_;
 
     //for 1D-like operations:
     dim3 dimBlock1;
@@ -158,6 +163,7 @@ private:
     {
         
         printf("abc flow template specialization class:\n");
+        printf("solution constants: A = %lf, B= %lf, C = %lf\n", A_, B_, C_);
         //1D
         dim3 s_dimBlock1(BLOCKSIZE);
         dimBlock1 = s_dimBlock1;
