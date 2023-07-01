@@ -128,7 +128,7 @@ public:
     void set_newton(T tolerance_, unsigned int maximum_iterations_, T relax_tolerance_factor_, int relax_tolerance_steps_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true, unsigned int stagnation_max_p = 10, T maximum_norm_increase_p = 2.0, T newton_wight_threshold_p = 1.0e-12)
     {
         conv_newton_cont->set_convergence_constants(tolerance_, maximum_iterations_, relax_tolerance_factor_, relax_tolerance_steps_, newton_wight_, store_norms_history_,  verbose_, stagnation_max_p, maximum_norm_increase_p, newton_wight_threshold_p);
-        epsilon = T(1000.0)*tolerance_; //tolerance to check distance between vectors in curves.
+        epsilon = T(100.0)*tolerance_; //tolerance to check distance between vectors in curves.
     }
 
 

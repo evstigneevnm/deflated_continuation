@@ -317,16 +317,16 @@ public:
     void jacobian_alpha(BC_vec& dV)
     {
         kern->copy3(U_0.x, U_0.y, U_0.z, dV.x, dV.y, dV.z);
-        kern->apply_Laplace(TR(1.0/(Reynolds_0*Reynolds_0)), Laplace, dV.x, dV.y, dV.z);
-        kern->add_mul3(TC(1.0/(Reynolds_0*Reynolds_0),0), forceABC.x, forceABC.y, forceABC.z, dV.x, dV.y, dV.z);
+        kern->apply_Laplace(TR(-1.0/(Reynolds_0*Reynolds_0)), Laplace, dV.x, dV.y, dV.z);
+        kern->add_mul3(TC(-1.0/(Reynolds_0*Reynolds_0),0), forceABC.x, forceABC.y, forceABC.z, dV.x, dV.y, dV.z);
     } 
   
     void jacobian_alpha(const BC_vec& U0, const T& Reynolds_0_, BC_vec& dV)
     {
           
         kern->copy3(U0.x, U0.y, U0.z, dV.x, dV.y, dV.z);
-        kern->apply_Laplace(TR(1.0/(Reynolds_0_*Reynolds_0_)), Laplace, dV.x, dV.y, dV.z);
-        kern->add_mul3(TC(1.0/(Reynolds_0_*Reynolds_0_),0), forceABC.x, forceABC.y, forceABC.z, dV.x, dV.y, dV.z);
+        kern->apply_Laplace(TR(-1.0/(Reynolds_0_*Reynolds_0_)), Laplace, dV.x, dV.y, dV.z);
+        kern->add_mul3(TC(-1.0/(Reynolds_0_*Reynolds_0_),0), forceABC.x, forceABC.y, forceABC.z, dV.x, dV.y, dV.z);
 
     }
 
