@@ -6,18 +6,13 @@
 #include <sstream>
 #include <array>
 #include <cmath>
-// #include <utils/init_cuda.h>
-
+#include <utils/init_cuda.h>
+#include <external_libraries/cublas_wrap.h>
 #include <utils/log.h>
-// #include <numerical_algos/lin_solvers/default_monitor.h>
-// #include <numerical_algos/lin_solvers/bicgstabl.h>
-
 // #include <common/macros.h>
-// #include <common/gpu_file_operations.h>
-// #include <common/gpu_vector_operations.h>
+#include <common/gpu_file_operations.h>
+#include <common/gpu_vector_operations.h>
 #include <common/file_operations.h>
-#include <common/cpu_vector_operations.h>
-
 #include <time_stepper/time_step_adaptation_constant.h>
 #include <time_stepper/time_step_adaptation_error_control.h>
 #include <time_stepper/explicit_time_step.h>
@@ -37,7 +32,8 @@ int main(int argc, char const *argv[])
     using real = SCALAR_TYPE;
     using log_t = utils::log_std;
 
-    using vec_ops_t = cpu_vector_operations<real>;
+    
+    using vec_ops_t = gpu_vector_operations<real>;
     using vec_t = typename vec_ops_t::vector_type;
     
     using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t,log_t>;
@@ -56,8 +52,8 @@ int main(int argc, char const *argv[])
     using newton_solver_t = numerical_algos::newton_method::newton_solver<vec_ops_t, periodic_orbit_nonlinear_operator_t, system_operator_single_section_t, convergence_strategy_single_section_t>;
 
     std::string scheme_name("RKDP45");
-    real a_param = 0.2, b_param = 0.2, c_param = 5.7, max_time_simlation = 100.0;   
-    if((argc >1 )&&(argc != 6))
+    real a_param = 0.1, b_param = 0.1, c_param = 6.1, max_time_simlation = 250.0;   
+    if((argc >1 )&&(argc != 6)&&(argc != 2))
     {
         std::cout << "Usage: " << argv[0] << " scheme_name" << std::endl;
         std::cout << "scheme_name: EE, HE, RK33SSP, RK43SSP, RKDP45, RK64SSP" << std::endl;
@@ -117,11 +113,18 @@ int main(int argc, char const *argv[])
     real ref_error = std::numeric_limits<real>::epsilon();
 
 
+    if(!utils::init_cuda(-1))
+    {
+        return 2;
+    }
+
+    cublas_wrap cublas;
+
 
     log_t log;
     log.info("test periodic orbit stabilization for rossler operator.");
 
-    vec_ops_t vec_ops(3);
+    vec_ops_t vec_ops(3, &cublas);
     
     vec_t x0, x1, b, x;
 
@@ -154,44 +157,6 @@ int main(int argc, char const *argv[])
     periodic_orbit_nonlin_op.set_hyperplane_from_initial_guesses(x0, mu);
     periodic_orbit_nonlin_op.time_stepper(x0, mu, {0, max_time_simlation});
     periodic_orbit_nonlin_op.save_norms("rossler_initial.dat");
-/*    
-    periodic_orbit_nonlin_op.F(x0, mu, b);
-    auto b_norm = vec_ops.norm(b);
-    log.info_f("=> ||b|| = %le", b_norm);
-    size_t n_iter = 0;
-    while(b_norm>1.0e-10)
-    {
-
-        vec_ops.assign_scalar(0, x);
-        sys_op.solve(&periodic_orbit_nonlin_op, x0, mu, x);
-        real wight = 1.0;
-        real b_norm_new = std::numeric_limits<real>::max();
-        vec_ops.assign(x0, x1);
-        while(b_norm_new>1.5*b_norm)
-        {  
-            vec_ops.add_mul(wight, x, x1);
-            periodic_orbit_nonlin_op.F(x1, mu, b);
-            b_norm_new = vec_ops.norm(b);            
-            wight *= 0.5;
-            if(wight < 1.0e-6)
-            {
-                log.error_f("failed with wight = %le and ||b|| = %le", wight, b_norm_new);
-                break;
-            }
-        }
-        if(wight < 1.0e-6)
-        {
-            break;
-        }
-        vec_ops.assign(x1, x0);
-        // periodic_orbit_nonlin_op.set_hyperplane_from_initial_guesses(x0, mu);
-        b_norm = b_norm_new;
-        log.info_f("=> ||b|| = %le", b_norm);
-        std::stringstream fn;
-        fn << "rossler_convergence_" << n_iter++ << ".dat";
-        periodic_orbit_nonlin_op.save_period_estmate_norms( fn.str() );
-    }
-*/
 
     newton.solve(&periodic_orbit_nonlin_op, x0, mu);
 

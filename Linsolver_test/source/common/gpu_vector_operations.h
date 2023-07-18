@@ -345,6 +345,12 @@ struct gpu_vector_operations
         
         return (result);
     }
+    
+    redef_type asum(const vector_type &x)const
+    {
+        return absolute_sum(x);
+    }
+
     void absolute_sum(const vector_type &x, redef_type *result)
     {
         if(use_high_precision_dot)
@@ -356,7 +362,19 @@ struct gpu_vector_operations
             cuBLAS->asum<scalar_type>(sz, x, result);
         }
     }
-
+    scalar_type sum(const vector_type &x)const
+    {
+        scalar_type result = 0.0;
+        if(use_high_precision_dot)
+        {
+            result = gpu_reduction_hp->sum(x);
+        }
+        else
+        {
+            
+        }
+        return result;
+    }
     
     
     //Observe, that for complex type we need template spetialization! vector type is compelx, but norm type is real!
@@ -374,6 +392,11 @@ struct gpu_vector_operations
         }
         return result;
     }
+    Tsc norm_sq(const vector_type &x)const
+    {
+        Tsc result = scalar_prod(x,x);
+        return result;        
+    }
     Tsc norm_l2(const vector_type &x)const
     {
         Tsc result;
@@ -386,6 +409,11 @@ struct gpu_vector_operations
             cuBLAS->norm2<T>(sz, x, &result);
         }
         return result;//std::sqrt(sz); //implements l2 norm as sqrt(sum_j (x_j^2) * (1/x_size))
+    }
+    Tsc norm2_sq(const vector_type &x)const
+    {
+        Tsc result = scalar_prod(x,x);
+        return result;  
     }
     //norm for a rank 1 updated vector
     Tsc norm_rank1(const vector_type &x, const scalar_type val_x) const

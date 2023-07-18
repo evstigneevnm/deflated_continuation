@@ -15,6 +15,7 @@
 
 #include <cmath>
 #include <vector>
+#include <limits>
 #include <utils/logged_obj_base.h>
 
 namespace nonlinear_operators
@@ -89,7 +90,7 @@ public:
             vec_ops->assign_mul(T(1.0), x, newton_wight, delta_x, x1);
             nonlin_op->F(x1, lambda, Fx);
             normFx1 = vec_ops->norm(Fx);
-            if(normFx1 <= normFx)
+            if(normFx1 <= (1.0 + std::numeric_limits<T>::epsilon() )*normFx)
             {
                 result_status = 0;
                 break;

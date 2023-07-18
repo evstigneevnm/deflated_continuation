@@ -252,8 +252,11 @@ test_glued_nonlinear_operator:
 test_glued_poincare_map_linear_operator:
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/glued_poincare_map_linear_operator.cpp $(OPENMP) -o test_glued_poincare_map_linear_operator.bin 2>results.make
 
-test_rossler_periodic_orbit:
-	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_periodic.cpp $(OPENMP) -o test_rossler_periodic.bin 2>results.make
+test_rossler_periodic_orbit_cpu:
+	$(G++)  $(G++FLAGS)  $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_periodic_cpu.cpp $(OPENMP) -o test_rossler_periodic_cpu.bin 2>results.make
+
+test_rossler_periodic_orbit_gpu:
+	$(NVCC) $(NVCCDEB) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_periodic_gpu.cpp O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o -o test_rossler_periodic_gpu.bin $(LCUDA) $(LIBS3) 2>results.make
 
 
 
