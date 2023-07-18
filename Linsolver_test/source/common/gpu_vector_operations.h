@@ -394,8 +394,8 @@ struct gpu_vector_operations
     }
     Tsc norm_sq(const vector_type &x)const
     {
-        Tsc result = scalar_prod(x,x);
-        return result;        
+        Tsc result = norm(x);
+        return result*result;        
     }
     Tsc norm_l2(const vector_type &x)const
     {
@@ -412,8 +412,8 @@ struct gpu_vector_operations
     }
     Tsc norm2_sq(const vector_type &x)const
     {
-        Tsc result = scalar_prod(x,x);
-        return result;  
+        Tsc result = norm(x);
+        return result*result; 
     }
     //norm for a rank 1 updated vector
     Tsc norm_rank1(const vector_type &x, const scalar_type val_x) const

@@ -9,7 +9,6 @@
 #include <utils/init_cuda.h>
 #include <external_libraries/cublas_wrap.h>
 #include <utils/log.h>
-// #include <common/macros.h>
 #include <common/gpu_file_operations.h>
 #include <common/gpu_vector_operations.h>
 #include <common/file_operations.h>
@@ -20,7 +19,7 @@
 #include <periodic_orbit/system_operator_single_section.h>
 #include <periodic_orbit/convergence_strategy_single_section.h>
 #include <numerical_algos/newton_solvers/newton_solver.h>
-#include "rossler_operator.h"
+#include "rossler_operator_gpu.h"
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 
@@ -113,7 +112,7 @@ int main(int argc, char const *argv[])
     real ref_error = std::numeric_limits<real>::epsilon();
 
 
-    if(!utils::init_cuda(-1))
+    if(!utils::init_cuda())
     {
         return 2;
     }
@@ -160,9 +159,10 @@ int main(int argc, char const *argv[])
 
     newton.solve(&periodic_orbit_nonlin_op, x0, mu);
 
+    auto x0_host = vec_ops.view(x0);
     for(int j = 0; j<3; j++)
     {
-        std::cout << x0[j] << std::endl;
+        std::cout << x0_host[j] << std::endl;
     }
 
     std::stringstream ss_periodic_estimate;
