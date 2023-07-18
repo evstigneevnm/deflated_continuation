@@ -53,7 +53,10 @@ public:
             return false;
         }
     }
-
+    bool is_adaptive()const
+    {
+        return false;
+    }
 
 protected:
     using parent_t::dt_;

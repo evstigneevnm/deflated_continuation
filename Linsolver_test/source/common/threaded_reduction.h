@@ -21,10 +21,9 @@ private:
     using TR = typename deduce_real_type_from_complex::recast_type<T>::real;
 
 public:
-    threaded_reduction(size_t vec_size_, int n_ = -1, int use_high_prec_p = 0, T initial_ = T(0.0)):
+    threaded_reduction(int n_ = -1, int use_high_prec_p = 0, T initial_ = T(0.0)):
     use_high_prec_(use_high_prec_p),
-    parts(n_),
-    vec_size(vec_size_)
+    parts(n_)
     {
         result_dot = T(0.0);
         result_sum = T(0.0);
@@ -38,17 +37,7 @@ public:
         {
             parts = std::thread::hardware_concurrency();
         }
-        bounds();
-        for(int j=0; j<parts; j++)
-        {
-            
-            dot_naive.emplace_back(array_bounds[j], array_bounds[j+1]);
-            dot_ogita.emplace_back(array_bounds[j], array_bounds[j+1]);
-            
-            sum_naive.emplace_back(array_bounds[j], array_bounds[j+1]);
-            sum_ogita.emplace_back(array_bounds[j], array_bounds[j+1]);
 
-        }
         g_lock_dot = std::make_shared<std::mutex>();
         g_lock_sum = std::make_shared<std::mutex>();
 
@@ -283,6 +272,20 @@ private:
 public:
     T dot(const T_vec& x_, const T_vec& y_) //const
     {   
+        if( x_.size()!=y_.size() )
+        {
+            throw std::logic_error("threaded_reduction::dot: vector sizes don't match.");
+        }
+
+        bounds(x_.size());
+        for(int j=0; j<parts; j++)
+        {
+            
+            dot_naive.emplace_back(array_bounds[j], array_bounds[j+1]);
+            dot_ogita.emplace_back(array_bounds[j], array_bounds[j+1]);
+        }
+
+
         result_dot = T(0.0);
         sigma_dot.first = T(0.0);
         sigma_dot.second = T(0.0);
@@ -315,6 +318,8 @@ public:
                 t.join();
         }
 
+        dot_naive.clear();
+        dot_ogita.clear();
         if(use_high_prec_ == 0)
         {
             return T(result_dot);
@@ -328,6 +333,17 @@ public:
 
     T sum(const T_vec& x_, bool use_abs_ = false) //const
     {   
+        
+        bounds(x_.size());
+        
+        for(int j=0; j<parts; j++)
+        {
+            sum_naive.emplace_back(array_bounds[j], array_bounds[j+1]);
+            sum_ogita.emplace_back(array_bounds[j], array_bounds[j+1]);
+        }
+
+
+
         result_sum = T(0.0);
         sigma_sum.first = T(0.0);
         sigma_sum.second = T(0.0);
@@ -359,7 +375,8 @@ public:
             if(t.joinable())
                 t.join();
         }
-
+        sum_naive.clear();
+        sum_ogita.clear();
         if(use_high_prec_ == 0)
         {
             return T(result_sum);
@@ -380,7 +397,6 @@ private:
     T result_sum;
     int use_high_prec_;
     int parts;
-    size_t vec_size;
     std::vector<int> array_bounds;
     std::vector<dot_product_naive> dot_naive;
     std::vector<dot_product_ogita> dot_ogita;
@@ -392,8 +408,9 @@ private:
     std::shared_ptr<std::mutex> g_lock_dot;
     std::shared_ptr<std::mutex> g_lock_sum;
 
-    void bounds()
+    void bounds(size_t vec_size)
     {
+        array_bounds.resize(0);
         array_bounds.reserve(parts+1);
         int delta = vec_size / parts;
         int reminder = vec_size % parts;

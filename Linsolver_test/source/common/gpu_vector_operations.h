@@ -452,6 +452,10 @@ struct gpu_vector_operations
 
     Tsc max_element(vector_type_real& x)const;
 
+    size_t argmax_element(vector_type_real& x)const;
+    
+    std::pair<Tsc, size_t> max_argmax_element(vector_type_real& y) const;
+
     Tsc norm_inf(const vector_type x)const
     {
         make_abs_copy(x, (vector_type_real&)x_device_real); //TODO! Complex type roblem again!

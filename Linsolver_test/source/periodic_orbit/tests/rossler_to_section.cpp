@@ -21,81 +21,9 @@
 #include <time_stepper/time_step_adaptation_constant.h>
 #include <time_stepper/time_step_adaptation_error_control.h>
 #include <time_stepper/explicit_time_step.h>
-#include <time_stepper/time_stepper.h>
-
-
-namespace nonlinear_operators
-{
-
-template<class VectorOperations>
-struct rossler //https://en.wikipedia.org/wiki/R%C3%B6ssler_attractor
-{
-    using T = typename VectorOperations::scalar_type;
-    using T_vec = typename VectorOperations::vector_type;
-
-    rossler(unsigned int used_param_number, T a_init, T b_init, T c_init):
-    used_param_number_(used_param_number), param{a_init, b_init, c_init}
-    {}
-    ~rossler() = default;
-
-    void F(const T time_p, const T_vec& in_p, const T param_p, T_vec& out_p )const
-    {
-        param[used_param_number_] = param_p;
-
-        out_p[0] = -in_p[1]-in_p[2];
-        out_p[1] = in_p[0]+param[0]*in_p[1];
-        out_p[2] = param[1] + in_p[2]*(in_p[0]-param[2]);
-    }
-
-    void set_initial(T_vec& x0)const
-    {
-        x0[0] = 2.0;
-        x0[1] = 0.0;
-        x0[2] = 0.0;
-    }
-
-    void norm_bifurcation_diagram(const T_vec& x0, std::vector<T>& norm_vec)const
-    {
-        norm_vec.push_back(x0[0]);
-        norm_vec.push_back(x0[1]);
-        norm_vec.push_back(x0[2]);
-    }
-    T check_solution_quality(const T_vec& x)const
-    {
-        bool finite = true;
-        for(int j = 0;j<3;j++)
-        {
-            finite &= std::isfinite(x[j]);
-        }
-        return finite;
-    }
-
-    T get_selected_parameter_value()const
-    {
-        return param[used_param_number_];
-    }
-
-private:
-    unsigned int used_param_number_;
-    mutable std::array<T, 3> param;
-    // some parameters:
-    // a = 0.2 b = 0.2 c = 5.7
-    // a = 0.2 b = 0.2 c = 14.0
-    // standard bifurcaitons:
-    // a=0.1, b=0.1:
-    // c = 4, period-1 orbit.
-    // c = 6, period-2 orbit.
-    // c = 8.5, period-4 orbit.
-    // c = 8.7, period-8 orbit.
-    // c = 9, sparse chaotic attractor.
-    // c = 12, period-3 orbit.
-    // c = 12.6, period-6 orbit.
-    // c = 13, sparse chaotic attractor.
-    // c = 18, filled-in chaotic attractor.
-
-};
-}
-
+#include <periodic_orbit/time_stepper_to_section.h>
+#include <periodic_orbit/hyperplane.h>
+#include "rossler_operator.h"
 
 
 int main(int argc, char const *argv[])
@@ -108,20 +36,16 @@ int main(int argc, char const *argv[])
     using vec_t = typename vec_ops_t::vector_type;
 
     using nlin_op_t = nonlinear_operators::rossler<vec_ops_t>;
-    
-    using time_step_const_t = time_steppers::time_step_adaptation_constant<vec_ops_t, log_t>;
     using time_step_err_ctrl_t = time_steppers::time_step_adaptation_error_control<vec_ops_t, log_t>;
-    
-    using single_step_const_t = time_steppers::explicit_time_step<vec_ops_t, nlin_op_t, log_t, time_step_const_t>;
     using single_step_err_ctrl_t = time_steppers::explicit_time_step<vec_ops_t, nlin_op_t, log_t, time_step_err_ctrl_t>;
-    
-    using time_stepper_const_t = time_steppers::time_stepper<vec_ops_t, nlin_op_t, single_step_const_t,log_t>;
-    using time_stepper_err_ctrl_t = time_steppers::time_stepper<vec_ops_t, nlin_op_t, single_step_err_ctrl_t,log_t>;
+    using hyperplane_t = periodic_orbit::hyperplane<vec_ops_t,nlin_op_t>;    
+    using time_stepper_err_ctrl_t = periodic_orbit::time_steppers::time_stepper_to_section<vec_ops_t, nlin_op_t, single_step_err_ctrl_t, hyperplane_t, log_t>;
 
 
-    if(argc != 7)
+    if(argc != 8)
     {
-        std::cout << argv[0] << " a b c select time name\n  a,b,c - parameters,\n select - main parameter number (0, 1 or 2), \n time - simulation time,\n";
+        std::cout << argv[0] << " a b c select time time_before_section_check name\n  a,b,c - parameters,\n select - main parameter number (0, 1 or 2), \n time - total simulation time,\n";
+        std::cout << "   time_before_section_check(<time) - simulation time before starting hyperplane intersection check,\n";
         std::cout << "   name - name of the scheme: EE, HE, RK33SSP, RK43SSP, RKDP45, RK64SSP" << std::endl;
         return(0);       
     }    
@@ -130,7 +54,8 @@ int main(int argc, char const *argv[])
     real c = std::stof(argv[3]);
     unsigned int select = std::stoi(argv[4]);
     real simulation_time = std::stof(argv[5]);
-    std::string scheme_name(argv[6]);
+    real time_b4_section_check = std::stof(argv[6]);
+    std::string scheme_name(argv[7]);
 
     log_t log;
 
@@ -141,11 +66,9 @@ int main(int argc, char const *argv[])
     vec_ops.init_vector(x0); vec_ops.start_use_vector(x0);
 
 
-    nlin_op_t rossler(select, a, b, c); //use second parameter as a bifurcation parameter.
+    nlin_op_t rossler(&vec_ops, select, a, b, c); //use second parameter as a bifurcation parameter.
     rossler.set_initial(x0);
 
-    
-    time_step_const_t time_step_const(&vec_ops, &log);
     time_step_err_ctrl_t time_step_err_ctrl(&vec_ops, &log);
 
     auto method = time_steppers::detail::methods::EXPLICIT_EULER;
@@ -179,10 +102,10 @@ int main(int argc, char const *argv[])
     }
     auto mu = rossler.get_selected_parameter_value();
 
-    single_step_const_t explicit_step_const(&vec_ops, &rossler, &time_step_const, &log, mu, method);
-    single_step_err_ctrl_t explicit_step_err_control(&vec_ops, &rossler, &time_step_err_ctrl, &log, mu, method);
+    single_step_err_ctrl_t explicit_step_err_control(&vec_ops, &time_step_err_ctrl, &log,  &rossler, mu, method);
     
-    time_stepper_const_t time_stepper_const(&vec_ops, &rossler, &explicit_step_const, &log);
+    hyperplane_t hyperplane(&vec_ops, &rossler, x0, rossler.get_selected_parameter_value() );
+
     time_stepper_err_ctrl_t time_stepper_err_ctrl(&vec_ops, &rossler, &explicit_step_err_control, &log);
 
     log.info_f("executing time stepper with time = %.2le", simulation_time);
@@ -190,10 +113,14 @@ int main(int argc, char const *argv[])
     // time_stepper_err_ctrl.set_initial_conditions(x0, 0.0);
     // time_stepper_err_ctrl.execute();
 
-    time_stepper_err_ctrl.execute(x0, mu, {0, simulation_time} );
-    std::stringstream ss;
+    time_stepper_err_ctrl.execute(&hyperplane, x0, mu, {0, simulation_time}, time_b4_section_check );
+    log.info_f("simulation time = %le, estimated periodic time = %le", time_stepper_err_ctrl.get_simulated_time(), time_stepper_err_ctrl.get_period_estmate_time());
+    std::stringstream ss, ss_periodic_estimate;
     ss << "rossler_result_" << scheme_name << ".dat";
     time_stepper_err_ctrl.save_norms( ss.str() );
+
+    ss_periodic_estimate << "rossler_period_estimate_result_" << scheme_name << ".dat";
+    time_stepper_err_ctrl.save_period_estmate_norms(ss_periodic_estimate.str() );
     // std::stringstream ss;
     // ss << "x_" << simulation_time << "_sim.pos";
 

@@ -44,6 +44,8 @@ int main(int argc, char const *argv[])
     vec_ops_R->assign_random(u1_d);
     real norm_u1 = vec_ops_R->norm(u1_d);
     printf("||u1||=%lf\n", double(norm_u1));
+    auto max_u1 = vec_ops_R->max_argmax_element(u1_d);
+    printf("max(u1) = %lf, argmax(u1) = %d\n", max_u1.first, max_u1.second);
 
     vec_ops_C->assign_scalar(complex(1.0), z1_d);
 

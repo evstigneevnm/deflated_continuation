@@ -570,12 +570,16 @@ void gpu_vector_operations<T, BLOCK_SIZE>::min_pointwise(const Tsc sc, vector_ty
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
 #include <thrust/extrema.h>     
+#include <utility>
 
 template<class T, class T_vec>
-T thrust_wrappers_max_element(size_t sz, T_vec x)
+std::pair<T,size_t> thrust_wrappers_max_element(size_t sz, T_vec x)
 {
-    T result = *(::thrust::max_element(thrust::device, ::thrust::device_pointer_cast(x), ::thrust::device_pointer_cast(x) + sz) );
-    return result;
+
+    auto iterator = ::thrust::max_element(thrust::device, ::thrust::device_pointer_cast(x), ::thrust::device_pointer_cast(x) + sz);
+    T result = *(iterator);
+    size_t element_num = iterator - ::thrust::device_pointer_cast(x);
+    return {result, element_num};
 }
 // Tsc result = thrust::reduce(thrust::device,
                     // ::thrust::device_pointer_cast(x_device_real), 
@@ -587,8 +591,21 @@ T thrust_wrappers_max_element(size_t sz, T_vec x)
 template <typename T, int BLOCK_SIZE>
 typename gpu_vector_operations_type::vec_ops_scalar_complex_type_help<T>::norm_type gpu_vector_operations<T, BLOCK_SIZE>::max_element(vector_type_real& y) const
 {
+    return thrust_wrappers_max_element<Tsc, vector_type_real>(sz, y).first;
+}
+template <typename T, int BLOCK_SIZE>
+size_t gpu_vector_operations<T, BLOCK_SIZE>::argmax_element(vector_type_real& y) const
+{
+    return thrust_wrappers_max_element<Tsc, vector_type_real>(sz, y).second;
+}
+template <typename T, int BLOCK_SIZE>
+std::pair<typename gpu_vector_operations_type::vec_ops_scalar_complex_type_help<T>::norm_type, size_t> gpu_vector_operations<T, BLOCK_SIZE>::max_argmax_element(vector_type_real& y) const
+{
     return thrust_wrappers_max_element<Tsc, vector_type_real>(sz, y);
 }
+
+
+
 
 
 //===

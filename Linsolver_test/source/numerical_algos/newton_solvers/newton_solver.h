@@ -7,6 +7,7 @@
 
 #include <string>
 #include <stdexcept>
+#include "../detail/str_source_helper.h"
 
 namespace numerical_algos
 {
@@ -20,7 +21,7 @@ public:
     typedef typename vector_operations::scalar_type  T;
     typedef typename vector_operations::vector_type  T_vec;
 
-    newton_solver(vector_operations*& vec_ops_, system_operator*& system_op_, convergence_strategy*& conv_strat_):
+    newton_solver(vector_operations* vec_ops_, system_operator* system_op_, convergence_strategy* conv_strat_):
     vec_ops(vec_ops_),
     system_op(system_op_),
     conv_strat(conv_strat_)
@@ -35,7 +36,7 @@ public:
     }
 
     //solve inplace
-    bool solve(nonlinear_operator*& nonlin_op, T_vec& x, const T& lambda)
+    bool solve(nonlinear_operator* nonlin_op, T_vec& x, const T& lambda)
     {
         
         int result_status = 1;
@@ -65,7 +66,7 @@ public:
 
     }
 
-    bool solve(nonlinear_operator*& nonlin_op, const T_vec& x0, const T& lambda0, T_vec& x)
+    bool solve(nonlinear_operator* nonlin_op, const T_vec& x0, const T& lambda0, T_vec& x)
     {
         vec_ops->assign(x0, x);
         bool converged = false;

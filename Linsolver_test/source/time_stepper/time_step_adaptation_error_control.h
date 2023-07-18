@@ -30,14 +30,21 @@ public:
     nfailed_(0),
     converged_(true)
     {
-        vec_ops_->init_vectors(f_help_, x_help_); vec_ops_->start_use_vectors(f_help_, x_help_);
+        vec_ops_->init_vector(f_help_);
+        vec_ops_->init_vector(x_help_);
+        vec_ops_->start_use_vector(f_help_);
+        vec_ops_->start_use_vector(x_help_);
         threshold_ = absolute_tolerance_/relative_tolerance_;
     }
     
     ~time_step_adaptation_error_control()
     {
-        log_->info_f("~time_step_adaptation(): total number of failed restarts = %d", nfailed_);
-        vec_ops_->stop_use_vectors(f_help_, x_help_); vec_ops_->free_vectors(f_help_, x_help_);
+        
+        vec_ops_->stop_use_vector(f_help_);
+        vec_ops_->stop_use_vector(x_help_); 
+        vec_ops_->free_vector(f_help_);
+        vec_ops_->free_vector(x_help_);
+        log_->info_f("~time_step_adaptation(): total number of failed restarts = %d", nfailed_);        
     }
         
 
@@ -112,6 +119,10 @@ public:
         }
     }
 
+    bool is_adaptive()const
+    {
+        return true;
+    }
 
 protected:
     using parent_t::dt_;
