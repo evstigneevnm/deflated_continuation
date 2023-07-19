@@ -169,12 +169,14 @@ int main(int argc, char const *argv[])
     periodic_orbit_nonlin_op.set_hyperplane_from_initial_guesses(x0, R);
     if(simulation_time>0.0)
     {
+        std::stringstream ss;
+        ss << "abc_initial_R_" << R << ".dat";
         periodic_orbit_nonlin_op.time_stepper(x0, R, {0, simulation_time});
-        periodic_orbit_nonlin_op.save_norms("abc_initial.dat");
+        periodic_orbit_nonlin_op.save_norms( ss.str() );
     }
-
+    
     bool is_newton_converged = newton.solve(&periodic_orbit_nonlin_op, x0, R);
-
+    
     if(is_newton_converged)
     {
         std::stringstream ss_periodic_estimate;

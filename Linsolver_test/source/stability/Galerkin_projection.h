@@ -176,7 +176,7 @@ private:
 
     unsigned int m;
     size_t N;
-    std::string which = "LR"; // default
+    std::string which = "LM"; // default
     std::vector<std::string> sorting_list_permisive = {"LR", "lr", "LM", "lm", "SR", "sr"};
 
     void sort_eigs(eigs_t& eigs)
