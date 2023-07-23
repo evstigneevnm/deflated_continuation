@@ -71,9 +71,9 @@ int main(int argc, char const *argv[])
 
     iram_t IRAM(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &lapack, &arnoldi, &sys_op, &lin_op, &log);
         
-    IRAM.set_target_eigs("LM");
+    IRAM.set_target_eigs("LR");
     IRAM.set_number_of_desired_eigenvalues(k0);
-    IRAM.set_tolerance(1.0e-6);
+    IRAM.set_tolerance(1.0e-8);
     IRAM.set_max_iterations(100);
 
     IRAM.set_verbocity(true);

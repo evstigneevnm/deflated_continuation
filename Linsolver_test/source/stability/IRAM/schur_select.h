@@ -73,9 +73,6 @@ public:
         H2_host = std::vector<T>(m*m,0);
         form_hessinberg_mask(); //do we need this mask???
         mat_ops_s->init_matrix(Q_gpu); mat_ops_s->start_use_matrix(Q_gpu);
-        mat_ops_s->init_matrix(H_gpu); mat_ops_s->start_use_matrix(H_gpu);
-        vec_ops_l->init_vector(f_gpu); vec_ops_l->start_use_vector(f_gpu);
-        mat_ops_l->init_matrix(V_gpu); mat_ops_l->start_use_matrix(V_gpu);
 
     }
     ~schur_select()
@@ -83,19 +80,7 @@ public:
         if(Q_gpu != nullptr)
         {
             mat_ops_s->stop_use_matrix(Q_gpu); mat_ops_s->free_matrix(Q_gpu);
-        }
-        if(H_gpu != nullptr)
-        {
-            mat_ops_s->stop_use_matrix(H_gpu); mat_ops_s->free_matrix(H_gpu);
-        }        
-        if(f_gpu != nullptr)
-        {
-            vec_ops_l->stop_use_vector(f_gpu); vec_ops_l->free_vector(f_gpu);
-        }
-        if(V_gpu != nullptr)
-        {
-            mat_ops_l->stop_use_matrix(V_gpu); mat_ops_l->free_matrix(V_gpu);
-        }
+        }      
     }
     
     void set_number_of_desired_eigenvalues(int k_p)
@@ -205,10 +190,10 @@ public:
             lapack->set_row(k, Q_row.data(), cont_.ref_H(), m, k);
             // write_matrix("H_after.dat", m, m, cont_.ref_H(), 4 );
             cont_.to_gpu();
-            device_2_device_cpy(cont_.ref_V(), V_gpu, N*m);
+            // device_2_device_cpy(cont_.ref_V(), V_gpu, N*m);
             host_2_device_cpy(Q_gpu, Q.data(), m*m);
 
-            mat_ops_l->mat2column_mult_mat(V_gpu, Q_gpu, m, 1.0, 0.0, cont_.ref_V() );
+            mat_ops_l->mat2column_mult_mat(cont_.ref_V(), Q_gpu, m, 1.0, 0.0, cont_.ref_V() );
             // cont_.to_cpu();
             // write_matrix("V.dat", N, m, cont_.ref_V(), 4 );
             // write_vector("f_ref.dat", N, cont_.ref_f(), 4 );
@@ -345,9 +330,6 @@ private:
 
     std::vector<T> Q;
     T_mat Q_gpu = nullptr;
-    T_mat H_gpu = nullptr;
-    T_vec f_gpu = nullptr;
-    T_mat V_gpu = nullptr;
     std::vector<T> R;
     std::vector<C> eigs;
     std::vector<C> eigs1;

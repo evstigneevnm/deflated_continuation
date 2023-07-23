@@ -164,8 +164,8 @@ int main(int argc, char const *argv[])
     container.init_f();
     container.to_cpu();
     container.to_gpu();
-    bulge.set_target("SR");
-    schur_select.set_target("SR");
+    bulge.set_target("LM");
+    schur_select.set_target("LM");
 
 
     sys_op.set_matrix_ptr(A);

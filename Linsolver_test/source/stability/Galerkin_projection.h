@@ -121,11 +121,13 @@ public:
     }
     eigs_t eigs(const T_mat& V, const T_mat& H, const size_t k)
     {
+        eigs_t eigs = eigs_t(m, 0);
         mat_ops_l->make_zero_columns(V, k, m, V0 );
         mat_ops_s->make_zero_columns(H, k, m, H_dev);
         std::vector<T> Q_fin(m*m, 0);
         std::vector<T> U_fin(m*m, 0);
-        lapack->hessinberg_schur_from_gpu(H_dev, m, Q_fin.data(), U_fin.data() );
+        lapack->eigs_schur_from_gpu(H_dev, m, Q_fin.data(), U_fin.data(), eigs.data() );
+        eigs.resize(k);
         host_2_device_cpy(Q_fin_dev, Q_fin.data(), m*m);
         mat_ops_l->mat2column_mult_mat(V0, Q_fin_dev, m, 1.0, 0.0, V1);
         for(int j=0;j<k;j++)
@@ -140,16 +142,19 @@ public:
         std::vector<T> R_fin_sub(k*k, 0);
         device_2_host_cpy(R_fin.data(), R_fin_dev, m*m);
         //copy a submatrix to a smaller matrix. Should be remade more conceptually.
-        for(int j=0;j<k;j++)
-        {
-            for(int l=0;l<k;l++)
-            {
-                R_fin_sub[j+l*k] = R_fin[j+l*m];
-            }
-        }
-        eigs_t eigs = eigs_t(k, 0);
+        // for(int j=0;j<k;j++)
+        // {
+        //     for(int l=0;l<k;l++)
+        //     {
+        //         R_fin_sub[j+l*k] = R_fin[j+l*m];
+        //     }
+        // }
+        lapack->return_submatrix(R_fin.data(), {m,m}, {0,0}, R_fin_sub.data(), {k,k});
+
+        // eigs_t eigs = eigs_t(k, 0);
         lapack->eigs(R_fin_sub.data(), k, eigs.data() );
         sort_eigs(eigs);
+
         return eigs;        
 
     }

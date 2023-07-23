@@ -56,7 +56,7 @@ iram_simulation:
 	$(NVCC) $(NVCCFLAGS) $(NVCCDEB) $(SCALAR_TYPE) $(IPROJECT) source/test_inst/IRAM/iram_simulation.cpp $(LIBS1) $(LLAPACK) O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_IRAM.bin	
 
 iram_process:
-	$(NVCC) $(NVCCFLAGS) $(NVCCDEB )$(SCALAR_TYPE) $(IPROJECT) source/test_inst/IRAM/iram_test.cpp $(LIBS1) $(LLAPACK) O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_IRAM.bin	
+	$(NVCC) $(NVCCFLAGS) $(NVCCDEB) $(SCALAR_TYPE) $(IPROJECT) source/test_inst/IRAM/iram_test.cpp $(LIBS1) $(LLAPACK) O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_IRAM.bin	
 
 arnoldi_iters:
 	$(NVCC) $(NVCCFLAGS) $(NVCCDEB) $(SCALAR_TYPE) $(IPROJECT) source/test_inst/Arnoldi_Iterations/arnoldi_iteraitons_test.cpp $(LIBS1) $(LLAPACK) O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_ArIter.bin	

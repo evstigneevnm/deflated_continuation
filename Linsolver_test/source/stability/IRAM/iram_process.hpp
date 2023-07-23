@@ -3,7 +3,8 @@
 
 
 #include <stability/IRAM/iram_container.h>
-#include <stability/IRAM/shift_bulge_chase.h>
+// #include <stability/IRAM/shift_bulge_chase.h>
+#include <stability/IRAM/schur_select.h>
 #include <iomanip>
 #include <complex>
 #include <stability/Galerkin_projection.h>
@@ -36,7 +37,8 @@ public:
 private:    
     using C = std::complex<T>;
     using container_t = stability::IRAM::iram_container<VectorOperations, MatrixOperations, Log>;
-    using bulge_t = stability::IRAM::shift_bulge_chase<VectorOperations, MatrixOperations, LapackOperations, Log>;
+    // using bulge_t = stability::IRAM::shift_bulge_chase<VectorOperations, MatrixOperations, LapackOperations, Log>;
+    using schur_select_t = stability::IRAM::schur_select<VectorOperations, MatrixOperations, LapackOperations, Log>;
     using project_t = stability::Galerkin_projection<VectorOperations, MatrixOperations, LapackOperations, LinearOperator, Log, eigs_t>;
 
 public:
@@ -63,8 +65,10 @@ public:
 
         which_sys_op = sys_op->target_eigs();
         container = new container_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, log);
-        bulge = new bulge_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, log, lapack);
-        bulge->set_target(which_sys_op);
+        // bulge = new bulge_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, log, lapack);
+        schur_select = new schur_select_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, log, lapack);
+        schur_select->set_target(which_sys_op);
+
         project = new project_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, lapack, A, log);
 
 
@@ -72,7 +76,7 @@ public:
     ~iram_process()
     {
         free_chk(project);
-        free_chk(bulge);
+        free_chk(schur_select);
         free_chk(container);        
     }
     
@@ -84,7 +88,9 @@ public:
     void set_number_of_desired_eigenvalues(unsigned int k0_)
     {
         k0 = k0_;
-        bulge->set_number_of_desired_eigenvalues(k0);
+        schur_select->set_number_of_desired_eigenvalues(k0);
+
+
     }
     void set_linear_operator_stable_eigenvalues_halfplane(const T sign_) // sign_ = -1  => left half plane
     {
@@ -110,11 +116,21 @@ public:
         unsigned int iters = 0;
         size_t k = 0;
         start_process();
+        if(v_init == nullptr)
+        {
+            v_init = container->ref_f();
+        }        
         while( (ritz_norm>tolerance)&&(iters<max_iterations) )
         {
             container->reset_ritz();
-            arnoldi->execute_arnoldi(k, container->ref_V(), container->ref_H(), v_init ); //(PA) V_j = V_j H_j + beta_j*f_{j+1}*e^T
-            bulge->execute(*container);
+            // arnoldi->execute_arnoldi(k, container->ref_V(), container->ref_H(), v_init ); //(PA) V_j = V_j H_j + beta_j*f_{j+1}*e^T
+            T ritz_value = arnoldi->execute_arnoldi_schur(k, container->ref_V(), container->ref_H(), v_init );
+            // bulge->execute(*container);
+            if(std::isnan(ritz_value))
+            {
+                throw std::runtime_error("iram_process: NAN value of the ritz estimate value is detected at step " + std::to_string(iters));
+            }
+            schur_select->execute(*container, ritz_value);
             container->to_gpu();
             ritz_norm = container->ritz_norm();
             k = container->K;
@@ -131,7 +147,7 @@ public:
             iters++;
         }
 
-        auto eigs = project->eigs(container->ref_V(), container->ref_H(), k); 
+        auto eigs = project->eigs(container->ref_V(), container->ref_H(), container->K0); 
 
         return eigs;
     }
@@ -158,7 +174,8 @@ private:
     unsigned int k0 = 6; // default value
     unsigned int m;
     size_t N;
-    bulge_t* bulge = nullptr;
+    // bulge_t* bulge = nullptr;
+    schur_select_t* schur_select = nullptr;
     container_t* container = nullptr;
     project_t* project = nullptr;
     T sign = T(1.0);
@@ -177,7 +194,7 @@ private:
     void start_process()
     {
         container->force_gpu();
-        container->set_f();
+        container->init_f();
     }
 
     void sort_eigs(eigs_t& eigs)

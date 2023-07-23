@@ -408,6 +408,18 @@ public:
         device_2_host_cpy<T>(A_, (T*)H_device, Nl*Nl);
         hessinberg_schur(A_, Nl, Q, R, eig);
     }
+    void eigs_schur_from_gpu(const T* A_device, size_t Nl, T* Q, T* R, T* eig_real = nullptr, T* eig_imag = nullptr)
+    {
+        device_2_host_cpy<T>(A_, (T*)A_device, Nl*Nl);
+        eigs_schur(A_, Nl, eig_real, eig_imag, Q, R);
+    }
+    template<class C_t>
+    void eigs_schur_from_gpu(const T* A_device, size_t Nl, T* Q, T* R, C_t* eig)
+    {
+        device_2_host_cpy<T>(A_, (T*)A_device, Nl*Nl);
+        eigs_schur(A_, Nl, eig, Q, R);
+    }
+
 
 
     void qr(const T* H, size_t Nl, T* Q, T* R = nullptr)

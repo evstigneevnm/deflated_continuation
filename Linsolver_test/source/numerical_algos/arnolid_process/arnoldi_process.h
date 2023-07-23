@@ -126,7 +126,9 @@ public:
 
     T execute_arnoldi_schur(size_t& k, T_mat V_mat, T_mat H_mat, T_vec v_in)
     {
-        vec_ops_large->normalize(v_in);
+        T beta = vec_ops_large->normalize(v_in);
+        if (std::isnan(beta) ) throw std::runtime_error("numerical_algos::eigen_solvers::arnoldi_process: initial vector norm is NAN.");
+        if (beta < 1.0e-12) throw std::runtime_error("numerical_algos::eigen_solvers::arnoldi_process: initial vector norm is too small.");        
         // size_t add = k>0?0:0;
         T ritz_estimate = 1.0;
 
@@ -135,9 +137,10 @@ public:
             // std::stringstream ssv;
             // ssv << "v_in_" << j << ".dat";
             // write_vector(ssv.str(), N, vec_ops_large->view(v_in));
-
+            // auto x1 = vec_ops_large->view(v_in);
             mat_ops_large->set_matrix_column(V_mat, v_in, j);  //V_mat[k+1]<-v_in
             bool res_flag = sys_op->solve(v_in, v_out);
+            // auto x2 = vec_ops_large->view(v_out);
             vec_ops_small->assign_scalar(T(0.0), h_v);
             vec_ops_small->assign_scalar(T(0.0), cc_v);
             mat_ops_large->mat2column_dot_vec(V_mat, j+1, 1.0, v_out, 0.0, h_v); //j+1 ?
@@ -160,6 +163,10 @@ public:
             vec_ops_large->assign(v_out, v_in); 
             mat_ops_small->set_matrix_column(H_mat, h_v, j);
             ritz_estimate = vec_ops_large->normalize(v_in);
+            if( std::isnan(ritz_estimate) )
+            {
+                throw std::runtime_error("numerical_algos::eigen_solvers::arnoldi_process: normalization of vector at step " + std::to_string(j) + " caused NAN." );
+            }
             // std::cout << "Ritz_est = " << ritz_estimate << std::endl;
             if(j+1<m)
             {
