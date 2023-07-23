@@ -93,11 +93,11 @@ public:
         }
     }
     
-    void set_number_of_desired_eigenvalues(int k_)
+    void set_number_of_desired_eigenvalues(unsigned int k_)
     {
-        if(k>m)
+        if(k_>m)
         {
-            throw std::logic_error("IRAM::shift_bulge_chase: numner of desired eigenvalues must not be greater then the maximum size of the Krylov subspace = " + std::to_string(m) );
+            throw std::logic_error("IRAM::shift_bulge_chase: numner of desired eigenvalues = " + std::to_string(k_) + " must not be greater then the maximum size of the Krylov subspace = " + std::to_string(m) );
         }
         k = k_;
 
@@ -107,7 +107,7 @@ public:
         target = trg_;
     }
 
-    void select_shifts(const T_mat H)
+    void select_shifts(const T_mat& H)
     {
 
         lapack->hessinberg_schur_from_gpu(H, m, Q.data(), R.data(), (C*)eigs.data() );
@@ -121,7 +121,8 @@ public:
 
 
     }
-    void form_polynomial(T_mat H)
+
+    void form_polynomial(const T_mat& H)
     {
         
         device_2_host_cpy(H_host.data(), H, m*m);
@@ -208,7 +209,7 @@ public:
         }          
 
     }
-    void print_matrix(const T_mat A)
+    void print_matrix(const T_mat& A)
     {
 
         for(int j =0;j<m;j++)
@@ -221,11 +222,11 @@ public:
         }
     }  
 
-    void _debug_set_Q(T_mat Q_)
+    void _debug_set_Q(T_mat& Q_)
     {
         device_2_host_cpy(Q.data(), Q_, m*m);
     }
-    void _debug_set_H(T_mat H_)
+    void _debug_set_H(T_mat& H_)
     {
         device_2_host_cpy(H_host.data(), H_, m*m);
     }

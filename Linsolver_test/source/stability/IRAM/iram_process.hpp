@@ -93,6 +93,7 @@ public:
     void set_tolerance(const T tolerance_)
     {
         tolerance = tolerance_;//*vec_ops_l->get_l2_size();
+        container->set_tolerance(tolerance);
     }
     void set_max_iterations(unsigned int max_it_)
     {

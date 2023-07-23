@@ -46,11 +46,12 @@ public:
     //sutable for both single execution and for the IRA execution
     // for the IRA: 0<=k<m and v_in is set
     // both V_mat and H_mat are on device
-    void execute_arnoldi(size_t& k, T_mat V_mat, T_mat H_mat, T_vec v_in = nullptr)
+    // returns residual at position H(m, m+1)
+    T execute_arnoldi(size_t& k, T_mat V_mat, T_mat H_mat, T_vec v_in = nullptr)
     {
         if(k > m)
         {
-            throw std::runtime_error("arnoldi_process: execute_arnoldi k > m");
+            throw std::runtime_error("numerical_algos::eigen_solvers::arnoldi_process: execute_arnoldi k > m");
         }
         if(v_in == nullptr)
         {
@@ -60,8 +61,8 @@ public:
         if(k==0) //constructing the first vector in the V_mat
         {
             T beta = vec_ops_large->normalize(v_in);
-            if (std::isnan(beta) ) throw std::runtime_error("arnoldi_process: initial vector norm is NAN.");
-            if (beta < T(1.0e-12)) throw std::runtime_error("arnoldi_process: initial vector norm is too small.");
+            if (std::isnan(beta) ) throw std::runtime_error("numerical_algos::eigen_solvers::arnoldi_process: initial vector norm is NAN.");
+            if (beta < T(1.0e-12)) throw std::runtime_error("numerical_algos::eigen_solvers::arnoldi_process: initial vector norm is too small.");
             
             bool res_flag = sys_op->solve(v_in, v_out);
 
@@ -78,12 +79,18 @@ public:
                 vec_ops_large->add_mul(-cc, v_out, v_in);
                 alpha+=cc;
             }
+            if(iter == 10)
+            {
+                log->warning_f("numerical_algos::eigen_solvers::arnoldi_process: reorthogonalization process failed with tolerance %le after %i iterations.", cc, iter);
+            }            
             //reorthogonalization ends
             mat_ops_small->set_matrix_value(H_mat, alpha, 0, 0);
         }
         for(int j=k+1;j<m;j++) //assemble the whole Krylov basis and Hessenberg matrix
         { 
             T beta = vec_ops_large->normalize(v_in);
+            T check_norm = vec_ops_large->norm(v_in);
+
             mat_ops_small->set_matrix_value(H_mat, beta, j, j-1);
             mat_ops_large->set_matrix_column(V_mat, v_in, j);   //sets the j-th vector in the Krylov subspace
 
@@ -104,12 +111,66 @@ public:
                 vec_ops_small->add_mul(T(1.0), cc_v, h_v);
                 cc = vec_ops_small->norm(cc_v);
             }
+            if(iter == 10)
+            {
+                log->warning_f("numerical_algos::eigen_solvers::arnoldi_process: reorthogonalization process failed with tolerance %le after %i iterations.", cc, iter);
+            }
             //reorthogonalization ends
             vec_ops_large->assign(v_out, v_in); // v_out -> v_in
             mat_ops_small->set_matrix_column(H_mat, h_v, j);
         }
+        T beta_residual = vec_ops_large->norm(v_in);
 
+        return beta_residual;
     }
+
+    T execute_arnoldi_schur(size_t& k, T_mat V_mat, T_mat H_mat, T_vec v_in)
+    {
+        vec_ops_large->normalize(v_in);
+        // size_t add = k>0?0:0;
+        T ritz_estimate = 1.0;
+
+        for(size_t j = k;j<m;j++)
+        {
+            // std::stringstream ssv;
+            // ssv << "v_in_" << j << ".dat";
+            // write_vector(ssv.str(), N, vec_ops_large->view(v_in));
+
+            mat_ops_large->set_matrix_column(V_mat, v_in, j);  //V_mat[k+1]<-v_in
+            bool res_flag = sys_op->solve(v_in, v_out);
+            vec_ops_small->assign_scalar(T(0.0), h_v);
+            vec_ops_small->assign_scalar(T(0.0), cc_v);
+            mat_ops_large->mat2column_dot_vec(V_mat, j+1, 1.0, v_out, 0.0, h_v); //j+1 ?
+            mat_ops_large->mat2column_mult_vec(V_mat, j+1, T(-1.0), h_v, T(1.0), v_out);                        
+            T cc = 1.0; 
+            int iter = 0;
+            while((cc>orthogonalization_tolerance)&&(iter<10))
+            {
+                iter++;
+                mat_ops_large->mat2column_dot_vec(V_mat, j+1, 1.0, v_out, 0.0, cc_v); //j+1 ?
+                mat_ops_large->mat2column_mult_vec(V_mat, j+1, T(-1.0), cc_v, T(1.0), v_out);
+                vec_ops_small->add_mul(T(1.0), cc_v, h_v);
+                cc = vec_ops_small->norm(cc_v);
+            }       
+
+            // std::stringstream ss;
+            // ss << "h_v_" << j << ".dat";
+            // write_vector(ss.str(), m, vec_ops_small->view(h_v));
+            // write_vector("v_out.dat", m, vec_ops_large->view(v_out));
+            vec_ops_large->assign(v_out, v_in); 
+            mat_ops_small->set_matrix_column(H_mat, h_v, j);
+            ritz_estimate = vec_ops_large->normalize(v_in);
+            // std::cout << "Ritz_est = " << ritz_estimate << std::endl;
+            if(j+1<m)
+            {
+                mat_ops_small->set_matrix_value(H_mat, ritz_estimate, j+1, j);
+            }
+        }
+
+
+        return ritz_estimate;
+    }
+
 
 
 private:
@@ -144,6 +205,18 @@ private:
         vec_ops_large->stop_use_vector(v_out); vec_ops_large->free_vector(v_out); 
         vec_ops_large->stop_use_vector(v_v); vec_ops_large->free_vector(v_v); 
 
+    }
+
+
+    void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec=17)
+    {
+        std::ofstream f(f_name.c_str(), std::ofstream::out);
+        if (!f) throw std::runtime_error("print_matrix: error while opening file " + f_name);
+        for (size_t i = 0; i<N; i++)
+        {
+            f << std::setprecision(prec) << vec[i] << std::endl;
+        } 
+        f.close();
     }
 
 };

@@ -26,12 +26,15 @@ private:
     Log* log;
 
 public:
-    iram_container(VectorOperations* vec_ops_l_, MatrixOperations* mat_ops_l_, VectorOperations* vec_ops_s_, MatrixOperations* mat_ops_s_, Log* log_, bool debug_ = false):
+    iram_container(VectorOperations* vec_ops_l_, MatrixOperations* mat_ops_l_, VectorOperations* vec_ops_s_, MatrixOperations* mat_ops_s_, Log* log_, T tolerance_p = 1.0e-6, size_t K_p = 6, bool debug_ = false):
     vec_ops_l(vec_ops_l_),
     vec_ops_s(vec_ops_s_),
     mat_ops_l(mat_ops_l_),
     mat_ops_s(mat_ops_s_),
     log(log_),
+    tolerance(tolerance_p),
+    K(K_p),
+    K0(K_p),
     debug(debug_)
     {
         mat_ops_l->init_matrix(V_gpu); mat_ops_l->start_use_matrix(V_gpu);
@@ -55,9 +58,22 @@ public:
         free_mat_s(H_gpu);
         free_vec_l(f_gpu);
     }
-
-
-    void set_f(bool random_ = false)
+    void set_tolerance(const T tolerance_)
+    {
+        tolerance = tolerance_;//*vec_ops_l->get_l2_size();
+    }
+    T get_tolerance()const
+    {
+        return tolerance;
+    }    
+    void set_f(const T_vec& x)
+    {
+        if(f_gpu != nullptr)
+        {
+            vec_ops_l->assign(x, f_gpu);
+        }
+    }
+    void init_f(bool random_ = false)
     {
         if(debug) log->info("iram_container: initialized f-vector");
         vec_ops_l->assign_scalar(0, f_gpu);
@@ -148,13 +164,14 @@ public:
     T ritz_norm()
     {
         T norm = 0;
-        for(int j=0;j<K;j++) norm+=ritz.at(j)*ritz.at(j);
+        for(int j=0;j<K0;j++) norm+=ritz.at(j)*ritz.at(j);
 
         return std::sqrt(norm);
     }
 
     std::vector<T> ritz;
-    size_t K = 0;
+    size_t K;
+    size_t K0;
 
 private:
     bool cpu_active = false;
@@ -167,7 +184,7 @@ private:
     std::vector<T> H_cpu;
     T_vec f_gpu = nullptr;
     std::vector<T> f_cpu;
-
+    T tolerance = 1.0e-6;
 
     void free_mat_l(T_mat mat_)
     {

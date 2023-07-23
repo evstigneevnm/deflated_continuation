@@ -119,7 +119,7 @@ public:
         }
         which = which_;
     }
-    eigs_t eigs(const T_mat V, const T_mat H, const size_t k)
+    eigs_t eigs(const T_mat& V, const T_mat& H, const size_t k)
     {
         mat_ops_l->make_zero_columns(V, k, m, V0 );
         mat_ops_s->make_zero_columns(H, k, m, H_dev);

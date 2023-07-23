@@ -17,7 +17,7 @@ int main(int argc, char const *argv[])
 {
     int N=100;
     int m = 10;
-    int k = m;
+    int k = 4;
     typedef SCALAR_TYPE real;
     typedef thrust::complex<real> complex;
 
@@ -75,8 +75,6 @@ int main(int argc, char const *argv[])
     
     mat_ops_real->mat2column_mult_mat(A, B, k, 1.0, 0.0, C);
 
-    mat_ops_real->set_matrix_value(C, 12345.0, 0, 0);
-    mat_ops_real->set_matrix_value(C, -12345.0, N-1, m-1);
 
     files_mat->write_matrix("A.dat", A);
     files_mat_small->write_matrix("B.dat", B);
@@ -84,6 +82,11 @@ int main(int argc, char const *argv[])
     files_vec->write_vector("x.dat", x);
     files_vec_small->write_vector("z.dat", z);
     files_vec_small->write_vector("y.dat", y);
+
+    mat_ops_real->set_matrix_value(C, 12345.0, 0, 0);
+    mat_ops_real->set_matrix_value(C, -12345.0, N-1, m-1);
+
+    files_mat->write_matrix("C_modified.dat", C);
 
     vec_ops_real_small->stop_use_vector(y); vec_ops_real_small->free_vector(y); 
     vec_ops_real_small->stop_use_vector(z); vec_ops_real_small->free_vector(z);
