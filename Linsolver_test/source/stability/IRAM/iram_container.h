@@ -68,6 +68,7 @@ public:
     }    
     void set_f(const T_vec& x)
     {
+        if(debug) log->info("iram_container: f-vector set from external vector");
         if(f_gpu != nullptr)
         {
             vec_ops_l->assign(x, f_gpu);

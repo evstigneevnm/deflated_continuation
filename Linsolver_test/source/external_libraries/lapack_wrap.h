@@ -270,15 +270,13 @@ public:
     template<class C_t>
     void hessinberg_eigs(const T* H, size_t Nl, C_t* eig)
     {
-        T* eig_real = new T[Nl];
-        T* eig_imag = new T[Nl];
-        hessinberg_eigs(H, Nl, eig_real, eig_imag);
+        std::vector<T> eig_real(Nl);
+        std::vector<T> eig_imag(Nl);
+        hessinberg_eigs(H, Nl, eig_real.data(), eig_imag.data() );
         for(int j=0;j<Nl;j++)
         {
             eig[j] = C_t(eig_real[j], eig_imag[j]);
-        }
-        delete [] eig_real;
-        delete [] eig_imag;        
+        }       
     }
 
     //reorder the real Schur factorization of a real matrix Q*R*Q^T, so that the diagonal block
@@ -293,15 +291,13 @@ public:
     template<class C_t>
     void hessinberg_schur(const T* H, size_t Nl, T* Q, T* R, C_t* eig)
     {
-        T* eig_real = new T[Nl];
-        T* eig_imag = new T[Nl];
-        hessinberg_schur(H, Nl, Q, R, eig_real, eig_imag);
+        std::vector<T> eig_real(Nl);
+        std::vector<T> eig_imag(Nl);
+        hessinberg_schur(H, Nl, Q, R, eig_real.data(), eig_imag.data() );
         for(int j=0;j<Nl;j++)
         {
             eig[j] = C_t(eig_real[j], eig_imag[j]);
-        }
-        delete [] eig_real;
-        delete [] eig_imag;        
+        }      
     }
 
     // eigenenvalues of a general matrix
@@ -310,15 +306,13 @@ public:
     template<class C_t>
     void eigs(const T* A, size_t Nl, C_t* eig)
     {
-        T* eig_real = new T[Nl];
-        T* eig_imag = new T[Nl];
-        eigs(A, Nl, eig_real, eig_imag);
+        std::vector<T> eig_real(Nl);
+        std::vector<T> eig_imag(Nl);
+        eigs(A, Nl, eig_real.data(), eig_imag.data());
         for(int j=0;j<Nl;j++)
         {
             eig[j] = C_t(eig_real[j], eig_imag[j]);
         }
-        delete [] eig_real;
-        delete [] eig_imag;
     }
     // eigenv*s of a general matrix
     void eigsv(const T* A, size_t Nl, T* eig_real, T* eig_imag, T* eigv_R);    
@@ -387,15 +381,13 @@ public:
     template<class C_t>
     void hessinberg_eigs_from_gpu(const T* H_device, size_t Nl, C_t* eig)
     {
-        T* eig_real = new T[Nl];
-        T* eig_imag = new T[Nl];
-        hessinberg_eigs_from_gpu(H_device, Nl, eig_real, eig_imag);
+        std::vector<T> eig_real(Nl);
+        std::vector<T> eig_imag(Nl);
+        hessinberg_eigs_from_gpu(H_device, Nl, eig_real.data(), eig_imag.data() );
         for(int j=0;j<Nl;j++)
         {
             eig[j] = C_t(eig_real[j], eig_imag[j]);
-        }
-        delete [] eig_real;
-        delete [] eig_imag;        
+        }        
     }
     void hessinberg_schur_from_gpu(const T* H_device, size_t Nl, T* Q, T* R, T* eig_real = nullptr, T* eig_imag = nullptr)
     {
@@ -416,8 +408,10 @@ public:
     template<class C_t>
     void eigs_schur_from_gpu(const T* A_device, size_t Nl, T* Q, T* R, C_t* eig)
     {
-        device_2_host_cpy<T>(A_, (T*)A_device, Nl*Nl);
-        eigs_schur(A_, Nl, eig, Q, R);
+        std::vector<T> A_l(Nl*Nl);
+
+        device_2_host_cpy<T>(A_l.data(), (T*)A_device, Nl*Nl);
+        eigs_schur(A_l.data(), Nl, eig, Q, R);
     }
 
 
@@ -595,6 +589,55 @@ public:
         }
     }
 
+    template <class T_l>
+    void write_matrix(const std::string &f_name, size_t Row, size_t Col, T_l *matrix, unsigned int prec=17)
+    {
+        size_t N=Col;
+        std::ofstream f(f_name.c_str(), std::ofstream::out);
+        if (!f) throw std::runtime_error("print_matrix: error while opening file " + f_name);
+        for (size_t i = 0; i<Row; i++)
+        {
+            for(size_t j=0;j<Col;j++)
+            {
+                if(j<Col-1)
+                    f << std::setprecision(prec) << matrix[I2_R(i,j,Row)] << " ";
+                else
+                    f << std::setprecision(prec) << matrix[I2_R(i,j,Row)];
+
+            }
+            f << std::endl;
+        } 
+        
+        f.close();
+    }
+    template <class T_l>
+    void write_vector(const std::string &f_name, size_t N, T_l *vec, unsigned int prec=17)
+    {
+        std::ofstream f(f_name.c_str(), std::ofstream::out);
+        if (!f) throw std::runtime_error("print_matrix: error while opening file " + f_name);
+        for (size_t i = 0; i<N; i++)
+        {
+            f << std::setprecision(prec) << vec[i] << std::endl;
+        } 
+        f.close();
+    }    
+
+
+    template<class T_l>
+    void write_matrix_from_device(const std::string &f_name, size_t Row, size_t Col, T_l *matrix, unsigned int prec=17)
+    {
+        std::vector<T_l> A_l(Row*Col, 0);
+        device_2_host_cpy<T_l>(A_l.data(), (T_l*)matrix, Row*Col);
+        write_matrix(f_name, Row, Col, A_l.data(), prec);
+    }
+
+    template<class T_l>
+    void write_vector_from_device(const std::string &f_name, size_t N, T_l *vec, unsigned int prec=17)
+    {
+        std::vector<T_l> v_l(N,0);
+        device_2_host_cpy<T_l>(v_l.data(), (T_l*)vec, N);
+        write_vector(f_name, N, v_l, prec);
+    }
 
 private:
     void qr_no_R_(T* A, T* Q);

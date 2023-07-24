@@ -131,7 +131,8 @@ public:
         if (beta < 1.0e-12) throw std::runtime_error("numerical_algos::eigen_solvers::arnoldi_process: initial vector norm is too small.");        
         // size_t add = k>0?0:0;
         T ritz_estimate = 1.0;
-
+        // auto xxx = vec_ops_large->view(v_in);
+        
         for(size_t j = k;j<m;j++)
         {
             // std::stringstream ssv;

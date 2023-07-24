@@ -11,7 +11,7 @@
 #include <common/gpu_matrix_file_operations.h>
 #include <utils/cuda_support.h>
 #include <stability/IRAM/iram_container.h>
-
+#include <stability/detail/eigenvalue_sorter.h>
 
 namespace stability
 {
@@ -94,7 +94,7 @@ public:
     }
     void set_target(std::string trg_)
     {
-        target = trg_;
+        sorter.set_target_eigs(trg_);
     }
 
     void set_block_ordering(bool ord_p)
@@ -109,6 +109,7 @@ public:
         // std::cout << "ritz_value = " << ritz_value << std::endl;
         cont_.to_cpu();
         // lapack->hessinberg_schur(cont_.ref_H(), m, Q.data(), R.data(), (C*)eigs.data() ); // Q->T, R->U
+        // lapack->write_matrix("H_eig.dat", m, m, cont_.ref_H(), 4);
         lapack->eigs_schur(cont_.ref_H(), m, eigs.data(), Q.data(), R.data());
 
         // write_matrix("Q_mat.dat", m, m, Q.data(), 4 );
@@ -128,7 +129,7 @@ public:
             mu.at(j).first = eigs.at(j);
             mu.at(j).second = ritz.at(j);
         }        
-        sort_eigs(mu);
+        sorter(mu);
         for(int j=0;j<m;j++)
         {
             eigs.at(j) = mu.at(j).first;
@@ -152,7 +153,7 @@ public:
             {
                 eigidx.push_back({eigs1.at(j), j});   
             }
-            sort_eigs(eigidx);
+            sorter(eigidx);
             adjust_number_of_desired(cont_, eigidx);
             // for(auto& v: eigidx)
             // {
@@ -201,7 +202,7 @@ public:
         }
         else
         {
-            
+            log->info_f("converged using target %s", sorter.get_target_eigs().c_str() );
             int iter = 0;
             if(k0 < m)
             {
@@ -311,7 +312,7 @@ private:
 private:
     bool block_ordering;
     int _deb_run_i_qr = 0;
-    std::string target;
+    ::stability::detail::eigenvalue_sorter sorter;
     std::vector<vec_sort_t> mu;
     Log* log;
     VectorOperations* vec_ops_l;
@@ -448,34 +449,7 @@ private:
         }
     }
 
-    template<class VV>
-    void sort_eigs(std::vector< VV >& eigidx_p)
-    {
-        if((target == "LM")||(target == "lm"))
-        {
-            std::stable_sort(eigidx_p.begin(), eigidx_p.end(), [this](const VV& left_, const VV& right_)
-            {
-                return std::abs(left_.first) > std::abs(right_.first);
-            } 
-            );
-        }
-        else if((target == "LR")||(target == "lr"))
-        {
-            std::stable_sort(eigidx_p.begin(), eigidx_p.end(), [this](const VV& left_, const VV& right_)
-            {
-                return  left_.first.real() > right_.first.real();
-            } 
-            );
-        }
-        else if((target == "SR")||(target == "sr"))
-        {
-            std::stable_sort(eigidx_p.begin(), eigidx_p.end(), [this](const VV& left_, const VV& right_)
-            {
-                return  left_.first.real() < right_.first.real();
-            } 
-            );
-        }        
-    }
+
 
 
     // void adjust_number_of_desired(container_t& cont_, const std::vector< eig_idx_sort_t >& eigidx_p)

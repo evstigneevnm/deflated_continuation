@@ -1,12 +1,15 @@
 #ifndef __STABILITY_GALERKIN_PROGECTION_H__
 #define __STABILITY_GALERKIN_PROGECTION_H__ 
 
+#include <complex>
 #include <string>
 #include <vector>
+#include <utility>
 #include <stdexcept>
 #include <iomanip>
 #include <algorithm>
 #include <utils/cuda_support.h>
+#include <stability/detail/eigenvalue_sorter.h>
 
 namespace stability
 {
@@ -33,7 +36,7 @@ private:
     typedef typename VectorOperations::vector_type  T_vec;
     typedef typename MatrixOperations::matrix_type T_mat;
     using eigs_t = Eigenvalues;
-    using eig = typename Eigenvalues::value_type;
+    using eig_t = typename Eigenvalues::value_type;
 
 public:
 
@@ -49,6 +52,14 @@ public:
         mat_ops_s->init_matrix(R_fin_dev); mat_ops_s->start_use_matrix(R_fin_dev);
 
         vec_ops_l->init_vector(v_helper); vec_ops_l->start_use_vector(v_helper);
+        vec_ops_l->init_vector(w_helper); vec_ops_l->start_use_vector(w_helper);
+        vec_ops_l->init_vector(v_r_); vec_ops_l->start_use_vector(v_r_);
+        vec_ops_l->init_vector(v_i_); vec_ops_l->start_use_vector(v_i_);
+        vec_ops_l->init_vector(w_r_); vec_ops_l->start_use_vector(w_r_);
+        vec_ops_l->init_vector(w_i_); vec_ops_l->start_use_vector(w_i_);
+        vec_ops_l->init_vector(eigv_real); vec_ops_l->start_use_vector(eigv_real);
+        vec_ops_l->init_vector(eigv_imag); vec_ops_l->start_use_vector(eigv_imag);
+        
 
         auto small_rows = mat_ops_s->get_rows();
         auto small_cols = mat_ops_s->get_cols();
@@ -98,27 +109,22 @@ public:
         {
             vec_ops_l->stop_use_vector(v_helper); vec_ops_l->free_vector(v_helper);
         }
-
+        vec_ops_l->stop_use_vector(w_helper); vec_ops_l->free_vector(w_helper);
+        vec_ops_l->stop_use_vector(v_r_); vec_ops_l->free_vector(v_r_);
+        vec_ops_l->stop_use_vector(v_i_); vec_ops_l->free_vector(v_i_);
+        vec_ops_l->stop_use_vector(w_r_); vec_ops_l->free_vector(w_r_);
+        vec_ops_l->stop_use_vector(w_i_); vec_ops_l->free_vector(w_i_);        
+        vec_ops_l->stop_use_vector(eigv_real); vec_ops_l->free_vector(eigv_real);
+        vec_ops_l->stop_use_vector(eigv_imag); vec_ops_l->free_vector(eigv_imag);
 
     }
-    void set_target_eigs(const std::string& which_)
+    void set_target_eigs(const std::pair<std::string, std::string>& which_)
     {
-        
-        bool found = false;
-        for(auto &p_: sorting_list_permisive)
-        {
-            if(which_ == p_)
-            {
-                found = true;
-                break;
-            }
-        }
-        if(!found)
-        {
-            throw std::logic_error("Galerkin_projection::set_target_eigs: Only LM, LR or SR sort of eigenvalues is supported. You provided: " + which);
-        }
-        which = which_;
+        sorter_system_operator.set_target_eigs(which_.first);
+        sorter_orig.set_target_eigs(which_.second);
     }
+
+/*
     eigs_t eigs(const T_mat& V, const T_mat& H, const size_t k)
     {
         eigs_t eigs = eigs_t(m, 0);
@@ -130,6 +136,7 @@ public:
         eigs.resize(k);
         host_2_device_cpy(Q_fin_dev, Q_fin.data(), m*m);
         mat_ops_l->mat2column_mult_mat(V0, Q_fin_dev, m, 1.0, 0.0, V1);
+
         for(int j=0;j<k;j++)
         {
             
@@ -153,14 +160,122 @@ public:
 
         // eigs_t eigs = eigs_t(k, 0);
         lapack->eigs(R_fin_sub.data(), k, eigs.data() );
-        sort_eigs(eigs);
+        sorter(eigs);
+
 
         return eigs;        
 
     }
+*/
 
-    // TODO: add implementation for eigenvectors
-    // This requres more information from the sorting process i.e. the permuation index matrix
+    eigs_t eigs(const T_mat& H, size_t k)
+    {
+        eigs_t eigs(m, 0);
+
+        std::vector<T> Q(m*m, 0);
+        std::vector<eig_t> QC(m*m, 0);   
+        std::vector<T> R(m*m, 0);
+        std::vector<eig_t> U(m*m, 0);
+        std::vector<eig_t> U1(m*m, 0);
+
+        lapack->eigs_schur_from_gpu(H, m, Q.data(), R.data(), eigs.data() );
+        lapack->eigsv(R.data(), m, eigs.data(), U.data());
+        sorter_orig(eigs);
+        eigs.resize(k);
+        return eigs;
+    }
+
+
+
+    eigs_t eigs(const T_mat& V, const T_mat& H, const size_t k)
+    {
+        std::vector<T_vec> fake_vec;
+        return eigs(V, H, k, fake_vec, fake_vec);
+    }
+    eigs_t eigs(const T_mat& V, const T_mat& H, const size_t k, std::vector<T_vec>& eigvs_real, std::vector<T_vec>& eigvs_imag)    
+    {
+        
+
+        eigs_t eigs(m, 0);
+        std::vector< std::pair<eig_t, size_t> > eigsidxes(m);
+
+        std::vector<T> Q(m*m, 0);
+        std::vector<eig_t> QC(m*m, 0);   
+        std::vector<T> R(m*m, 0);
+        std::vector<eig_t> U(m*m, 0);
+        std::vector<eig_t> U1(m*m, 0);
+
+        lapack->eigs_schur_from_gpu(H, m, Q.data(), R.data(), eigs.data() );
+        
+        lapack->eigsv(R.data(), m, eigs.data(), U.data());
+        size_t idx_e = 0;
+        for(auto& e: eigs)
+        {
+            eigsidxes.at(idx_e) = {e, idx_e};
+            idx_e++;
+        }
+        sorter_system_operator(eigsidxes);
+        lapack->double2complex(Q.data(), m, m, QC.data());
+        lapack->gemm(QC.data(), 'N', U.data(), 'N', m, U1.data() );
+        
+        std::vector<T> U_real;
+        std::vector<T> U_imag;
+        U_real.reserve(m*m);
+        U_imag.reserve(m*m);
+
+        idx_e = 0;
+        for(auto& v: U1)
+        {
+            U_real.push_back( v.real() );
+            U_imag.push_back( v.imag() );
+        }
+        host_2_device_cpy(Q_fin_dev, U_real.data(), m*m);
+        mat_ops_l->mat2column_mult_mat(V, Q_fin_dev, m, 1.0, 0.0, V0); //V0: real eigenvectors
+        host_2_device_cpy(Q_fin_dev, U_imag.data(), m*m);
+        mat_ops_l->mat2column_mult_mat(V, Q_fin_dev, m, 1.0, 0.0, V1); //V1: imag eigenvectors
+        eigs.resize(k);
+        for(int j=0;j<k;j++)
+        {
+            auto sortidx = eigsidxes.at(j).second;
+            vec_ops_l->assign( &V0[sortidx*N], eigv_real );
+            vec_ops_l->assign( &V1[sortidx*N], eigv_imag );
+            // std::stringstream ssr;
+            // ssr << "eigv_real_" << j << ".dat";
+            // write_vector(ssr.str(), N, vec_ops_l->view(eigv_real), 4);
+            // std::stringstream ssi;
+            // ssi << "eigv_imag_" << j << ".dat";
+            // write_vector(ssi.str(), N, vec_ops_l->view(eigv_imag), 4);
+ 
+            A->apply(eigv_real, &V0[j*N] ); //Avr->wr
+            A->apply(eigv_imag, &V1[j*N] ); //Avi-->wi
+
+            vec_ops_l->mul_pointwise(1.0, eigv_real, 1.0, eigv_real, v_r_); //vr^2
+            vec_ops_l->mul_pointwise(1.0, eigv_imag, 1.0, eigv_imag, v_i_); //wr^2
+            vec_ops_l->add_mul(1.0, v_r_, 1.0, v_i_, 0.0, v_helper); // vr^2+wr^2->v_helper
+
+            vec_ops_l->mul_pointwise(1.0, eigv_real, 1.0, &V0[j*N], v_r_); // vr*wr
+            vec_ops_l->mul_pointwise(1.0, eigv_imag, 1.0, &V1[j*N], v_i_); // vi*wi
+            vec_ops_l->add_mul(1.0, v_r_, 1.0, v_i_, 0.0, w_helper); // vr*wr+vi*wi->v_helper
+            vec_ops_l->div_pointwise(w_helper, 1.0, v_helper); //real parts of eigenvalues
+            auto e_real = vec_ops_l->get_value_at_point(0, w_helper );
+
+            vec_ops_l->mul_pointwise(1.0, eigv_real, 1.0, &V1[j*N], v_r_); // vr*wi
+            vec_ops_l->mul_pointwise(1.0, eigv_imag, 1.0, &V0[j*N], v_i_); // vi*wi
+            vec_ops_l->add_mul(1.0, v_r_, -1.0, v_i_, 0.0, w_helper); // vr*wi-vi*wr->v_helper
+            vec_ops_l->div_pointwise(w_helper, 1.0, v_helper); //imag real parts of eigenvalues
+            auto e_imag = vec_ops_l->get_value_at_point(0, w_helper );
+            if((eigvs_real.size()>0)&&(eigvs_imag.size()>0))
+            {
+                vec_ops_l->assign( eigv_real, eigvs_real.at(j) );
+                vec_ops_l->assign( eigv_imag, eigvs_imag.at(j) );
+            }
+            eigs.at(j) = {e_real, e_imag};
+        }        
+
+
+        return eigs;
+    }
+
 
 
 private:
@@ -171,6 +286,9 @@ private:
     LapackOperations* lapack;
     LinearOperator* A;
     Log* log;  
+    ::stability::detail::eigenvalue_sorter sorter_system_operator;
+    ::stability::detail::eigenvalue_sorter sorter_orig;
+
 
     T_mat V0 = nullptr;
     T_mat V1 = nullptr;
@@ -178,44 +296,50 @@ private:
     T_mat R_fin_dev = nullptr;
     T_mat H_dev = nullptr;
     T_vec v_helper = nullptr;
+    T_vec w_helper = nullptr;
+    T_vec v_r_ = nullptr;
+    T_vec v_i_ = nullptr;
+    T_vec w_r_ = nullptr;
+    T_vec w_i_ = nullptr;
+    T_vec eigv_real = nullptr;
+    T_vec eigv_imag = nullptr;
 
     unsigned int m;
     size_t N;
-    std::string which = "LM"; // default
-    std::vector<std::string> sorting_list_permisive = {"LR", "lr", "LM", "lm", "SR", "sr"};
 
-    void sort_eigs(eigs_t& eigs)
+
+    template <class T>
+    void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec=17)
     {
-        if((which == "LM")||(which == "lm"))
+        std::ofstream f(f_name.c_str(), std::ofstream::out);
+        if (!f) throw std::runtime_error("print_matrix: error while opening file " + f_name);
+        for (size_t i = 0; i<N; i++)
         {
-            std::stable_sort(eigs.begin(), eigs.end(), [this](const eig& left_, const eig& right_)
-            {
-             
-                return std::abs(left_) > std::abs(right_);
-            } 
-            );
-        }
-        else if((which == "LR")||(which == "lr"))
-        {
-            std::stable_sort(eigs.begin(), eigs.end(), [this](const eig& left_, const eig& right_)
-            {
-                return  left_.real() > right_.real();
-            } 
-            );
-        }
-        else if((which == "SR")||(which == "sr"))
-        {
-            std::stable_sort(eigs.begin(), eigs.end(), [this](const eig& left_, const eig& right_)
-            {
-                return  left_.real() < right_.real();
-            } 
-            );
-        }  
-        else
-        {
-            throw std::logic_error("Galerkin_projection::sort: Only LM, LR or SR sort of eigenvalues is supported. You provided: " + which);
-        }      
+            f << std::setprecision(prec) << vec[i] << std::endl;
+        } 
+        f.close();
     }
+    template <class T>
+    void write_matrix(const std::string &f_name, size_t Row, size_t Col, T *matrix, unsigned int prec=17)
+    {
+        size_t N=Col;
+        std::ofstream f(f_name.c_str(), std::ofstream::out);
+        if (!f) throw std::runtime_error("print_matrix: error while opening file " + f_name);
+        for (size_t i = 0; i<Row; i++)
+        {
+            for(size_t j=0;j<Col;j++)
+            {
+                if(j<Col-1)
+                    f << std::setprecision(prec) << matrix[I2_R(i,j,Row)] << " ";
+                else
+                    f << std::setprecision(prec) << matrix[I2_R(i,j,Row)];
+
+            }
+            f << std::endl;
+        } 
+        
+        f.close();
+    }    
 
 };
 }

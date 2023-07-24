@@ -46,7 +46,7 @@ public:
  * @brief      Constructor.
  */
     iram_process(VectorOperations* vec_ops_l_, MatrixOperations* mat_ops_l_, VectorOperations* vec_ops_s_, MatrixOperations* mat_ops_s_, LapackOperations* lapack_, ArnoldiProcess* arnoldi_, SystemOperator* sys_op_, LinearOperator* A_, Log* log_):
-    vec_ops_l(vec_ops_l_), mat_ops_l(mat_ops_l_), vec_ops_s(vec_ops_s_), mat_ops_s(mat_ops_s_), lapack(lapack_), sys_op(sys_op_), arnoldi(arnoldi_), A(A_), log(log_)
+    vec_ops_l(vec_ops_l_), mat_ops_l(mat_ops_l_), vec_ops_s(vec_ops_s_), mat_ops_s(mat_ops_s_), lapack(lapack_), sys_op(sys_op_), arnoldi(arnoldi_), A(A_), log(log_), f_set(false)
     {
         auto small_rows = mat_ops_s->get_rows();
         auto small_cols = mat_ops_s->get_cols();
@@ -83,13 +83,12 @@ public:
     void set_target_eigs(const std::string& which_)
     {
         which = which_;
-        project->set_target_eigs(which);
+        project->set_target_eigs({which_sys_op, which} );
     }
     void set_number_of_desired_eigenvalues(unsigned int k0_)
     {
         k0 = k0_;
         schur_select->set_number_of_desired_eigenvalues(k0);
-
 
     }
     void set_linear_operator_stable_eigenvalues_halfplane(const T sign_) // sign_ = -1  => left half plane
@@ -109,8 +108,19 @@ public:
     {
         verbocity = verb_;
     }
-
+    void set_initial_vector(const T_vec& x_0)
+    {
+        container->set_f(x_0);
+        f_set = true;
+    }
+    
     eigs_t execute(T_vec v_init = nullptr)
+    {
+        std::vector<T_vec> fake_vec;
+        return execute(fake_vec, fake_vec, v_init);
+    }
+
+    eigs_t execute(std::vector<T_vec>& eigvec_real, std::vector<T_vec>& eigvec_imag, T_vec v_init = nullptr)
     {
         T ritz_norm = T(1.0);
         unsigned int iters = 0;
@@ -147,6 +157,8 @@ public:
             iters++;
         }
 
+        // auto eigs = project->eigs(container->ref_V(), container->ref_H(), container->K0, eigvec_real, eigvec_imag ); 
+
         auto eigs = project->eigs(container->ref_V(), container->ref_H(), container->K0); 
 
         return eigs;
@@ -168,7 +180,6 @@ private:
     LinearOperator* A;
     Log* log;
 
-    T_mat V1 = nullptr;
     T_mat Q_fin_dev = nullptr;
     T_mat R_fin_dev = nullptr;
     unsigned int k0 = 6; // default value
@@ -181,7 +192,7 @@ private:
     T sign = T(1.0);
     T tolerance = T(1.0e-6);
     unsigned int max_iterations = 100; // default value
-
+    bool f_set;
     template<class T>
     void free_chk(T ref_)
     {
@@ -194,7 +205,10 @@ private:
     void start_process()
     {
         container->force_gpu();
-        container->init_f();
+        if(!f_set)
+        {
+            container->init_f();
+        }
     }
 
     void sort_eigs(eigs_t& eigs)

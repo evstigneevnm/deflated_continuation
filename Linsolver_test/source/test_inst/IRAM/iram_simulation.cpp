@@ -85,7 +85,7 @@ int main(int argc, char const *argv[])
     using arnoldi_t = numerical_algos::eigen_solvers::arnoldi_process<vec_ops_t, mat_ops_t, sys_op_t, log_t>;
     using lapack_wrap_t = lapack_wrap<real>;
     using container_t = stability::IRAM::iram_container<vec_ops_t,mat_ops_t,log_t>;
-    using bulge_t = stability::IRAM::shift_bulge_chase<vec_ops_t, mat_ops_t, lapack_wrap_t, log_t>;
+    // using bulge_t = stability::IRAM::shift_bulge_chase<vec_ops_t, mat_ops_t, lapack_wrap_t, log_t>;
     using schur_select_t = stability::IRAM::schur_select<vec_ops_t, mat_ops_t, lapack_wrap_t, log_t>;
 
     if((argc != 2)&&(argc != 3)&&(argc != 4))
@@ -155,16 +155,16 @@ int main(int argc, char const *argv[])
     arnoldi_t arnoldi(&vec_ops_N, &vec_ops_m, &mat_ops_N, &mat_ops_m, &sys_op, &log);
 
     container_t container(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &log, ritz_eps, k0, debug);
-    bulge_t bulge(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &log, &blas);
+    // bulge_t bulge(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &log, &blas);
     schur_select_t schur_select(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &log, &blas);
 
-    bulge.set_number_of_desired_eigenvalues(k0);
+    // bulge.set_number_of_desired_eigenvalues(k0);
     schur_select.set_number_of_desired_eigenvalues(k0);
     container.force_gpu();
     container.init_f();
     container.to_cpu();
     container.to_gpu();
-    bulge.set_target("LM");
+    // bulge.set_target("LM");
     schur_select.set_target("LM");
 
 
