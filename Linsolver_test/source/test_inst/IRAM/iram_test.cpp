@@ -25,7 +25,7 @@ int main(int argc, char const *argv[])
     using sys_op_t = stability::system_operator_stability<vec_ops_t, mat_ops_t, log_t>;
     using lin_op_t = stability::linear_operator<vec_ops_t, mat_ops_t>;
     using lapack_wrap_t = lapack_wrap<real>;
-    using iram_t = stability::IRAM::iram_process<vec_ops_t, mat_ops_t, lapack_wrap_t, lin_op_t, log_t>;
+    using iram_t = stability::IRAM::iram_process<vec_ops_t, mat_ops_t, lapack_wrap_t, lin_op_t, log_t, sys_op_t>;
 
     if((argc != 3)&&(argc != 4))
     {
@@ -81,7 +81,7 @@ int main(int argc, char const *argv[])
     sys_op.set_matrix_ptr(PA);
 
 
-    iram_t IRAM(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &lapack, &lin_op, &log);
+    iram_t IRAM(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &lapack, &lin_op, &log, &sys_op);
         
     IRAM.set_target_eigs("LR");
     IRAM.set_number_of_desired_eigenvalues(k0);
