@@ -3,7 +3,6 @@
 #include <common/gpu_matrix_file_operations.h>
 #include <common/gpu_file_operations.h>
 #include <common/file_operations.h>
-#include <numerical_algos/arnolid_process/arnoldi_process.h>
 #include <utils/cuda_support.h>
 #include <utils/log.h>
 #include <external_libraries/cublas_wrap.h>
@@ -25,9 +24,8 @@ int main(int argc, char const *argv[])
     using log_t = utils::log_std;
     using sys_op_t = stability::system_operator_stability<vec_ops_t, mat_ops_t, log_t>;
     using lin_op_t = stability::linear_operator<vec_ops_t, mat_ops_t>;
-    using arnoldi_t = numerical_algos::eigen_solvers::arnoldi_process<vec_ops_t, mat_ops_t, sys_op_t, log_t>;
     using lapack_wrap_t = lapack_wrap<real>;
-    using iram_t = stability::IRAM::iram_process<vec_ops_t, mat_ops_t, lapack_wrap_t, arnoldi_t, sys_op_t, lin_op_t, log_t>;
+    using iram_t = stability::IRAM::iram_process<vec_ops_t, mat_ops_t, lapack_wrap_t, lin_op_t, log_t>;
 
     if((argc != 3)&&(argc != 4))
     {
@@ -79,12 +77,11 @@ int main(int argc, char const *argv[])
 
     lin_op_t lin_op(&vec_ops_N, &mat_ops_A);
     sys_op_t sys_op(&vec_ops_N, &mat_ops_A, &log);
-    arnoldi_t arnoldi(&vec_ops_N, &vec_ops_m, &mat_ops_N, &mat_ops_m, &sys_op, &log);
     lin_op.set_matrix_ptr(A);
     sys_op.set_matrix_ptr(PA);
 
 
-    iram_t IRAM(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &lapack, &arnoldi, &sys_op, &lin_op, &log);
+    iram_t IRAM(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &lapack, &lin_op, &log);
         
     IRAM.set_target_eigs("LR");
     IRAM.set_number_of_desired_eigenvalues(k0);

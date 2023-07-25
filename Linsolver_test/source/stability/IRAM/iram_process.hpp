@@ -1,13 +1,15 @@
 #ifndef __STABILITY_IRAM_PROCESS_HPP__
 #define __STABILITY_IRAM_PROCESS_HPP__ 
 
-
+#include <type_traits>
+#include <numerical_algos/arnolid_process/arnoldi_process.h>
 #include <stability/IRAM/iram_container.h>
 // #include <stability/IRAM/shift_bulge_chase.h>
 #include <stability/IRAM/schur_select.h>
 #include <iomanip>
 #include <complex>
 #include <stability/Galerkin_projection.h>
+#include <stability/detail/system_operator_dummy.h>
 
 /**
  * @brief      implementaton of the IRAM
@@ -25,7 +27,7 @@ namespace stability
 namespace IRAM
 {
 
-template<class VectorOperations, class MatrixOperations, class LapackOperations, class ArnoldiProcess, class SystemOperator, class LinearOperator, class Log>
+template<class VectorOperations, class MatrixOperations, class LapackOperations, class LinearOperator, class Log, class SystemOperator = ::stability::detail::system_operator_dummy<VectorOperations, LinearOperator> >
 class iram_process
 {
 private:
@@ -38,15 +40,23 @@ private:
     using C = std::complex<T>;
     using container_t = stability::IRAM::iram_container<VectorOperations, MatrixOperations, Log>;
     // using bulge_t = stability::IRAM::shift_bulge_chase<VectorOperations, MatrixOperations, LapackOperations, Log>;
+    using arnoldi_t = numerical_algos::eigen_solvers::arnoldi_process<VectorOperations, MatrixOperations, SystemOperator, Log>;    
     using schur_select_t = stability::IRAM::schur_select<VectorOperations, MatrixOperations, LapackOperations, Log>;
+    
     using project_t = stability::Galerkin_projection<VectorOperations, MatrixOperations, LapackOperations, LinearOperator, Log, eigs_t>;
 
 public:
 /**
  * @brief      Constructor.
  */
-    iram_process(VectorOperations* vec_ops_l_, MatrixOperations* mat_ops_l_, VectorOperations* vec_ops_s_, MatrixOperations* mat_ops_s_, LapackOperations* lapack_, ArnoldiProcess* arnoldi_, SystemOperator* sys_op_, LinearOperator* A_, Log* log_):
-    vec_ops_l(vec_ops_l_), mat_ops_l(mat_ops_l_), vec_ops_s(vec_ops_s_), mat_ops_s(mat_ops_s_), lapack(lapack_), sys_op(sys_op_), arnoldi(arnoldi_), A(A_), log(log_), f_set(false)
+    
+    iram_process(VectorOperations* vec_ops_l_, MatrixOperations* mat_ops_l_, VectorOperations* vec_ops_s_, MatrixOperations* mat_ops_s_, LapackOperations* lapack_, LinearOperator* A_, Log* log_):
+    iram_process(vec_ops_l_, mat_ops_l_, vec_ops_s_, mat_ops_s_, lapack_, A_, log_, new ::stability::detail::system_operator_dummy<VectorOperations, LinearOperator>(vec_ops_l_, A_) )
+    {}
+
+
+    iram_process(VectorOperations* vec_ops_l_, MatrixOperations* mat_ops_l_, VectorOperations* vec_ops_s_, MatrixOperations* mat_ops_s_, LapackOperations* lapack_, LinearOperator* A_, Log* log_, SystemOperator* sys_op_):
+    vec_ops_l(vec_ops_l_), mat_ops_l(mat_ops_l_), vec_ops_s(vec_ops_s_), mat_ops_s(mat_ops_s_), lapack(lapack_), A(A_), log(log_), sys_op(sys_op_), f_set(false)
     {
         auto small_rows = mat_ops_s->get_rows();
         auto small_cols = mat_ops_s->get_cols();
@@ -66,9 +76,9 @@ public:
         which_sys_op = sys_op->target_eigs();
         container = new container_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, log);
         // bulge = new bulge_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, log, lapack);
+        arnoldi = new arnoldi_t(vec_ops_l, vec_ops_s, mat_ops_l, mat_ops_s, sys_op, log);
         schur_select = new schur_select_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, log, lapack);
         schur_select->set_target(which_sys_op);
-
         project = new project_t(vec_ops_l, mat_ops_l, vec_ops_s, mat_ops_s, lapack, A, log);
 
 
@@ -77,13 +87,25 @@ public:
     {
         free_chk(project);
         free_chk(schur_select);
-        free_chk(container);        
+        free_chk(container); 
+        if constexpr (std::is_same<SystemOperator, ::stability::detail::system_operator_dummy<VectorOperations, LinearOperator>>::value)  
+        {
+            delete sys_op;
+        }     
     }
     
     void set_target_eigs(const std::string& which_)
     {
         which = which_;
         project->set_target_eigs({which_sys_op, which} );
+        if constexpr (std::is_same<SystemOperator, ::stability::detail::system_operator_dummy<VectorOperations, LinearOperator>>::value)  
+        {
+            sys_op->set_target_eigs(which_);
+            which_sys_op = sys_op->target_eigs();
+            schur_select->set_target(which_sys_op);
+            project->set_target_eigs({which_sys_op, which} );
+        }         
+
     }
     void set_number_of_desired_eigenvalues(unsigned int k0_)
     {
@@ -175,7 +197,6 @@ private:
     VectorOperations* vec_ops_s;
     MatrixOperations* mat_ops_s;
     LapackOperations* lapack;
-    ArnoldiProcess* arnoldi;
     SystemOperator* sys_op;
     LinearOperator* A;
     Log* log;
@@ -189,6 +210,8 @@ private:
     schur_select_t* schur_select = nullptr;
     container_t* container = nullptr;
     project_t* project = nullptr;
+    arnoldi_t* arnoldi = nullptr;
+
     T sign = T(1.0);
     T tolerance = T(1.0e-6);
     unsigned int max_iterations = 100; // default value
