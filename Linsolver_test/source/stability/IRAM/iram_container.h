@@ -74,7 +74,7 @@ public:
             vec_ops_l->assign(x, f_gpu);
         }
     }
-    void init_f(bool random_ = false)
+    void init_f(bool random_ = true)
     {
         if(debug) log->info("iram_container: initialized f-vector");
         vec_ops_l->assign_scalar(0, f_gpu);

@@ -515,7 +515,7 @@ public:
         FFT_vis->ifft(UX_hat, UX);
         FFT_vis->ifft(UY_hat, UY);
         FFT_vis->ifft(UZ_hat, UZ);
-        kern->apply_scale_inplace(Nx_dest, Ny_dest, Nz_dest, scale_loc, UX, UY, UZ);
+        kern->apply_scale_inplace(Nx_dest, Ny_dest, Nz_dest, 1.0/scale, UX, UY, UZ);
         
         TR_vec U_abs = device_allocate<TR>(Nx_dest, Ny_dest, Nz_dest);
 

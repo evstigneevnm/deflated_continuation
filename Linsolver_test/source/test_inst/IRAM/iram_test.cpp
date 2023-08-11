@@ -1,3 +1,4 @@
+#include <limits>
 #include <common/gpu_vector_operations.h>
 #include <common/gpu_matrix_vector_operations.h>
 #include <common/gpu_matrix_file_operations.h>
@@ -100,10 +101,18 @@ int main(int argc, char const *argv[])
     // auto eigs = IRAM.execute(eigv_real, eigv_imag);
     auto eigs = IRAM.execute();
 
-    std::cout << std::scientific;
+    // std::cout << std::scientific;
     for(auto &e: eigs)
     {
-        std::cout << e << std::endl;
+        auto e_real = e.real();
+        auto e_imag = e.imag();
+        if( std::abs(e_imag) < std::numeric_limits<real>::epsilon() )
+            log.info_f("%le",e_real);
+        else if(e_imag>0.0)
+            log.info_f("%le+%le",e_real,e_imag);
+        else
+            log.info_f("%le%le",e_real,e_imag);
+        // std::cout << e << std::endl;
     }
 
 

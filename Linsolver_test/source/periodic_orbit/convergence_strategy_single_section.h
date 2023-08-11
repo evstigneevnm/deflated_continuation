@@ -84,17 +84,22 @@ public:
 
 
         log->info_f("nonlinear_operators::convergence: iteration %i, previous residual %le, initial current residual %le",iterations, (double)normFx, (double)normFx1);
-        
+        bool iterations_residual = false; 
         while(true)
         {
             vec_ops->assign_mul(T(1.0), x, newton_wight, delta_x, x1);
             nonlin_op->F(x1, lambda, Fx);
             normFx1 = vec_ops->norm(Fx);
-            if(normFx1 <= (1.0 + std::numeric_limits<T>::epsilon() )*normFx)
+            if(normFx1 < (1.0 + std::numeric_limits<T>::epsilon() )*normFx)
             {
                 result_status = 0;
+                if(iterations_residual)
+                {
+                    log->info_f("nonlinear_operators::convergence: iteration %i, previous residual %le, initial current residual %le",iterations, (double)normFx, (double)normFx1);
+                }
                 break;
             }
+            iterations_residual = true;
             if( newton_wight<T(1.0e-6) )
             {
                 log->error_f("nonlinear_operators::convergence: Newton wight is too small (%le).", newton_wight);   

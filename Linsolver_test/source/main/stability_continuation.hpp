@@ -90,8 +90,7 @@ private:
 
     //setting up the eigensolver
     using Cayley_system_op_t = stability::system_operator_Cayley_transform<VectorOperations, NonlinearOperations, LinearOperatorShifted, lin_slv_sh_t, Log>;
-    using arnoldi_t = numerical_algos::eigen_solvers::arnoldi_process<VectorOperations, MatrixOperations, Cayley_system_op_t, Log>;
-    using iram_t = stability::IRAM::iram_process<VectorOperations, MatrixOperations, lapack_wrap_t, arnoldi_t, Cayley_system_op_t, LinearOperator, Log>;
+    using iram_t = stability::IRAM::iram_process<VectorOperations, MatrixOperations, lapack_wrap_t, LinearOperator, Log, Cayley_system_op_t>;
 
 
     using stability_t = stability::stability_analysis<
@@ -179,8 +178,7 @@ public:
 
         
         Cayley_sys_op = new Cayley_system_op_t(vec_ops, nonlin_op, lin_op_sh, lin_slv_sh, log);
-        arnoldi = new arnoldi_t(vec_ops, vec_ops_small_, mat_ops, mat_ops_small_, Cayley_sys_op, log);
-        iram = new iram_t(vec_ops, mat_ops, vec_ops_small_, mat_ops_small_, lapack, arnoldi, Cayley_sys_op, lin_op, log);
+        iram = new iram_t(vec_ops, mat_ops, vec_ops_small_, mat_ops_small_, lapack, lin_op, log, Cayley_sys_op);
 
         stab = new stability_t(vec_ops, log, nonlin_op, newton, iram);
 
@@ -204,7 +202,6 @@ public:
         delete stability_diagram;
         delete bif_diag;
         delete Cayley_sys_op;
-        delete arnoldi;
         delete iram;
         delete stab;        
         delete newton;
@@ -499,7 +496,6 @@ private:
     lin_slv_sh_t* lin_slv_sh = nullptr;
 
     Cayley_system_op_t* Cayley_sys_op = nullptr;
-    arnoldi_t* arnoldi = nullptr;
     iram_t* iram = nullptr;
     monitor_t* mon = nullptr;
     newton_t* newton = nullptr;

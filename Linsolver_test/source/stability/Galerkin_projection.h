@@ -42,7 +42,7 @@ public:
 
 
     Galerkin_projection(VectorOperations* vec_ops_l_, MatrixOperations* mat_ops_l_, VectorOperations* vec_ops_s_, MatrixOperations* mat_ops_s_, LapackOperations* lapack_, LinearOperator* A_, Log* log_):
-    vec_ops_l(vec_ops_l_), mat_ops_l(mat_ops_l_), vec_ops_s(vec_ops_s_), mat_ops_s(mat_ops_s_), lapack(lapack_), A(A_), log(log_)
+    vec_ops_l(vec_ops_l_), mat_ops_l(mat_ops_l_), vec_ops_s(vec_ops_s_), mat_ops_s(mat_ops_s_), lapack(lapack_), A(A_), log(log_), recover_(true)
     {
 
         mat_ops_l->init_matrix(V0); mat_ops_l->start_use_matrix(V0);
@@ -123,6 +123,12 @@ public:
         sorter_system_operator.set_target_eigs(which_.first);
         sorter_orig.set_target_eigs(which_.second);
     }
+
+    void do_recover(bool recover_p)
+    {
+        recover_ = recover_p;
+    }
+
 
 /*
     eigs_t eigs(const T_mat& V, const T_mat& H, const size_t k)
@@ -239,37 +245,44 @@ public:
             auto sortidx = eigsidxes.at(j).second;
             vec_ops_l->assign( &V0[sortidx*N], eigv_real );
             vec_ops_l->assign( &V1[sortidx*N], eigv_imag );
-            // std::stringstream ssr;
-            // ssr << "eigv_real_" << j << ".dat";
-            // write_vector(ssr.str(), N, vec_ops_l->view(eigv_real), 4);
-            // std::stringstream ssi;
-            // ssi << "eigv_imag_" << j << ".dat";
-            // write_vector(ssi.str(), N, vec_ops_l->view(eigv_imag), 4);
- 
-            A->apply(eigv_real, &V0[j*N] ); //Avr->wr
-            A->apply(eigv_imag, &V1[j*N] ); //Avi-->wi
-
-            vec_ops_l->mul_pointwise(1.0, eigv_real, 1.0, eigv_real, v_r_); //vr^2
-            vec_ops_l->mul_pointwise(1.0, eigv_imag, 1.0, eigv_imag, v_i_); //wr^2
-            vec_ops_l->add_mul(1.0, v_r_, 1.0, v_i_, 0.0, v_helper); // vr^2+wr^2->v_helper
-
-            vec_ops_l->mul_pointwise(1.0, eigv_real, 1.0, &V0[j*N], v_r_); // vr*wr
-            vec_ops_l->mul_pointwise(1.0, eigv_imag, 1.0, &V1[j*N], v_i_); // vi*wi
-            vec_ops_l->add_mul(1.0, v_r_, 1.0, v_i_, 0.0, w_helper); // vr*wr+vi*wi->v_helper
-            vec_ops_l->div_pointwise(w_helper, 1.0, v_helper); //real parts of eigenvalues
-            auto e_real = vec_ops_l->get_value_at_point(0, w_helper );
-
-            vec_ops_l->mul_pointwise(1.0, eigv_real, 1.0, &V1[j*N], v_r_); // vr*wi
-            vec_ops_l->mul_pointwise(1.0, eigv_imag, 1.0, &V0[j*N], v_i_); // vi*wi
-            vec_ops_l->add_mul(1.0, v_r_, -1.0, v_i_, 0.0, w_helper); // vr*wi-vi*wr->v_helper
-            vec_ops_l->div_pointwise(w_helper, 1.0, v_helper); //imag real parts of eigenvalues
-            auto e_imag = vec_ops_l->get_value_at_point(0, w_helper );
-            if((eigvs_real.size()>0)&&(eigvs_imag.size()>0))
+            if((eigvs_real.size()>0)&&(j<eigvs_real.size()))
             {
                 vec_ops_l->assign( eigv_real, eigvs_real.at(j) );
+            }   
+            if((eigvs_imag.size()>0)&&(j<eigvs_imag.size()))
+            {
                 vec_ops_l->assign( eigv_imag, eigvs_imag.at(j) );
             }
-            eigs.at(j) = {e_real, e_imag};
+
+            if(recover_)
+            {
+                T_vec v0_l = static_cast<T_vec>(&V0[j*N]);
+                T_vec v1_l = static_cast<T_vec>(&V1[j*N]);
+                A->apply(eigv_real, v0_l ); //Avr->wr
+                A->apply(eigv_imag, v1_l ); //Avi-->wi
+
+                vec_ops_l->mul_pointwise(1.0, eigv_real, 1.0, eigv_real, v_r_); //vr^2
+                vec_ops_l->mul_pointwise(1.0, eigv_imag, 1.0, eigv_imag, v_i_); //wr^2
+                vec_ops_l->add_mul(1.0, v_r_, 1.0, v_i_, 0.0, v_helper); // vr^2+wr^2->v_helper
+
+                vec_ops_l->mul_pointwise(1.0, eigv_real, 1.0, &V0[j*N], v_r_); // vr*wr
+                vec_ops_l->mul_pointwise(1.0, eigv_imag, 1.0, &V1[j*N], v_i_); // vi*wi
+                vec_ops_l->add_mul(1.0, v_r_, 1.0, v_i_, 0.0, w_helper); // vr*wr+vi*wi->v_helper
+                vec_ops_l->div_pointwise(w_helper, 1.0, v_helper); //real parts of eigenvalues
+                auto e_real = vec_ops_l->get_value_at_point(0, w_helper );
+
+                vec_ops_l->mul_pointwise(1.0, eigv_real, 1.0, &V1[j*N], v_r_); // vr*wi
+                vec_ops_l->mul_pointwise(1.0, eigv_imag, 1.0, &V0[j*N], v_i_); // vi*wi
+                vec_ops_l->add_mul(1.0, v_r_, -1.0, v_i_, 0.0, w_helper); // vr*wi-vi*wr->v_helper
+                vec_ops_l->div_pointwise(w_helper, 1.0, v_helper); //imag real parts of eigenvalues
+                auto e_imag = vec_ops_l->get_value_at_point(0, w_helper );
+
+                eigs.at(j) = {e_real, e_imag};
+            }
+            else
+            {
+                eigs.at(j) = eigsidxes.at(j).first;
+            }
         }        
 
 
@@ -289,7 +302,7 @@ private:
     ::stability::detail::eigenvalue_sorter sorter_system_operator;
     ::stability::detail::eigenvalue_sorter sorter_orig;
 
-
+    bool recover_;
     T_mat V0 = nullptr;
     T_mat V1 = nullptr;
     T_mat Q_fin_dev = nullptr;

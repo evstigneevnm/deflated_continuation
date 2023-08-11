@@ -4,12 +4,14 @@
 #include <cstdlib>
 #include <string>
 #include <sstream>
+#include <fstream>
 #include <thrust/complex.h>
 #include <utils/cuda_support.h>
 
 #include <utils/init_cuda.h>
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
+#include <external_libraries/lapack_wrap.h>
 
 #include <utils/log.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
@@ -27,11 +29,13 @@
 
 #include <common/gpu_file_operations.h>
 #include <common/gpu_vector_operations.h>
+#include <common/gpu_matrix_vector_operations.h>
+#include <stability/IRAM/iram_process.hpp>
 
 
 int main(int argc, char const *argv[])
 {
-    const int Blocks_x_ = 32;
+    const int Blocks_x_ = 64;
     const int Blocks_y_ = 16;
     
     using real = SCALAR_TYPE;
@@ -40,7 +44,9 @@ int main(int argc, char const *argv[])
     using gpu_vector_operations_complex_t = gpu_vector_operations<complex>;
     using vec_ops_t = gpu_vector_operations<real>;
     using vec_t = typename vec_ops_t::vector_type;
-    
+    using mat_ops_t = gpu_matrix_vector_operations<real, vec_t>;
+    using mat_t = typename mat_ops_t::matrix_type;
+
     using vec_file_ops_t = gpu_file_operations<vec_ops_t>;
 
     using cufft_type = cufft_wrap_R2C<real>;
@@ -54,7 +60,7 @@ int main(int argc, char const *argv[])
     using log_t = utils::log_std;
     using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t,log_t>;
 
-    using periodic_orbit_nonlinear_operator_t = periodic_orbit::periodic_orbit_nonlinear_operator<vec_ops_t, abc_flow_t, log_t, time_steppers::time_step_adaptation_error_control, time_steppers::explicit_time_step>;
+    using periodic_orbit_nonlinear_operator_t = periodic_orbit::periodic_orbit_nonlinear_operator<vec_ops_t, abc_flow_t, log_t, time_steppers::time_step_adaptation_error_control, time_steppers::explicit_time_step>; //time_step_adaptation_constant //time_step_adaptation_error_control
 
     using periodic_orbit_linear_operator_t = typename periodic_orbit_nonlinear_operator_t::linear_operator_type;
     using periodic_orbit_preconditioner_t = typename periodic_orbit_nonlinear_operator_t::preconditioner_type;
@@ -65,27 +71,43 @@ int main(int argc, char const *argv[])
     using convergence_strategy_single_section_t = nonlinear_operators::newton_method::convergence_strategy_single_section<vec_ops_t, periodic_orbit_nonlinear_operator_t, log_t>;
     using newton_solver_t = numerical_algos::newton_method::newton_solver<vec_ops_t, periodic_orbit_nonlinear_operator_t, system_operator_single_section_t, convergence_strategy_single_section_t>;
 
-    if((argc < 5)||(argc > 6))
+    using lapack_wrap_t = lapack_wrap<real>;
+    using iram_t = stability::IRAM::iram_process<vec_ops_t, mat_ops_t, lapack_wrap_t, periodic_orbit_linear_operator_t, log_t>;
+
+
+    if((argc < 6)||(argc > 8))
     {
-        std::cout << argv[0] << " N R time method state_file(optional)\n  R -- Reynolds number,\n  N = 2^n- discretization in one direction. \n  time - simmulation time. \n";
+        std::cout << argv[0] << " cuda_dev_num N R time method state_file(optional) desired_eignevalues(optional)\n  R -- Reynolds number,\n  N = 2^n- discretization in one direction. \n  time - simmulation time. \n";
          std::cout << " method - name of the scheme: EE, HE, RK33SSP, RK43SSP, RKDP45, RK64SSP" << std::endl;
         return(0);       
     }    
-
-    size_t N = std::stoul(argv[1]);
+    int cuda_dev_num = std::stoi(argv[1]);
+    size_t N = std::stoul(argv[2]);
     size_t Nx = N;
     size_t Ny = N;
     size_t Nz = N;
-    real R = std::stof(argv[2]);
-    real simulation_time = std::stof(argv[3]);
-    std::string scheme_name(argv[4]);
+    real R = std::stof(argv[3]);
+    real simulation_time = std::stof(argv[4]);
+    std::string scheme_name(argv[5]);
     bool load_file = false;
     std::string load_file_name;
-    if(argc == 6)
+        
+    //number of desired and total eigenvalues
+    size_t m = 30;
+    size_t k = 6;
+
+    if(argc == 7)
     {
         load_file = true;
-        load_file_name = std::string(argv[5]);
+        load_file_name = std::string(argv[6]);
     }
+    if(argc == 8)
+    {
+        load_file = true;
+        load_file_name = std::string(argv[6]);
+        k = std::stoul(argv[7]);
+        m = k*5;
+    }    
     auto method = time_steppers::detail::methods::EXPLICIT_EULER;
     if(scheme_name == "EE")
     {
@@ -116,27 +138,35 @@ int main(int argc, char const *argv[])
         throw std::logic_error("incorrect method string type provided.");
     }
 
-    if( !utils::init_cuda() )
+    if( !utils::init_cuda(cuda_dev_num) )
     {
         return 2;
     } 
     cufft_type cufft_c2r(Nx, Ny, Nz);
     size_t Mz = cufft_c2r.get_reduced_size();
     cublas_wrap cublas(true);
+    lapack_wrap_t lapack(m);
     cublas.set_pointer_location_device(false);
 
     log_t log;
     log_t log_ls;
     log_ls.set_verbosity(0);
-
+    log.info_f("using eigensolver with m = %i and k = %i", m, k);
     
     gpu_vector_operations_real_t vec_ops_r(Nx*Ny*Nz, &cublas);
     gpu_vector_operations_complex_t vec_ops_c(Nx*Ny*Mz, &cublas);
     vec_ops_t vec_ops(6*(Nx*Ny*Mz-1), &cublas);
     vec_file_ops_t file_ops(&vec_ops);
-    vec_t x0;
+
+    vec_ops_t vec_ops_m(m, &cublas);
+    mat_ops_t mat_ops_N(N, m, &cublas);
+    mat_ops_t mat_ops_m(m, m, &cublas);
+
+ 
+    vec_t x0,x1;
 
     vec_ops.init_vector(x0); vec_ops.start_use_vector(x0);
+    vec_ops.init_vector(x1); vec_ops.start_use_vector(x1);
 
     abc_flow_t abc_flow(Nx, Ny, Nz, &vec_ops_r, &vec_ops_c, &vec_ops, &cufft_c2r);
 
@@ -152,16 +182,18 @@ int main(int argc, char const *argv[])
 
     auto periodic_orbit_lin_op = periodic_orbit_nonlin_op.linear_operator;
 
+    iram_t iram(&vec_ops, &mat_ops_N, &vec_ops_m, &mat_ops_m, &lapack, periodic_orbit_lin_op, &log);
+
     lin_solve_t solver(&vec_ops, &log, 0);
-    solver.set_basis_size(3);
-    real rel_tol = 1.0e-2;
-    size_t max_iters = 100;
+    solver.set_basis_size(4);
+    real rel_tol = 2.0e-2;
+    size_t max_iters = 15;
     auto& mon = solver.monitor();
     mon.init(rel_tol, real(0), max_iters);
     mon.set_save_convergence_history(true);
     mon.set_divide_out_norms_by_rel_base(true);    
 
-    real newton_rol = 1.0e-7;
+    real newton_rol = 1.0e-10;
     system_operator_single_section_t sys_op(&vec_ops, periodic_orbit_lin_op, &solver);
     convergence_strategy_single_section_t convergence(&vec_ops, &log, newton_rol);
     newton_solver_t newton(&vec_ops, &sys_op, &convergence);
@@ -173,6 +205,10 @@ int main(int argc, char const *argv[])
         ss << "abc_initial_R_" << R << ".dat";
         periodic_orbit_nonlin_op.time_stepper(x0, R, {0, simulation_time});
         periodic_orbit_nonlin_op.save_norms( ss.str() );
+
+        std::stringstream ss_t;
+        ss_t << "x_" << simulation_time << "_R_" << R << ".dat";
+        file_ops.write_vector(ss_t.str(), x0);
     }
     
     bool is_newton_converged = newton.solve(&periodic_orbit_nonlin_op, x0, R);
@@ -183,15 +219,97 @@ int main(int argc, char const *argv[])
         ss_periodic_estimate << "abc_period_R_" << R << "_scheme_" << scheme_name << ".dat";
         periodic_orbit_nonlin_op.save_period_estmate_norms(ss_periodic_estimate.str() );
 
-        std::stringstream ss, ss1;
+        std::stringstream ss, ss1, sseigs;
         ss << "x_" << simulation_time << "_R_" << R << "_periodic.pos";
         auto pos_file_name(ss.str());
         abc_flow.write_solution_abs(pos_file_name, x0);     
 
         ss1 << "x_" << simulation_time << "_R_" << R << "_periodic.dat";
         file_ops.write_vector(ss1.str(), x0);
+
+        if(k>0)
+        {
+            //setting up eigenvalue problem
+            log.info("=== starting up eigenvalue problem ===");
+            iram.set_target_eigs("LM");
+            iram.set_number_of_desired_eigenvalues(k);
+            iram.set_tolerance(newton_rol);
+            iram.set_max_iterations(100);
+            iram.set_verbocity(true);
+            abc_flow.randomize_vector(x1, 18);
+            iram.set_initial_vector(x1);
+            
+            std::vector<vec_t> eigvs_real;
+            std::vector<vec_t> eigvs_imag;
+
+            for(int jj=0;jj<3;jj++)
+            {
+                vec_t x_r,x_i;
+                vec_ops.init_vector(x_r); vec_ops.start_use_vector(x_r); 
+                vec_ops.init_vector(x_i); vec_ops.start_use_vector(x_i); 
+                eigvs_real.push_back(x_r);
+                eigvs_imag.push_back(x_i);
+            }
+
+
+            auto eigs = iram.execute(eigvs_real, eigvs_imag);
+            
+
+            for(auto &e: eigs)
+            {
+                auto e_real = e.real();
+                auto e_imag = e.imag();
+                if( std::abs(e_imag) < std::numeric_limits<real>::epsilon() )
+                    log.info_f("%le",1.0+e_real); //shift for Monodromy matrix
+                else if(e_imag>0.0)
+                    log.info_f("%le+%le",1.0+e_real,e_imag);
+                else
+                    log.info_f("%le%le",1.0+e_real,e_imag);
+                // std::cout << e << std::endl;
+
+            }
+            sseigs << "abc_flow_eigs_" << simulation_time << "_R_" << R << "_periodic.dat";
+            std::ofstream f(sseigs.str(), std::ofstream::out);
+            if (!f) throw std::runtime_error("error while opening file " + sseigs.str());
+
+            for(auto &e: eigs)
+            {
+                if (!(f << std::scientific << std::setprecision(17) << 1.0+e.real() << "," << e.imag() <<  std::endl))
+                    throw std::runtime_error("error while writing to file " + sseigs.str());
+            }        
+            f.close();         
+
+            size_t jj = 0;
+            for(auto &x: eigvs_real)
+            {
+                std::stringstream ss_eigvs_real, sv_eigvs_real;
+                ss_eigvs_real << "abc_flow_eigv_real_" << jj << "_" << simulation_time << "_R_" << R << "_periodic.pos";
+                abc_flow.write_solution_abs(ss_eigvs_real.str(), x); 
+                sv_eigvs_real << "abc_flow_eigv_real_" << jj << "_" << simulation_time << "_R_" << R << "_periodic.dat";
+                file_ops.write_vector(sv_eigvs_real.str(), x);
+                ++jj;
+            }
+            jj = 0;
+            for(auto &x: eigvs_imag)
+            {
+                std::stringstream ss_eigvs_imag, sv_eigvs_imag;
+                ss_eigvs_imag << "abc_flow_eigv_imag_" << jj << "_" << simulation_time << "_R_" << R << "_periodic.pos";
+                abc_flow.write_solution_abs(ss_eigvs_imag.str(), x); 
+                sv_eigvs_imag << "abc_flow_eigv_imag_" << jj << "_" << simulation_time << "_R_" << R << "_periodic.dat";
+                file_ops.write_vector(sv_eigvs_imag.str(), x);   
+                ++jj;         
+            }
+
+            for(int jj=0;jj<3;jj++)
+            {
+                vec_ops.stop_use_vector(eigvs_real.at(jj)); vec_ops.free_vector(eigvs_real.at(jj)); 
+                vec_ops.stop_use_vector(eigvs_imag.at(jj)); vec_ops.free_vector(eigvs_imag.at(jj));
+            }
+
+        }
     }
 
+    vec_ops.stop_use_vector(x1); vec_ops.free_vector(x1);
     vec_ops.stop_use_vector(x0); vec_ops.free_vector(x0);
 
     return 0;

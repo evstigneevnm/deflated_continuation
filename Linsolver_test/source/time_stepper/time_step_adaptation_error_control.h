@@ -22,7 +22,7 @@ private:
 public:
     time_step_adaptation_error_control(VectorOperations* vec_ops_p, Log* log_p, std::pair<T,T> time_interval_p = {0.0,1.0},  T dt_p = 1.0, PositivePreservingCheck* positive_check_p = new detail::positive_preserving_dummy<VectorOperations>() ):
     parent_t(vec_ops_p, log_p, time_interval_p, dt_p, positive_check_p),
-    relative_tolerance_(1.0e-6), //default values
+    relative_tolerance_(1.0e-10), //default values
     absolute_tolerance_(1.0e-12), //default values
     norm_control_(true),
     nofailed_(true),

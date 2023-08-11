@@ -214,7 +214,7 @@ abc_flow_time_stepping: source/models/abc_flow/abc_flow_time_stepping.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_time_stepping.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o abc_flow_time_stepping.bin 2>results.make
 
 abc_flow_perodic_orbit_stabilization: source/models/abc_flow/abc_flow_perodic_orbit_stabilization.cpp
-	$(NVCC) $(NVCCFLAGS) $(NVCCREL) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_perodic_orbit_stabilization.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o abc_flow_perodic_orbit_stabilization.bin 2>results.make
+	$(NVCC) $(NVCCFLAGS) $(NVCCREL) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_perodic_orbit_stabilization.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LIBS2) $(LLAPACK) -o abc_flow_perodic_orbit_stabilization.bin 2>results.make
 
 
 test_butcher_tables: source/time_stepper/tests/butcher_tables.cpp
@@ -261,7 +261,7 @@ test_rossler_periodic_orbit_cpu:
 
 test_rossler_periodic_orbit_gpu:
 	$(NVCC) $(NVCCDEB) $(NVCCFLAGS) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_operator_ker.cu -c -o O/rossler_operator_kernels.o 2>results.make
-	$(NVCC) $(NVCCDEB) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_periodic_gpu.cpp O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/rossler_operator_kernels.o -o test_rossler_periodic_gpu.bin $(LCUDA) $(LIBS3) 2>results.make
+	$(NVCC) $(NVCCDEB) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_periodic_gpu.cpp O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o O/rossler_operator_kernels.o -o test_rossler_periodic_gpu.bin $(LCUDA) $(LIBS3) $(LLAPACK) 2>results.make
 
 
 

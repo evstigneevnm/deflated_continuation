@@ -104,6 +104,7 @@ public:
             which_sys_op = sys_op->target_eigs();
             schur_select->set_target(which_sys_op);
             project->set_target_eigs({which_sys_op, which} );
+            project->do_recover(false);
         }         
 
     }
@@ -111,7 +112,8 @@ public:
     {
         k0 = k0_;
         schur_select->set_number_of_desired_eigenvalues(k0);
-
+        container->K0 = k0_;
+        
     }
     void set_linear_operator_stable_eigenvalues_halfplane(const T sign_) // sign_ = -1  => left half plane
     {
@@ -181,7 +183,7 @@ public:
 
         // auto eigs = project->eigs(container->ref_V(), container->ref_H(), container->K0, eigvec_real, eigvec_imag ); 
 
-        auto eigs = project->eigs(container->ref_V(), container->ref_H(), container->K0); 
+        auto eigs = project->eigs(container->ref_V(), container->ref_H(), container->K0, eigvec_real, eigvec_imag); 
 
         return eigs;
     }

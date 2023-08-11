@@ -4,6 +4,9 @@
 /*//
     wrap over some specific LAPACK routines, mainly used for eigenvalue estimation.
 */
+#include <iostream>
+#include <iomanip>
+#include <fstream>
 #include <complex>
 #include <vector>
 #include <utils/cuda_support.h>
@@ -222,7 +225,7 @@ public:
         std::vector<bool> subdiag(Nl);
         for(size_t l=0;l<Nl-1;l++)
         {
-            subdiag.at(l) = std::abs(R[I2_R(l+1,l,Nl)])>machine_eps_;
+            subdiag.at(l) = std::abs(R[_I2(l+1,l,Nl)])>machine_eps_;
         }
         size_t ind_m = 0, ind_p = 0, eig_ind = 0;
         while(true)
@@ -233,8 +236,8 @@ public:
             {
                 for(int k=ind_m;k<=ind_p;k++)
                 {
-                    submatrix.push_back( R[I2_R(j,k,Nl)] );
-                    // std::cout << submatrix.at(I2_R(j-ind_m,k-ind_m,2)) << " ";
+                    submatrix.push_back( R[_I2(j,k,Nl)] );
+                    // std::cout << submatrix.at(_I2(j-ind_m,k-ind_m,2)) << " ";
                 }
                 // std::cout << std::endl;
             }
@@ -600,9 +603,9 @@ public:
             for(size_t j=0;j<Col;j++)
             {
                 if(j<Col-1)
-                    f << std::setprecision(prec) << matrix[I2_R(i,j,Row)] << " ";
+                    f << std::setprecision(prec) << matrix[_I2(i,j,Row)] << " ";
                 else
-                    f << std::setprecision(prec) << matrix[I2_R(i,j,Row)];
+                    f << std::setprecision(prec) << matrix[_I2(i,j,Row)];
 
             }
             f << std::endl;
@@ -707,11 +710,11 @@ private:
     //column majour format:
     // j - row numner
     // k - column number
-    size_t inline _I2(int j, int k, size_t Nl) 
+    size_t inline _I2(int j, int k, size_t Nl) const
     {
         return(j + Nl*k);
     }
-    size_t inline _I2(int j, int k) 
+    size_t inline _I2(int j, int k) const
     {
         return _I2(j, k, expected_size);
     }
@@ -725,16 +728,16 @@ private:
         }
         else
         {
-            T a11 = submatrix.at( I2_R(0,0,2) );
-            T a12 = submatrix.at( I2_R(0,1,2) );
-            T a21 = submatrix.at( I2_R(1,0,2) );
-            T a22 = submatrix.at( I2_R(1,1,2) );
+            T a11 = submatrix.at( _I2(0,0,2) );
+            T a12 = submatrix.at( _I2(0,1,2) );
+            T a21 = submatrix.at( _I2(1,0,2) );
+            T a22 = submatrix.at( _I2(1,1,2) );
             T b = -(a11+a22);
             T c = (a11*a22-a12*a21);
             T D = b*b-4.0*c;
-            if(D>=0.0)
+            if(D>0.0)
             {
-                throw std::runtime_error("lapack_wrap::solve_2_2_eigensystem: real eigenvalue for a 2X2 Schur block.");
+                throw std::runtime_error("lapack_wrap::solve_2_2_eigensystem: real eigenvalue for a 2X2 Schur block, D = " + std::to_string(D) );
             }
             T sqrtD = std::sqrt(-D);
             T realL = -0.5*b;

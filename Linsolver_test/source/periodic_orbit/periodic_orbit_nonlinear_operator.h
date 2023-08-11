@@ -40,9 +40,10 @@ public:
         {}
         ~linear_operator_type() = default;
 
-        void apply(const T_vec& x, T_vec& f)const
+        bool apply(const T_vec& x, T_vec& f)const
         {
             poincare_map_x_->apply(x, f);
+            return true;
         }
     private:
         glued_poincare_map_linear_op_t* poincare_map_x_;

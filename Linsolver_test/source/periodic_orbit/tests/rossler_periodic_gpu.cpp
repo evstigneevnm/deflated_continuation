@@ -23,6 +23,9 @@
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 
+#include <external_libraries/lapack_wrap.h>
+#include <common/gpu_matrix_vector_operations.h>
+#include <stability/IRAM/iram_process.hpp>
 
 
 int main(int argc, char const *argv[])
@@ -49,6 +52,13 @@ int main(int argc, char const *argv[])
     using system_operator_single_section_t = nonlinear_operators::newton_method::system_operator_single_section<vec_ops_t, periodic_orbit_nonlinear_operator_t, periodic_orbit_linear_operator_t, lin_solve_t>;    
     using convergence_strategy_single_section_t = nonlinear_operators::newton_method::convergence_strategy_single_section<vec_ops_t, periodic_orbit_nonlinear_operator_t, log_t>;
     using newton_solver_t = numerical_algos::newton_method::newton_solver<vec_ops_t, periodic_orbit_nonlinear_operator_t, system_operator_single_section_t, convergence_strategy_single_section_t>;
+
+    //eigenvalues
+    using mat_ops_t = gpu_matrix_vector_operations<real, vec_t>;
+    using mat_t = typename mat_ops_t::matrix_type;
+    using lapack_wrap_t = lapack_wrap<real>;
+    using iram_t = stability::IRAM::iram_process<vec_ops_t, mat_ops_t, lapack_wrap_t, periodic_orbit_linear_operator_t, log_t>;
+
 
     std::string scheme_name("RKDP45");
     real a_param = 0.1, b_param = 0.1, c_param = 6.1, max_time_simlation = 250.0;   
@@ -124,7 +134,7 @@ int main(int argc, char const *argv[])
     log.info("test periodic orbit stabilization for rossler operator.");
 
     vec_ops_t vec_ops(3, &cublas);
-    
+
     vec_t x0, x1, b, x;
 
     vec_ops.init_vectors(x0, x1, b, x); vec_ops.start_use_vectors(x0, x1, b, x);
@@ -168,6 +178,32 @@ int main(int argc, char const *argv[])
     std::stringstream ss_periodic_estimate;
     ss_periodic_estimate << "rossler_period_" << scheme_name << ".dat";
     periodic_orbit_nonlin_op.save_period_estmate_norms(ss_periodic_estimate.str() );
+
+    // eigenvalues
+    vec_ops_t vec_ops_s(2, &cublas);
+    mat_ops_t mat_ops_l(3,2, &cublas);
+    mat_ops_t mat_ops_s(2,2, &cublas);
+    lapack_wrap_t lapack(2);
+    iram_t iram(&vec_ops, &mat_ops_l, &vec_ops_s, &mat_ops_s, &lapack, periodic_orbit_lin_op, &log);
+    log.info("=== starting up eigenvalue problem ===");
+    iram.set_target_eigs("LM");
+    iram.set_number_of_desired_eigenvalues(2);
+    iram.set_tolerance(1.0e-7);
+    iram.set_max_iterations(10);
+    iram.set_verbocity(true);
+    auto eigs = iram.execute();
+    for(auto &e: eigs)
+    {
+        auto e_real = e.real();
+        auto e_imag = e.imag();
+        if( std::abs(e_imag) < std::numeric_limits<real>::epsilon() )
+            log.info_f("%le",1.0+e_real);
+        else if(e_imag>0.0)
+            log.info_f("%le+%le",1.0+e_real,e_imag);
+        else
+            log.info_f("%le%le",1.0+e_real,e_imag);
+        // std::cout << e << std::endl;
+    }     
 
 
     vec_ops.stop_use_vectors(x0, x1, b, x); vec_ops.free_vectors(x0, x1, b, x);
