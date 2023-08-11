@@ -43,6 +43,8 @@ test_cpu_vector_operations:
 test_cpu_glued_vector_operations:
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_cpu_glued_vector_operations.cpp $(OPENMP) -o test_cpu_glued_vector_operations.bin 2>results.make
 
+test_multi_precision:
+	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) source/test_inst/test_multi_precision/test_multi_precision.cpp -o test_multi_precision.bin
 
 
 #all targets
