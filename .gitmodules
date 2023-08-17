@@ -1,0 +1,3 @@
+[submodule "Linsolver_test/source/contrib/scfd"]
+	path = Linsolver_test/source/contrib/scfd
+	url = git@github.com:oryabkov/SCFD-all.git
