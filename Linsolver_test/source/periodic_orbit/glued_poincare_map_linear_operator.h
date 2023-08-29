@@ -239,7 +239,6 @@ public:
 
         plane_1->project_to(period_time, glued_vec_.comp(0), glued_vec_.comp(1));
         vec_ops_->assign_mul(-1.0, v_in, 1.0, glued_vec_.comp(1), v_out);
-
     }
     void save_period_estmate_norms(const std::string& file_name_)const
     {

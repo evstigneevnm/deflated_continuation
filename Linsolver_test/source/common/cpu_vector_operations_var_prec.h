@@ -1,49 +1,73 @@
-#ifndef __cpu_vector_operations_H__
-#define __cpu_vector_operations_H__
+#ifndef __cpu_vector_operations_HIGH_PREC_H__
+#define __cpu_vector_operations_HIGH_PREC_H__
 
 #include <cmath>
 #include <vector>
 #include <iterator>
 #include <algorithm>
-#include <common/dot_product.h>
-#include <common/threaded_reduction.h>
+#include <boost/multiprecision/cpp_bin_float.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/random.hpp>
+#include <chrono>
 
-// 230707 GLOBAL CHANGE IN THE CONCEPT!
-// All vectors MUST contain size, hence vector_operations don't store size explicitly
-
-
-template <typename T>
-struct cpu_vector_operations
+template <int SignificantBits>
+struct cpu_vector_operations_var_prec
 {
-    // typedef T  scalar_type;
-    // typedef T* vector_type;
-    using scalar_type = T;
+    using scalar_type = boost::multiprecision::number<boost::multiprecision::backends::cpp_bin_float<200> >;
+    using T = scalar_type;
     using vector_type = std::vector<T>;//T*;
     bool location;
-    dot_product<T, vector_type>* dot = nullptr;
-    threaded_reduction<scalar_type, vector_type>* threaded_dot = nullptr;
-    int use_threaded_dot = 0;
     size_t sz_default_;
 
-    cpu_vector_operations(size_t sz_p, int use_high_precision_dot_product_ = 0, int use_threaded_dot_ = 0):
-    sz_default_(sz_p),
-    use_threaded_dot(use_threaded_dot_)
+
+private:
+
+    using gen_t = boost::random::independent_bits_engine<boost::random::mt19937, std::numeric_limits<T>::digits, boost::multiprecision::cpp_int>;
+    
+    mutable vector_type helper_vector_;
+    size_t pow2_;
+    gen_t* gen_;
+
+
+    T sum_pow2_helper() const
+    {
+        size_t sz_reduction = 2 << (pow2_-2); // 2^(pow2_-1)
+        while (sz_reduction>1)
+        {
+            
+            // #pragma omp parallel for
+            for(int j=0;j<sz_reduction;j++)
+            {
+                if(j+sz_reduction<sz_default_)
+                {
+                    helper_vector_[j] = helper_vector_[j] + helper_vector_[j+sz_reduction];
+                }
+                
+            }
+
+            sz_reduction /= 2;
+        }
+        return helper_vector_[0]+helper_vector_[1];
+    }    
+
+public:
+
+    cpu_vector_operations_var_prec(size_t sz_p):
+    sz_default_(sz_p)
     {
         location=false;
-        dot = new dot_product<T, vector_type>(use_high_precision_dot_product_);
-        threaded_dot = new threaded_reduction<scalar_type, vector_type>(use_threaded_dot_, use_high_precision_dot_product_);
+        pow2_ = static_cast<size_t>(std::ceil( std::log2(sz_default_) ));
+        init_vector(helper_vector_);
+        start_use_vector(helper_vector_);
+        gen_ = new gen_t();
+        auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+        gen_->seed( seed ); //init seed with time. remove it to get default seed
     }
-    ~cpu_vector_operations()
+    ~cpu_vector_operations_var_prec()
     {
-        if(dot!=nullptr)
-        {
-            delete dot;
-        }
-        if(threaded_dot!=nullptr)
-        {
-            delete threaded_dot;
-        }
-       
+        delete gen_;
+        stop_use_vector(helper_vector_);
+        free_vector(helper_vector_);
     }
 
     size_t get_default_size()const
@@ -108,7 +132,7 @@ struct cpu_vector_operations
         size_t sz_l = x.size();
         for (size_t i = 0;i < sz_l;++i)
         {
-            if (std::isinf(x[i]))
+            if (boost::multiprecision::isinf(x[i]))
             {
                 return false;
             }
@@ -116,46 +140,43 @@ struct cpu_vector_operations
         
         return true;
     }
-    scalar_type scalar_prod(const vector_type &x, const vector_type &y, int use_high_prec_ = -1)const
+    scalar_type scalar_prod(const vector_type &x, const vector_type &y)const
     {
-        // T res(0.f);
-        // for (int i = 0;i < sz_;++i)
-        // {
-        //     res += x[i]*y[i];
-        // }        
-        // return res;
-        scalar_type dot_res = T(0.0);
-
-        if (use_threaded_dot == 0)
+        size_t sz_x = x.size();
+        size_t sz_y = y.size();
+        T res = 0;
+        if(sz_x != sz_y)
         {
-            if(use_high_prec_ == 1)
-            {
-                dot->use_high_prec();
-            }
-            if(use_high_prec_ == 0)
-            {
-                dot->use_normal_prec();
-            }
-            dot_res = dot->dot(x, y);
+            throw std::logic_error("cpu_vector_operations_var_prec: scalar_prod can't be made with vetors of different size");
         }
+        if( get_default_size() == sz_x)
+        {
+            res = scalar_prod(const_cast<T*>(x.data()), const_cast<T*>(y.data()) );
+        }        
         else
         {
-            if(use_high_prec_ == 1)
+            for(size_t jj = 0;jj < sz_x; ++jj)
             {
-                threaded_dot->use_high_prec();
+                res = res + x[jj]*y[jj];
             }
-            if(use_high_prec_ == 0)
-            {
-                threaded_dot->use_normal_prec();
-            }
-            dot_res = threaded_dot->dot(x, y);            
         }
-        return dot_res;
+        
+        return res;
+    }
+    scalar_type scalar_prod(const T* x, const T* y)const
+    {
+
+        // #pragma omp parallel for
+        for(size_t j=0;j<get_default_size();j++)
+        {
+            helper_vector_[j] = x[j]*y[j];
+        }
+        return sum_pow2_helper();
     }
 
     scalar_type norm(const vector_type &x)const
     {
-        return std::sqrt(scalar_prod(x, x));
+        return boost::multiprecision::sqrt(scalar_prod(x, x));
     }
     scalar_type norm_sq(const vector_type &x)const
     {
@@ -164,10 +185,10 @@ struct cpu_vector_operations
     scalar_type norm_inf(const vector_type& x)const
     {
         size_t sz_l = x.size();
-        scalar_type max_val = 0.0;
+        scalar_type max_val = 0;
         for(size_t j=0;j<sz_l;j++)
         {
-            max_val = (max_val<std::abs(x[j]))?std::abs(x[j]):max_val;
+            max_val = (max_val<boost::multiprecision::abs(x[j]))?boost::multiprecision::abs(x[j]):max_val;
         }
         return max_val;
     }
@@ -189,7 +210,7 @@ struct cpu_vector_operations
         auto norm_x = norm(x);
         if(norm_x>0.0)
         {
-            scale(static_cast<scalar_type>(1.0)/norm_x, x);
+            scale(static_cast<scalar_type>(1)/norm_x, x);
         }
         return norm_x;
     }
@@ -225,7 +246,7 @@ struct cpu_vector_operations
     {
         if(x.size() != y.size() )
         {
-            throw std::logic_error("cpu_vector_operations::assign: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::assign: incorrect vector sizes provided");
         }
 
         size_t sz_l = x.size();
@@ -239,7 +260,7 @@ struct cpu_vector_operations
     {
         if(x.size() != y.size() )
         {
-            throw std::logic_error("cpu_vector_operations::assign_mul: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::assign_mul: incorrect vector sizes provided");
         }        
         for (int i = 0;i < x.size();++i) 
         {
@@ -253,7 +274,7 @@ struct cpu_vector_operations
     {
         if((x.size() != y.size() )&&(x.size() != z.size() ))
         {
-            throw std::logic_error("cpu_vector_operations::assign_mul: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::assign_mul: incorrect vector sizes provided");
         }  
         for (int i = 0;i < x.size();++i) 
             z[i] = mul_x*x[i] + mul_y*y[i];
@@ -263,7 +284,7 @@ struct cpu_vector_operations
     {
         if(x.size() != y.size() )
         {
-            throw std::logic_error("cpu_vector_operations::add_mul: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::add_mul: incorrect vector sizes provided");
         }         
         for (int i = 0;i < x.size();++i) 
             y[i] += mul_x*x[i];
@@ -273,7 +294,7 @@ struct cpu_vector_operations
     {
         if(x.size() != y.size() )
         {
-            throw std::logic_error("cpu_vector_operations::add_mul: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::add_mul: incorrect vector sizes provided");
         } 
         for (int i = 0;i < x.size();++i) 
             y[i] = mul_x*x[i] + mul_y*y[i];
@@ -284,7 +305,7 @@ struct cpu_vector_operations
     {
         if((x.size() != y.size() )&&(x.size() != z.size() ))
         {
-            throw std::logic_error("cpu_vector_operations::add_mul: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::add_mul: incorrect vector sizes provided");
         }         
         for (int i = 0;i < x.size();++i) 
             z[i] = mul_x*x[i] + mul_y*y[i] + mul_z*z[i];
@@ -293,18 +314,18 @@ struct cpu_vector_operations
     {
         if(x.size() != y.size() )
         {
-            throw std::logic_error("cpu_vector_operations::make_abs_copy: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::make_abs_copy: incorrect vector sizes provided");
         }
         for(size_t j = 0;j<x.size();j++)
         {
-            y[j] = std::abs(x[j]);
+            y[j] = boost::multiprecision::abs(x[j]);
         }
     }
     void make_abs(vector_type& x)const
     {
         for(size_t j=0;j<x.size();j++)
         {
-            auto xa = std::abs(x[j]);
+            auto xa = boost::multiprecision::abs(x[j]);
             x[j] = xa;
         }
     }
@@ -313,7 +334,7 @@ struct cpu_vector_operations
     {
         if(x.size() != y.size() )
         {
-            throw std::logic_error("cpu_vector_operations::max_pointwise: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::max_pointwise: incorrect vector sizes provided");
         }        
         for(size_t j=0;j<x.size();j++)
         {
@@ -332,7 +353,7 @@ struct cpu_vector_operations
     {
         if(x.size() != y.size() )
         {
-            throw std::logic_error("cpu_vector_operations::min_pointwise: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::min_pointwise: incorrect vector sizes provided");
         }         
         for(size_t j=0;j<x.size();j++)
         {
@@ -351,7 +372,7 @@ struct cpu_vector_operations
     {
         if(x.size() != y.size() )
         {
-            throw std::logic_error("cpu_vector_operations::mul_pointwise: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::mul_pointwise: incorrect vector sizes provided");
         }           
         for(size_t j=0;j<x.size();j++)
         {
@@ -364,7 +385,7 @@ struct cpu_vector_operations
     {
         if((x.size() != y.size() )&&(x.size() != z.size() ))
         {
-            throw std::logic_error("cpu_vector_operations::mul_pointwise: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::mul_pointwise: incorrect vector sizes provided");
         }          
         for(size_t j=0;j<x.size();j++)
         {
@@ -377,7 +398,7 @@ struct cpu_vector_operations
     {
         if((x.size() != y.size() )&&(x.size() != z.size() ))
         {
-            throw std::logic_error("cpu_vector_operations::div_pointwise: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::div_pointwise: incorrect vector sizes provided");
         }     
         for(size_t j=0;j<x.size();j++)
         {
@@ -389,7 +410,7 @@ struct cpu_vector_operations
     {
         if(x.size() != y.size())
         {
-            throw std::logic_error("cpu_vector_operations::div_pointwise: incorrect vector sizes provided");
+            throw std::logic_error("cpu_vector_operations_var_prec::div_pointwise: incorrect vector sizes provided");
         }         
         for(size_t j=0;j<x.size();j++)
         {
@@ -397,7 +418,6 @@ struct cpu_vector_operations
         }
     }  
 
-    //TODO:!
     std::pair<scalar_type, size_t> max_argmax_element(vector_type& y) const
     {
         auto max_iterator = std::max_element(y.begin(), y.end());
@@ -418,13 +438,33 @@ struct cpu_vector_operations
         return ret.second;
     }
     
+    void assign_random(vector_type& vec) const
+    {
+        boost::random::uniform_real_distribution<T> ur;
+
+        for(size_t j=0;j<vec.size();j++)
+        {
+            vec[j] = ur(*gen_);
+        }
+    }
+    void assign_random(vector_type& vec, scalar_type a, scalar_type b) const
+    {
+        boost::random::uniform_real_distribution<T> ur(a, b);
+
+        for(size_t j=0;j<vec.size();j++)
+        {
+            vec[j] = ur(*gen_);
+        }
+    }
+
+
     // x.size()<= y.size()
     void assign_slices(const vector_type& x, const std::vector< std::pair<size_t,size_t> > slices, vector_type&y)const
     {
         size_t sz_l = x.size();
         if( sz_l<y.size() )
         {
-            throw std::logic_error("cpu_vector_operations::assign_slice: can only be applied to vectors of sizes x.size<=y.size");
+            throw std::logic_error("cpu_vector_operations_var_prec::assign_slice: can only be applied to vectors of sizes x.size<=y.size");
         }
         size_t index_y = 0;
         for(auto& slice: slices)
@@ -433,7 +473,7 @@ struct cpu_vector_operations
             size_t end = slice.second; 
             if(end>sz_l)
             {
-                throw std::logic_error("cpu_vector_operations::assign_slice: provided slice size is greater than input vector size.");
+                throw std::logic_error("cpu_vector_operations_var_prec::assign_slice: provided slice size is greater than input vector size.");
             }
             for(size_t j = begin; j<end;j++)
             {
@@ -448,7 +488,7 @@ struct cpu_vector_operations
         size_t sz_l = x.size();
         if( sz_l<y.size() )
         {
-            throw std::logic_error("cpu_vector_operations::assign_skip_slices: can only be applied to vectors of sizes x.size<=y.size");
+            throw std::logic_error("cpu_vector_operations_var_prec::assign_skip_slices: can only be applied to vectors of sizes x.size<=y.size");
         }        
         size_t index_y = 0;
         for(size_t j = 0; j<sz_l;j++)

@@ -44,7 +44,7 @@ test_cpu_glued_vector_operations:
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_cpu_glued_vector_operations.cpp $(OPENMP) -o test_cpu_glued_vector_operations.bin 2>results.make
 
 test_multi_precision:
-	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) source/test_inst/test_multi_precision/test_multi_precision.cpp -o test_multi_precision.bin
+	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) $(ICUDA) source/test_inst/test_multi_precision/test_multi_precision.cpp -o test_multi_precision.bin $(OPENMP)
 
 
 #all targets
@@ -217,6 +217,9 @@ abc_flow_time_stepping: source/models/abc_flow/abc_flow_time_stepping.cpp
 
 abc_flow_perodic_orbit_stabilization: source/models/abc_flow/abc_flow_perodic_orbit_stabilization.cpp
 	$(NVCC) $(NVCCFLAGS) $(NVCCREL) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_perodic_orbit_stabilization.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LIBS2) $(LLAPACK) -o abc_flow_perodic_orbit_stabilization.bin 2>results.make
+
+abc_flow_lyapunov_exponents: source/models/abc_flow/abc_flow_lyapunov_exponents.cpp
+	$(NVCC) $(NVCCFLAGS) $(NVCCREL) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_lyapunov_exponents.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LIBS2) -o abc_flow_lyapunov_exponents.bin 2>results.make
 
 
 test_butcher_tables: source/time_stepper/tests/butcher_tables.cpp

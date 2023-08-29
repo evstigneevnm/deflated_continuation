@@ -48,8 +48,8 @@ void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec
 }
 
 
-template <class T>
-void write_matrix(const std::string &f_name, size_t Row, size_t Col, T *matrix, unsigned int prec=19)
+template <class T_mat>
+void write_matrix(const std::string &f_name, size_t Row, size_t Col, T_mat& matrix, unsigned int prec=19)
 {
     size_t N=Col;
     std::ofstream f(f_name.c_str(), std::ofstream::out);
@@ -70,22 +70,37 @@ void write_matrix(const std::string &f_name, size_t Row, size_t Col, T *matrix, 
     f.close();
 }
 
-inline size_t read_matrix_size(const std::string &f_name)
+inline std::pair<size_t, size_t> read_matrix_size(const std::string &f_name)
 {
 
     std::ifstream f(f_name.c_str(), std::ifstream::in);
     if (!f) throw std::runtime_error("read_matrix_size: error while opening file " + f_name);
     std::string line;
-    size_t matrix_size=0;
-    while (std::getline(f, line)){
-        matrix_size++;
+    size_t matrix_size_rows = 0;
+    size_t matrix_size_cols = 0;
+    bool check_cols = true;
+
+    while ( std::getline(f, line) )
+    {
+        if(check_cols)
+        {
+            for(auto &s: line)
+            {
+                if(s == ' ')
+                {
+                    ++matrix_size_cols;
+                }                
+            }
+            check_cols = false;
+        }
+        ++matrix_size_rows;
     }
     f.close();
-    return matrix_size;
+    return {matrix_size_rows, matrix_size_cols};
 }
 
-template <class T>
-void read_matrix(const std::string &f_name,  size_t Row, size_t Col,  T *matrix){
+template <class T, class T_mat>
+void read_matrix(const std::string &f_name,  size_t Row, size_t Col, T_mat& matrix){
     std::ifstream f(f_name.c_str(), std::ifstream::in);
     if (!f) throw std::runtime_error("read_matrix: error while opening file " + f_name);
     for (size_t i = 0; i<Row; i++)
@@ -97,7 +112,7 @@ void read_matrix(const std::string &f_name,  size_t Row, size_t Col,  T *matrix)
             // matrix[I2(i,j,Row)]=(real)val;
             T val;
             f >> val;
-            matrix[I2_R(i,j,Row)]=(T)val;
+            matrix[I2_R(i,j,Row)]= static_cast<T>(val);
         }
         
     } 
@@ -112,9 +127,9 @@ int read_vector(const std::string &f_name,  size_t N,  T *vec){
     if (!f) throw std::runtime_error("read_vector: error while opening file " + f_name);
     for (size_t i = 0; i<N; i++)
     {
-        T val=0;   
+        T val;   
         f >> val;             
-        vec[i]=(T)val;           
+        vec[i]= static_cast<T>(val);           
     } 
     f.close();
     return 0;
