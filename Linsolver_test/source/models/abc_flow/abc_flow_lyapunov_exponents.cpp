@@ -61,9 +61,9 @@ int main(int argc, char const *argv[])
 
 
 
-    if((argc < 6)||(argc > 7))
+    if((argc < 6)||(argc > 8))
     {
-        std::cout << argv[0] << " cuda_dev_num N R time method state_file(optional)\n  R -- Reynolds number,\n  N = 2^n- discretization in one direction. \n  time - simmulation time. \n";
+        std::cout << argv[0] << " cuda_dev_num N R time iterations method state_file(optional)\n  R -- Reynolds number,\n  N = 2^n- discretization in one direction. \n  time - simmulation time. \n";
          std::cout << " method - name of the scheme: EE, HE, RK33SSP, RK43SSP, RKDP45, RK64SSP" << std::endl;
         return(0);       
     }    
@@ -74,14 +74,15 @@ int main(int argc, char const *argv[])
     size_t Nz = N;
     real R = std::stof(argv[3]);
     real simulation_time = std::stof(argv[4]);
-    std::string scheme_name(argv[5]);
+    size_t iterations = std::stoul(argv[5]);
+    std::string scheme_name(argv[6]);
     bool load_file = false;
     std::string load_file_name;
         
-    if(argc == 7)
+    if(argc == 8)
     {
         load_file = true;
-        load_file_name = std::string(argv[6]);
+        load_file_name = std::string(argv[7]);
     }
 
     auto method = time_steppers::detail::methods::EXPLICIT_EULER;
@@ -126,7 +127,7 @@ int main(int argc, char const *argv[])
     log_t log;
     log_t log_ls;
     log_ls.set_verbosity(0);
-    log.info_f("Executing Lyapunov exponents for R = %f", R);
+    log.info_f("Executing Lyapunov exponents for R = %f with total iterations = %i, each of time = %f", R, iterations, simulation_time);
     
     gpu_vector_operations_real_t vec_ops_r(Nx*Ny*Nz, &cublas);
     gpu_vector_operations_complex_t vec_ops_c(Nx*Ny*Mz, &cublas);
@@ -153,12 +154,16 @@ int main(int argc, char const *argv[])
     lyapunov_exp_t lyapunov_exp(&vec_ops, &abc_flow, &log, simulation_time, R, method);
 
 
-    lyapunov_exp.run_single_time(x0, x1);
+    // lyapunov_exp.run_single_time(x0, x1);
+    lyapunov_exp.apply(iterations, x0, x1);
 
     std::stringstream ss_t;
     ss_t << "x_lyapunov_" << simulation_time << "_R_" << R << ".dat";
     file_ops.write_vector(ss_t.str(), x1);
 
+    std::stringstream ss_e;
+    ss_e << "x_lyapunov_exponents_" << iterations << "_R_" << R << ".dat";
+    lyapunov_exp.save_exponents(ss_e.str() );
     
 
 
