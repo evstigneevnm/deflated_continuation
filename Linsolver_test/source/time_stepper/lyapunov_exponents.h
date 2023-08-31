@@ -111,9 +111,10 @@ public:
         size_t it = 0;
         for(auto &x_: exponents_)
         {
+            if(!(file_ << it << " ")) throw std::runtime_error("lyapunov_exponents::save_exponents: failed to write to " + file_name_);
             for(auto &y_: x_)
             {
-                if(!(file_ << it << " " << std::scientific << y_ << " ")) throw std::runtime_error("lyapunov_exponents::save_exponents: failed to write to " + file_name_);
+                if(!(file_  << std::scientific << y_ << " ")) throw std::runtime_error("lyapunov_exponents::save_exponents: failed to write to " + file_name_);
             }
             if(!(file_ << std::endl)) throw std::runtime_error("time_stepper::lyapunov_exponents: failed to write to " + file_name_);
             it++;
