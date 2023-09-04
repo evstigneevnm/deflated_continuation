@@ -48,6 +48,8 @@ public:
         iD = new matrix_wrap(N, N);
         iDA = new matrix_wrap(N, N);
 
+        std::cout << params.param_number << params.sigma << params.L << params.delta << params.gamma << params.mu << params.u0 << std::endl;
+
         problem = new problem_type(N, params.param_number, params.sigma, params.L, params.delta, params.gamma, params.mu, params.u0);
         
         mat_ops_->init_matrices(linear_operator->data, mass_matrix->data, stiffness_matrix->data, shifted_linear_operator->data, eye->data, iD->data, iDA->data);

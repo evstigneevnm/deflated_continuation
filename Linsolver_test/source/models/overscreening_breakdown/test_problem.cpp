@@ -24,7 +24,7 @@ int main(int argc, char const *argv[])
     cublas_wrap cublas(true);
     vec_ops_t vec_ops(N, &cublas);
     mat_ops_t mat_ops(vec_ops.get_vector_size(), vec_ops.get_vector_size(), vec_ops.get_cublas_ref() );
-    ob_prob_t ob_prob( &vec_ops, &mat_ops, params );
+    ob_prob_t ob_prob(&vec_ops, &mat_ops, params );
     vec_file_ops_t vec_file_ops(&vec_ops);
     mat_file_ops_t mat_file_ops(&mat_ops);
 

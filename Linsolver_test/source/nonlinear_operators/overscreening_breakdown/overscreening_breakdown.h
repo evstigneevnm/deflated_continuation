@@ -75,6 +75,8 @@ public:
     vec_ops_(vec_ops), 
     mat_ops_(mat_ops)
     {
+        std::cout << params.param_number << params.sigma << params.L << params.delta << params.gamma << params.mu << params.u0 << std::endl;
+
         N_ = vec_ops_->get_vector_size();
         kern_ = new kern_t(vec_ops, mat_ops_, params);
         // plot = new plot_t();

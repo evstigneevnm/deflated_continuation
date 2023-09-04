@@ -2,7 +2,7 @@
 #include <common/gpu_vector_operations.h>
 #include <common/gpu_matrix_vector_operations.h>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.h>
-
+#include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_params.h>
 #include <common/gpu_file_operations.h>
 #include <common/gpu_matrix_file_operations.h>
 
@@ -16,17 +16,10 @@ int main(int argc, char const *argv[])
     using ob_ker_t = nonlinear_operators::overscreening_breakdown_ker<vec_ops_t, mat_ops_t>;
 
     using vec_file_ops_t = gpu_file_operations<vec_ops_t>;
+    using params_t = params_s<real>;
 
-    struct params_s
-    {
-        real L = 1.0;
-        real gamma = 1.0;
-        real delta = 1.0;    
-        real mu = 1.0;
-        real u0 = 1.0;
-    };
     size_t N = 10;
-    params_s params;
+    params_t params;
     cublas_wrap cublas(true);
     vec_ops_t vec_ops(N, &cublas);
     mat_ops_t mat_ops(vec_ops.get_vector_size(), vec_ops.get_vector_size(), vec_ops.get_cublas_ref() );
