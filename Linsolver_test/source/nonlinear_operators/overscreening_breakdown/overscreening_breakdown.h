@@ -38,7 +38,7 @@ namespace nonlinear_operators
 *       For sigma=0 we have g(x) = 1/sqrt(2pi)
 */
 
-template<class VecOps, class MatOps>
+template<class VecOps, class MatOps, class Kern = overscreening_breakdown_ker<VecOps, MatOps>, class FileOperations = gpu_file_operations<VecOps> >
 class overscreening_breakdown
 {
 private:
@@ -52,8 +52,8 @@ private:
     // using plot_t = plot_solution<vec_ops_t>;
 
     //class for low level CUDA kern_els
-    using kern_t = overscreening_breakdown_ker<vec_ops_t, mat_ops_t>;
-    using file_ops_t = gpu_file_operations<VecOps>;
+    using kern_t = Kern;//overscreening_breakdown_ker<vec_ops_t, mat_ops_t>;
+    using file_ops_t = FileOperations;// gpu_file_operations<VecOps>;
 
 
 

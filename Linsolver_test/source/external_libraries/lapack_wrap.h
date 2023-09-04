@@ -176,6 +176,36 @@ extern "C" void sgees_(
         int* LWORK,
         int* BWORK,
         int* INFO );
+
+//https://www.math.utah.edu/software/lapack/lapack-d/dgels.html
+//DGELS - solve overdetermined or underdetermined real linear systems involving an M-by-N matrix A, or its transpose, using a QR or LQ factorization of A
+extern "C" void dgels_(
+        char* TRANS, 
+        int* M, 
+        int* N, 
+        int* NRHS, 
+        double* A, 
+        int* LDA, 
+        double* B, 
+        int* LDB, 
+        double* WORK,
+        int* LWORK,
+        int* INFO
+        );
+extern "C" void sgels_(
+        char* TRANS, 
+        int* M, 
+        int* N, 
+        int* NRHS, 
+        double* A, 
+        int* LDA, 
+        double* B, 
+        int* LDB, 
+        double* WORK,
+        int* LWORK,
+        int* INFO
+        );
+
 }
 
 template<class T>

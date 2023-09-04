@@ -345,57 +345,57 @@ __global__ void set_identity_matrix_kernel(size_t N, Matrix E)
 
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::form_stiffness_matrix(size_t N, problem_s problem, matrix_device_s A, matrix_device_s iD)
+void overscreening_breakdown_ker<VecOps, MatOps>::form_stiffness_matrix(size_t N, problem_type problem, matrix_wrap A, matrix_wrap iD)
 {
-    form_stiffness_matrix_kernel<T, T_vec, problem_s, matrix_device_s><<<dim_grid, dim_block>>>(N, problem, A, iD);
+    form_stiffness_matrix_kernel<T, T_vec, problem_type, matrix_wrap><<<dim_grid, dim_block>>>(N, problem, A, iD);
 }
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::form_rhs_linearization_matrix(size_t N, problem_s problem, T_vec u_solution, matrix_device_s B)
+void overscreening_breakdown_ker<VecOps, MatOps>::form_rhs_linearization_matrix(size_t N, problem_type problem, T_vec u_solution, matrix_wrap B)
 {
-    form_rhs_linearization_matrix_kernel<T, T_vec, problem_s, matrix_device_s><<<dim_grid, dim_block>>>(N, problem, u_solution, B);
-}
-
-
-template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::form_mass_matrix(size_t N, problem_s problem, matrix_device_s mass_matrix)
-{
-    form_mass_matrix_kernel<T, T_vec, problem_s, matrix_device_s><<<dim_grid, dim_block>>>(N, problem, mass_matrix);
+    form_rhs_linearization_matrix_kernel<T, T_vec, problem_type, matrix_wrap><<<dim_grid, dim_block>>>(N, problem, u_solution, B);
 }
 
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::calucalte_function_at_basis(size_t N, problem_s problem, bool mult, T_vec res)
+void overscreening_breakdown_ker<VecOps, MatOps>::form_mass_matrix(size_t N, problem_type problem, matrix_wrap mass_matrix)
+{
+    form_mass_matrix_kernel<T, T_vec, problem_type, matrix_wrap><<<dim_grid, dim_block>>>(N, problem, mass_matrix);
+}
+
+
+template<class VecOps, class MatOps>
+void overscreening_breakdown_ker<VecOps, MatOps>::calucalte_function_at_basis(size_t N, problem_type problem, bool mult, T_vec res)
 {
     if(mult)
     {
-        calucalte_function_at_basis_kernel<T, T_vec, problem_s, true><<<dim_grid_1d, dim_block_1d>>>(N, problem, res);
+        calucalte_function_at_basis_kernel<T, T_vec, problem_type, true><<<dim_grid_1d, dim_block_1d>>>(N, problem, res);
     }
     else
     {
-        calucalte_function_at_basis_kernel<T, T_vec, problem_s, false><<<dim_grid_1d, dim_block_1d>>>(N, problem, res);
+        calucalte_function_at_basis_kernel<T, T_vec, problem_type, false><<<dim_grid_1d, dim_block_1d>>>(N, problem, res);
     }        
 }
 
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::reformulate_bcs(size_t N, problem_s problem, T_vec res)
+void overscreening_breakdown_ker<VecOps, MatOps>::reformulate_bcs(size_t N, problem_type problem, T_vec res)
 {
-    reformulate_bcs_kernel<T, T_vec, problem_s><<<dim_grid_1d, dim_block_1d>>>(N, problem, res);
+    reformulate_bcs_kernel<T, T_vec, problem_type><<<dim_grid_1d, dim_block_1d>>>(N, problem, res);
 }
 
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::form_right_hand_side(size_t N, problem_s problem, T_vec u, T_vec res)
+void overscreening_breakdown_ker<VecOps, MatOps>::form_right_hand_side(size_t N, problem_type problem, T_vec u, T_vec res)
 {
-    form_right_hand_side_kernel<T, T_vec, problem_s><<<dim_grid_1d, dim_block_1d>>>(N, problem, u, res);
+    form_right_hand_side_kernel<T, T_vec, problem_type><<<dim_grid_1d, dim_block_1d>>>(N, problem, u, res);
 }
 
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::form_right_hand_parameter_derivative(size_t N, problem_s problem, T_vec u, T_vec res)
+void overscreening_breakdown_ker<VecOps, MatOps>::form_right_hand_parameter_derivative(size_t N, problem_type problem, T_vec u, T_vec res)
 {
-    form_right_hand_parameter_derivative_kernel<T, T_vec, problem_s><<<dim_grid_1d, dim_block_1d>>>(N, problem, u, res);
+    form_right_hand_parameter_derivative_kernel<T, T_vec, problem_type><<<dim_grid_1d, dim_block_1d>>>(N, problem, u, res);
 }
 
 template<class VecOps, class MatOps>
@@ -409,29 +409,29 @@ void overscreening_breakdown_ker<VecOps, MatOps>::smooth_random_data(size_t N, T
 
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::fill_points_at_basis(size_t N,  problem_s problem, T_vec res)
+void overscreening_breakdown_ker<VecOps, MatOps>::fill_points_at_basis(size_t N,  problem_type problem, T_vec res)
 {
-    fill_points_at_basis_or_domain_kernel<T, T_vec, problem_s, true><<<dim_grid_1d, dim_block_1d>>>(N, problem, res);
+    fill_points_at_basis_or_domain_kernel<T, T_vec, problem_type, true><<<dim_grid_1d, dim_block_1d>>>(N, problem, res);
 }
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::fill_points_at_domain(size_t N,  problem_s problem, T_vec res)
+void overscreening_breakdown_ker<VecOps, MatOps>::fill_points_at_domain(size_t N,  problem_type problem, T_vec res)
 {
-    fill_points_at_basis_or_domain_kernel<T, T_vec, problem_s, false><<<dim_grid_1d, dim_block_1d>>>(N, problem, res);
+    fill_points_at_basis_or_domain_kernel<T, T_vec, problem_type, false><<<dim_grid_1d, dim_block_1d>>>(N, problem, res);
 }
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::set_shifted_matrix(size_t N, T a, matrix_device_s A, T b, matrix_device_s aApbE)
+void overscreening_breakdown_ker<VecOps, MatOps>::set_shifted_matrix(size_t N, T a, matrix_wrap A, T b, matrix_wrap aApbE)
 {
-    set_shifted_matrix_kernel<T, T_vec, matrix_device_s><<<dim_grid, dim_block>>>(N, a, A, b, aApbE);
+    set_shifted_matrix_kernel<T, T_vec, matrix_wrap><<<dim_grid, dim_block>>>(N, a, A, b, aApbE);
 
 }
 
 
 
 template<class VecOps, class MatOps>
-void overscreening_breakdown_ker<VecOps, MatOps>::set_identity_matrix(size_t N, matrix_device_s E)
+void overscreening_breakdown_ker<VecOps, MatOps>::set_identity_matrix(size_t N, matrix_wrap E)
 {
-    set_identity_matrix_kernel<T, matrix_device_s><<<dim_grid, dim_block>>>(N, E);
+    set_identity_matrix_kernel<T, matrix_wrap><<<dim_grid, dim_block>>>(N, E);
 
 }
 

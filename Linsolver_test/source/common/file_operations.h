@@ -135,6 +135,22 @@ int read_vector(const std::string &f_name,  size_t N,  T *vec){
     return 0;
 }
 
+template <class T, class Vector>
+int read_vector(const std::string &f_name,  size_t N,  Vector& vec){
+
+    std::ifstream f(f_name.c_str(), std::ifstream::in);
+    if (!f) throw std::runtime_error("read_vector: error while opening file " + f_name);
+    for (size_t i = 0; i<N; i++)
+    {
+        T val;   
+        f >> val;             
+        vec[i]= static_cast<T>(val);           
+    } 
+    f.close();
+    return 0;
+}
+
+
 inline size_t read_vector_size(const std::string &f_name){
 
     std::ifstream f(f_name.c_str(), std::ifstream::in);

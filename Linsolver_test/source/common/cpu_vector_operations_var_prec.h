@@ -13,7 +13,7 @@
 template <int SignificantBits>
 struct cpu_vector_operations_var_prec
 {
-    using scalar_type = boost::multiprecision::number<boost::multiprecision::backends::cpp_bin_float<200> >;
+    using scalar_type = boost::multiprecision::number<boost::multiprecision::backends::cpp_bin_float<SignificantBits> >;
     using T = scalar_type;
     using vector_type = std::vector<T>;//T*;
     bool location;
@@ -208,9 +208,9 @@ public:
     scalar_type normalize(vector_type& x)const
     {
         auto norm_x = norm(x);
-        if(norm_x>0.0)
+        if(norm_x>static_cast<T>(0.0))
         {
-            scale(static_cast<scalar_type>(1)/norm_x, x);
+            scale(static_cast<scalar_type>(1.0)/norm_x, x);
         }
         return norm_x;
     }
@@ -269,8 +269,7 @@ public:
     }
     
     //calc: z := mul_x*x + mul_y*y
-    void assign_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, const vector_type& y, 
-                               vector_type& z)const
+    void assign_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, const vector_type& y, vector_type& z)const
     {
         if((x.size() != y.size() )&&(x.size() != z.size() ))
         {

@@ -29,7 +29,7 @@ namespace gpu_file_operations_functions
     {  
         T* vec_cpu = host_allocate<T>(Row*Col);
         device_2_host_cpy(vec_cpu, matrix_gpu, Row*Col);
-        file_operations::write_matrix<T>(f_name, Row, Col, vec_cpu, prec);
+        file_operations::write_matrix<T*>(f_name, Row, Col, vec_cpu, prec);
         host_deallocate<T>(vec_cpu);
     }
 
@@ -37,7 +37,7 @@ namespace gpu_file_operations_functions
     void read_matrix(const std::string &f_name, size_t Row, size_t Col, T* matrix_gpu)
     {
         T* vec_cpu = host_allocate<T>(Row*Col);
-        file_operations::read_matrix<T>(f_name, Row, Col, vec_cpu);
+        file_operations::read_matrix<T, T*>(f_name, Row, Col, vec_cpu);
         host_2_device_cpy(matrix_gpu, vec_cpu, Row*Col);   
         host_deallocate<T>(vec_cpu);
  
