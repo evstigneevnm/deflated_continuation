@@ -11,6 +11,7 @@
 #include <cuda_runtime.h>
 #include <utils/cuda_support.h>
 #include <external_libraries/cublas_wrap.h>
+#include <external_libraries/cusolver_wrap.h>
 #include <stdexcept>
  
 
@@ -26,27 +27,39 @@ struct gpu_matrix_vector_operations
     gpu_matrix_vector_operations(size_t sz_row_, size_t sz_col_, cublas_wrap *cuBLAS_ = nullptr):
     sz_row(sz_row_),
     sz_col(sz_col_),
-    cuBLAS(cuBLAS_)
+    cuBLAS(cuBLAS_),
+    cusolver_(new cusolver_wrap(true) )
     {
-        location=true;
+        location = true;
         l_dim_A = sz_row;
+        if(cuBLAS != nullptr)
+        {
+            cusolver_->set_cublas(cuBLAS);
+        }
+        // printf("gpu_matrix_vector_operations: address of cublas is %p\n", (void *)cuBLAS ); 
+
     }
 
     //DISTRUCTOR!
     ~gpu_matrix_vector_operations()
     {
+        delete cusolver_;
     }
 
     void set_cublas(cublas_wrap *cuBLAS_p)
     {
         cuBLAS = cuBLAS_p;
+        cusolver_->set_cublas(cuBLAS);
     }
-
 
     cublas_wrap* get_cublas_ref()
     {
         return cuBLAS;
     }
+    cusolver_wrap* get_cusolver_ref()
+    {
+        return cusolver_;
+    }    
     void init_matrix(matrix_type& x)const 
     {
         x = NULL;
@@ -183,9 +196,30 @@ struct gpu_matrix_vector_operations
         cuBLAS->geam<scalar_type>(opA, RowAC, ColBC, alpha, A, RowAC,  beta, B, RowAC, C, ColBC);
     }
 
+//  from cusolver!!!
+    //overrights all
+    void gesv(const size_t rows_cols, matrix_type& A, vector_type& b_x)
+    {
+        cusolver_->gesv(rows_cols, A, b_x);
+    }
+    //writes only to x
+    void gesv(const size_t rows_cols, const matrix_type& A, const vector_type& b, vector_type& x)
+    {
+        cusolver_->gesv(rows_cols, A, b, x);
+    }
+
+
+    void eig(size_t rows_cols, matrix_type& A, vector_type& lambda)
+    {
+        cusolver_->eig(rows_cols, A, lambda);
+    }
+
+
+
 //*/
 private:
     cublas_wrap *cuBLAS;
+    cusolver_wrap *cusolver_;
     size_t sz_row;
     size_t sz_col;
     size_t l_dim_A;//leading_dim_matrix;

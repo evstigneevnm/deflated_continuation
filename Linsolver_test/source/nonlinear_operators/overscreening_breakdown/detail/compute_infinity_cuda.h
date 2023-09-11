@@ -35,6 +35,7 @@ __DEVICE_TAG__ inline double compute_infinity()
     return 0x7ff0000000000000;
 }
 
+// std::numeric_limits<T>::infinity()
 
 }
 

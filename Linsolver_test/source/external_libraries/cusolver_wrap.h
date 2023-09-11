@@ -131,6 +131,7 @@ public:
             cublas = cublas_;
         }
         cublas_set = true;
+        // printf("set_cublas: address of cublas is %p\n", (void *)cublas ); 
     }
 
 //  WARNING!

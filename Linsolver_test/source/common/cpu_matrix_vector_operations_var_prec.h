@@ -36,12 +36,16 @@ struct cpu_matrix_vector_operations_var_prec
         vec_ops_->init_vector(vec_helper_col_);
         vec_ops_->start_use_vector(vec_helper_col_);  
         machesp_ = macheps();
-        std::cout << "macheps = " << machesp_ << std::endl;
+        std::cout << "cpu_matrix_vector_operations_var_prec: macheps = " << machesp_ << std::endl;
+        init_matrix(helper_matrix_);
+        start_use_matrix(helper_matrix_);
     }
 
     //DISTRUCTOR!
     ~cpu_matrix_vector_operations_var_prec()
     {
+        stop_use_matrix(helper_matrix_);
+        free_matrix(helper_matrix_);
         vec_ops_->stop_use_vector(vec_helper_col_);
         vec_ops_->free_vector(vec_helper_col_);
         vec_ops_->stop_use_vector(vec_helper_row_);
@@ -95,7 +99,7 @@ struct cpu_matrix_vector_operations_var_prec
 
 
     // copies a matrices:  from_ ----> to_
-    void assign(const matrix_type& from_, matrix_type& to_)
+    void assign(const matrix_type& from_, matrix_type& to_)const
     {
         std::transform(from_.cbegin(), from_.cend(), to_.begin(), [](T c) { return c; });
     }
@@ -523,6 +527,44 @@ struct cpu_matrix_vector_operations_var_prec
         lup_decomp_s lup(A, sz_rows, sz_cols, machesp_);
         lup.solve(A, b, x);
     }
+ 
+    void gesv(matrix_type& A, vector_type&x)const 
+    {
+        lup_decomp_s lup(A, sz_rows, sz_cols, machesp_);
+        vec_ops_->assign(x, vec_helper_row_);
+        lup.solve(A, vec_helper_row_, x);
+    }    
+
+    void gesv(const matrix_type& A, const vector_type&b, vector_type&x)const
+    {
+        assign(A, helper_matrix_);
+        lup_decomp_s lup(helper_matrix_, sz_rows, sz_cols, machesp_);
+        lup.solve(helper_matrix_, b, x);
+    }
+
+    void gesv(const size_t rows_cols, matrix_type& A, vector_type& b_x)const
+    {
+        if(rows_cols == sz_rows)
+        {
+            gesv(A, b_x);
+        }
+        else
+        {
+            throw std::runtime_error("gesv: incorrect matrix dims");
+        }
+    }
+    void gesv(const size_t rows_cols, const matrix_type& A, const vector_type& b, vector_type& x) const
+    {
+        if(rows_cols == sz_rows)
+        {
+            gesv(A, b, x);
+        }
+        else
+        {
+            throw std::runtime_error("gesv: incorrect matrix dims");
+        }        
+    }
+
     void inv(matrix_type& A, matrix_type& iA)const
     {
         lup_decomp_s lup(A, sz_rows, sz_cols, machesp_);
@@ -570,10 +612,6 @@ private:
         ~lup_decomp_s()
         {}
 
-
-        /* INPUT: A,P filled in lup_decompose; b - rhs vector;
-         * OUTPUT: x - solution vector of A*x=b
-         */
         void solve(const matrix_type& A, const vector_type& b, vector_type& x)
         {
 
@@ -648,7 +686,7 @@ private:
 
             for(size_t k = 0;k<N;k++)
             {
-                for(size_t j = 0;j<N;j++) //running on rows
+                for(size_t j = 0;j<N;j++)
                 {
                     if(P_[k] == j)
                     {
@@ -674,9 +712,6 @@ private:
             if(wrong_size_) throw(std::runtime_error("lup_decompose: incorrect matrix size provided: rows = " + std::to_string(sz_rows_) + " cols = " +  std::to_string(sz_cols_) ) );
             size_t N = sz_rows_;
 
-
-            // for (size_t j = 0; j <= N; j++)
-                // P_[j] = j; //Unit permutation matrix, P[N] initialized with N
 
             std::iota(P_.begin(), P_.end(), 0);
             
@@ -764,6 +799,7 @@ private:
     bool location;
     mutable vector_type vec_helper_row_;
     mutable vector_type vec_helper_col_;
+    mutable matrix_type helper_matrix_;
     const VectorOperations* vec_ops_;
 
 };

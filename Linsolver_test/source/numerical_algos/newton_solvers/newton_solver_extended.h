@@ -21,7 +21,7 @@ public:
     typedef typename vector_operations::scalar_type  T;
     typedef typename vector_operations::vector_type  T_vec;
 
-    newton_solver_extended(vector_operations*& vec_ops_, system_operator*& system_op_, convergence_strategy*& conv_strat_):
+    newton_solver_extended(vector_operations* vec_ops_, system_operator* system_op_, convergence_strategy* conv_strat_):
     vec_ops(vec_ops_),
     system_op(system_op_),
     conv_strat(conv_strat_)

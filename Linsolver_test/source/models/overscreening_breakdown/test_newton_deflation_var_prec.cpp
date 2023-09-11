@@ -10,10 +10,8 @@
 #include <numerical_algos/lin_solvers/exact_wrapper.h>
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 
-#include <contrib/scfd/include/scfd/utils/init_cuda.h>
-#include <external_libraries/cublas_wrap.h>
-
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_params.h>
+#include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.h>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown.h>
 #include <nonlinear_operators/overscreening_breakdown/linear_operator_overscreening_breakdown.h>
 #include <nonlinear_operators/overscreening_breakdown/preconditioner_overscreening_breakdown.h>
@@ -31,13 +29,12 @@
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
 #include <common/macros.h>
-#include <common/gpu_file_operations.h>
-#include <common/gpu_vector_operations.h>
-#include <common/gpu_matrix_vector_operations.h>
+#include <common/cpu_file_operations.h>
+#include <common/cpu_vector_operations_var_prec.h>
+#include <common/cpu_matrix_vector_operations_var_prec.h>
 #include <contrib/scfd/include/scfd/utils/system_timer_event.h>
 
-#include <models/overscreening_breakdown/test_newton_deflation.h>
-
+#include <models/overscreening_breakdown/test_newton_deflation_var_prec.h>
 
 
 int main(int argc, char const *argv[])
@@ -52,6 +49,7 @@ int main(int argc, char const *argv[])
         return(0);       
     }
     
+
     size_t N = std::stoi(argv[1]);
     T sigma = std::stof(argv[2]);
     T L = std::stof(argv[3]);
@@ -65,17 +63,13 @@ int main(int argc, char const *argv[])
     T lin_solver_tol = 1.0e-10;
     unsigned int newton_def_max_it = 50;
     unsigned int lin_solver_max_it = 5;
-    unsigned int deflation_attempts = 10;
-    T newton_def_tol = 1.0e-7;
-    T Power = 4.0;
+    T newton_def_tol = 1.0e-10;
+    T Power = 3.0;
     T newton_wight = 1.0;
-    T norm_wight = 1.0;// sqrt(N);
+    T norm_wight = sqrt(N);
 
-    scfd::utils::init_cuda(10);
-    cublas_wrap cublas(true);
-    vec_ops_t vec_ops(N, &cublas);
-    mat_ops_t mat_ops(vec_ops.get_vector_size(), vec_ops.get_vector_size(), vec_ops.get_cublas_ref() );
-
+    vec_ops_t vec_ops(N);
+    mat_ops_t mat_ops(vec_ops.get_vector_size(), vec_ops.get_vector_size(), &vec_ops );
     vec_file_ops_t vec_file_ops(&vec_ops);
     
     ob_prob_t ob_prob(&vec_ops, &mat_ops, params );
@@ -113,7 +107,7 @@ int main(int argc, char const *argv[])
     // system_operator_t system_operator(&vec_ops, &Ax, &SM);
     // newton_t newton(&vec_ops, &system_operator, &conv_newton);
 
-    deflation_operator_t deflation_op(&vec_ops, &log, &newton_def, deflation_attempts);
+    deflation_operator_t deflation_op(&vec_ops, &log, &newton_def, 5);
 
     deflation_op.execute_all(sigma, &ob_prob, &sol_storage_def);
     //deflation_op->find_add_solution(Rey, &ob_prob, sol_storage_def);
@@ -125,9 +119,9 @@ int main(int argc, char const *argv[])
     for(auto &x: sol_storage_def)
     {        
         std::stringstream f_name;
-        f_name << "solution_" << p << "_for_" << params.N << "_L" << params.L << "_mu" << mu << ".dat";
+        f_name << "solution_" << p << "_for_" << params.N << "_" << params.L << params.L << "_mu" << mu << "_var_prec.dat";
         ob_prob.write_solution_basis(f_name.str(), (T_vec&)x);
-        log.info_f("solution %i, norm = %le", p, static_cast<double>(vec_ops.norm( (T_vec&) x)) );
+        log.info_f("solution %i, norm = %le\n", p, static_cast<double>(vec_ops.norm( (T_vec&) x)) );
         p++;
     }
     

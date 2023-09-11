@@ -10,9 +10,9 @@
 #include <boost/random.hpp>
 #include <chrono>
 
-template <int SignificantBits>
 struct cpu_vector_operations_var_prec
 {
+    static const unsigned int SignificantBits = 100;
     using scalar_type = boost::multiprecision::number<boost::multiprecision::backends::cpp_bin_float<SignificantBits> >;
     using T = scalar_type;
     using vector_type = std::vector<T>;//T*;
@@ -21,6 +21,11 @@ struct cpu_vector_operations_var_prec
 
 
 private:
+
+    
+    // template <int N> boost::multiprecision::bmp::number< bmp::cpp_dec_float<N> > const my_const_pi = boost::multiprecision::default_ops::get_constant_pi<bmp::cpp_dec_float<N> >();
+
+
 
     using gen_t = boost::random::independent_bits_engine<boost::random::mt19937, std::numeric_limits<T>::digits, boost::multiprecision::cpp_int>;
     
@@ -74,6 +79,10 @@ public:
     {
         return sz_default_;
     }
+    size_t get_vector_size()const
+    {
+        return get_default_size();
+    }
     size_t size()const
     {
         return get_default_size();
@@ -85,6 +94,10 @@ public:
     bool device_location()const
     {
         return location;
+    }
+    unsigned int get_fp_prec()const
+    {
+        return SignificantBits;
     }
 
 
@@ -182,6 +195,12 @@ public:
     {
         return scalar_prod(x, x);
     }    
+
+    scalar_type norm_l2(const vector_type& x)const
+    {
+        auto result = norm(x);
+        return result;//std::sqrt(sz);
+    }
     scalar_type norm_inf(const vector_type& x)const
     {
         size_t sz_l = x.size();

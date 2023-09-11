@@ -1,34 +1,30 @@
-#include <external_libraries/cublas_wrap.h>
-#include <common/gpu_vector_operations.h>
-#include <common/gpu_matrix_vector_operations.h>
+#include <common/cpu_vector_operations_var_prec.h>
+#include <common/cpu_matrix_vector_operations_var_prec.h>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.h>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_params.h>
-#include <common/gpu_file_operations.h>
-#include <common/gpu_matrix_file_operations.h>
 
 int main(int argc, char const *argv[])
 {
-    using real =  SCALAR_TYPE;
-    using vec_ops_t = gpu_vector_operations<real>;
+    const unsigned int fp_bits = 100;
+    using vec_ops_t = cpu_vector_operations_var_prec<fp_bits>;
+    using T = typename vec_ops_t::scalar_type;
     using T_vec = typename vec_ops_t::vector_type;
-    using mat_ops_t = gpu_matrix_vector_operations<real, T_vec>;
-
+    using mat_ops_t = cpu_matrix_vector_operations_var_prec<vec_ops_t>;
+    using T_mat = typename mat_ops_t::matrix_type;
     using ob_ker_t = nonlinear_operators::overscreening_breakdown_ker<vec_ops_t, mat_ops_t>;
-
-    using vec_file_ops_t = gpu_file_operations<vec_ops_t>;
-    using params_t = params_s<real>;
+    using params_t = params_s<T>;
 
     size_t N = 10;
     params_t params;
-    cublas_wrap cublas(true);
-    vec_ops_t vec_ops(N, &cublas);
-    mat_ops_t mat_ops(vec_ops.get_vector_size(), vec_ops.get_vector_size(), vec_ops.get_cublas_ref() );
-    vec_file_ops_t vec_file_ops(&vec_ops);
+    vec_ops_t vec_ops(N);
+    mat_ops_t mat_ops(vec_ops.get_vector_size(), vec_ops.get_vector_size(), &vec_ops );
     
     ob_ker_t ob_ker( &vec_ops, &mat_ops, params );
     T_vec u_sol, u_coeff;
     vec_ops.init_vectors(u_sol, u_coeff);
     vec_ops.start_use_vectors(u_sol, u_coeff);
+    
+
     
     ob_ker.calucalte_function_at_basis(u_coeff);
     ob_ker.expend_function(u_coeff);

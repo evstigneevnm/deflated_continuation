@@ -21,7 +21,7 @@ public:
     typedef typename VectorOperations::vector_type  T_vec;
 
 
-    deflation_operator(VectorOperations*& vec_ops_, Logging*& log_, NewtonMethod*& newton_, unsigned int max_retries_ = 5):
+    deflation_operator(VectorOperations* vec_ops_, Logging* log_, NewtonMethod* newton_, unsigned int max_retries_ = 5):
     vec_ops(vec_ops_),
     log(log_),
     newton(newton_),
@@ -79,7 +79,7 @@ public:
             log->info("deflation::convergence_norms:");
             for(auto& x: *newton->get_convergence_strategy_handle()->get_norms_history_handle())
             {
-                log->info_f("%le", x);
+                log->info_f("%le", static_cast<double>(x)) ;
             }            
         }
         return(found_solution);      

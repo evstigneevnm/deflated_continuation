@@ -98,7 +98,7 @@ public:
             }
             reset_wight();            
         }
-        if((std::abs(normFx1-normFx)/normFx<T(0.05))&&(iterations_>maximum_iterations_/3))
+        if(( abs(normFx1-normFx)/normFx<T(0.05))&&(iterations_>maximum_iterations_/3))
         {
             newton_wight_ *= 0.5;
             log_->warning_f("NonlinearOperators::convergence: adjusting Newton wight to %le and updating...", newton_wight_);   
@@ -112,25 +112,25 @@ public:
             finish = true;
             result_status = 4;
         }
-        if(std::isnan(normFx))
+        if( isnan(normFx))
         {
             log_->error("NonlinearOperators::convergence: Newton initial vector caused nan.");
             finish = true;
             result_status = 3;
         }
-        else if(std::isnan(normFx1))
+        else if( isnan(normFx1))
         {
             log_->error("NonlinearOperators::convergence: Newton updated vector caused nan.");
             finish = true;
             result_status = 3;
         }
-        else if(std::isinf(normFx))
+        else if( isinf(normFx))
         {
             log_->error("NonlinearOperators::convergence: Newton initial vector caused inf.");
             finish = true;
             result_status = 2;            
         }
-        else if(std::isinf(normFx1))
+        else if( isinf(normFx1))
         {
             log_->error("NonlinearOperators::convergence: Newton update caused inf.");
             finish = true;

@@ -46,7 +46,22 @@ void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec
         
         f.close();
 }
+template <class T, class Vector>
+void write_vector(const std::string &f_name, size_t N, Vector& vec, unsigned int prec=19)
+{
+        std::ofstream f(f_name.c_str(), std::ofstream::out);
+        if (!f) throw std::runtime_error("print_vector: error while opening file " + f_name);
 
+        for (size_t i = 0; i < N-1; ++i)
+        {
+            if (!(f << std::scientific << std::setprecision(prec) << vec[i] <<  std::endl))
+                throw std::runtime_error("print_vector: error while writing to file " + f_name);
+        }
+        if (!(f << std::scientific << std::setprecision(prec) << vec[N-1]))
+            throw std::runtime_error("print_vector: error while writing to file " + f_name);
+        
+        f.close();
+}
 
 template <class T_mat>
 void write_matrix(const std::string &f_name, size_t Row, size_t Col, T_mat& matrix, unsigned int prec=19)

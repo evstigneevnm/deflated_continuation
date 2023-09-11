@@ -227,11 +227,23 @@ test_butcher_tables: source/time_stepper/tests/butcher_tables.cpp
 ob_ker: source/nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.cu
 	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(ICUDA) $(IPROJECT) source/nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.cu -c -o O/overscreening_breakdown_ker.o 2>results.make
 
+ob_ker_var_prec: source/nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.cpp
+	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(ICUDA) $(IPROJECT) $(IBOOST) source/nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.cpp -c -o O/overscreening_breakdown_ker_var_prec.o $(NVOPENMP) 2>results.make
+
+
 test_ob_kernels:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/overscreening_breakdown/test_kernels.cpp O/overscreening_breakdown_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o test_ob_kernels.bin 2>results.make
 
+test_ob_kernels_var_prec:
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/overscreening_breakdown/test_kernels_var_prec.cpp O/overscreening_breakdown_ker_var_prec.o -o test_ob_kernels_var_prec.bin 2>results.make
+
+
 test_ob_problem:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/overscreening_breakdown/test_problem.cpp O/overscreening_breakdown_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o test_ob_problem.bin 2>results.make
+
+test_ob_problem_var_prec:
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/overscreening_breakdown/test_problem_var_prec.cpp O/overscreening_breakdown_ker_var_prec.o -o test_ob_problem_var_prec.bin $(NVOPENMP) 2>results.make
+
 
 ob_view:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/overscreening_breakdown/view_solution.cpp O/overscreening_breakdown_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o ob_view_solution.bin 2>results.make
@@ -239,6 +251,17 @@ ob_view:
 
 test_ob_newton:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/overscreening_breakdown/test_newton.cpp O/overscreening_breakdown_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) $(LLAPACK) -o test_ob_newton.bin 2>results.make
+
+test_ob_newton_deflation:
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/overscreening_breakdown/test_newton_deflation.cpp O/overscreening_breakdown_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) $(LLAPACK) -o test_ob_newton_deflation.bin 2>results.make
+
+
+test_ob_newton_var_prec:
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/overscreening_breakdown/test_newton_var_prec.cpp O/overscreening_breakdown_ker_var_prec.o $(NVOPENMP) -o test_ob_newton_var_prec.bin 2>results.make
+
+test_ob_newton_deflation_var_prec:
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/overscreening_breakdown/test_newton_deflation_var_prec.cpp O/overscreening_breakdown_ker_var_prec.o $(NVOPENMP) -o test_ob_newton_deflation_var_prec.bin 2>results.make
+
 
 ob_json:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/overscreening_breakdown/ob_bd_json.cpp O/overscreening_breakdown_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) $(LLAPACK) $(LBOOST) $(LIBBOOST) -o ob_bd_json.bin 2>results.make

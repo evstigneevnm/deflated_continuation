@@ -66,7 +66,7 @@ private:
     const NonlinearOperator* nonlin_op_;
     mutable const LinearOperator* lin_op_;
     const VectorOperations* vec_ops_;
-    T_vec b_;
+    mutable T_vec b_;
 
     
 };

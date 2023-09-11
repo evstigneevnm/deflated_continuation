@@ -355,7 +355,7 @@ public:
         scalar_type r_sc_ = -beta+alpha*v+cTu;
         scalar_type residual_norm = vec_ops_->norm_rank1(r_, r_sc_);
         // std::cout << "actual residual = " << residual_norm << std::endl;
-        logged_obj_t::info_f("actual residual = %e, alpha = %e, beta = %e", residual_norm, alpha, beta );
+        logged_obj_t::info_f("actual residual = %le, alpha = %le, beta = %le", static_cast<double>(residual_norm), static_cast<double>(alpha), static_cast<double>(beta) );
         return flag;
     }
 
@@ -389,7 +389,7 @@ public:
         scalar_type cTu = vec_ops_->scalar_prod(c, u);
         vec_ops_->add_mul(-cTu, d, static_cast<scalar_type>(alpha), r_);
         scalar_type residual_norm = vec_ops_->norm(r_);
-        logged_obj_t::info_f("actual residual = %e, gamma = %e, alpha = %e", residual_norm, gamma, alpha );
+        logged_obj_t::info_f("actual residual = %le, gamma = %le, alpha = %le", static_cast<double>(residual_norm), static_cast<double>(gamma), static_cast<double>(alpha) );
 
         return flag;
     }

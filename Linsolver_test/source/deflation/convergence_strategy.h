@@ -21,9 +21,9 @@ private:
     typedef typename VectorOperations::vector_type  T_vec;
 //    typedef utils::logged_obj_base<Logging> logged_obj_t;
 
-    const T max_norm_Fx_ = 1.0e5;
+    const T max_norm_Fx_ = 1.0e40;
 public:    
-    convergence_strategy(VectorOperations*& vec_ops_, Logging*& log_, T tolerance_ = 1.0e-6, unsigned int maximum_iterations_ = 100, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true):
+    convergence_strategy(VectorOperations* vec_ops_, Logging* log_, T tolerance_ = 1.0e-6, unsigned int maximum_iterations_ = 100, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true):
     vec_ops(vec_ops_),
     log(log_),
     iterations(0),
@@ -114,23 +114,23 @@ public:
         
         reset_wight();
 
-        if(std::isnan(normFx))
+        if(isnan(normFx))
         {
             log->error("deflation::convergence: Newton initial vector caused nan.");
             finish = true;
             result_status = 3;
         }
-        else if(std::isnan(normFx1))
+        else if(isnan(normFx1))
         {
             log->error("deflation::convergence: Newton updated vector caused nan.");
             finish = true;
             result_status = 3;
-        }else if(std::isinf(normFx))
+        }else if(isinf(normFx))
         {
             log->error("deflation::convergence: Newton initial vector caused inf.");
             finish = true;
             result_status = 2;            
-        }else if(std::isinf(normFx1))
+        }else if(isinf(normFx1))
         {
             log->error("deflation::convergence: Newton update caused inf.");
             finish = true;
@@ -160,7 +160,7 @@ public:
             result_status = 1;
             finish = true;
         }
-        if( std::abs(normFx-normFx1)/normFx<1.0e-6)
+        if( abs(normFx-normFx1)/normFx<1.0e-6)
         {
             stagnation++;
         }

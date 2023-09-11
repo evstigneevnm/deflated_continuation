@@ -75,14 +75,14 @@ public:
     vec_ops_(vec_ops), 
     mat_ops_(mat_ops)
     {
-        std::cout << params.param_number << params.sigma << params.L << params.delta << params.gamma << params.mu << params.u0 << std::endl;
-
+        
         N_ = vec_ops_->get_vector_size();
         kern_ = new kern_t(vec_ops, mat_ops_, params);
         // plot = new plot_t();
         vec_ops_->init_vectors(u_0_, u_solution_, x_points_);
         vec_ops_->start_use_vectors(u_0_, u_solution_, x_points_);
         file_ops_ = new file_ops_t(vec_ops_);
+        std::srand(unsigned(std::time(0)));
     }
 
     ~overscreening_breakdown()
@@ -202,13 +202,12 @@ public:
         file_ops_->write_2_vectors_by_side(f_name, x_points_, u_solution_);
     }
 
-    void randomize_vector(T_vec u_out, int steps_p = -1)
+    void randomize_vector(T_vec& u_out, int steps_p = -1)
     {
         int steps = steps_p;
         if(steps_p == -1)
         {
-            std::srand(unsigned(std::time(0)));
-            steps = std::rand()%10+5; 
+            steps = std::rand()%10+3; 
         }
         // std::cout << "steps = " << steps << std::endl;
         kern_->set_random_smoothed_data(u_out, steps);
@@ -217,7 +216,7 @@ public:
 
     T check_solution_quality(const T_vec& u_in)
     {
-        return std::isfinite(vec_ops_->norm(u_in));
+        return isfinite(vec_ops_->norm(u_in));
     }
 
     T norm(const T_vec& u_in_)
