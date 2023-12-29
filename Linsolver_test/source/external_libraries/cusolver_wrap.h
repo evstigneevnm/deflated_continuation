@@ -337,6 +337,13 @@ private:
 
 
 template<> inline
+void cusolver_wrap::geqrf_ormqr(char operation_, char side_, size_t rows, size_t cols, thrust::complex<double>* A, size_t lda, thrust::complex<double>* b, size_t ldb)
+{}
+template<> inline
+void cusolver_wrap::geqrf_ormqr(char operation_, char side_, size_t rows, size_t cols, thrust::complex<float>* A, size_t lda, thrust::complex<float>* b, size_t ldb)
+{}
+
+template<> inline
 void cusolver_wrap::geqrf_ormqr(char operation_, char side_, size_t rows, size_t cols, double *A, size_t lda, double* b, size_t ldb)
 {
     int *devInfo = nullptr;
@@ -480,6 +487,15 @@ void cusolver_wrap::geqrf_ormqr(char operation_, char side_, size_t rows, size_t
 }
 
 template<> inline
+void cusolver_wrap::qr_size(char operation_, char side_, size_t rows, size_t cols, const thrust::complex<double> *A, size_t lda, const thrust::complex<double> *b, size_t ldb)
+{}
+
+template<> inline
+void cusolver_wrap::qr_size(char operation_, char side_, size_t rows, size_t cols, const thrust::complex<float> *A, size_t lda, const thrust::complex<float> *b, size_t ldb)
+{}
+
+
+template<> inline
 void cusolver_wrap::qr_size(char operation_, char side_, size_t rows, size_t cols, const double *A, size_t lda, const double* b, size_t ldb)
 {
     
@@ -597,6 +613,14 @@ void cusolver_wrap::qr_size(char operation_, char side_, size_t rows, size_t col
     set_d_work_float(lwork);
 }
 
+
+template<> inline
+void cusolver_wrap::eig(size_t rows_cols, thrust::complex<double>* A, thrust::complex<double>* lambda)
+{}
+
+template<> inline
+void cusolver_wrap::eig(size_t rows_cols, thrust::complex<float>* A, thrust::complex<float>* lambda)
+{}
 
 
 template<> inline

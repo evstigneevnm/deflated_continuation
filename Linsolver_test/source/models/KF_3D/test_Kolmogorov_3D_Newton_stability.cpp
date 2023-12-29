@@ -6,6 +6,7 @@
 #include <utils/cuda_support.h>
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
+#include <external_libraries/lapack_wrap.h>
 
 #include <utils/log.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
@@ -26,7 +27,7 @@
 #include <common/gpu_vector_operations.h>
 #include <common/gpu_matrix_vector_operations.h>
 #include <stability/stability_analysis.hpp>
-
+#include <stability/system_operator_Cayley_transform.h>
 
 
 #define Blocks_x_ 32
@@ -197,8 +198,19 @@ int main(int argc, char const *argv[])
     printf("Newton 2 solution norm = %le, div = %le\n", vec_ops->norm(x0), KF_3D->div_norm(x0));
     KF_3D->write_solution_abs("x_2.pos", x0);
     
-    typedef stability::stability_analysis<gpu_vector_operations_t, gpu_matrix_vector_operations_t,  
-                                KF_3D_t, lin_op_t, lin_solver_t, log_t, newton_t> stability_t;
+    // typedef stability::stability_analysis<gpu_vector_operations_t, gpu_matrix_vector_operations_t,  
+    //                             KF_3D_t, lin_op_t, lin_solver_t, log_t, newton_t> stability_t;
+
+    using lapack_wrap_t = lapack_wrap<real>;
+    using cayley_t = stability::system_operator_Cayley_transform<gpu_vector_operations_t, KF_3D_t, lin_op_t, >;
+    using iram_t = stability::IRAM::iram_process<gpu_vector_operations_t, MatrixOperations, lapack_wrap_t, lin_op_t, log_t, Cayley_system_op_t>;
+    
+    using stability_t = stability::stability_analysis<
+        gpu_vector_operations_t,
+        KF_3D_t,
+        log_t,
+        newton_t,
+        iram_t>;
 
     stability_t *stabl = new stability_t(vec_ops, mat_ops, vec_ops_small, mat_ops_small, log_p, KF_3D, lin_op_p, lin_solver_p, newton);
 

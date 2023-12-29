@@ -70,7 +70,7 @@ int main(int argc, char const *argv[])
     T lin_solver_tol = 1.0e-10;
     //newton deflation control
     unsigned int newton_def_max_it = 500;
-    T newton_def_tol = 1.0e-10;
+    T newton_def_tol = 1.0e-40;
 
     vec_ops_t vec_ops(N);
     mat_ops_t mat_ops(vec_ops.get_vector_size(), vec_ops.get_vector_size(), &vec_ops );
@@ -127,7 +127,9 @@ int main(int argc, char const *argv[])
 
     
 
-    ob_prob.randomize_vector(x0);
+    // ob_prob.randomize_vector(x0);
+    ob_prob.exact_solution(1.0,x0);
+
     vec_ops.assign(x0, x_back);
     ob_prob.physical_solution(x0, x1);
     vec_file_ops.write_vector("test_newton_solution_initial_var_prec.dat", x1);

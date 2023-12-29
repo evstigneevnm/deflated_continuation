@@ -307,6 +307,25 @@ public:
         C2R(u_helper_in, dr);
     }
 
+    //preconditioner for the temporal Jacobian a*E + b*dF/du
+    void preconditioner_jacobian_temporal_u(TC_vec& dr, T a, T b)
+    {
+        //calc: z := mul_x*x + mul_y*y
+        vec_ops_C->assign_mul(TC(b_val),  (const TC_vec&)biharmonic,  TC(alpha_0), (const TC_vec&)Laplace, b_hat); //b_val*biharmonic+lambda*laplace->z
+        vec_ops_C->set_value_at_point(TC(1), 0, b_hat);
+        //calc: x := x/(mul_y*y)
+        vec_ops_C->div_pointwise(dr, TC(1), (const TC_vec&)b_hat); //dr=dr/(1*z);                
+    }
+    void preconditioner_jacobian_temporal_u(T_vec_im& dr, T a, T b)
+    {
+            
+        R2C(dr, u_helper_in);
+        preconditioner_jacobian_temporal_u(u_helper_in, a, b);
+        C2R(u_helper_in, dr);
+    }
+
+
+
     void exact_solution(const T alpha, T_vec_im& vec_out)
     {
        vec_ops_R_im->assign_scalar(T(0.0), vec_out);
@@ -397,7 +416,7 @@ public:
 
         for(int st=0;st<steps;st++)
         {
-            apply_smooth<T, TC>(dimGrid_F, dimBlock, Nx, My, T(10.0*steps), T(0.05), Laplace, u_helper_out);
+            apply_smooth<T, TC>(dimGrid_F, dimBlock, Nx, My, T(10.0*steps), T(0.1), Laplace, u_helper_out);
         }
 
 

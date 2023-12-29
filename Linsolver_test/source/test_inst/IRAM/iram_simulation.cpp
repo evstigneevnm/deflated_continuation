@@ -108,8 +108,10 @@ int main(int argc, char const *argv[])
     {
         pause = argv[3][0];
     }
-    size_t N = file_operations::read_matrix_size(A_file_name);
-    if(init_cuda(4) == 0)
+    auto NN = file_operations::read_matrix_size(A_file_name);
+    size_t N = NN.first;
+
+    if(init_cuda(-1) == 0)
     {
         return 0;
     }

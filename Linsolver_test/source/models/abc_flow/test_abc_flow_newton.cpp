@@ -55,8 +55,8 @@ int main(int argc, char const *argv[])
         return(0);       
     }
     
-    real Rey = std::atof(argv[1]);
-    size_t N = std::atoi(argv[2]);
+    real Rey = std::stof(argv[1]);
+    size_t N = std::stoi(argv[2]);
     init_cuda(-1);
     size_t Nx = N;
     size_t Ny = N;
@@ -64,7 +64,7 @@ int main(int argc, char const *argv[])
     std::cout << "Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << std::endl;
 
     //linsolver control
-    unsigned int lin_solver_max_it = 1000;
+    unsigned int lin_solver_max_it = 20;
     real lin_solver_tol = 1.0e-1;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;

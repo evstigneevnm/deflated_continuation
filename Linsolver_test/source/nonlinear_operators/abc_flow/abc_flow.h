@@ -601,8 +601,10 @@ public:
         vec_ops_R->assign_random( UR0->y );
         vec_ops_R->assign_random( UR0->z );
         
-        //vec_ops_R->assign_scalar(0, UR0->x);
-        // vec_ops_R->assign_scalar(0, UR0->z);
+        // vec_ops_R->scale(10.0, UR0->x);
+        // vec_ops_R->scale(10.0, UR0->y);
+        // vec_ops_R->scale(10.0, UR0->z);
+
         int steps = steps_;
         if(steps_ == -1)
         {

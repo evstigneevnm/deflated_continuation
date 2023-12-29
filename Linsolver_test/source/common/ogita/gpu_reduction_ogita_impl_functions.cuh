@@ -16,7 +16,6 @@ namespace gpu_reduction_ogita_gpu_kernels
 template<class T>
 __device__ __forceinline__ T _shfl(T a, const int j)
 {
-   
     // WarpSize equals 32 (default third param)
     #if(CUDART_VERSION < 9000)
     return __shfl_xor(a, j); //for 8.0<= cuda < 9.0
@@ -24,8 +23,6 @@ __device__ __forceinline__ T _shfl(T a, const int j)
     return __shfl_xor_sync(0xFFFFFFFF, a, j); //for cuda >=9 
     // -1 = 0xFFFFFFFF assumes that threadsize = 32, see cuda/include/cooperative_groups.h
     #endif
-     
-    
 }
 
 //basic template (int, float)

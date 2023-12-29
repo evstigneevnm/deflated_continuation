@@ -184,7 +184,7 @@ public:
     alpha(alpha_)
     {
         n_y_force = 1;
-        n_z_force = 0;
+        n_z_force = 1;
         scale_force = T(1.0);
 
         Mz=FFT->get_reduced_size();

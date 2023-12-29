@@ -12,18 +12,19 @@ endif
 -include $(CONFIG_FILE)
 
 
-#these variables for your local machine are set from the config file
+CPPSTD = c++14
 NVCC = $(CUDA_ROOT_PATH)/bin/nvcc
 NVCC_CHECK_REGS = -Xptxas -v 
-NVCCFLAGS = -Wno-deprecated-gpu-targets -arch=$(CUDA_ARCH) -std=$(CPPSTD) $(TARGET)
+NVCCFLAGS = -Wno-deprecated-gpu-targets $(CUDA_ARCH) -std=$(CPPSTD) $(TARGET_NVCC)
 OPENMP = -fopenmp -lpthread
 NVOPENMP = -Xcompiler $(OPENMP)
+CONTRIB_SCFD = source/contrib/scfd
 
 G++ = $(GCC_ROOT_PATH)/g++
 LIBFLAGS = --compiler-options -fPIC
-G++FLAGS = -std=$(CPPSTD) $(TARGET)
+G++FLAGS = -std=$(CPPSTD) $(TARGET_GCC)
 ICUDA = -I$(CUDA_ROOT_PATH)/include
-IPROJECT = -I source/
+IPROJECT = -I source/ -I $(CONTRIB_SCFD)/include
 IBOOST = -I$(BOOST_ROOT_PATH)/include
 
 LCUDA = -L$(CUDA_ROOT_PATH)/lib64
@@ -31,59 +32,60 @@ LBOOST = -L$(BOOST_ROOT_PATH)/lib
 LIBS1 = -lcublas -lcurand 
 LIBS2 = -lcufft $(LIBS1)
 LIBS3 = -lcusolver $(LIBS1)
+LIBSAll = -lcublas -lcurand -lcufft -lcusolver
 LIBBOOST = -lboost_serialization
 LLAPACK = -L$(OPENBLAS_ROOT_PATH)/lib -lopenblas
 
 #component tests
-test_cpu_vector_operations:
+test_cpu_vector_operations.bin:
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_cpu_vector_operations.cpp $(OPENMP) -o test_cpu_vector_operations.bin 2>results.make
 
-test_cpu_glued_vector_operations:
+test_cpu_glued_vector_operations.bin:
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_cpu_glued_vector_operations.cpp $(OPENMP) -o test_cpu_glued_vector_operations.bin 2>results.make
 
-test_multi_precision:
+test_multi_precision.bin:
 	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) $(ICUDA) source/test_inst/test_multi_precision/test_multi_precision.cpp -o test_multi_precision.bin $(OPENMP)
 
 
 #all targets
-lapack_test:
+lapack_test.bin:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/models/tests/lapack.cpp $(LLAPACK) -o test_lapack.bin
 
-iram_bulge_test:
+iram_bulge_test.bin:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/test_inst/IRAM/predefined_matrix.cpp $(LIBS1) $(LLAPACK) O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_IRAM.bin	
 
-iram_simulation:
+iram_simulation.bin:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/test_inst/IRAM/iram_simulation.cpp $(LIBS1) $(LLAPACK) O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_IRAM.bin	
 
-iram_process:
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/test_inst/IRAM/iram_test.cpp $(LIBS1) $(LLAPACK) O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_IRAM.bin	
+iram_process.bin:
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/test_inst/IRAM/iram_test.cpp $(LCUDA) $(LIBSAll) $(LLAPACK) O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_IRAM.bin	
 
-arnoldi_iters:
+arnoldi_iters.bin:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/test_inst/Arnoldi_Iterations/arnoldi_iteraitons_test.cpp $(LIBS1) $(LLAPACK) O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_ArIter.bin	
 
 
-cpu_1st_call_alloc_test: source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp
+cpu_1st_call_alloc_test.bin: source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp -o cpu_1st_call_alloc_test_float.bin
 
-sm_test: source/numerical_algos/lin_solvers/tests/sm_test.cpp
+sm_test.bin: source/numerical_algos/lin_solvers/tests/sm_test.cpp
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/numerical_algos/lin_solvers/tests/sm_test.cpp -o sm_test.bin 2>results.make $(OPENMP)
 
-exact_linsolver_test: source/numerical_algos/lin_solvers/tests/exact_solver_test.cpp
+exact_linsolver_test.bin: source/numerical_algos/lin_solvers/tests/exact_solver_test.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/numerical_algos/lin_solvers/tests/exact_solver_test.cpp O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o exact_solver_test.bin 2>results.make 
 
-lin_solvers_test: source/models/tests/linear_solvers_test.cpp
+lin_solvers_test.bin: source/models/tests/linear_solvers_test.cpp
 	$(NVCC) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/models/tests/linear_solvers_test.cpp -o linear_solvers_test.bin 2>results.make
 
-cufft_test: source/models/tests/cufft_test.cpp
+cufft_test.bin: source/models/tests/cufft_test.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)  source/models/tests/cufft_test_kernels.cu -c -o O/cufft_test_kernels.o 2>results.make
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -g source/models/tests/cufft_test.cpp O/cufft_test_kernels.o $(LIBS2) -o cufft_test.bin 2>results.make
 
-cufft_test_2D: source/models/tests/cufft_test_2D.cpp
+cufft_test_2D.bin: source/models/tests/cufft_test_2D.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/cufft_test_kernels.cu -c -o O/cufft_test_kernels.o 2>results.make
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/cufft_test_2D.cpp O/cufft_test_kernels.o $(LIBS2) -o cufft_test_2D.bin 2>results.make
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/cufft_test_2D_1.cpp O/cufft_test_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o cufft_test_2D_1.bin 2>results.make
 
-gpu_vector_operations:
+gpu_vector_operations.bin:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/gpu_vector_operations_kernels.cu -c -o O/gpu_vector_operations_kernels.o 2>results.make
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/test_vector_operations.cpp O/gpu_vector_operations_kernels.o O/gpu_reduction_ogita_kernels.o $(LIBS2) -o test_vector_operations.bin 2>results.make
 
@@ -95,14 +97,14 @@ gpu_vector_operations_ker:
 
 gpu_matrix_vector_operations_ker:
 	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)   source/common/gpu_matrix_vector_operations_kernels.cu -c -o O/gpu_matrix_vector_operations_kernels.o 2>results.make
-gpu_matrix_vector_operations:
+gpu_matrix_vector_operations.bin:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/test_matrix_vector_operations.cpp $(LLAPACK) $(LIBS1) O/gpu_vector_operations_kernels.o O/gpu_reduction_ogita_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_matrix_vector_operations.bin 2>results.make	
 
 
-KS_2D_ker:
+Kuramoto_Sivashinskiy_2D_ker:
 	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)   source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D_ker.cu -c -o O/Kuramoto_Sivashinskiy_2D_ker.o 2>results.make
 
-KS_2D: source/models/KS_2D/test_Kuramoto_Sivashinskiy_2D_RHS.cpp
+test_Kuramoto_Sivashinskiy_2D_RHS.bin: source/models/KS_2D/test_Kuramoto_Sivashinskiy_2D_RHS.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KS_2D/test_Kuramoto_Sivashinskiy_2D_RHS.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o O/gpu_reduction_ogita_kernels.o $(LIBS2) -o test_Kuramoto_Sivashinskiy_2D_RHS.bin 2>results.make
 
 
@@ -120,14 +122,14 @@ cont_def_KS_2D: source/models/KS_2D/test_deflation_continuation_KS.cpp
 circle_ker: source/nonlinear_operators/circle/circle_ker.cu
 	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)  source/nonlinear_operators/circle/circle_ker.cu -c -o O/circle_ker.o 2>results.make
 
-cont_def_circle: source/circle_test_deflation_continuation.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/circle_test_deflation_continuation.cpp O/circle_ker.o O/gpu_vector_operations_kernels.o $(LIBS1) -o circle_test_deflation_continuation.bin 2>results.make	
+cont_def_circle: source/models/circle/circle_test_deflation_continuation.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/circle/circle_test_deflation_continuation.cpp O/circle_ker.o O/gpu_vector_operations_kernels.o $(LIBS1) -o circle_test_deflation_continuation.bin 2>results.make	
 
 circle_bd: source/models/circle/circle_bd.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/circle/circle_bd.cpp O/circle_ker.o O/gpu_vector_operations_kernels.o $(LIBS1) -o circle_bd.bin 2>results.make	
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/circle/circle_bd.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o O/circle_ker.o $(LIBSAll) $(LBOOST) $(LIBBOOST) -o circle_bd.bin 2>results.make	
 
-KS_bd: source/models/KS_2D/KS_bd_json.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KS_2D/KS_bd_json.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBBOOST) $(LIBS2) $(LLAPACK) -o KS_bd_json.bin 2>results.make	
+KS_bd: source/models/KS_2D/KS_bd_json_new.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KS_2D/KS_bd_json_new.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBSAll) $(LLAPACK) -o KS_bd_json.bin 2>results.make	
 
 Kolmogorov_3D_ker: source/nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D_ker.cu
 	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(ICUDA) $(IPROJECT)   source/nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D_ker.cu -c -o O/Kolmogorov_3D_ker.o 2>results.make
@@ -195,7 +197,7 @@ abc_flow_newton: source/models/abc_flow/test_abc_flow_newton.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/test_abc_flow_newton.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_abc_flow_newton.bin 2>results.make
 
 abc_flow_deflation: source/models/abc_flow/test_deflation_abc_flow.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/test_deflation_abc_flow.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_deflation_abc_flow.bin 2>results.make
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/test_deflation_abc_flow.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBSAll) -o test_deflation_abc_flow.bin 2>results.make
 
 abc_bd_deb: source/models/abc_flow/abc_bd_json.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IBOOST) $(IPROJECT) source/models/abc_flow/abc_bd_json.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBS2) $(LLAPACK) -o abc_bd_json.bin 2>results.make	
@@ -205,10 +207,10 @@ abc_bd_rel: source/models/abc_flow/abc_bd_json.cpp
 
 
 abc_bd: source/models/abc_flow/abc_bd_json.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IBOOST) $(IPROJECT) source/models/abc_flow/abc_bd_json.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBS2) $(LLAPACK) -o abc_bd_json.bin 2>results.make	
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IBOOST) $(IPROJECT) source/models/abc_flow/abc_bd_json.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBSAll) $(LLAPACK) -o abc_bd_json.bin 2>results.make	
 
 abc_view: source/models/abc_flow/view_solution.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/view_solution.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBS2) -o abc_view_solution.bin 2>results.make
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/view_solution.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBSAll) -o abc_view_solution.bin 2>results.make
 
 abc_flow_time_stepping: source/models/abc_flow/abc_flow_time_stepping.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_time_stepping.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o abc_flow_time_stepping.bin 2>results.make
@@ -288,8 +290,6 @@ test_rossler_periodic_orbit_cpu:
 test_rossler_periodic_orbit_gpu:
 	$(NVCC) $(NVCCFLAGS) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_operator_ker.cu -c -o O/rossler_operator_kernels.o 2>results.make
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_periodic_gpu.cpp O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o O/rossler_operator_kernels.o -o test_rossler_periodic_gpu.bin $(LCUDA) $(LIBS3) $(LLAPACK) 2>results.make
-
-
 
 # make all common kernels
 ker:

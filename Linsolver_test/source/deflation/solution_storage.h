@@ -140,24 +140,31 @@ private:
         //M=(1./(S.*(w.*normE(x_s-x0_s(:,1))).^p));
         //V=(-p./(S.*(w.*normE(x_s-x0_s(:,1))).^(p+2))).*w.*(x_s-x0_s(:,1))';
         vec_ops->assign_mul(static_cast<T>(1.0), x, static_cast<T>(-1.0), x0_, distance_help);
-        distance = static_cast<T>(1.0)/(pow(vec_ops->norm_l2(distance_help),p)*(elements_number+1)); //distance to zero
+        auto total_elements = elements_number+1;
+        distance = static_cast<T>(1.0)/(pow(vec_ops->norm_l2(distance_help),p)*(total_elements)); //distance to zero
         if(ignore_zero_)
+        {
             distance = 0;
-        distance_der = -static_cast<T>(p)/(pow(vec_ops->norm_l2(distance_help), p+T(2.0))*(elements_number+1)); //distance to zero
+            total_elements = elements_number;
+        }
+        distance_der = -static_cast<T>(p)/(pow(vec_ops->norm_l2(distance_help), p+T(2.0))*(total_elements)); //distance to zero
         if(ignore_zero_)
+        {
             distance_der = 0;        
+        }
         //calc: y := mul_x*x
         // c = distance_der*(x-0)
         vec_ops->assign_mul(distance_der/norm_weight, x, c);
         //xxx vec_ops->assign_scalar(0.0, c);
         for(int j=0;j<elements_number;j++)
         {
+            
             //calc: z := mul_x*x + mul_y*y
             //distance_help := x - container[j].get_ref()
             vec_ops->assign_mul(static_cast<T>(1.0), x, static_cast<T>(-1.0), container[j].get_ref(), distance_help);
 
-            distance += static_cast<T>(1.0)/(pow(vec_ops->norm_l2(distance_help),p)*(elements_number+1));
-            distance_der = -static_cast<T>(p)/(pow(vec_ops->norm_l2(distance_help),p+T(2.0))*(elements_number+1));
+            distance += static_cast<T>(1.0)/(pow(vec_ops->norm_l2(distance_help),p)*(total_elements));
+            distance_der = -static_cast<T>(p)/(pow(vec_ops->norm_l2(distance_help),p+T(2.0))*(total_elements));
             //calc: y := mul_x*x + mul_y*y
             //c := c + distance_der*distance_help
             vec_ops->add_mul(distance_der/norm_weight, distance_help, static_cast<T>(1.0), c);

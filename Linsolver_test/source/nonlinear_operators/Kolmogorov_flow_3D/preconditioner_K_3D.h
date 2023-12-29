@@ -30,7 +30,7 @@ public:
 
     }
     
-    void set_operator(const linear_operator *op_)
+    void set_operator(const linear_operator *op_)const
     {
         lin_op = (linear_operator*)op_;
     }
@@ -42,7 +42,7 @@ public:
 
 private:
     nonlinear_operator* nonlin_op;
-    linear_operator* lin_op;
+    mutable const linear_operator* lin_op;
 
     
 };

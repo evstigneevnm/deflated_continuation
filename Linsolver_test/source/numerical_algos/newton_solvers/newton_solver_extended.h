@@ -14,14 +14,14 @@ namespace numerical_algos
 namespace newton_method_extended
 {
 
-template<class vector_operations, class nonlinear_operator, class system_operator, class convergence_strategy, class solution_point>
+template<class VectorOperations, class NonlinearOperator, class SystemOperator, class ConvergenceStrategy, class SolutionPoint>
 class newton_solver_extended
 {
 public:
-    typedef typename vector_operations::scalar_type  T;
-    typedef typename vector_operations::vector_type  T_vec;
+    typedef typename VectorOperations::scalar_type  T;
+    typedef typename VectorOperations::vector_type  T_vec;
 
-    newton_solver_extended(vector_operations* vec_ops_, system_operator* system_op_, convergence_strategy* conv_strat_):
+    newton_solver_extended(VectorOperations* vec_ops_, SystemOperator* system_op_, ConvergenceStrategy* conv_strat_):
     vec_ops(vec_ops_),
     system_op(system_op_),
     conv_strat(conv_strat_)
@@ -36,7 +36,7 @@ public:
     }
 
     //inplace
-    bool solve(nonlinear_operator*& nonlin_op, T_vec& x, T& lambda)
+    bool solve(NonlinearOperator*& nonlin_op, T_vec& x, T& lambda)
     {
         int result_status = 1;
         T delta_lambda = T(0.0);
@@ -69,7 +69,7 @@ public:
         return converged;
     }
 
-    bool solve(nonlinear_operator*& nonlin_op, const T_vec& x0, const T& lambda0, T_vec& x, T& lambda)
+    bool solve(NonlinearOperator*& nonlin_op, const T_vec& x0, const T& lambda0, T_vec& x, T& lambda)
     {
         vec_ops->assign(x0, x);
         lambda = lambda0;
@@ -83,15 +83,15 @@ public:
         return converged;
     }   
 
-    convergence_strategy* get_convergence_strategy_handle()
+    ConvergenceStrategy* get_convergence_strategy_handle()
     {
         return conv_strat;
     }
 
 private:
-    vector_operations* vec_ops;
-    system_operator* system_op;
-    convergence_strategy* conv_strat;
+    VectorOperations* vec_ops;
+    SystemOperator* system_op;
+    ConvergenceStrategy* conv_strat;
     T_vec delta_x;
 
 

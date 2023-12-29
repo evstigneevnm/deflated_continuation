@@ -61,7 +61,6 @@ public:
     void F(const T_vec& u, const T alpha, T_vec& v)
     {
         function<T>(dimGrid, dimBlock, Nx, R, (const T*&)u, alpha, v);
-
     }
 
     //sets (u_0, alpha_0) for jacobian linearization
@@ -114,6 +113,19 @@ public:
     void physical_solution(T_vec& u_in, T_vec& u_out)
     {
         //void funciton that should return a physical solution
+    }
+    void project(T_vec& u_)
+    {
+        //void fuction to project to invariant subspace
+    }
+    void exact_solution(const T& param, T_vec& u_out)
+    {
+        //void function for exact solution.
+    }
+    T check_solution_quality(const T_vec& u_in)
+    {
+        //void function that returns some norm of solution diverge from invariant subspace
+        return 0;
     }
 
     void norm_bifurcation_diagram(const T_vec& u_in, std::vector<T>& res) const

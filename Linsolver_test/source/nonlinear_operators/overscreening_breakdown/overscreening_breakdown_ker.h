@@ -42,8 +42,8 @@ public:
         mat_ops_->init_matrices(linear_operator->data, mass_matrix->data, stiffness_matrix->data, shifted_linear_operator->data, eye->data, iD->data, iDA->data);
         mat_ops_->start_use_matrices(linear_operator->data, mass_matrix->data, stiffness_matrix->data, shifted_linear_operator->data, eye->data, iD->data, iDA->data);
         
-        vec_ops_->init_vectors(u_solution, u_randomized, iDb);
-        vec_ops_->start_use_vectors(u_solution, u_randomized, iDb);
+        vec_ops_->init_vectors(u_solution, u_randomized, iDb, basis_points);
+        vec_ops_->start_use_vectors(u_solution, u_randomized, iDb, basis_points);
 
         form_mass_matrix(N, *problem, *mass_matrix);
         form_stiffness_matrix(N, *problem, *stiffness_matrix, *iD);
@@ -55,8 +55,8 @@ public:
     {
         mat_ops_->stop_use_matrices(linear_operator->data, mass_matrix->data, stiffness_matrix->data, shifted_linear_operator->data, eye->data, iD->data, iDA->data);
         mat_ops_->free_matrices(linear_operator->data, mass_matrix->data, stiffness_matrix->data, shifted_linear_operator->data, eye->data, iD->data, iDA->data);
-        vec_ops_->stop_use_vectors(u_solution, u_randomized, iDb);
-        vec_ops_->free_vectors(u_solution, u_randomized, iDb); 
+        vec_ops_->stop_use_vectors(u_solution, u_randomized, iDb, basis_points);
+        vec_ops_->free_vectors(u_solution, u_randomized, iDb, basis_points); 
         delete iDA;
         delete iD;
         delete eye;
@@ -163,13 +163,10 @@ public:
         }
     }
     void solve_linear_system(const T alpha, T_mat& matrix, const T beta, T_vec& b2x)
-    {
-        
+    {        
         mat_ops_->geam('N', N, N, alpha, matrix, beta, eye->data, shifted_linear_operator->data);
         mat_ops_->gesv(N, shifted_linear_operator->data, b2x);
     }
-
-
 
     void set_random_smoothed_data(T_vec& coeffs, int steps)
     {
@@ -186,11 +183,41 @@ public:
     {
         fill_points_at_basis(N, *problem, res);
     }
-    void fill_points_at_domain(T_vec res)
+    void fill_points_at_domain(T_vec& res)
     {
         fill_points_at_domain(N, *problem, res);
     }    
-     
+
+
+
+    void get_right_hand_side(const T_vec& u, T_vec& rhs_p)
+    {
+        get_solution_at_basis_points(u, u_solution);
+        get_right_hand_side(N, *problem, u_solution, rhs_p);
+    }
+
+
+
+    T integrate_rhs(const T_vec& u)
+    {
+        
+        T res_all = integrate_solution(N, *problem, u);
+
+    }
+
+    T integrate_rhs_to(const T_vec& u, T x)
+    {
+        // auto val = *problem.right_hand_side(T x, T u);
+        T u_of_x = get_solution_value_at_point(N, x, *problem, u, u_solution, true);
+        return u_of_x;
+    }
+
+    void exact_solution(T_vec& u)
+    {
+        get_exact_solution(N, *problem, u);
+        expend_function(u);
+    }
+
 
 private:
     problem_type* problem;
@@ -205,6 +232,7 @@ private:
     bool apply_inverse_diag_;
     T_vec u_solution;
     T_vec u_randomized;
+    T_vec basis_points;
     T_vec iDb;
     VectorOperations* vec_ops_;
     mat_ops_t* mat_ops_;
@@ -223,6 +251,12 @@ private:
     void fill_points_at_domain(size_t N,  problem_type& problem, T_vec& res);
     void set_shifted_matrix(size_t N, T a, matrix_wrap& A, T b, matrix_wrap& aApbE);
     void set_identity_matrix(size_t N, matrix_wrap& E);
+    void get_right_hand_side(size_t N, problem_type& problem, const T_vec& u, T_vec& res);
+    T get_solution_value_at_point(size_t N, T x, problem_type& problem, const T_vec& u_coeffs, T_vec& temp_storage, bool point_in_domain);
+    T integrate_solution(size_t N, problem_type& problem, const T_vec& u_coeffs);
+    void get_exact_solution(size_t N, problem_type& problem, T_vec& res);
+
+
 };
 
 }

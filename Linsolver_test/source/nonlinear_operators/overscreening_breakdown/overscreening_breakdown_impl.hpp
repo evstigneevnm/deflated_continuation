@@ -1,6 +1,7 @@
 #ifndef __NONLINEAR_PROBLEM_OVERSCREENING_BREAKDOWN_IMPL_HPP__
 #define __NONLINEAR_PROBLEM_OVERSCREENING_BREAKDOWN_IMPL_HPP__
 
+#include <vector>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.h>
 // namespace overscreening_breakdown_device
 
@@ -221,6 +222,23 @@ void overscreening_breakdown_ker<VecOps, MatOps>::form_right_hand_side(size_t N,
 
 }
 
+template<class VecOps, class MatOps>
+void overscreening_breakdown_ker<VecOps, MatOps>::get_right_hand_side(size_t N, problem_type& problem, const T_vec& u, T_vec& res)
+{
+
+    #pragma omp parallel for
+    for(size_t j = 0;j<N;j++)
+    {
+        auto x_point = problem.point_in_domain(j);
+        auto u_point = u_solution[j];
+        res[j] = problem.right_hand_side(x_point, u_point); //we assume that the form is Lu-rhs=0, hence '-'
+        // if(problem.delta>problem.delta_threshold)
+        // {
+        res[j] /= (problem.delta*problem.delta);
+        // }
+    }
+
+}
 
 template<class VecOps, class MatOps>
 void overscreening_breakdown_ker<VecOps, MatOps>::form_right_hand_parameter_derivative(size_t N, problem_type& problem, T_vec& u, T_vec& res)
@@ -373,6 +391,55 @@ void overscreening_breakdown_ker<VecOps, MatOps>::set_identity_matrix(size_t N, 
         {
             T delta = ( (j==k)?static_cast<T>(1.0):static_cast<T>(0.0) );
             E(j,k) = delta;
+        }
+    }
+}
+
+
+
+
+template<class VecOps, class MatOps>
+typename VecOps::scalar_type overscreening_breakdown_ker<VecOps, MatOps>::get_solution_value_at_point(size_t N,  T x, problem_type& problem, const T_vec& u_coeffs, T_vec& temp_storage, bool point_in_domain)
+{
+    return 0;
+
+}
+
+
+
+
+template<class VecOps, class MatOps>
+typename VecOps::scalar_type overscreening_breakdown_ker<VecOps, MatOps>::integrate_solution(size_t N, problem_type& problem, const T_vec& u_coeffs)
+{
+
+    
+    return 0;
+}
+
+template<class VecOps, class MatOps>
+void overscreening_breakdown_ker<VecOps, MatOps>::get_exact_solution(size_t N, problem_type& problem, T_vec& res)
+{
+    
+    #pragma omp parallel for
+    for(size_t j = 0;j<N;j++)
+    {
+        
+        if(j == 0)
+        {
+            res[j] = 0; //u bc at infinity
+        }
+        else if(j == N-2)
+        {
+            res[j] = problem.u0; //u bc at zero
+        }
+        else if(j == N-1)
+        {
+            res[j] = 0; //u_{xxx} bc at zero
+        }
+        else
+        {
+            auto x_point = problem.point_in_domain(j);
+            res[j] = problem.exact_solution_uxx(x_point);
         }
     }
 }

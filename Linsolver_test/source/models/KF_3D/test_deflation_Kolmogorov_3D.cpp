@@ -108,7 +108,7 @@ int main(int argc, char const *argv[])
     SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle()->set_basis_size(basis_sz);
 
-    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops, log, newton_def_tol, newton_def_max_it, real(0.5), true );
+    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops, log, newton_def_tol, newton_def_max_it, real(1.0), true );
 
     sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops, 50, norm_wight, Power);
     system_operator_def_t *system_operator_def = new system_operator_def_t(vec_ops, Ax, SM, sol_storage_def);
@@ -122,8 +122,10 @@ int main(int argc, char const *argv[])
     SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
     SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle_original()->set_basis_size(basis_sz);    
-    convergence_newton_t *conv_newton = new convergence_newton_t(vec_ops, log, newton_def_tol, newton_def_max_it, real(0.5) );
+    convergence_newton_t *conv_newton = new convergence_newton_t(vec_ops, log, newton_def_tol, newton_def_max_it, real(1.0) );
     system_operator_t *system_operator = new system_operator_t(vec_ops, Ax, SM);
+    
+    sol_storage_def->set_ignore_zero();
     newton_t *newton = new newton_t(vec_ops, system_operator, conv_newton);
 
   

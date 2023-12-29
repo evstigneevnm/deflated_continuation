@@ -408,7 +408,7 @@ struct gpu_vector_operations
         {     
             cuBLAS->norm2<T>(sz, x, &result);
         }
-        return result;//std::sqrt(sz); //implements l2 norm as sqrt(sum_j (x_j^2) * (1/x_size))
+        return result/std::sqrt(sz); //implements l2 norm as sqrt(sum_j (x_j^2) * (1/x_size))
     }
     Tsc norm2_sq(const vector_type &x)const
     {

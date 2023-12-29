@@ -40,7 +40,8 @@ int main(int argc, char const *argv[])
     {
         v_file_name = std::string(argv[3]);
     }
-    size_t N = file_operations::read_matrix_size(A_file_name);
+    auto NN = file_operations::read_matrix_size(A_file_name);
+    size_t N = NN.first;
     if(init_cuda(4) == 0)
     {
         return 0;

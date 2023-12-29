@@ -1,7 +1,7 @@
 #include <cmath>
 #include <iostream>
 #include <cstdio>
-
+#include <memory>
 #include <utils/cuda_support.h>
 #include <utils/log.h>
 #include <external_libraries/cublas_wrap.h>
@@ -14,7 +14,7 @@
 #include <nonlinear_operators/circle/system_operator.h>
 //problem dependant ends
 #include <numerical_algos/lin_solvers/default_monitor.h>
-#include <numerical_algos/lin_solvers/cgs.h>
+#include <numerical_algos/lin_solvers/bicgstabl.h>
 
 //problem dependant
 #include <common/gpu_vector_operations.h>
@@ -22,6 +22,7 @@
 //problem dependant ends
 
 #include <main/deflation_continuation.hpp>
+#include <main/parameters.hpp>
 
 
 #ifndef Blocks_x_
@@ -31,17 +32,9 @@
 int main(int argc, char const *argv[])
 {
     
-    if(argc!=3)
-    {
-        printf("Usage: %s dS S\n  dS - continuation step\n   S - number of continuation steps\n",argv[0]);
-        return 0;
-    }
     typedef SCALAR_TYPE real;
 
     size_t Nx = 1; //size of the vector variable. 1 in this case
-    real dS = atof(argv[1]);
-    unsigned int S = atoi(argv[2]);
-
     
     typedef utils::log_std log_t;
     typedef gpu_vector_operations<real> vec_ops_real;
@@ -61,57 +54,39 @@ int main(int argc, char const *argv[])
         vec_ops_real, circle_t, lin_op_t> prec_t;
 
 
+    typedef main_classes::parameters<real> parameters_t;
+    parameters_t parameters = main_classes::read_parameters_json<real>("json_project_files/circle_test.json");
+    parameters.plot_all();
 
-    init_cuda(1); // )(PCI) where PCI is the GPU PCI ID
+    Nx = parameters.nonlinear_operator.N_size.at(0)==1?Nx:(throw std::runtime_error("incorrect size for problem in config file provided. Expecting 1."));
+
+
+    unsigned int m_Krylov = parameters.stability_continuation.Krylov_subspace;
+    int nvidia_pci_id = parameters.nvidia_pci_id;
+    bool use_high_precision_reduction = parameters.use_high_precision_reduction;
+
+    init_cuda(nvidia_pci_id);
     real norm_wight = std::sqrt(real(Nx));
     real Rad = 1.0;
 
-    //linsolver control
-    unsigned int lin_solver_max_it = 1500;
-    unsigned int use_precond_resid = 1;
-    unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 1;
-    real lin_solver_tol = 5.0e-3; //relative tolerance wrt rhs vector. For Krylov-Newton method can be set low
-    
-    //newton control
-    unsigned int newton_def_max_it = 350;
-    unsigned int newton_def_cont_it = 100;
-    real newton_def_tol = 1.0e-9;
-    real newton_cont_tol = 1.0e-9;
-    real newton_interp_tol = 1.0e-9;
-
-
-    cublas_wrap *CUBLAS = new cublas_wrap();
-    CUBLAS->set_pointer_location_device(false);
-    vec_ops_real vec_ops_R(Nx, CUBLAS);
+    auto CUBLAS = std::make_shared<cublas_wrap>();
+    vec_ops_real vec_ops_R(Nx, CUBLAS.get() );
     files_ops_t file_ops( (vec_ops_real*) &vec_ops_R);
 
     circle_t CIRCLE(Rad, Nx, (vec_ops_real*) &vec_ops_R);
     log_t log;
-
+    log_t log_linsolver;
+    log_linsolver.set_verbosity(1);
     
     
     //test continuaiton process of a single curve
-    typedef main_classes::deflation_continuation<vec_ops_real, files_ops_t, log_t, monitor_t, circle_t, lin_op_t, prec_t, numerical_algos::lin_solvers::cgs, nonlinear_operators::system_operator> deflation_continuation_t;
+    typedef main_classes::deflation_continuation<vec_ops_real, files_ops_t, log_t, monitor_t, circle_t, lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator, parameters_t> deflation_continuation_t;
 
-    deflation_continuation_t DC((vec_ops_real*) &vec_ops_R, (files_ops_t*) &file_ops, (log_t*) &log, (circle_t*) &CIRCLE );
+    deflation_continuation_t DC((vec_ops_real*) &vec_ops_R, (files_ops_t*) &file_ops, (log_t*) &log, (log_t*) &log_linsolver, (circle_t*) &CIRCLE, (parameters_t*) &parameters);
 
-    DC.set_linsolver(lin_solver_tol, lin_solver_max_it);
-    DC.set_extended_linsolver(lin_solver_tol, lin_solver_max_it);
-    DC.set_newton(newton_cont_tol, newton_def_cont_it, real(1.0), true);
-    DC.set_steps(S, dS);
-    
-    DC.set_deflation_knots({-1.01, -0.98, -0.95, -0.9, -0.5, -0.1, 0.1, 0.5, 0.95, 0.98, 1.01});
+    DC.set_parameters();
 
     DC.execute();
-
-
-    //setup container of curves
-//    knots_t deflation_knots;
-//    curve_storage_t* curve_storage = new curve_storage_t(vec_ops_R, log, newton, CIRCLE, &deflation_knots);
-
-  
-//    delete curve_storage;
 
 
     return 0;

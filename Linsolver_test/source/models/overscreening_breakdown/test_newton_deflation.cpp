@@ -65,9 +65,9 @@ int main(int argc, char const *argv[])
     T lin_solver_tol = 1.0e-10;
     unsigned int newton_def_max_it = 50;
     unsigned int lin_solver_max_it = 5;
-    unsigned int deflation_attempts = 10;
+    unsigned int deflation_attempts = 1;
     T newton_def_tol = 1.0e-7;
-    T Power = 4.0;
+    T Power = 1.0;
     T newton_wight = 1.0;
     T norm_wight = 1.0;// sqrt(N);
 
@@ -125,12 +125,27 @@ int main(int argc, char const *argv[])
     for(auto &x: sol_storage_def)
     {        
         std::stringstream f_name;
-        f_name << "solution_" << p << "_for_" << params.N << "_L" << params.L << "_mu" << mu << ".dat";
+        f_name << "solution_basis_" << p << "_for_" << params.N << "_L" << params.L << "_mu" << mu << ".dat";
         ob_prob.write_solution_basis(f_name.str(), (T_vec&)x);
+        f_name.str("");
+        f_name.clear();
+        f_name << "solution_domain_" << p << "_for_" << params.N << "_L" << params.L << "_mu" << mu << ".dat";
+        ob_prob.write_solution_domain(f_name.str(), (T_vec&)x);
+        f_name.str("");
+        f_name.clear();
+        f_name << "rhs_basis_" << p << "_for_" << params.N << "_L" << params.L << "_mu" << mu << ".dat";
+        ob_prob.write_rhs_solution_basis(f_name.str(), (T_vec&)x); 
+        f_name.str("");
+        f_name.clear();
+        f_name << "rhs_domain_" << p << "_for_" << params.N << "_L" << params.L << "_mu" << mu << ".dat";
+        ob_prob.write_rhs_solution_domain(f_name.str(), (T_vec&)x);        
+
         log.info_f("solution %i, norm = %le", p, static_cast<double>(vec_ops.norm( (T_vec&) x)) );
         p++;
     }
     
+    ob_prob.write_rhs_domain_integral_from_0((T_vec&)sol_storage_def[0], {0.1, 1.0, 10.0, 100.0});
+
 
 //*/
 

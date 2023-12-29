@@ -125,9 +125,9 @@ public:
         kern_->apply_jacobi_matrix(x, f);
     }
 
-    void exact_solution(const T lambda, T_vec& x_deflation)
+    void exact_solution(const T lambda, T_vec& u_out)
     {
-        //we don't have any
+        kern_->exact_solution(u_out);
     }
     void project(T_vec& u_)
     {
@@ -185,6 +185,11 @@ public:
     {
         kern_->get_solution_at_basis_points(u_in, u_out);
     }
+    void rhs_physical_solution(const T_vec& u_in, T_vec& rhs_out) 
+    {
+        kern_->get_right_hand_side(u_in, rhs_out);
+    }
+
 
     void write_solution_basis(const std::string& f_name, const T_vec& u_in) 
     {   
@@ -195,12 +200,26 @@ public:
         // file_ops_->write_vector(f_name, u_solution_);
 
     }
+    void write_rhs_solution_basis(const std::string& f_name, const T_vec& u_in)
+    {
+        kern_->fill_points_at_basis(x_points_);
+        rhs_physical_solution(u_in, u_solution_);
+        file_ops_->write_2_vectors_by_side(f_name, x_points_, u_solution_);        
+    }
     void write_solution_domain(const std::string& f_name, const T_vec& u_in) 
     {   
         kern_->fill_points_at_domain(x_points_);
         physical_solution(u_in, u_solution_);
         file_ops_->write_2_vectors_by_side(f_name, x_points_, u_solution_);
     }
+    void write_rhs_solution_domain(const std::string& f_name, const T_vec& u_in)
+    {
+        kern_->fill_points_at_domain(x_points_);
+        rhs_physical_solution(u_in, u_solution_);
+        file_ops_->write_2_vectors_by_side(f_name, x_points_, u_solution_);
+    }
+
+
 
     void randomize_vector(T_vec& u_out, int steps_p = -1)
     {
@@ -211,6 +230,18 @@ public:
         }
         // std::cout << "steps = " << steps << std::endl;
         kern_->set_random_smoothed_data(u_out, steps);
+    }
+
+
+    T rhs_integral_from_0_to_infty(const T_vec& vec)
+    {
+
+    }
+
+    void write_rhs_domain_integral_from_0(const T_vec& vec, const std::vector<T>& points_at_domain)const
+    {
+        kern_->integrate_rhs(vec);
+        
     }
     
 

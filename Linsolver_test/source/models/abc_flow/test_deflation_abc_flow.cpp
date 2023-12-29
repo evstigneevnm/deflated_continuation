@@ -133,15 +133,18 @@ int main(int argc, char const *argv[])
   
     deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops, log, newton_def, 5);
 
-    ABC->exact_solution(Rey, x0);
-    sol_storage_def->set_known_solution(x0);
+    // ABC->exact_solution(Rey, x0);
+    // sol_storage_def->set_known_solution(x0);
+    sol_storage_def->set_ignore_zero();
+
+    // ABC->write_solution_vec("vec_initial.pos", (vec&)x0);
+    // ABC->write_solution_abs("abs_initial.pos", (vec&)x0);
 
     deflation_op->execute_all(Rey, ABC, sol_storage_def);
     //deflation_op->find_add_solution(Rey, ABC, sol_storage_def);
     
 
-    ABC->write_solution_vec("vec_initial.pos", (vec&)x0);
-    ABC->write_solution_abs("abs_initial.pos", (vec&)x0);
+
 
     unsigned int p=0;
     for(auto &x: *sol_storage_def)

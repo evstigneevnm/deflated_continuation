@@ -137,8 +137,7 @@ struct overscreening_breakdown_problem
                 return 0;
                 break;              
         }
-
-
+        return 0;
     }
 
     void rotate_initial_function()
@@ -155,6 +154,15 @@ struct overscreening_breakdown_problem
             return u0*exp(-x*x);
         else
             return (u0/(x*x+1.0));
+    }
+
+    __DEVICE_TAG__ inline T exact_solution_uxx(T x)
+    {
+        T th = sinh(0.25*u0)/cosh(0.25*u0);
+        T thexp = th*exp(-x);
+        T num = 1+thexp;
+        T din = 1-thexp;
+        return 2*log(num/din);
     }
 
     __DEVICE_TAG__ inline T point_in_basis(size_t j)
@@ -191,6 +199,53 @@ struct overscreening_breakdown_problem
         T y = 1/x;
         T ret = 2*atan(sqrt(L*y));
         return ret;
+    }
+    __DEVICE_TAG__ inline T from_basis_to_domain_differential(T t)
+    {
+        //-L Cot[x/2] Csc[x/2]^2=-L Cos[x/2]/(Sin[x/2]^3)
+        T ss = sin(0.5*t);
+        T cs = cos(0.5*t);
+        T ss3 = ss*ss*ss;
+        if(ss3 == 0)
+        {
+            return compute_infinity<T>();
+        }
+        return -L*cs/ss3;
+    }
+    __DEVICE_TAG__ inline T* quadrature_points(T x_max, T x_min)
+    {
+        auto x_len = 0.5*(x_max-x_min);
+        auto x_mid = 0.5*(x_max+x_min);
+        
+        T absc[5];
+        T ss1 = sqrt(static_cast<T>(10.0)/static_cast<T>(7.0));
+
+        absc[0] = -1.0/3.0*sqrt(5.0+2.0*ss1);
+        absc[1] = -1.0/3.0*sqrt(5.0-2.0*ss1);
+        absc[2] = 0;
+        absc[3] = 1.0/3.0*sqrt(5.0-2.0*ss1);
+        absc[4] = 1.0/3.0*sqrt(5.0+2.0*ss1);
+
+
+        T points[5];
+        #pragma unroll
+        for(char jj=0;jj<5;++jj)
+        {
+            points[jj] = x_len*absc[jj]+x_mid;
+        }
+        return points;
+    }
+    __DEVICE_TAG__ inline T* quadrature_wights()
+    {
+        T wights[5];
+        T sqrt70 = static_cast<T>(70.0);
+        wights[0] = (322.0-13.0*sqrt70)/900.0;
+        wights[1] = (322.0+13.0*sqrt70)/900.0;
+        wights[2] = 128.0/255.0;
+        wights[3] = (322.0+13.0*sqrt70)/900.0;
+        wights[4] = (322.0-13.0*sqrt70)/900.0;
+        return wights;
+        
     }
     __DEVICE_TAG__ inline T psi(int n, T t)
     {
