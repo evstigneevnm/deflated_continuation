@@ -26,7 +26,7 @@ class glued_poincare_map_linear_operator
     struct external_management
     {
 
-        external_management(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p, SingleStepperCustom* stepper_p, Log* log_p, std::pair<T,size_t> bisection_params_p = {1.0e-12, 100}):
+        external_management(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p, SingleStepperCustom* stepper_p, Log* log_p, std::pair<T,size_t> bisection_params_p = {1.0e-11, 200}):
         periodic_time_(0.0),
         vec_ops_(vec_ops_p), 
         nonlin_op_(nonlin_op_p), 
@@ -142,7 +142,7 @@ class glued_poincare_map_linear_operator
             }  
             else
             {
-                log_->warning_f("glued_poincare_map_linear_operator::external_management: failed to obtain intersection on %i iteration with error %.2le using timestep %.2le",  iters, error, dt_mod);
+                log_->warning_f("glued_poincare_map_linear_operator::external_management: failed to obtain intersection with tolerance %.2le on %i iteration with error %.2le using timestep %.2le",  bisection_tolerance_, iters, error, dt_mod);
             }      
             return ret_flag;
         }        

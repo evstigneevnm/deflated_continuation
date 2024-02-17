@@ -99,6 +99,7 @@ public:
             nonlin_op_->norm_bifurcation_diagram(v_in, bif_norms_at_t_);
             bif_norms_at_t_.push_back(dt);
             solution_norms.push_back(bif_norms_at_t_);
+            bif_priv = bif_norms_at_t_.at(2);
         }
 
         while(!finish && !finish_management)

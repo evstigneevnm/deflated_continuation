@@ -141,8 +141,8 @@ int main(int argc, char const *argv[])
     }
 
 
-    single_step_const_t explicit_step_const(&vec_ops, &vdp, &time_step_const, &log, mu, method);
-    single_step_err_ctrl_t explicit_step_err_control(&vec_ops, &vdp, &time_step_err_ctrl, &log, mu, method);
+    single_step_const_t explicit_step_const(&vec_ops, &time_step_const, &log, &vdp, mu, method);
+    single_step_err_ctrl_t explicit_step_err_control(&vec_ops, &time_step_err_ctrl, &log, &vdp,  mu, method);
     
     time_stepper_const_t time_stepper_const(&vec_ops, &vdp, &explicit_step_const, &log);
     time_stepper_err_ctrl_t time_stepper_err_ctrl(&vec_ops, &vdp, &explicit_step_err_control, &log);

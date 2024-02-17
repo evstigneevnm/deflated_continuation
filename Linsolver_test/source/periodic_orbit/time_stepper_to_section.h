@@ -20,7 +20,7 @@ private:
         using T = typename VectorOperations::scalar_type;
         using T_vec = typename VectorOperations::vector_type;   
 
-        external_management(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p, SingleStepper* stepper_p, Log* log_p, std::pair<T,size_t> bisection_params_p = {1.0e-12, 100}):
+        external_management(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p, SingleStepper* stepper_p, Log* log_p, std::pair<T,size_t> bisection_params_p = {1.0e-12, 200}):
         periodic_time_(0.0),
         time_b4_section_check_(0.0),
         vec_ops_(vec_ops_p), 
@@ -133,6 +133,8 @@ private:
             T error = 1.0;
             T distance = 1.0;
             size_t iters = 0;
+            T size_l2_correction = vec_ops_->get_l2_size();
+
             while((std::abs(error) > bisection_tolerance_)&&(iters < bisection_iters_))
             {
                 std::tie(error, distance) = hyperplane_->intersection(v_in, v_out);
@@ -146,9 +148,14 @@ private:
                 ret_flag = true;
                 log_->info_f("time_stepper_to_section::external_management: intersection tolerance %.2le on %i iteration with error %.2le using timestep %.2le", bisection_tolerance_, iters, error, dt_mod);
             }  
+            else if(std::abs(error) <= bisection_tolerance_*size_l2_correction)
+            {
+                ret_flag = true;
+                log_->warning_f("time_stepper_to_section::external_management: intersection ACCEPTED RELAXED tolerance %.2le on %i iteration with error %.2le using timestep %.2le", bisection_tolerance_*size_l2_correction, iters, error, dt_mod);                
+            }
             else
             {
-                log_->warning_f("time_stepper_to_section::external_management: failed to obtain intersection on %i iteration with error %.2le using timestep %.2le",  iters, error, dt_mod);
+                log_->warning_f("time_stepper_to_section::external_management: failed to obtain intersection tolerance %.2le on %i iteration with error %.2le using timestep %.2le",  bisection_tolerance_, iters, error, dt_mod);
             }      
             return ret_flag;
         }        

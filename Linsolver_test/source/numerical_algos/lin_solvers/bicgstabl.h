@@ -42,8 +42,7 @@ using numerical_algos::detail::vectors_arr_wrap_static;
 
 template<class LinearOperator,class Preconditioner,
      class VectorOperations,class Monitor,class Log>
-class bicgstabl : public iter_solver_base<LinearOperator,Preconditioner,
-                                          VectorOperations,Monitor,Log>
+class bicgstabl : public iter_solver_base<LinearOperator, Preconditioner, VectorOperations, Monitor, Log>
 {
 public:
     typedef typename VectorOperations::scalar_type  scalar_type;
@@ -57,9 +56,12 @@ public:
 private:
     static const int                                            max_basis_sz_ = SCFD_BICGSTABL_MAX_BASIS_SIZE;
     typedef scalar_type                                         T;
-    typedef utils::logged_obj_base<Log>                         logged_obj_t;
+    // typedef utils::logged_obj_base<Log>                         logged_obj_t;
+
     typedef iter_solver_base<LinearOperator,Preconditioner,
                              VectorOperations,Monitor,Log>      parent_t;
+    using logged_obj_t = typename parent_t::logged_obj_t;
+    using logged_obj_params_t = typename parent_t::logged_obj_params_t;    
     typedef vectors_arr_wrap_static<VectorOperations, 1>        buf_t;
     typedef typename buf_t::vectors_arr_use_wrap_type           buf_use_wrap_t;
     typedef vectors_arr_wrap_static<VectorOperations,

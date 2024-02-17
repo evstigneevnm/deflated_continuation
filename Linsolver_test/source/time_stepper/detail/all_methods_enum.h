@@ -15,10 +15,20 @@ enum methods {
     RK33SSP, 
     RK43SSP,
     RKDP45,
-    RK64SSP};
+    RK64SSP,
+    IMEX_EULER,
+    IMEX_TR2,
+    IMEX_ARS3,
+    IMEX_AS2,
+    IMEX_KOTO2,
+    IMEX_SSP222,
+    IMEX_SSP322,
+    IMEX_SSP332,
+    IMEX_SSP333,
+    IMEX_SSP433};
 }
 
-std::vector<std::string> methods_str{"EXPLICIT_EULER", "HEUN_EULER", "RK33SSP", "RK43SSP", "RKDP45", "RK64SSP"};
+std::vector<std::string> methods_str{"EXPLICIT_EULER", "HEUN_EULER", "RK33SSP", "RK43SSP", "RKDP45", "RK64SSP", "IMEX_EULER", "IMEX_TR2", "IMEX_ARS3", "IMEX_AS2", "IMEX_KOTO2", "IMEX_SSP222", "IMEX_SSP322", "IMEX_SSP332", "IMEX_SSP333", "IMEX_SSP433"};
 }
 
 #endif

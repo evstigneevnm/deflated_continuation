@@ -4,6 +4,7 @@
 #include <vector>
 #include <stdexcept>
 #include <limits>
+#include <utility>
 #include <time_stepper/detail/all_methods_enum.h>
 
 
@@ -200,6 +201,24 @@ private:
 
 };
 
+// first explicit, then implicit
+struct composite_tableu: public tableu
+{
+    
+    composite_tableu():tableu(){}
+    composite_tableu(const methods&& method_p, const tableu::mat_t&& A_e, const tableu::mat_t&& A_i, const tableu::vec_t&& b_e, const tableu::vec_t&& b_i, const tableu::vec_t&& c_e = {}, const tableu::vec_t&& c_i = {}, const tableu::vec_t&& b_hat_p_e = {}, const tableu::vec_t&& b_hat_p_i = {}):
+    E{std::move(method_p), std::move(A_e), std::move(b_e), std::move(c_e), std::move(b_hat_p_e)},
+    I{std::move(method_p), std::move(A_i), std::move(b_i), std::move(c_i), std::move(b_hat_p_i)}
+    {
+
+    }
+
+    tableu E, I;
+
+
+};
+
+
 struct butcher_tables
 {
 
@@ -243,6 +262,33 @@ struct butcher_tables
 
 };
 
+
+struct composite_butcher_tables
+{
+
+    std::pair<tableu, tableu> set_table(const methods& method_p) const
+    {
+        switch(method_p)
+        {
+            case IMEX_EULER:
+                {
+                    auto ct = composite_tableu(IMEX_EULER, {{0,0},{1,0}}, {{0,0},{0,1}}, {1, 0},{0, 1},{0, 1},{0, 1});
+                    return std::pair<tableu,tableu>( std::move(ct.E), std::move(ct.I)); 
+                }
+                break;  
+            case IMEX_TR2:
+                {
+                    auto ct = composite_tableu(IMEX_TR2, {{0,0},{1,0}}, {{0,0},{1.0/2.0,1.0/2.0}}, {1.0/2.0, 1.0/2.0},{1.0/2.0, 1.0/2.0},{0, 1},{0, 1});
+                    return std::pair<tableu,tableu>( std::move(ct.E), std::move(ct.I)); 
+                }
+                break;                 
+            default:
+                  throw std::logic_error("composite_butcher_tables: unsupported table enum provided.");                      
+        }        
+
+
+    }
+};
 
 
 }

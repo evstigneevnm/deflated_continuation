@@ -14,50 +14,40 @@
 // You should have received a copy of the GNU General Public License
 // along with SimpleCFD.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef __SCFD_MONITOR_CALL_WRAP_H__
-#define __SCFD_MONITOR_CALL_WRAP_H__
+#ifndef __SCFD_DEFAULT_PREC_CREATOR_H__
+#define __SCFD_DEFAULT_PREC_CREATOR_H__
 
-#include <cassert>
+#include "../preconditioners/dummy.h"
 
 namespace numerical_algos
 {
 namespace lin_solvers 
 {
+
 namespace detail
 {
 
-template<class VectorOperations, class Monitor>
-struct monitor_call_wrap
+template<class VectorOperations,class LinearOperator,class Preconditioner>
+struct default_prec_creator
 {
-    typedef VectorOperations                        vector_operations_type;
-    typedef typename VectorOperations::vector_type  vector_type;
-
-    Monitor                 &monitor_;
-    bool                    is_started_;
-
-    monitor_call_wrap(Monitor &monitor) : 
-        monitor_(monitor), is_started_(false) {}
-
-    void start(const vector_type& rhs)
+    static std::shared_ptr<Preconditioner> get(std::shared_ptr<VectorOperations>)
     {
-        assert(!is_started_);
-        monitor_.start(rhs);
-        is_started_ = true;
+        return nullptr;
     }
-    void stop()
-    {
-        assert(is_started_);
-        is_started_ = false;
-        monitor_.stop();
-    }
+};
 
-    ~monitor_call_wrap()
+template<class VectorOperations,class LinearOperator>
+struct default_prec_creator<VectorOperations,LinearOperator,preconditioners::dummy<VectorOperations,LinearOperator>>
+{
+    static std::shared_ptr<preconditioners::dummy<VectorOperations,LinearOperator>> 
+    get(std::shared_ptr<VectorOperations> vec_ops_)
     {
-        if (is_started_) stop();
+        return std::make_shared<preconditioners::dummy<VectorOperations,LinearOperator>>(std::move(vec_ops_));
     }
 };
 
 }
+
 }
 }
 

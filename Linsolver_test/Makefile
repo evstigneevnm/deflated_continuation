@@ -31,13 +31,13 @@ LCUDA = -L$(CUDA_ROOT_PATH)/lib64
 LBOOST = -L$(BOOST_ROOT_PATH)/lib
 LIBS1 = -lcublas -lcurand 
 LIBS2 = -lcufft $(LIBS1)
-LIBS3 = -lcusolver $(LIBS1)
+LIBS3 = -lcusolver $(LIBS2)
 LIBSAll = -lcublas -lcurand -lcufft -lcusolver
 LIBBOOST = -lboost_serialization
 LLAPACK = -L$(OPENBLAS_ROOT_PATH)/lib -lopenblas
 
 #component tests
-test_cpu_vector_operations.bin:
+test_cpu_vector_operations.bin: test_cpu_vector_operations.cpp
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_cpu_vector_operations.cpp $(OPENMP) -o test_cpu_vector_operations.bin 2>results.make
 
 test_cpu_glued_vector_operations.bin:
@@ -184,6 +184,13 @@ KF3D_1_bd: source/models/KF_3D/KF3D_1_bd.cpp
 
 test_Kolmogorov_3D_continuation_file: source/models/KF_3D/test_Kolmogorov_3D_continuation_file.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/test_Kolmogorov_3D_continuation_file.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o O/gpu_reduction_ogita_kernels.o $(LIBS2) -o test_Kolmogorov_3D_continuation_file.bin 2>results.make	
+
+Kolmogorov_3D_time_stepping: source/models/KF_3D/Kolmogorov_3D_continuation_time_stepping.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/Kolmogorov_3D_continuation_time_stepping.cpp O/Kolmogorov_3D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o Kolmogorov_3D_time_stepping.bin 2>results.make
+
+Kolmogorov_3D_perodic_orbit_stabilization: source/models/KF_3D/Kolmogorov_3D_perioidc_orbit_stabilization.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/Kolmogorov_3D_perioidc_orbit_stabilization.cpp O/Kolmogorov_3D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LIBS3) $(LLAPACK) -o Kolmogorov_3D_perodic_orbit_stabilization.bin 2>results.make
+
 
 # abc_flow
 abc_flow_ker: source/nonlinear_operators/abc_flow/abc_flow_ker.cu

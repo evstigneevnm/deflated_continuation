@@ -51,7 +51,9 @@
 #include <common/vector_wrap.h>
 #include <common/vector_pool.h>
 
-
+#include <tuple>
+#include <limits>
+#include <utility>
 
 namespace nonlinear_operators
 {
@@ -172,6 +174,8 @@ private:
     T Ly;
     T Lz;    
 
+    T homotopy_;
+
 public:
     Kolmogorov_3D(T alpha_, size_t Nx_, size_t Ny_, size_t Nz_,
         vec_R_t* vec_ops_R_, 
@@ -181,11 +185,12 @@ public:
     Nx(Nx_), Ny(Ny_), Nz(Nz_), 
     vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), vec_ops(vec_ops_),
     FFT(FFT_), 
-    alpha(alpha_)
+    alpha(alpha_),
+    homotopy_(0.0)
     {
         n_y_force = 1;
-        n_z_force = 1;
-        scale_force = T(1.0);
+        n_z_force = 0;
+        scale_force = T(0.1);
 
         Mz=FFT->get_reduced_size();
         common_constructor_operation();
@@ -195,6 +200,22 @@ public:
         Ly = T(2.0)*M_PI;
         Lz = T(2.0)*M_PI;
         plot = new plot_t(vec_ops_R_, Nx_, Ny_, Nz_, Lx, Ly, Lz);
+
+        std::cout << "Kolmogorov 3D===> nonlinear problem class self-testing:" << std::endl;
+        for(unsigned int j=0;j<1;j++)
+        {   
+            auto manufactured_norm = manufactured_solution(j);
+            std::cout << "Kolmogorov 3D===> manufactured solution number: " << j <<  ", solution norm = "<< std::scientific << manufactured_norm.first << ", residual norm = " << manufactured_norm.second << std::endl;
+            if( !std::isfinite(manufactured_norm.second) ||(manufactured_norm.second > std::numeric_limits<T>::epsilon()*1000.0 ))
+            {
+                throw std::runtime_error("manufactures solution number: " + std::to_string(j) + " returned bad residual norm!" );
+            }
+            else
+            {
+                std::cout << "Kolmogorov 3D===> OK" << std::endl;
+            }
+        }
+
     }
 
 
@@ -205,6 +226,17 @@ public:
         delete plot;
     }
 
+    // homotopy value
+    void set_homotopy_value(const T homotopy)
+    {
+        homotopy_ = homotopy;
+    }
+
+    void F(const T time_p, const T_vec& u, const T Reynolds_, T_vec& v)
+    {
+        //for general call to the time stepper.
+        F(u, Reynolds_, v);
+    }    
     //   F(u,alpha)=v
     void F(const T_vec& u, const T Reynolds_, T_vec& v)
     {
@@ -230,10 +262,70 @@ public:
         project(W); // W:=P[W]
         kern->negate3(W.x, W.y, W.z); //W:=-W;
         // U := \nabla^2 U
-        kern->apply_Laplace(TR(1.0/Reynolds_), Laplace, U.x, U.y, U.z);
+        if(homotopy_ > 0.0)
+        {
+            auto homotopy_4 = homotopy_*homotopy_*homotopy_*homotopy_;
+            kern->apply_Laplace_Biharmonic(TR(1.0/Reynolds_), Laplace, homotopy_4, Biharmonic, U.x, U.y, U.z);
+        }
+        else
+        {   
+             kern->apply_Laplace(TR(1.0/Reynolds_), Laplace, U.x, U.y, U.z);
+        }
         // W := W + U
         kern->add_mul3(TC(1.0,0), U.x, U.y, U.z, W.x, W.y, W.z);   
         
+    }
+
+
+    void F_nonstiff(BC_vec& U, const T Reynolds_, BC_vec& W)
+    {
+        project(U);
+        // vec_ops_C->assign_scalar(0.0,W.x);
+        // vec_ops_C->assign_scalar(0.0,W.y);
+        // vec_ops_C->assign_scalar(0.0,W.z);
+        B_V_nabla_F(U, U, W); //W:= (U, nabla) U
+        kern->add_mul3(TC(-1.0,0), force.x, force.y, force.z, W.x, W.y, W.z); // force:= W-force
+        project(W); // W:=P[W]
+        kern->negate3(W.x, W.y, W.z); //W:=-W;       
+    }
+
+
+    void F_nonstiff(const T_vec& u, const T Reynolds_, T_vec& v)
+    {
+        BC_vec* U = pool_BC.take(); //input
+        BC_vec* W = pool_BC.take(); //output        
+
+        V2C(u, *U);
+        F_nonstiff(*U, Reynolds_, *W); 
+        C2V(*W, v);
+
+        pool_BC.release(U);
+        pool_BC.release(W);
+    }
+
+    // inplace!!!
+    void F_stiff(BC_vec& U, const T Reynolds_)
+    {
+        
+        if(homotopy_ > 0.0)
+        {
+            auto homotopy_4 = homotopy_*homotopy_*homotopy_*homotopy_;
+            kern->apply_Laplace_Biharmonic(TR(1.0/Reynolds_), Laplace, homotopy_4, Biharmonic, U.x, U.y, U.z);
+        }
+        else
+        {   
+             kern->apply_Laplace(TR(1.0/Reynolds_), Laplace, U.x, U.y, U.z);
+        }
+    }
+    void F_stiff(const T_vec& u, const T Reynolds_, T_vec& v)
+    {
+        BC_vec* U = pool_BC.take(); //input
+
+        V2C(u, *U);
+        F_stiff(*U, Reynolds_, *W); 
+        C2V(*W, v);
+
+        pool_BC.release(U);   
     }
 
     //sets (u_0, alpha_0) for jacobian linearization
@@ -267,7 +359,15 @@ public:
         // vec_ops_C->assign_scalar(0.0,dV.x);
         // vec_ops_C->assign_scalar(0.0,dV.y);
         // vec_ops_C->assign_scalar(0.0,dV.z);
-        kern->apply_Laplace(TR(1.0/Reynolds_0), Laplace, dU.x, dU.y, dU.z); // dU:=nu*\nabla^2 dU
+        if(homotopy_ > 0.0)
+        {
+            auto homotopy_4 = homotopy_*homotopy_*homotopy_*homotopy_;
+            kern->apply_Laplace_Biharmonic(TR(1.0/Reynolds_0), Laplace, homotopy_4, Biharmonic, dU.x, dU.y, dU.z);
+        }
+        else
+        {        
+            kern->apply_Laplace(TR(1.0/Reynolds_0), Laplace, dU.x, dU.y, dU.z); // dU:=nu*\nabla^2 dU
+        }
         kern->add_mul3(TC(1.0,0), dU.x, dU.y, dU.z, dV.x, dV.y, dV.z); // dV:=dU+dV
  
         pool_BC.release(dW); 
@@ -331,10 +431,16 @@ public:
     //preconditioner for the Jacobian dF/du
     void preconditioner_jacobian_u(BC_vec& dR)
     {
-        project(dR);
-        kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, Reynolds_0);
-
-
+        // project(dR);
+        if(homotopy_ > 0.0)
+        {
+            auto homotopy_4 = homotopy_*homotopy_*homotopy_*homotopy_;
+            kern->apply_iLaplace3_Biharmonic3(Laplace, Biharmonic, dR.x, dR.y, dR.z, Reynolds_0, homotopy_4);
+        }
+        else
+        {
+            kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, Reynolds_0);
+        }
         //project(dR);
     }
     void preconditioner_jacobian_u(T_vec& dr)
@@ -353,9 +459,9 @@ public:
     //preconditioner for the temporal Jacobian a*E + b*dF/du
     void preconditioner_jacobian_temporal_u(BC_vec& dR, T a, T b)
     {
-        project(dR);
+        // project(dR);
         kern->apply_iLaplace3_plus_E(Laplace, dR.x, dR.y, dR.z, Reynolds_0, a, b);
-        project(dR);
+        // project(dR);
 
     }
     void preconditioner_jacobian_temporal_u(T_vec& dr, T a, T b)
@@ -371,7 +477,7 @@ public:
 
     //funciton that returns std::vector with different bifurcatoin norms
 
-    void norm_bifurcation_diagram(const T_vec& u_in, std::vector<T>& res)
+    void norm_bifurcation_diagram(const T_vec& u_in, std::vector<T>& res, bool clear_vector = false)
     {
         R_vec* uR0 = pool_R.take();
 
@@ -384,14 +490,22 @@ public:
         T val3 = physical_host[I3(int(Nx/4.0), int(Ny/5.0), int(Nz/5.0))];
         T val4 = physical_host[I3(int(Nx/2.0)-1, int(Ny/2.0)-1, int(Nz/2)-1)];
         T val5 = vec_ops->norm_l2(u_in);
-        
-        res.clear();
-        res.reserve(5);
+        T val6 = norm(u_in);
+        T val7 = vec_ops_R->norm_l2(uR0->x);
+
+        if(clear_vector)
+        {
+            res.clear();
+            res.reserve(7);
+        }
         res.push_back(val1);
         res.push_back(val2);
         res.push_back(val3);
         res.push_back(val4);
         res.push_back(val5);
+        res.push_back(val6);
+        res.push_back(val7);
+
 
         pool_R.release(uR0);
     }
@@ -401,9 +515,9 @@ public:
     void exact_solution_sin_cos(const T& Reynolds, T_vec& u_out)
     {
         BC_vec* UA = pool_BC.take();
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), force.x, UA->x);
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), force.y, UA->y);
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds,0), force.z, UA->z);        
+        vec_ops_C->assign_mul(TC(Reynolds,0), force.x, UA->x);
+        vec_ops_C->assign_mul(TC(Reynolds,0), force.y, UA->y);
+        vec_ops_C->assign_mul(TC(Reynolds,0), force.z, UA->z);        
         C2V(*UA, u_out);
         pool_BC.release(UA);        
     }
@@ -411,9 +525,9 @@ public:
     {
         T n = T(n_y_force);
         BC_vec* UA = pool_BC.take();
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds/(n*n),0), force.x, UA->x);
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds/(n*n),0), force.y, UA->y);
-        vec_ops_C->assign_mul(TC(scale_force*Reynolds/(n*n),0), force.z, UA->z);        
+        vec_ops_C->assign_mul(TC(Reynolds/(n*n),0), force.x, UA->x);
+        vec_ops_C->assign_mul(TC(Reynolds/(n*n),0), force.y, UA->y);
+        vec_ops_C->assign_mul(TC(Reynolds/(n*n),0), force.z, UA->z);        
         C2V(*UA, u_out);
         pool_BC.release(UA);        
     }
@@ -629,7 +743,14 @@ public:
         pool_BC.release(UC0);          
     }
 
-
+    TR norm(const T_vec& u_in_)
+    {
+        BC_vec* UC1 = pool_BC.take();
+        V2C(u_in_, *UC1);  
+        auto norm_ = norm(*UC1);
+        pool_BC.release(UC1);
+        return norm_;
+    }
 
 
 private:
@@ -642,7 +763,7 @@ private:
     TC_vec grad_z = nullptr;
     //WARNING ENDS
     TC_vec Laplace = nullptr;
-
+    TC_vec Biharmonic = nullptr;
     //linearized solution point:
     BC_vec U_0;
     T Reynolds_0;
@@ -661,6 +782,29 @@ private:
     TC_vec mask23;
 
 
+    
+    //tests the method with the some pre-defined manufactured solutions
+    //a particular solution is selected by the prived number
+    //returns a residual norm
+    std::pair<T,T> manufactured_solution(unsigned int solution_number = 0)
+    {
+        T resid_norm = -1.0;
+        T solution_norm = 0.0;
+        if(solution_number == 0)
+        {
+            T Reynolds = 5.0;
+            T_vec u_manufactured, resid;
+            vec_ops->init_vectors(u_manufactured, resid); vec_ops->start_use_vectors(u_manufactured, resid); 
+            exact_solution(Reynolds, u_manufactured);
+            solution_norm = vec_ops->norm_l2(u_manufactured);
+            F(u_manufactured, Reynolds, resid);
+            resid_norm = vec_ops->norm_l2(resid)/solution_norm;
+            vec_ops->stop_use_vectors(u_manufactured, resid); vec_ops->free_vectors(u_manufactured, resid); 
+        }
+        return {solution_norm, resid_norm};
+    }
+
+
     void common_distructor_operations()
     {
         device_deallocate<TC>(grad_x);
@@ -668,6 +812,7 @@ private:
         device_deallocate<TC>(grad_z);
 
         vec_ops_C->stop_use_vector(Laplace);  vec_ops_C->free_vector(Laplace); 
+        vec_ops_C->stop_use_vector(Biharmonic);  vec_ops_C->free_vector(Biharmonic); 
         vec_ops_C->stop_use_vector(mask23);  vec_ops_C->free_vector(mask23);         
         force.free();
         forceABC.free();
@@ -691,6 +836,7 @@ private:
         grad_z = device_allocate<TC>(Mz);
 
         vec_ops_C->init_vector(Laplace);  vec_ops_C->start_use_vector(Laplace); 
+        vec_ops_C->init_vector(Biharmonic);  vec_ops_C->start_use_vector(Biharmonic); 
         vec_ops_C->init_vector(mask23);  vec_ops_C->start_use_vector(mask23);
         force.alloc(vec_ops_C);
         forceABC.alloc(vec_ops_C);
@@ -750,6 +896,7 @@ private:
     {
         set_gradient_coefficients_low_level();
         set_Laplace_coefficients();
+        set_Biharmonic_coefficients();
         set_force();
         kern->apply_mask(alpha, mask23);
     }
@@ -831,6 +978,11 @@ private:
     {
         kern->Laplace_Fourier(grad_x, grad_y, grad_z, Laplace);
     }
+
+    void set_Biharmonic_coefficients()
+    {
+        kern->Biharmonic_Fourier(grad_x, grad_y, grad_z, Biharmonic);
+    }
    
     void set_force()
     {
@@ -855,9 +1007,9 @@ private:
 
     TR norm(const BC_vec& U_in)
     {
-        T norm_x = vec_ops->norm_l2(U_in.x);
-        T norm_y = vec_ops->norm_l2(U_in.y);
-        T norm_z = vec_ops->norm_l2(U_in.z);
+        T norm_x = vec_ops_C->norm_l2(U_in.x);
+        T norm_y = vec_ops_C->norm_l2(U_in.y);
+        T norm_z = vec_ops_C->norm_l2(U_in.z);
         return(std::sqrt(norm_x*norm_x+norm_y*norm_y+norm_z*norm_z));
     }
 

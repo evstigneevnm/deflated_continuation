@@ -179,8 +179,8 @@ int main(int argc, char const *argv[])
     }
     auto mu = rossler.get_selected_parameter_value();
 
-    single_step_const_t explicit_step_const(&vec_ops, &rossler, &time_step_const, &log, mu, method);
-    single_step_err_ctrl_t explicit_step_err_control(&vec_ops, &rossler, &time_step_err_ctrl, &log, mu, method);
+    single_step_const_t explicit_step_const(&vec_ops, &time_step_const, &log, &rossler, mu, method);
+    single_step_err_ctrl_t explicit_step_err_control(&vec_ops, &time_step_err_ctrl, &log, &rossler, mu, method);
     
     time_stepper_const_t time_stepper_const(&vec_ops, &rossler, &explicit_step_const, &log);
     time_stepper_err_ctrl_t time_stepper_err_ctrl(&vec_ops, &rossler, &explicit_step_err_control, &log);

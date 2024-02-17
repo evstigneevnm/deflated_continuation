@@ -31,6 +31,8 @@ struct Kolmogorov_3D_ker
     }
 
     void Laplace_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace);
+    
+    void Biharmonic_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Biharmonic);
 
     void force_Fourier_sin(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z);    
 
@@ -48,9 +50,13 @@ struct Kolmogorov_3D_ker
     
     void apply_Laplace(TR coeff, TC_vec Laplace, TC_vec ux, TC_vec uy, TC_vec uz);
 
+    void apply_Laplace_Biharmonic(TR coeff, TC_vec Laplace, TR coeff_bihrmonic, TC_vec Biharmonic, TC_vec ux, TC_vec uy, TC_vec uz);    
+
     void apply_iLaplace(TC_vec Laplace, TC_vec v, TR coeff = TR(1.0));
 
     void apply_iLaplace3(TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff = TR(1.0));
+
+    void apply_iLaplace3_Biharmonic3(TC_vec Laplace, TC_vec Biharmonic,  TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR coeff_bihrmonic);
 
     void apply_projection(TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec Laplace,  TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v_x, TC_vec v_y, TC_vec v_z);
 

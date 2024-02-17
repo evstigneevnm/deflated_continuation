@@ -40,6 +40,43 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::Laplace_Fou
 }
 
 
+template<typename TC, typename TC_vec>
+__global__ void Biharmonic_Fourier_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Biharmonic)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+    TC x2 = grad_x[j]*grad_x[j];
+    TC y2 = grad_y[k]*grad_y[k];
+    TC z2 = grad_z[l]*grad_z[l];
+
+    TC x4 = x2*x2;
+    TC y4 = y2*y2;
+    TC z4 = z2*z2;    
+
+    Biharmonic[I3(j,k,l)] = -TC(x4.real() + y4.real() + z4.real() + 2.0*(x2.real()*y2.real()+y2.real()*z2.real()+x2.real()*z2.real()), 0.0);
+
+    Biharmonic[0] = TC(1.0,0.0);
+
+}
+}
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::Biharmonic_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Biharmonic)
+{
+    Biharmonic_Fourier_kernel<TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, grad_x, grad_y, grad_z, Biharmonic);
+}
+
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
 __global__ void apply_Laplace_kernel(size_t Nx, size_t Ny, size_t Nz, T coeff, TC_vec Laplace, TC_vec ux, TC_vec uy, TC_vec uz)
@@ -76,6 +113,40 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_Lapla
 }
 
 
+
+template<typename T, typename T_vec, typename TC, typename TC_vec>
+__global__ void apply_Laplace_Biharmonic_kernel(size_t Nx, size_t Ny, size_t Nz, T coeff, TC_vec Laplace, T coeff_bihrmonic, TC_vec Biharmonic, TC_vec ux, TC_vec uy, TC_vec uz)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+    TC mult = TC(Laplace[I3(j,k,l)].real()*coeff + Biharmonic[I3(j,k,l)].real()*coeff_bihrmonic ,0);
+    ux[I3(j,k,l)]*=mult;
+    uy[I3(j,k,l)]*=mult;
+    uz[I3(j,k,l)]*=mult;
+
+    ux[0] = TC(0,0);
+    uy[0] = TC(0,0);
+    uz[0] = TC(0,0);
+
+}
+}
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_Laplace_Biharmonic(TR coeff, TC_vec Laplace, TR coeff_bihrmonic, TC_vec Biharmonic, TC_vec ux, TC_vec uy, TC_vec uz)
+{
+    apply_Laplace_Biharmonic_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, coeff, Laplace, coeff_bihrmonic, Biharmonic, ux, uy, uz);
+}
 
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
@@ -465,6 +536,45 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_iLapl
 
     apply_iLaplace3_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, Laplace, v_x, v_y, v_z, coeff);
 }
+
+template<typename T, typename T_vec, typename TC, typename TC_vec>
+__global__ void apply_iLaplace3_Biharmonic3_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec Laplace, TC_vec Biharmonic,  TC_vec v_x, TC_vec v_y, TC_vec v_z, T coeff, T coeff_bihrmonic)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+    
+
+    T lap = Laplace[I3(j,k,l)].real(); //Laplace is assumed to have 1 at the zero wavenumber!
+    T biharm = Biharmonic[I3(j,k,l)].real();
+    v_x[I3(j,k,l)] /= (lap/coeff+biharm*coeff_bihrmonic);
+    v_y[I3(j,k,l)] /= (lap/coeff+biharm*coeff_bihrmonic);
+    v_z[I3(j,k,l)] /= (lap/coeff+biharm*coeff_bihrmonic);
+
+    v_x[0] = TC(0,0);
+    v_y[0] = TC(0,0);
+    v_z[0] = TC(0,0);
+
+}
+}
+
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_iLaplace3_Biharmonic3(TC_vec Laplace, TC_vec Biharmonic,  TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR coeff_bihrmonic)
+{
+
+    apply_iLaplace3_Biharmonic3_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, Laplace, Biharmonic, v_x, v_y, v_z, coeff, coeff_bihrmonic);
+}
+
 
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>

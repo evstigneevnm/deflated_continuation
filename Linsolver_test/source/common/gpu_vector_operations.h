@@ -301,7 +301,6 @@ struct gpu_vector_operations
     }
     //DEBUG ENDS!
 
-    bool check_is_valid_number(const vector_type &x)const;
     // dot product of two vectors
     scalar_type scalar_prod(const vector_type &x, const vector_type &y)const
     {
@@ -316,6 +315,15 @@ struct gpu_vector_operations
         }
         return (result);
     }
+    bool is_valid_number(const vector_type &x)const
+    {
+        return std::isfinite(scalar_prod(x,x));
+    }
+    bool check_is_valid_number(const vector_type &x)const
+    {
+        return is_valid_number(x);
+    }
+
     void scalar_prod(const vector_type &x, const vector_type &y, scalar_type *result)
     {
         if(use_high_precision_dot)

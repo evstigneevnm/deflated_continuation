@@ -34,29 +34,30 @@
 int main(int argc, char const *argv[])
 {
     
-    if(argc != 5)
+    if(argc != 6)
     {
-        std::cout << argv[0] << " alpha R N high_prec:\n 0<alpha<=1, R is the Reynolds number, N = 2^n- discretization in one direction\n high_prec=(0/1) use(1) or not(0) high precision reduciton methods \n";
+        std::cout << argv[0] << " alpha R N high_prec homotopy:\n 0<alpha<=1, R is the Reynolds number, N = 2^n- discretization in one direction\n high_prec=(0/1) use(1) or not(0) high precision reduciton methods \n";
         return(0);       
     }
 
-    real alpha = std::atof(argv[1]);
-    real Rey = std::atof(argv[2]);
-    size_t N = std::atoi(argv[3]);
-    int high_prec = std::atoi(argv[4]);
+    real alpha = std::stof(argv[1]);
+    real Rey = std::stof(argv[2]);
+    size_t N = std::stoi(argv[3]);
+    int high_prec = std::stoi(argv[4]);
+    real homotopy = std::stof(argv[5]);
     int one_over_alpha = int(1/alpha);
 
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
     size_t Nz = N;
-    std::cout << "Testing deflation.\nUsing alpha = " << alpha << ", high precision = " << high_prec << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << std::endl;
+    std::cout << "Testing deflation.\nUsing alpha = " << alpha << ", high precision = " << high_prec << ", homotopy = " << homotopy << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << std::endl;
 
     
     init_cuda(-1);
 
     //linsolver control
     unsigned int lin_solver_max_it = 2000;
-    real lin_solver_tol = 1.0e-1;
+    real lin_solver_tol = 1.0e-2;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;
@@ -88,7 +89,7 @@ int main(int argc, char const *argv[])
 
     KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
 
-
+    KF_3D->set_homotopy_value(homotopy);
     log_t *log = new log_t();
     log->set_verbosity(1);
     log_t *log3 = new log_t();

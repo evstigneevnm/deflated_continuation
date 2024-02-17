@@ -7,7 +7,10 @@ int main(int argc, char const *argv[])
 {
 
     time_steppers::detail::butcher_tables tables;
+    time_steppers::detail::composite_butcher_tables composite_tables;
+
     using table_t = time_steppers::detail::tableu;
+    using composite_tableu_t = time_steppers::detail::composite_tableu;
 
     auto table_EULER = tables.set_table(time_steppers::detail::methods::EXPLICIT_EULER);
     auto table_HEUN_EULER = tables.set_table(time_steppers::detail::methods::HEUN_EULER);
@@ -16,6 +19,9 @@ int main(int argc, char const *argv[])
     auto table_RK43SSP = tables.set_table(time_steppers::detail::methods::RK43SSP);
     auto table_RK64SSP = tables.set_table(time_steppers::detail::methods::RK64SSP);
     
+    auto table_IMEX_EULER = composite_tables.set_table(time_steppers::detail::methods::IMEX_EULER);
+    auto table_IMEX_TR2 = composite_tables.set_table(time_steppers::detail::methods::IMEX_TR2);
+
     auto print_mat = [](const table_t& table_p)
     {
         size_t sz = table_p.get_size();
@@ -30,6 +36,15 @@ int main(int argc, char const *argv[])
         }
         
     };
+
+    auto print_mat_p = [&print_mat](const std::pair<table_t, table_t>& table_p)
+    {
+        std::cout << "explicit: " << std::endl;
+        print_mat(table_p.first);
+        std::cout << "implicit: " << std::endl;
+        print_mat(table_p.second);
+    };
+
     auto print_vecs = [](const table_t& table_p)
     {
         size_t sz = table_p.get_size();
@@ -59,6 +74,14 @@ int main(int argc, char const *argv[])
         }
 
     }; 
+    auto print_vecs_p = [&print_vecs](const std::pair<table_t, table_t>& table_p)
+    {
+        std::cout << "explicit: " << std::endl;
+        print_vecs(table_p.first);
+        std::cout << "implicit: " << std::endl;        
+        print_vecs(table_p.second);
+    };
+
 
     std::cout << "Explicit Euler: " << std::endl;
     print_mat(table_EULER);
@@ -85,6 +108,17 @@ int main(int argc, char const *argv[])
     print_vecs(table_RK64SSP);       
 //  to be continued...
 
+    std::cout << "IMEX_EULER: " << std::endl;
+    print_mat_p(table_IMEX_EULER);
+    print_vecs_p(table_IMEX_EULER);
     
+    std::cout << "IMEX_TR2: " << std::endl;
+    print_mat_p(table_IMEX_TR2);
+    print_vecs_p(table_IMEX_TR2);
+    
+    
+
+
+
     return 0;
 }
