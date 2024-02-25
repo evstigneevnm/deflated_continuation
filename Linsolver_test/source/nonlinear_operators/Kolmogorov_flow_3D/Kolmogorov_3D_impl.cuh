@@ -600,9 +600,9 @@ if ( index_in < sizeOfData )
     v_y[I3(j,k,l)]/=(a+b*lap/coeff);
     v_z[I3(j,k,l)]/=(a+b*lap/coeff);
 
-    v_x[0] = TC(0,0);
-    v_y[0] = TC(0,0);
-    v_z[0] = TC(0,0);
+    // v_x[0] = 0.0;
+    // v_y[0] = 0.0;
+    // v_z[0] = 0.0;
 
 }
 }
@@ -613,6 +613,46 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_iLapl
 
     apply_iLaplace3_plus_E_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, Laplace, v_x, v_y, v_z, coeff, a, b);
 }
+
+template<typename T, typename T_vec, typename TC, typename TC_vec>
+__global__ void apply_iLaplace3_Biharmonic3_plus_E_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec Laplace, TC_vec Biharmonic,  TC_vec v_x, TC_vec v_y, TC_vec v_z, T coeff, T coeff_bihrmonic, T a, T b)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+    
+
+    T lap = Laplace[I3(j,k,l)].real(); //Laplace is assumed to have 1 at the zero wavenumber!
+    T biharm = Biharmonic[I3(j,k,l)].real();
+    T opt = (lap/coeff+biharm*coeff_bihrmonic);
+
+    v_x[I3(j,k,l)]/=(a+b*opt);
+    v_y[I3(j,k,l)]/=(a+b*opt);
+    v_z[I3(j,k,l)]/=(a+b*opt);
+
+    // v_x[0] = TC(0,0);
+    // v_y[0] = TC(0,0);
+    // v_z[0] = TC(0,0);
+
+}
+}
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_iLaplace3_Biharmonic3_plus_E(TC_vec Laplace, TC_vec Biharmonic, TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR coeff_bihrmonic, TR a, TR b)
+{
+
+    apply_iLaplace3_Biharmonic3_plus_E_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, Laplace, Biharmonic, v_x, v_y, v_z, coeff, coeff_bihrmonic, a, b);
+}
+
 
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>

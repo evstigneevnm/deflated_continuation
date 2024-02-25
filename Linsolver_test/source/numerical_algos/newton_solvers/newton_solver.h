@@ -51,7 +51,7 @@ public:
         {
             vec_ops->assign_scalar(T(0.0), delta_x);
             linsolver_converged = system_op->solve(nonlin_op, x, lambda, delta_x);
-            finished = conv_strat->check_convergence(nonlin_op, x, lambda, delta_x, result_status);
+            finished = conv_strat->check_convergence(nonlin_op, x, lambda, delta_x, result_status, linsolver_converged);
         }
         if(result_status==0)
         {

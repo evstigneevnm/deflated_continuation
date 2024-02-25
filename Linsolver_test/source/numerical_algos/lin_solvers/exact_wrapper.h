@@ -47,7 +47,7 @@ public:
 private:
     using monitor_call_wrap_t = detail::monitor_call_wrap<VectorOperations, Monitor>;
     using parent_t = iter_solver_base<LinearOperator,Preconditioner, VectorOperations,Monitor,Log>;
-    using logged_obj_t = utils::logged_obj_base<Log>;
+    using logged_obj_t = typename parent_t::logged_obj_t;
 protected:
     using parent_t::monitor_;
     using parent_t::vec_ops_;

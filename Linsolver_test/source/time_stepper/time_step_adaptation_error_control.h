@@ -104,6 +104,10 @@ public:
     {
         return reject_step_;
     }
+    void reject_step() const
+    {
+        reject_step_ = true;
+    }
 
     bool estimate_timestep(const T_vec& x_p, const T_vec& x_new_p, const T_vec& f_err_p)
     {

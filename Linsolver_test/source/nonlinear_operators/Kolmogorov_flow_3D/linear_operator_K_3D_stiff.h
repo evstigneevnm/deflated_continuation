@@ -1,5 +1,5 @@
-#ifndef __LINEAR_OPERATOR_K_3D_SHIFTED_H__
-#define __LINEAR_OPERATOR_K_3D_SHIFTED_H__
+#ifndef __LINEAR_OPERATOR_K_3D_STIFF_H__
+#define __LINEAR_OPERATOR_K_3D_STIFF_H__
 
 /**
 *   Helper class for iterative linear solver
@@ -13,20 +13,19 @@ namespace nonlinear_operators
 
 
 template<class VectorOperations, class NonlinearOperator> 
-class linear_operator_K_3D_shifted
+class linear_operator_K_3D_stiff
 {
 public:    
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
 
-
-    linear_operator_K_3D_shifted(VectorOperations* vec_ops_, NonlinearOperator* nonlin_op_): 
+    linear_operator_K_3D_stiff(VectorOperations* vec_ops_, NonlinearOperator* nonlin_op_): 
     vec_ops(vec_ops_),
     nonlin_op(nonlin_op_)
     {
 
     }
-    ~linear_operator_K_3D_shifted()
+    ~linear_operator_K_3D_stiff()
     {
 
     }
@@ -39,10 +38,9 @@ public:
 
     void apply(const T_vec& x, T_vec& f)const
     {
-        nonlin_op->jacobian_u(x, f);
+        nonlin_op->jacobian_stiff_u(x, f);
         //calc: y := mul_x*x + mul_y*y
         vec_ops->add_mul(ab.first, x, ab.second, f);
-
     }
 
     std::pair<T, T> get_a_b()

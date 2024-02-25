@@ -25,13 +25,13 @@ public:
     using method_type = detail::methods;
     using table_t = time_steppers::detail::tableu;
 
-    explicit_time_step(VectorOperations* vec_ops_p, TimeStepAdaptation* time_step_adapt_p, Log* log_, NonlinearOperator* nonlin_op_p = nullptr, T param_p = 1.0,  method_type method_p = method_type::RKDP45):
+    explicit_time_step(VectorOperations* vec_ops_p, TimeStepAdaptation* time_step_adapt_p, Log* log_, NonlinearOperator* nonlin_op_p = nullptr, T param_p = 1.0,  const std::string& method_s = "RKDP45"):
     vec_ops_(vec_ops_p), 
     nonlin_op_(nonlin_op_p), 
     time_step_adapt_(time_step_adapt_p),
     log(log_), 
     param_(param_p),
-    method_(method_p)
+    method_(method_s)
     {
         set_table_and_reinit_storage();
         vec_ops_->init_vector(v1_helper_);
@@ -49,11 +49,11 @@ public:
         clear_storage();
     }
     
-    void scheme(method_type method_p)
+    void scheme(const std::string& method_s)
     {
-        if(method_ != method_p)
+        if(method_ != method_s)
         {
-            method_ = method_p;
+            method_ = method_s;
             set_table_and_reinit_storage();
         }
     }
@@ -178,7 +178,7 @@ private:
     Log* log;
     detail::butcher_tables table_generator;
     table_t table;
-    method_type method_;
+    std::string method_;
     size_t n_stages_;
 
 
@@ -248,7 +248,7 @@ private:
 
     void set_table_and_reinit_storage()
     {
-        table = table_generator.set_table(method_);
+        table = table_generator.set_table_by_name(method_);
 
         if(time_step_adapt_->is_adaptive()&&!table.is_embedded())
         {

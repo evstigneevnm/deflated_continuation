@@ -16,7 +16,7 @@
 
 #ifndef __SCFD_BICGSTAB_H__
 #define __SCFD_BICGSTAB_H__
-
+#include <cmath>
 #include <numerical_algos/detail/vectors_arr_wrap_static.h>
 #include "detail/monitor_call_wrap.h"
 #include "iter_solver_base.h"
@@ -54,9 +54,10 @@ public:
 
 private:
     typedef scalar_type                                         T;
-    typedef utils::logged_obj_base<Log>                         logged_obj_t;
+    // typedef utils::logged_obj_base<Log>                         logged_obj_t;
     typedef iter_solver_base<LinearOperator,Preconditioner,
                              VectorOperations,Monitor,Log>      parent_t;
+    using logged_obj_t = typename parent_t::logged_obj_t;                             
     typedef vectors_arr_wrap_static<VectorOperations,7>         bufs_arr_t;
     typedef typename bufs_arr_t::vectors_arr_use_wrap_type      bufs_arr_use_wrap_t;
     typedef detail::monitor_call_wrap<VectorOperations,
@@ -87,7 +88,7 @@ public:
         resid_recalc_freq_(0)
     {
         bufs.init();
-        int sz=vec_ops->sz_;
+        int sz=vec_ops->size();
         some_vec=(scalar_type*)malloc(sizeof(scalar_type)*sz);
         if(some_vec==NULL)
             throw std::runtime_error("bicgstab: failed to allocate memory");;
@@ -152,8 +153,8 @@ public:
             //nu_i, pi, ri are nu_{i-1}, p_{i-1}, r_{i-1}
             T   rho_i = vec_ops_->scalar_prod(ri, r_),
                 beta = (rho_i/rho_i_1)*(alpha/omega_i_1);
-            if (isnan(beta)) { logged_obj_t::info("solve: stop iterations because beta is ind"); not_valid_coeff_faced = true; break; }
-            if (isinf(beta)) { logged_obj_t::info("solve: stop iterations because beta is inf"); not_valid_coeff_faced = true; break; }
+            if (std::isnan(beta)) { logged_obj_t::info("solve: stop iterations because beta is ind"); not_valid_coeff_faced = true; break; }
+            if (std::isinf(beta)) { logged_obj_t::info("solve: stop iterations because beta is inf"); not_valid_coeff_faced = true; break; }
 
             //pi := ri - beta*omega_{i_1}*nu_i + beta*p_{i-1}
             vec_ops_->add_mul(T(1), ri, -beta*omega_i_1, nu_i, beta, pi);
@@ -168,8 +169,8 @@ public:
             //nu_i now is nu_i
 
             alpha = rho_i/vec_ops_->scalar_prod(nu_i, r_);
-            if (isnan(alpha)) { logged_obj_t::info("solve: stop iterations because alpha is nan"); not_valid_coeff_faced = true; break; }
-            if (isinf(alpha)) { logged_obj_t::info("solve: stop iterations because alpha is inf"); not_valid_coeff_faced = true; break; }
+            if (std::isnan(alpha)) { logged_obj_t::info("solve: stop iterations because alpha is nan"); not_valid_coeff_faced = true; break; }
+            if (std::isinf(alpha)) { logged_obj_t::info("solve: stop iterations because alpha is inf"); not_valid_coeff_faced = true; break; }
 
             //s := ri - alpha*nu_i
             vec_ops_->assign_mul(T(1), ri, -alpha, nu_i, s);
@@ -188,8 +189,8 @@ public:
             if (prec_ != NULL) prec_->apply(t);
 
             T omega_i = vec_ops_->scalar_prod(t, s)/vec_ops_->scalar_prod(t, t);
-            if (isnan(omega_i)) { logged_obj_t::info("solve: stop iterations because omega_i is nan"); not_valid_coeff_faced = true; break; }
-            if (isinf(omega_i)) { logged_obj_t::info("solve: stop iterations because omega_i is inf"); not_valid_coeff_faced = true; break; }
+            if (std::isnan(omega_i)) { logged_obj_t::info("solve: stop iterations because omega_i is nan"); not_valid_coeff_faced = true; break; }
+            if (std::isinf(omega_i)) { logged_obj_t::info("solve: stop iterations because omega_i is inf"); not_valid_coeff_faced = true; break; }
 
             //x := x + alpha*pi + omega_i*s
             vec_ops_->add_mul(alpha, pi, omega_i, s, T(1), x);

@@ -39,6 +39,8 @@ public:
     {
         return false;
     }
+    void reject_step() const
+    { }    
     bool estimate_timestep(const T_vec& x_p, const T_vec& x_new_p, const T_vec& f_err_p)
     {
         //this implements timestep strategy adaptation. It is void for the constant time step.
@@ -49,8 +51,8 @@ public:
         else
         {
             log_->error_f("time_step_adaptation::estimate_timestep: returned nan at step %i at time %e for dt %e", current_step_, current_time_, dt_);
-            bool fail_flag_ = true;
-            return false;
+            fail_flag_ = true;
+            return true;
         }
     }
     bool is_adaptive()const

@@ -236,7 +236,17 @@ public:
     {
         //for general call to the time stepper.
         F(u, Reynolds_, v);
-    }    
+    }   
+    void F_stiff(const T time_p, const T_vec& u, const T Reynolds_, T_vec& v)
+    {
+        //for general call to the time stepper.
+        F_stiff(u, Reynolds_, v);
+    }  
+    void F_nonstiff(const T time_p, const T_vec& u, const T Reynolds_, T_vec& v)
+    {
+        //for general call to the time stepper.
+        F_nonstiff(u, Reynolds_, v);
+    }           
     //   F(u,alpha)=v
     void F(const T_vec& u, const T Reynolds_, T_vec& v)
     {
@@ -322,8 +332,8 @@ public:
         BC_vec* U = pool_BC.take(); //input
 
         V2C(u, *U);
-        F_stiff(*U, Reynolds_, *W); 
-        C2V(*W, v);
+        F_stiff(*U, Reynolds_); 
+        C2V(*U, v);
 
         pool_BC.release(U);   
     }
@@ -381,6 +391,40 @@ public:
         
         V2C(du, *dU);
         jacobian_u(*dU, *dV);
+        C2V(*dV, dv);
+        
+        pool_BC.release(dU);
+        pool_BC.release(dV);
+
+    }
+
+
+    //jacobian of the stiff part of the equaitons
+    void jacobian_stiff_u(BC_vec& dU, BC_vec& dV)
+    {
+        
+        kern->copy3(dU.x, dU.y, dU.z, dV.x, dV.y, dV.z); // dV:=dU
+        if(homotopy_ > 0.0)
+        {
+            auto homotopy_4 = homotopy_*homotopy_*homotopy_*homotopy_;
+            kern->apply_Laplace_Biharmonic(TR(1.0/Reynolds_0), Laplace, homotopy_4, Biharmonic, dV.x, dV.y, dV.z);
+        }
+        else
+        {        
+            kern->apply_Laplace(TR(1.0/Reynolds_0), Laplace, dV.x, dV.y, dV.z); // dU:=nu*\nabla^2 dU
+        }
+
+
+    }
+
+    void jacobian_stiff_u(const T_vec& du, T_vec& dv)
+    {
+
+        BC_vec* dU = pool_BC.take(); //input
+        BC_vec* dV = pool_BC.take(); //output           
+        
+        V2C(du, *dU);
+        jacobian_stiff_u(*dU, *dV);
         C2V(*dV, dv);
         
         pool_BC.release(dU);
@@ -461,7 +505,7 @@ public:
     {
         // project(dR);
         kern->apply_iLaplace3_plus_E(Laplace, dR.x, dR.y, dR.z, Reynolds_0, a, b);
-        // project(dR);
+        project(dR);
 
     }
     void preconditioner_jacobian_temporal_u(T_vec& dr, T a, T b)
@@ -474,6 +518,39 @@ public:
         
         pool_BC.release(dR);
     }
+
+
+
+    //preconditioner for the stiff temporal Jacobian a*E + b*dF_stiff/du
+    void preconditioner_jacobian_stiff_u(BC_vec& dR, T a, T b)
+    {
+        // project(dR);
+        if(homotopy_ > 0.0)
+        {
+            auto homotopy_4 = homotopy_*homotopy_*homotopy_*homotopy_;
+            kern->apply_iLaplace3_Biharmonic3_plus_E(Laplace, Biharmonic, dR.x, dR.y, dR.z, Reynolds_0, homotopy_4, a, b);
+        }
+        else
+        {
+            kern->apply_iLaplace3_plus_E(Laplace, dR.x, dR.y, dR.z, Reynolds_0, a, b);
+        }
+
+    }
+    void preconditioner_jacobian_stiff_u(T_vec& dr, T a, T b)
+    {
+        // auto bbb = vec_ops->norm_l2(dr);
+        
+        BC_vec* dR = pool_BC.take();
+        
+        V2C(dr, *dR);
+        preconditioner_jacobian_stiff_u(*dR, a, b);
+        C2V(*dR, dr);
+        
+        pool_BC.release(dR);
+        // auto ccc = vec_ops->norm_l2(dr);
+        
+    }
+
 
     //funciton that returns std::vector with different bifurcatoin norms
 

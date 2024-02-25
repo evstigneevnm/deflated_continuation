@@ -116,6 +116,10 @@ struct cpu_vector_operations
         
         return true;
     }
+    bool is_valid_number(const vector_type &x)const
+    {
+        return check_is_valid_number(x);  
+    }
     scalar_type scalar_prod(const vector_type &x, const vector_type &y, int use_high_prec_ = -1)const
     {
         // T res(0.f);
@@ -170,6 +174,10 @@ struct cpu_vector_operations
             max_val = (max_val<std::abs(x[j]))?std::abs(x[j]):max_val;
         }
         return max_val;
+    }
+    scalar_type norm_l2(const vector_type& x)const
+    {
+        return  std::sqrt( norm_sq(x)/size() );
     }
     scalar_type norm2_sq(const vector_type& x)const
     {

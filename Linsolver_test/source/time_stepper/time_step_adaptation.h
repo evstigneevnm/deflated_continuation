@@ -29,7 +29,9 @@ public:
     dt_initial_(dt_p),
     current_step_(0),
     fail_flag_(false),
-    positive_check_(positive_check_p)
+    positive_check_(positive_check_p),
+    base_ode_solver_order_(4),
+    force_globalization_(false)
     {
         calculate_initial_dt();
     }
@@ -89,8 +91,7 @@ public:
         current_step_ = previous_step_;
         dt_accepted_ = previous_dt_accepted_;
     }
-
-
+    
     void reset_steps()
     {
         current_time_ = 0;
@@ -120,18 +121,34 @@ public:
     {
         return positive_check_->apply(sol_p);
     }
+    void set_ode_stepper_order(std::size_t order)
+    {
+        base_ode_solver_order_ = order;
+    }
+    bool check_globalization() const
+    {
+        return force_globalization_;
+    }
+
+    void force_globalization() const
+    {
+        force_globalization_ = true;
+    }
 
     virtual void pre_execte_step()const = 0;
     virtual bool check_reject_step()const = 0;
     virtual void init_steps(const T_vec& x_p, const T_vec& fx_p) = 0;
     virtual bool estimate_timestep(const T_vec& x_p, const T_vec& x_new_p, const T_vec& f_err_p) = 0;
-    virtual bool is_adaptive()const=0;
+    virtual bool is_adaptive()const = 0;
+    virtual void reject_step()const = 0;
 
 protected:
     mutable T dt_;
     mutable T dt_accepted_;
     mutable T dt_min_;
     mutable T previous_dt_accepted_;
+    mutable bool force_globalization_;
+    std::size_t base_ode_solver_order_;
     T dt_initial_;
     std::pair<T,T> time_interval_;
     mutable T current_time_;
