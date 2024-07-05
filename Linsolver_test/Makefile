@@ -139,6 +139,15 @@ Kolmogorov_3D: source/models/KF_3D/test_Kolmogorov_3D_RHS.cpp
 
 Kolmogorov_3D_all: Kolmogorov_3D_ker Kolmogorov_3D
 
+Taylor_Green_ker: source/nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D_ker.cu
+	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(ICUDA) $(IPROJECT)   source/nonlinear_operators/Taylor_Green/Taylor_Green_ker.cu -c -o O/Taylor_Green_ker.o 2>results.make
+
+Taylor_Green: source/models/Taylor_Green/test_Taylor_Green_RHS.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/Taylor_Green/test_Taylor_Green_RHS.cpp O/Taylor_Green_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o test_Taylor_Green_RHS.bin 2>results.make
+
+Taylor_Green_all: Taylor_Green_ker Taylor_Green
+
+
 newton_Kolmogorov_3D: source/models/KF_3D/test_Kolmogorov_3D_Newton.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/test_Kolmogorov_3D_Newton.cpp O/Kolmogorov_3D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o newton_Kolmogorov_3D.bin 2>results.make
 
