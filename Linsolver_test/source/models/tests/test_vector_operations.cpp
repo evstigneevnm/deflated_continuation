@@ -10,8 +10,7 @@
 #include <external_libraries/cublas_wrap.h>
 #include <common/gpu_vector_operations.h>
 #include <common/gpu_file_operations.h>
-
-
+#include <scfd/utils/cuda_ownutils.h>
 
 int main(int argc, char const *argv[])
 {
@@ -23,7 +22,7 @@ int main(int argc, char const *argv[])
 
     typedef gpu_file_operations<gpu_vector_operations_real> files_real_t;
     typedef gpu_file_operations<gpu_vector_operations_complex> files_complex_t;
-    init_cuda(5);
+    scfd::utils::init_cuda_persistent(500);
 
     cublas_wrap *CUBLAS = new cublas_wrap(true);
     gpu_vector_operations_real *vec_ops_R = new gpu_vector_operations_real(N, CUBLAS);
@@ -39,6 +38,8 @@ int main(int argc, char const *argv[])
     vec_ops_R->start_use_vector(u1_d); vec_ops_R->start_use_vector(u2_d); vec_ops_R->start_use_vector(u3_d);
     vec_ops_C->start_use_vector(z1_d); vec_ops_C->start_use_vector(z2_d); vec_ops_C->start_use_vector(z3_d);
 
+    bool flag_ok = true;
+
     //vec_ops_R->assign_scalar(0.5, u1_d);
     printf("using vectors of size = %i\n", N);
     vec_ops_R->assign_random(u1_d);
@@ -50,10 +51,10 @@ int main(int argc, char const *argv[])
     vec_ops_C->assign_scalar(complex(1.0), z1_d);
 
     vec_ops_R->assign_scalar(-0.5, u2_d); 
-    vec_ops_C->assign_scalar(complex(-0.5,0.3), z2_d);
+    vec_ops_C->assign_scalar(complex(-0.5, 0.3), z2_d);
 
     vec_ops_R->assign_scalar(123.0, u3_d); 
-    vec_ops_C->assign_scalar(complex(0,2.2), z3_d);
+    vec_ops_C->assign_scalar(complex(0, 2.2), z3_d);
 
     vec_ops_R->mul_pointwise(1.0, u1_d, 0.2, u2_d, 
                         u3_d);
@@ -76,15 +77,39 @@ int main(int argc, char const *argv[])
 
     vec_ops_R->add_mul(2.0, u1_d, 2.0, u3_d);
 
-    printf("real vector norm_{inf} = %lf, should be 0.5\n", (double) vec_ops_R->norm_inf(u2_d) );
+    auto norm_1_inf = vec_ops_R->norm_inf(u2_d);
+    printf("real vector norm_{inf} = %lf, should be 0.5\n", (double) norm_1_inf );
+    if((norm_1_inf - 0.5)> 10*std::numeric_limits<real>::epsilon() )
+    {
+        std::cout << "failed" << std::endl;
+        flag_ok = false;
+    }
 
     printf("result real vector norm2 =%le\n",(double) vec_ops_R->normalize(u3_d));
-    printf("after normalization=%le\n",(double) vec_ops_R->norm(u3_d));
+    auto norm_2 = vec_ops_R->norm(u3_d);
+    printf("after normalization=%le\n",(double)norm_2 );
+    if((norm_2 - 1.0)> 10*std::numeric_limits<real>::epsilon() )
+    {
+        std::cout << "failed" << std::endl;
+        flag_ok = false;
+    }
 
     complex scal_prod_test = sqrt(vec_ops_C->scalar_prod(z3_d,z3_d));
     printf("result for complex vector dot prod (z,z)^1/2=(%le,%le), check no imag part!\n", (double) scal_prod_test.real(), (double) scal_prod_test.imag() );
+    if(( scal_prod_test.imag() )>10*std::numeric_limits<real>::epsilon() )
+    {
+        std::cout << "failed" << std::endl;
+        flag_ok = false;
+    }
     printf("result complex vector norm=%le\n",(double) vec_ops_C->normalize(z3_d));
-    printf("after normalization=%le\n",(double) vec_ops_C->norm(z3_d));
+
+    auto norm_3 = (double) vec_ops_C->norm(z3_d);
+    printf("after normalization=%le\n", (double)norm_3);
+    if((norm_3 - 1.0)> 10*std::numeric_limits<real>::epsilon() )
+    {
+        std::cout << "failed" << std::endl;
+        flag_ok = false;
+    }
 
     printf("populating a single nan in real v3 vector and a single inf into complex v2 vector!\n");
     
@@ -100,13 +125,41 @@ int main(int argc, char const *argv[])
     printf("is result finite?:\n");
     printf("        v1, v2, v3\n");
     printf("R vecs: %s, %s, %s\n",true==vec_ops_R->check_is_valid_number(u1_d)?"T":"F",true==vec_ops_R->check_is_valid_number(u2_d)?"T":"F",true==vec_ops_R->check_is_valid_number(u3_d)?"T":"F");
+    if( vec_ops_R->check_is_valid_number(u3_d) )    
+    {
+        std::cout << "failed" << std::endl;
+        flag_ok = false;
+    }
     printf("C vecs: %s, %s, %s\n",true==vec_ops_C->check_is_valid_number(z1_d)?"T":"F",true==vec_ops_C->check_is_valid_number(z2_d)?"T":"F",true==vec_ops_C->check_is_valid_number(z3_d)?"T":"F");
+    if( vec_ops_C->check_is_valid_number(z2_d) )    
+    {
+        std::cout << "failed" << std::endl;
+        flag_ok = false;
+    }
 
     // files_R->write_vector("real_vector_test.dat", u3_d);
-    files_C->write_vector("complex_vector_test.dat", z2_d);    
+    files_C->write_vector("complex_vector_test.dat", z3_d);    
+    files_C->read_vector("complex_vector_test.dat", z2_d);
+    //check difference
 
-    files_R->read_vector("real_vector_test0.dat", u3_d);
-    files_R->write_vector("real_vector_test.dat", u3_d);
+    vec_ops_C->add_mul( -1.0, z3_d, z2_d );
+    auto C_file_diff_norm = vec_ops_C->norm(z2_d);
+    std::cout << "file write/read norm = " << C_file_diff_norm << std::endl;
+    if( C_file_diff_norm>0.0 )    
+    {
+        flag_ok = false;
+    }    
+
+    files_R->write_vector("real_vector_test.dat", u2_d);
+    files_R->read_vector("real_vector_test.dat", u3_d);
+    vec_ops_R->add_mul( -1.0, u3_d, u2_d );
+    auto R_file_diff_norm = vec_ops_R->norm(u2_d);
+    std::cout << "file write/read norm = " << R_file_diff_norm << std::endl;    
+    if( R_file_diff_norm>0.0 )    
+    {
+        flag_ok = false;
+    }    
+
 
     vec_ops_R->free_vector(u1_d); vec_ops_R->free_vector(u2_d); vec_ops_R->free_vector(u3_d); 
     vec_ops_C->free_vector(z1_d); vec_ops_C->free_vector(z2_d); vec_ops_C->free_vector(z3_d);
@@ -116,5 +169,16 @@ int main(int argc, char const *argv[])
     delete vec_ops_C;
     delete vec_ops_R;
     delete CUBLAS;
-    return 0;
+
+
+    if(flag_ok)
+    {
+        std::cout << "PASS" << std::endl;
+        return 0;
+    }
+    else
+    {
+        std::cout << "FAILED" << std::endl;
+        return 1;
+    }
 }

@@ -16,12 +16,14 @@
 using namespace numerical_algos::lin_solvers;
 
 typedef SCALAR_TYPE   real;
-typedef real*         vector_t;
+// typedef real*         vector_t;
 
-typedef cpu_vector_operations<real> cpu_vector_operations_real;
+using cpu_vector_operations_real = cpu_vector_operations<real>;
+using vector_t = typename cpu_vector_operations_real::vector_type
 
 struct system_operator: public cpu_vector_operations_real
 {
+    using vector_t = typename cpu_vector_operations_real::vector_type;
     int sz;
     vector_t A;
     system_operator(int sz_, vector_t A_) : sz(sz_), A(A_), cpu_vector_operations(sz_)
@@ -40,8 +42,8 @@ private:
 
         for (int i=0; i<sz; i++)
         {
-            real *mat_row = &mat[I2(i,0,sz)];
-            result[i] = scalar_prod(mat_row, vec);
+            // real *mat_row = &mat[I2(i,0,sz)];
+            // result[i] = scalar_prod(mat_row, vec);
         }
     }
 
@@ -50,9 +52,10 @@ private:
 
 struct prec_operator:public cpu_vector_operations_real
 {
+    using vector_t = typename cpu_vector_operations_real::vector_type;
     int sz;
     vector_t iP;
-    real* some_vec;
+    vector_t some_vec;
     const system_operator *op;
 
     
@@ -82,13 +85,13 @@ struct prec_operator:public cpu_vector_operations_real
 
 private:
 
-    void matrix_vector_prod(const vector_t &mat, vector_t &vec, real *result)const
+    void matrix_vector_prod(const vector_t &mat, vector_t &vec, vector_t &result)const
     {
         
         for (int i=0; i<sz; i++)
         {
-            real *mat_row = &mat[I2(i,0,sz)];
-            result[i] = scalar_prod(mat_row, vec);
+            // real *mat_row = &mat[I2(i,0,sz)];
+            // result[i] = scalar_prod(mat_row, vec);
         }
     }
 

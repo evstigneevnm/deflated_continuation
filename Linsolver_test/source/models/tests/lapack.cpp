@@ -59,6 +59,17 @@ void read_matrix(const std::string &f_name,  size_t Row, size_t Col,  T *matrix)
     f.close();
 }
 
+template<class T>
+auto vec_norm(const std::vector<T>& vec)
+{
+    T res = 0;
+    for(auto &x: vec)
+    {
+        res += x*x;
+    }
+    return std::sqrt(res);
+}
+
 
 
 int main(int argc, char const *argv[])
@@ -149,14 +160,25 @@ int main(int argc, char const *argv[])
         } 
         blas.qr(A.data(), 4, R.data() );
         std::cout << "Q-diff (should be zero):" << std::endl;    
+        std::vector<double> res_diff;
+        res_diff.reserve(4*4);
         for(int j=0;j<4;j++)
         {
             for(int k=0;k<4;k++)
             { 
-                std::cout << R[j+4*k] - Q[j+4*k] << " ";
+                auto diff = R[j+4*k] - Q[j+4*k];
+                std::cout << diff << " ";
+                res_diff.push_back(diff);
             }
             std::cout << std::endl;
-        }     
+        }    
+        auto diff1 = vec_norm(res_diff);
+        std::cout << "diff = " << diff1 << std::endl;
+        if(vec_norm(res_diff)>std::sqrt(std::numeric_limits<double>::epsilon()))
+        {
+            throw(std::runtime_error("FAILED"));
+        }
+
 
         blas.eigs(A.data(), 4, eig_r.data(), eig_i.data() );
         std::cout << "eigs(A):" << std::endl;
@@ -171,6 +193,7 @@ int main(int argc, char const *argv[])
         {
             std::cout << eig[j] << std::endl;
         }    
+
 
         std::vector<double> eigV = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
         // eigV.reserve(4*4);

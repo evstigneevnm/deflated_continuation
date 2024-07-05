@@ -114,6 +114,20 @@ inline std::pair<size_t, size_t> read_matrix_size(const std::string &f_name)
     return {matrix_size_rows, matrix_size_cols};
 }
 
+size_t read_matrix_size_square(const std::string &f_name)
+{
+
+    auto res = read_matrix_size(f_name);
+    if (res.first != res.second)
+        return res.first;
+    else
+    {
+        throw std::runtime_error("requested square matrix, but marix is rectangular");
+        return 0;
+    }
+
+}
+
 template <class T, class T_mat>
 void read_matrix(const std::string &f_name,  size_t Row, size_t Col, T_mat& matrix){
     std::ifstream f(f_name.c_str(), std::ifstream::in);

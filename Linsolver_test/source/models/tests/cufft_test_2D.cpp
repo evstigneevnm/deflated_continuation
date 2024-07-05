@@ -1,4 +1,5 @@
 #include <cmath>
+#include <limits>
 #include <iostream>
 #include <cstdio>
 #include <thrust/complex.h>
@@ -8,6 +9,7 @@
 #include "cufft_test_kernels.h"
 #include <common/macros.h>
 #include <common/file_operations.h>
+#include <scfd/utils/cuda_ownutils.h>
 
 int main(int argc, char const *argv[])
 {
@@ -15,9 +17,10 @@ int main(int argc, char const *argv[])
     typedef thrust::complex<real> complex;
     typedef cufft_wrap_C2C<real>::complex_type complex_type;
 
-    init_cuda(-1);
+    bool flag_ok = true;
+    scfd::utils::init_cuda(-1);
 
-    int N = file_operations::read_matrix_size("A.dat");//"testFFT.dat"
+    int N = file_operations::read_matrix_size_square("./dat_files/A.dat");//"testFFT.dat"
     size_t Nx=N;
     size_t Ny=N;
     printf("Nx=%i, Ny=%i\n", Nx, Ny);
@@ -41,7 +44,7 @@ int main(int argc, char const *argv[])
     AI_d = device_allocate<real>(Nx*My);
 
 
-    file_operations::read_matrix<real>("A.dat",  Nx, Ny, A);
+    file_operations::read_matrix<real>("./dat_files/A.dat",  Nx, Ny, A);
 
     host_2_device_cpy<real>(A_d, A, Nx*Ny);
    
@@ -54,15 +57,22 @@ int main(int argc, char const *argv[])
     for(int j=0;j<Nx*Ny;j++)
     {   
         real diff=A1[j]/Nx/Ny-A[j];
-        res_norm_R+=sqrt(diff*diff);
+        res_norm_R+=diff*diff;
     }
-    printf("R2C: %le \n", (double)res_norm_R);
+    res_norm_R = std::sqrt(res_norm_R);
+    printf("R2C: %le \n", (double) res_norm_R );
+    if(res_norm_R > std::sqrt( std::numeric_limits<real>::epsilon() ) )
+    {
+        flag_ok = false;
+        std::cout << "norm exceeds threshold." << std::endl;
+    }
+
 
     device_2_host_cpy<real>(AR, AR_d, Nx*My);
     device_2_host_cpy<real>(AI, AI_d, Nx*My);
-    file_operations::write_matrix<real>("testFFT_R.dat",  My, Nx, AR);
-    file_operations::write_matrix<real>("testFFT_I.dat",  My, Nx, AI);
-    file_operations::write_matrix<real>("testFFT_t.dat",  Nx, My, A);
+    file_operations::write_matrix<real*>("testFFT_R.dat",  My, Nx, AR);
+    file_operations::write_matrix<real*>("testFFT_I.dat",  My, Nx, AI);
+    file_operations::write_matrix<real*>("testFFT_t.dat",  Nx, My, A);
 
     cudaFree(A_d);
     cudaFree(A1_d);
@@ -77,6 +87,14 @@ int main(int argc, char const *argv[])
 
     delete CUBLAS;
     delete CUFFT2_R;
-
-    return 0;
+    if(flag_ok)
+    {
+        std::cout << "PASS" << std::endl;
+        return 0;
+    }
+    else
+    {
+        std::cout << "FAILED" << std::endl;
+        return 1;
+    }
 }

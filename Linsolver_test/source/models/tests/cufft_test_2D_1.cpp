@@ -10,6 +10,8 @@
 #include <common/macros.h>
 #include <common/file_operations.h>
 
+//TODO: improve this complex-valued test
+
 int main(int argc, char const *argv[])
 {
     typedef SCALAR_TYPE real;
@@ -62,19 +64,17 @@ int main(int argc, char const *argv[])
     CUFFT2_R->fft(A_d,GC_d);
 
     device_2_host_cpy<complex>(ACC, z3_d, Nx*Ny);
-    file_operations::write_matrix<complex>("AC.dat",  Nx, Ny, ACC,2);
+    file_operations::write_matrix<complex*>("AC.dat",  Nx, Ny, ACC,2);
     device_2_host_cpy<complex>(AC, GC_d, Nx*My);
-    file_operations::write_matrix<complex>("ACf.dat",  Nx, My, AC, 2);
+    file_operations::write_matrix<complex*>("ACf.dat",  Nx, My, AC, 2);
     device_2_host_cpy<real>(A, A_d, Nx*Ny);
-    file_operations::write_matrix<real>("A.dat",  Nx, Ny, A,2);
+    file_operations::write_matrix<real*>("A.dat",  Nx, Ny, A,2);
     
     CUFFT2_R->ifft(GC_d, A_d);
     vec_ops_R->scale(1.0/Nx/Ny, A_d);
     device_2_host_cpy<real>(A, A_d, Nx*Ny);
-    file_operations::write_matrix<real>("A1.dat",  Nx, Ny, A,2);
-   
-
-
+    file_operations::write_matrix<real*>("A1.dat",  Nx, Ny, A,2);
+    
 
 
 
