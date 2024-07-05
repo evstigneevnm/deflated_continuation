@@ -188,17 +188,17 @@ __global__ void check_is_valid_number_kernel(size_t N, const thrust::complex<flo
 
 }
 
-template <typename T, int BLOCK_SIZE>
-bool gpu_vector_operations<T, BLOCK_SIZE>::check_is_valid_number(const vector_type& x)const
-{
-    bool result_h=true, *result_d;
-    result_d=device_allocate<bool>(1);
-    host_2_device_cpy<bool>(result_d, &result_h, 1);
-    check_is_valid_number_kernel<T><<<dimGrid, dimBlock>>>(sz, x, result_d);
-    device_2_host_cpy<bool>(&result_h, result_d, 1);
-    CUDA_SAFE_CALL(cudaFree(result_d));
-    return result_h;
-}
+// template <typename T, int BLOCK_SIZE>
+// bool gpu_vector_operations<T, BLOCK_SIZE>::check_is_valid_number(const vector_type& x)const
+// {
+//     bool result_h=true, *result_d;
+//     result_d=device_allocate<bool>(1);
+//     host_2_device_cpy<bool>(result_d, &result_h, 1);
+//     check_is_valid_number_kernel<T><<<dimGrid, dimBlock>>>(sz, x, result_d);
+//     device_2_host_cpy<bool>(&result_h, result_d, 1);
+//     CUDA_SAFE_CALL(cudaFree(result_d));
+//     return result_h;
+// }
 //===
 template<typename T> 
 __global__ void assign_scalar_kernel(size_t N, const T scalar, T* x)
