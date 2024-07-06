@@ -12,7 +12,6 @@ endif
 -include $(CONFIG_FILE)
 
 
-CPPSTD = c++14
 NVCC = $(CUDA_ROOT_PATH)/bin/nvcc
 NVCC_CHECK_REGS = -Xptxas -v 
 NVCCFLAGS = -Wno-deprecated-gpu-targets $(CUDA_ARCH) -std=$(CPPSTD) $(TARGET_NVCC)
