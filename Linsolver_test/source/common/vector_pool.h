@@ -67,6 +67,14 @@ public:
         }
     }
     
+    void print()
+    {
+        for(auto &x: container)
+        {
+            printf("address = %lu, busy = %i\n", x.first, x.second.first);
+        }
+    }
+
     vec_t* take()
     {
         vec_t *ret = nullptr;

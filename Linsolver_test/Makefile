@@ -311,5 +311,5 @@ test_rossler_periodic_orbit_gpu:
 
 # make all common kernels
 ker:
-	make gpu_matrix_vector_operations_ker gpu_vector_operations_ker gpu_reduction_ogita_ker abc_flow_ker
+	make gpu_matrix_vector_operations_ker gpu_vector_operations_ker gpu_reduction_ogita_ker abc_flow_ker Kolmogorov_3D_ker Taylor_Green_ker
 

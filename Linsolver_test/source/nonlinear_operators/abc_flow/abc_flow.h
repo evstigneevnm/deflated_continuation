@@ -247,19 +247,30 @@ public:
     //   F(u,alpha)=v
     void F(BC_vec& U, const T Reynolds_, BC_vec& W)
     {
+        //debug:
+        // T_vec v;
+        // vec_ops->init_vector(v); vec_ops->start_use_vector(v);        
+        // C2V(U, v);
+        // write_solution_vec("u0.pos", v);        
         project(U);
+        // C2V(U, v);
+        // write_solution_vec("u1.pos", v);        
         // vec_ops_C->assign_scalar(0.0,W.x);
         // vec_ops_C->assign_scalar(0.0,W.y);
         // vec_ops_C->assign_scalar(0.0,W.z);
         B_V_nabla_F(U, U, W); //W:= (U, nabla) U
+        // C2V(U, v);
+        // write_solution_vec("u2.pos", v);  //ruined!!!       
+        // C2V(W, v);
+        // write_solution_vec("w2.pos", v);        
         kern->add_mul3(TC(-1.0/Reynolds_,0), forceABC.x, forceABC.y, forceABC.z, W.x, W.y, W.z); // force:= W-force
         project(W); // W:=P[W]??
         kern->negate3(W.x, W.y, W.z); //W:=-W;
         // U := \nabla^2 U
-        kern->apply_Laplace(TR(1.0/Reynolds_), Laplace, U.x, U.y, U.z);
+        kern->apply_Laplace(1.0/Reynolds_, Laplace, U.x, U.y, U.z);
         // W := W + U
-        kern->add_mul3(TC(1.0,0), U.x, U.y, U.z, W.x, W.y, W.z);   
-        
+        kern->add_mul3(TC(1.0,0), U.x, U.y, U.z, W.x, W.y, W.z);  
+        // vec_ops->stop_use_vector(v); vec_ops->free_vector(v);
     }
 
     //sets (u_0, alpha_0) for jacobian linearization
@@ -645,8 +656,12 @@ public:
             T_vec u_manufactured, resid;
             vec_ops->init_vectors(u_manufactured, resid); vec_ops->start_use_vectors(u_manufactured, resid); 
             exact_solution(Reynolds, u_manufactured);
+            write_solution_vec("u_manufactured.pos", u_manufactured);
+
             solution_norm = vec_ops->norm_l2(u_manufactured);
             F(u_manufactured, Reynolds, resid);
+            write_solution_vec("u_manufactured_resid.pos", resid);
+
             resid_norm = vec_ops->norm_l2(resid)/solution_norm;
             vec_ops->stop_use_vectors(u_manufactured, resid); vec_ops->free_vectors(u_manufactured, resid); 
         }
@@ -810,10 +825,8 @@ private:
         //adjust pool sizes!!!
         pool_R.alloc_all(vec_ops_R, 1);
         pool_C.alloc_all(vec_ops_C, 1);
-        pool_BR.alloc_all(vec_ops_R, 5);
-        pool_BC.alloc_all(vec_ops_C, 6);        
-
-
+        pool_BR.alloc_all(vec_ops_R, 7);
+        pool_BC.alloc_all(vec_ops_C, 7);        
 
     }
 
@@ -822,37 +835,83 @@ private:
     //V, F and ret are block vectors.
     void B_V_nabla_F(const BC_vec& Vel, const BC_vec& Func, BC_vec& ret)
     {
+        // std::cout << "pool BR:" << std::endl; pool_BR.print();
+        // std::cout << "pool BC:" << std::endl; pool_BC.print();
+
         BC_vec* CdFx = pool_BC.take();
         BC_vec* CdFy = pool_BC.take();
         BC_vec* CdFz = pool_BC.take();
-        
+        BC_vec* Vel_reduced = pool_BC.take();
+    
+        // T_vec v;
+        // vec_ops->init_vector(v); vec_ops->start_use_vector(v);
+
+        kern->apply_grad3(Func.x, Func.y, Func.z, mask23, grad_x, grad_y, grad_z, CdFx->x, CdFx->y, CdFx->z, CdFy->x, CdFy->y, CdFy->z, CdFz->x, CdFz->y, CdFz->z);
+        kern->copy_mul_poinwise_3(mask23, Vel.x, Vel.y, Vel.z, Vel_reduced->x, Vel_reduced->y, Vel_reduced->z);
+        // C2V(Func, v);
+        // write_solution_vec("f1.pos", v);
+        // C2V(*CdFx, v);
+        // write_solution_vec("CdFx1.pos", v);
+        // C2V(*CdFy, v);
+        // write_solution_vec("CdFy1.pos", v);
+        // C2V(*CdFz, v);
+        // write_solution_vec("CdFz1.pos", v);
+        // C2V(Vel, v);
+        // write_solution_vec("Vel1.pos", v);
+
         BR_vec* RdFx = pool_BR.take();
         BR_vec* RdFy = pool_BR.take();
         BR_vec* RdFz = pool_BR.take();
         BR_vec* VelR = pool_BR.take();
+        BR_vec* resR = pool_BR.take();  
 
-        kern->apply_grad3(Func.x, Func.y, Func.z, mask23, grad_x, grad_y, grad_z, CdFx->x, CdFx->y, CdFx->z, CdFy->x, CdFy->y, CdFy->z, CdFz->x, CdFz->y, CdFz->z);
+        // std::cout << "pool BR:" << std::endl; pool_BR.print();
+        // std::cout << "pool BC:" << std::endl; pool_BC.print();
 
         ifft(*CdFx, *RdFx);
         ifft(*CdFy, *RdFy);
         ifft(*CdFz, *RdFz);
-        ifft(Vel, *VelR);
-        
+        ifft(*Vel_reduced, *VelR);
+        // fft(*VelR, ret);
+        // C2V(ret, v);
+        // write_solution_vec("Vel1_fft.pos", v);          
+
         pool_BC.release(CdFx);
         pool_BC.release(CdFy);
         pool_BC.release(CdFz);
+        pool_BC.release(Vel_reduced);
+        // std::cout << "pool BR:" << std::endl; pool_BR.print();
+        // std::cout << "pool BC:" << std::endl; pool_BC.print();
 
-        BR_vec* resR = pool_BR.take();
+        // fft(*RdFx, ret);
+        // C2V(ret, v);
+        // write_solution_vec("RdFx1_fft.pos", v); 
+        // fft(*RdFy, ret);
+        // C2V(ret, v);
+        // write_solution_vec("RdFy1_fft.pos", v); 
+        // fft(*RdFz, ret);
+        // C2V(ret, v);
+        // write_solution_vec("RdFz1_fft.pos", v); 
+
         kern->multiply_advection(VelR->x, VelR->y, VelR->z, RdFx->x, RdFx->y, RdFx->z, RdFy->x, RdFy->y, RdFy->z, RdFz->x, RdFz->y, RdFz->z, resR->x, resR->y, resR->z);
 
         fft(*resR, ret);
         // imag_vec(ret); //make sure it's pure imag after approximate advection!
-        
+        // C2V(ret, v);
+        // write_solution_vec("ret2.pos", v);
+        // C2V(Vel, v);
+        // write_solution_vec("Vel2.pos", v);        
+        // C2V(Func, v);
+        // write_solution_vec("f2.pos", v);
+        // vec_ops->stop_use_vector(v); vec_ops->free_vector(v);
         pool_BR.release(resR);
         pool_BR.release(RdFx);
         pool_BR.release(RdFy);
         pool_BR.release(RdFz);
         pool_BR.release(VelR);
+
+        // std::cout << "pool BR:" << std::endl; pool_BR.print();
+        // std::cout << "pool BC:" << std::endl; pool_BC.print();
 
     }
 

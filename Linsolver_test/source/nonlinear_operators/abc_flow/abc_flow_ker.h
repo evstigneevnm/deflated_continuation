@@ -110,6 +110,8 @@ struct abc_flow_ker
 
     void copy3(TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z);
 
+    void copy_mul_poinwise_3(TC_vec mask, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z);
+
     void B_ABC_exact(TR coeff, TR_vec ux, TR_vec uy, TR_vec uz);
 
     void apply_iLaplace3_plus_E(TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR a, TR b);

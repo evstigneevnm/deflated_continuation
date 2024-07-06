@@ -763,7 +763,7 @@ public:
         }
 
         fft(*UR0, *UC0);
-        imag_vec(*UC0);
+        // imag_vec(*UC0);
         project(*UC0);
         for(int st=0;st<steps;st++)
         {
@@ -933,35 +933,29 @@ private:
         BC_vec* CdFx = pool_BC.take();
         BC_vec* CdFy = pool_BC.take();
         BC_vec* CdFz = pool_BC.take();
-        
+        BC_vec* Vel_reduced = pool_BC.take();
+        kern->apply_grad3(Func.x, Func.y, Func.z, mask23, grad_x, grad_y, grad_z, CdFx->x, CdFx->y, CdFx->z, CdFy->x, CdFy->y, CdFy->z, CdFz->x, CdFz->y, CdFz->z);
+        kern->copy_mul_poinwise_3(mask23, Vel.x, Vel.y, Vel.z, Vel_reduced->x, Vel_reduced->y, Vel_reduced->z);
         BR_vec* RdFx = pool_BR.take();
         BR_vec* RdFy = pool_BR.take();
         BR_vec* RdFz = pool_BR.take();
         BR_vec* VelR = pool_BR.take();
-
-        kern->apply_grad3(Func.x, Func.y, Func.z, mask23, grad_x, grad_y, grad_z, CdFx->x, CdFx->y, CdFx->z, CdFy->x, CdFy->y, CdFy->z, CdFz->x, CdFz->y, CdFz->z);
-
+        BR_vec* resR = pool_BR.take();  
         ifft(*CdFx, *RdFx);
         ifft(*CdFy, *RdFy);
         ifft(*CdFz, *RdFz);
-        ifft(Vel, *VelR);
-        
+        ifft(*Vel_reduced, *VelR);
         pool_BC.release(CdFx);
         pool_BC.release(CdFy);
         pool_BC.release(CdFz);
-
-        BR_vec* resR = pool_BR.take();
+        pool_BC.release(Vel_reduced);
         kern->multiply_advection(VelR->x, VelR->y, VelR->z, RdFx->x, RdFx->y, RdFx->z, RdFy->x, RdFy->y, RdFy->z, RdFz->x, RdFz->y, RdFz->z, resR->x, resR->y, resR->z);
-
         fft(*resR, ret);
-        imag_vec(ret); //make sure it's pure imag after approximate advection!
-        
         pool_BR.release(resR);
         pool_BR.release(RdFx);
         pool_BR.release(RdFy);
         pool_BR.release(RdFz);
         pool_BR.release(VelR);
-
     }
 
     void init_all_derivatives()
@@ -1006,10 +1000,10 @@ private:
 
     }
 
-    void imag_vec(BC_vec& U_in_place)
-    {
-        kern->imag_vector(U_in_place.x, U_in_place.y, U_in_place.z);
-    }
+    // void imag_vec(BC_vec& U_in_place)
+    // {
+        // kern->imag_vector(U_in_place.x, U_in_place.y, U_in_place.z);
+    // }
 
     void set_gradient_coefficients_low_level()
     {

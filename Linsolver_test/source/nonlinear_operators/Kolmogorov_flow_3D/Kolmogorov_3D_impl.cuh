@@ -980,6 +980,30 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::copy3(TC_ve
 }
 
 
+template<typename TC, typename TC_vec>
+__global__ void copy_mul_poinwise_3_kernel(TC_vec mask, TC_vec u_x, TC_vec u_y, TC_vec u_z, size_t N, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i>=N) return;
+    auto mask_l = mask[i];
+    TC vx = u_x[i];
+    v_x[i] = vx*mask_l;
+
+    TC vy = u_y[i];
+    v_y[i] = vy*mask_l;
+    
+    TC vz = u_z[i];
+    v_z[i] = vz*mask_l;
+
+
+}
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::copy_mul_poinwise_3(TC_vec mask, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+{
+
+    copy_mul_poinwise_3_kernel<TC, TC_vec><<<dimGrid1C, dimBlock1>>>(mask, u_x, u_y, u_z, Nx*Ny*Mz, v_x, v_y, v_z);
+
+}
 
 
 template<typename T, typename T_vec>

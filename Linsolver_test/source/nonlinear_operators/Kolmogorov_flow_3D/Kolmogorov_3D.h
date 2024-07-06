@@ -923,8 +923,8 @@ private:
         //adjust pool sizes!!!
         pool_R.alloc_all(vec_ops_R, 1);
         pool_C.alloc_all(vec_ops_C, 1);
-        pool_BR.alloc_all(vec_ops_R, 5);
-        pool_BC.alloc_all(vec_ops_C, 6);        
+        pool_BR.alloc_all(vec_ops_R, 7);
+        pool_BC.alloc_all(vec_ops_C, 7);        
 
 
 
@@ -935,38 +935,34 @@ private:
     //V, F and ret are block vectors.
     void B_V_nabla_F(const BC_vec& Vel, const BC_vec& Func, BC_vec& ret)
     {
+  
         BC_vec* CdFx = pool_BC.take();
         BC_vec* CdFy = pool_BC.take();
         BC_vec* CdFz = pool_BC.take();
-        
+        BC_vec* Vel_reduced = pool_BC.take();
+        kern->apply_grad3(Func.x, Func.y, Func.z, mask23, grad_x, grad_y, grad_z, CdFx->x, CdFx->y, CdFx->z, CdFy->x, CdFy->y, CdFy->z, CdFz->x, CdFz->y, CdFz->z);
+        kern->copy_mul_poinwise_3(mask23, Vel.x, Vel.y, Vel.z, Vel_reduced->x, Vel_reduced->y, Vel_reduced->z);
         BR_vec* RdFx = pool_BR.take();
         BR_vec* RdFy = pool_BR.take();
         BR_vec* RdFz = pool_BR.take();
         BR_vec* VelR = pool_BR.take();
-
-        kern->apply_grad3(Func.x, Func.y, Func.z, mask23, grad_x, grad_y, grad_z, CdFx->x, CdFx->y, CdFx->z, CdFy->x, CdFy->y, CdFy->z, CdFz->x, CdFz->y, CdFz->z);
-
+        BR_vec* resR = pool_BR.take();  
         ifft(*CdFx, *RdFx);
         ifft(*CdFy, *RdFy);
         ifft(*CdFz, *RdFz);
-        ifft(Vel, *VelR);
-        
+        ifft(*Vel_reduced, *VelR);
         pool_BC.release(CdFx);
         pool_BC.release(CdFy);
         pool_BC.release(CdFz);
-
-        BR_vec* resR = pool_BR.take();
+        pool_BC.release(Vel_reduced);
         kern->multiply_advection(VelR->x, VelR->y, VelR->z, RdFx->x, RdFx->y, RdFx->z, RdFy->x, RdFy->y, RdFy->z, RdFz->x, RdFz->y, RdFz->z, resR->x, resR->y, resR->z);
-
         fft(*resR, ret);
         imag_vec(ret); //make sure it's pure imag after approximate advection!
-        
         pool_BR.release(resR);
         pool_BR.release(RdFx);
         pool_BR.release(RdFy);
         pool_BR.release(RdFz);
         pool_BR.release(VelR);
-
     }
 
     void init_all_derivatives()
