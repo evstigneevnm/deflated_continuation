@@ -195,9 +195,9 @@ __global__ void vec2complex_kernel(size_t N, T_vec v_in, TC_vec u_x, TC_vec u_y,
     u_y[0] = TC(0,0);
     u_z[0] = TC(0,0);
 
-    u_x[i+1] = TC(0, v_in[i]);
-    u_y[i+1] = TC(0, v_in[i+(N-1)]);
-    u_z[i+1] = TC(0, v_in[i+2*(N-1)]);    
+    u_x[i+1] = TC(v_in[i], v_in[i + (N-1)] );
+    u_y[i+1] = TC(v_in[i+2*(N-1)], v_in[i+3*(N-1)]);
+    u_z[i+1] = TC(v_in[i+4*(N-1)], v_in[i+5*(N-1)]);   
 
 }
 
@@ -309,6 +309,71 @@ void nonlinear_operators::Taylor_Green_ker<TR, TR_vec, TC, TC_vec>::force_ABC(TR
 
 
 
+template<typename T, typename T_vec, typename TC, typename TC_vec>
+__global__ void solution_Taylor_Green_kernel(T L, size_t Nx, size_t Ny, size_t Nz, T_vec force_x, T_vec force_y, T_vec force_z)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+    T x = T(j)*T(L*2.0*M_PI)/T(Nx);
+    T y = T(k)*T(L*2.0*M_PI)/T(Ny);
+    T z = T(l)*T(L*2.0*M_PI)/T(Nz);
+
+    force_x[I3(j,k,l)] = sin(x)*cos(y)*cos(z);
+    force_y[I3(j,k,l)] = -cos(x)*sin(y)*cos(z);
+    force_z[I3(j,k,l)] = 0;
+
+}
+}
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Taylor_Green_ker<TR, TR_vec, TC, TC_vec>::solution_Taylor_Green(TR_vec force_x, TR_vec force_y, TR_vec force_z)
+{
+    solution_Taylor_Green_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNR, dimBlockN>>>(L, Nx, Ny, Nz, force_x, force_y, force_z);
+}
+
+
+template<typename T, typename T_vec, typename TC, typename TC_vec>
+__global__ void residual_Taylor_Green_kernel(T L, T nu, size_t Nx, size_t Ny, size_t Nz, T_vec force_x, T_vec force_y, T_vec force_z)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+    T x = T(j)*T(L*2.0*M_PI)/T(Nx);
+    T y = T(k)*T(L*2.0*M_PI)/T(Ny);
+    T z = T(l)*T(L*2.0*M_PI)/T(Nz);
+
+    force_x[I3(j,k,l)] = 0.25*(12.0*nu*cos(y)*cos(z)+cos(x)*cos(2*z) )*sin(x);//1.0/4.0*M_PI*(cos(x-2*z)+24.0*M_PI*nu*(cos(y-z)+cos(y+z))+cos(x+2*z))*sin(x); //0.25*(12.0*nu*cos(y)*cos(z)+cos(x)*sin(2*z) )*sin(x);
+    force_y[I3(j,k,l)] = -3.0*nu*cos(x)*cos(z)*sin(y)+0.125*cos(2*z)*sin(2*y);//1.0/4.0*M_PI*(cos(y-2*z)-24.0*M_PI*nu*(cos(x-z)+cos(x+z))+cos(y+2*z))*sin(y); //-3.0*nu*cos(x)*cos(z)*sin(y)+0.125*cos(2*z)*sin(2*y);
+    force_z[I3(j,k,l)] = -0.125*(cos(2*x)+cos(2*y))*sin(2*z);//-1.0/4.0*M_PI*(cos(2*x)+cos(2*y))*sin(2*z);//-0.125*(cos(2*x)+cos(2*y))*sin(2*z);
+
+}
+}
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Taylor_Green_ker<TR, TR_vec, TC, TC_vec>::residual_Taylor_Green(TR nu, TR_vec force_x, TR_vec force_y, TR_vec force_z)
+{
+    residual_Taylor_Green_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNR, dimBlockN>>>(L, nu, Nx, Ny, Nz, force_x, force_y, force_z);
+}
+
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
 __global__ void complex2vec_kernel(size_t N, TC_vec u_x, TC_vec u_y, TC_vec u_z, T_vec v_out)
@@ -316,9 +381,14 @@ __global__ void complex2vec_kernel(size_t N, TC_vec u_x, TC_vec u_y, TC_vec u_z,
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i>=N-1) return; //N-1 due to zero in the begining
     
-    v_out[i] = T(u_x[i+1].imag());
-    v_out[i+(N-1)] = T(u_y[i+1].imag());
-    v_out[i+2*(N-1)] = T(u_z[i+1].imag());
+    v_out[i] = T(u_x[i+1].real());
+    v_out[i+(N-1)] = T(u_x[i+1].imag());
+    
+    v_out[i+2*(N-1)] = T(u_y[i+1].real());
+    v_out[i+3*(N-1)] = T(u_y[i+1].imag());    
+    
+    v_out[i+4*(N-1)] = T(u_z[i+1].real()); 
+    v_out[i+5*(N-1)] = T(u_z[i+1].imag());
 
 }
 
@@ -466,39 +536,39 @@ void nonlinear_operators::Taylor_Green_ker<TR, TR_vec, TC, TC_vec>::apply_smooth
 }
 
 
-template<typename T, typename T_vec, typename TC, typename TC_vec>
-__global__ void imag_vector_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec v_x, TC_vec v_y, TC_vec v_z)
-{
-unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
-unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
-gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
-index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
-if ( index_in < sizeOfData )
-{
-    t1 =  index_in/Nz; 
-    zIndex = index_in - Nz*t1 ;
-    xIndex =  t1/Ny; 
-    yIndex = t1 - Ny * xIndex ;
-    unsigned int j=xIndex, k=yIndex, l=zIndex;
-//  operation starts from here:
+// template<typename T, typename T_vec, typename TC, typename TC_vec>
+// __global__ void imag_vector_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+// {
+// unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+// unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+// gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+// index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+// if ( index_in < sizeOfData )
+// {
+//     t1 =  index_in/Nz; 
+//     zIndex = index_in - Nz*t1 ;
+//     xIndex =  t1/Ny; 
+//     yIndex = t1 - Ny * xIndex ;
+//     unsigned int j=xIndex, k=yIndex, l=zIndex;
+// //  operation starts from here:
     
 
-    v_x[I3(j,k,l)] = TC(0.0, v_x[I3(j,k,l)].imag());
-    v_y[I3(j,k,l)] = TC(0.0, v_y[I3(j,k,l)].imag());
-    v_z[I3(j,k,l)] = TC(0.0, v_z[I3(j,k,l)].imag());
+//     v_x[I3(j,k,l)] = TC(0.0, v_x[I3(j,k,l)].imag());
+//     v_y[I3(j,k,l)] = TC(0.0, v_y[I3(j,k,l)].imag());
+//     v_z[I3(j,k,l)] = TC(0.0, v_z[I3(j,k,l)].imag());
 
-    v_x[0] = TC(0,0);
-    v_y[0] = TC(0,0);
-    v_z[0] = TC(0,0);
-}
-}
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Taylor_Green_ker<TR, TR_vec, TC, TC_vec>::imag_vector(TC_vec v_x, TC_vec v_y, TC_vec v_z)
-{
+//     v_x[0] = TC(0,0);
+//     v_y[0] = TC(0,0);
+//     v_z[0] = TC(0,0);
+// }
+// }
+// template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+// void nonlinear_operators::Taylor_Green_ker<TR, TR_vec, TC, TC_vec>::imag_vector(TC_vec v_x, TC_vec v_y, TC_vec v_z)
+// {
 
-    imag_vector_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, v_x, v_y, v_z);
+//     imag_vector_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, v_x, v_y, v_z);
 
-}
+// }
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
 __global__ void apply_iLaplace_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec Laplace,  TC_vec v, T coeff)

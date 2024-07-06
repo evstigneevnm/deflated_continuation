@@ -24,8 +24,8 @@ struct int3_t
 template<typename TR, typename TR_vec, typename TC, typename TC_vec>
 struct Taylor_Green_ker
 {
-    Taylor_Green_ker(TR alpha_, size_t Nx_, size_t Ny_, size_t Nz_, size_t Mz_, unsigned int BLOCKSIZE_x_, unsigned int BLOCKSIZE_y_):
-    Nx(Nx_),Ny(Ny_),Nz(Nz_),Mz(Mz_), alpha(alpha_), BLOCKSIZE_x(BLOCKSIZE_x_), BLOCKSIZE_y(BLOCKSIZE_y_)
+    Taylor_Green_ker(TR L_, size_t Nx_, size_t Ny_, size_t Nz_, size_t Mz_, unsigned int BLOCKSIZE_x_, unsigned int BLOCKSIZE_y_):
+    Nx(Nx_),Ny(Ny_),Nz(Nz_),Mz(Mz_), L(L_), BLOCKSIZE_x(BLOCKSIZE_x_), BLOCKSIZE_y(BLOCKSIZE_y_)
     {
         BLOCKSIZE = BLOCKSIZE_x*BLOCKSIZE_y;
         NR = Nx*Ny*Nz;
@@ -50,6 +50,10 @@ struct Taylor_Green_ker
     void force_Fourier_sin_cos(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z);    
 
     void force_ABC(TR_vec force_x, TR_vec force_y, TR_vec force_z);
+
+    void solution_Taylor_Green(TR_vec force_x, TR_vec force_y, TR_vec force_z);
+
+    void residual_Taylor_Green(TR nu, TR_vec force_x, TR_vec force_y, TR_vec force_z);
 
     void vec2complex(TR_vec v_in, TC_vec u_x, TC_vec u_y, TC_vec u_z);
 
@@ -78,11 +82,11 @@ struct Taylor_Green_ker
     void apply_abs(TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v);
     void apply_abs(size_t Nx, size_t Ny, size_t Nz, TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v);
     void apply_scale_inplace(size_t Nx_l, size_t Ny_l, size_t Nz_l, TR scale, TR_vec ux, TR_vec uy, TR_vec uz);
-    void add_mul3(TR alpha, TR_vec u_x, TR_vec u_y, TR_vec u_z, TR_vec v_x, TR_vec v_y, TR_vec v_z);
+    void add_mul3(TR L, TR_vec u_x, TR_vec u_y, TR_vec u_z, TR_vec v_x, TR_vec v_y, TR_vec v_z);
 
-    void add_mul3(TC alpha, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z);
+    void add_mul3(TC L, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z);
 
-    void apply_mask(TR alpha, TC_vec mask_2_3);
+    void apply_mask(TR L, TC_vec mask_2_3);
 
     void apply_grad3(TC_vec u1, TC_vec u2, TC_vec u3, TC_vec mask, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v1_x, TC_vec v1_y, TC_vec v1_z, TC_vec v2_x, TC_vec v2_y, TC_vec v2_z, TC_vec v3_x, TC_vec v3_y, TC_vec v3_z);
 
@@ -111,7 +115,7 @@ private:
     unsigned int BLOCKSIZE_x, BLOCKSIZE_y, BLOCKSIZE;
     size_t Nx, Ny, Nz, Mz;
     size_t N, NR, NC;
-    TR alpha;
+    TR L;
     //for 1D-like operations:
     dim3 dimBlock1;
     dim3 dimGrid1;

@@ -140,7 +140,6 @@ private:
     typedef vector_pool<BR_vec> pool_BR_t;
     typedef vector_pool<BC_vec> pool_BC_t;
 
-
     //calss for low level CUDA kernels
     typedef Taylor_Green_ker<TR, TR_vec, TC, TC_vec> kern_t;
     
@@ -269,7 +268,6 @@ public:
         B_V_nabla_F(U, U, W); //W:= (U, nabla) U
         project(W); // W:=P[W]
         kern->negate3(W.x, W.y, W.z); //W:=-W;
-        // U := \nabla^2 U
         if(homotopy_ > 0.0)
         {
             auto homotopy_4 = homotopy_*homotopy_*homotopy_*homotopy_;
@@ -629,10 +627,30 @@ public:
         C2V(*UA, u_out);
         pool_BC.release(UA);        
     }
+    void exact_solution_Taylor_Green(const T& Reynolds, T_vec& u_out)
+    {
+        BR_vec* UR = pool_BR.take();
+        BC_vec* UC = pool_BC.take();
+        kern->solution_Taylor_Green(UR->x, UR->y, UR->z);      
+        fft(*UR, *UC);
+        C2V(*UC, u_out);
+        pool_BC.release(UC);
+        pool_BR.release(UR);          
+    }
+    void residual_Taylor_Green(const T& Reynolds, T_vec& u_out)
+    {
+        BR_vec* UR = pool_BR.take();
+        BC_vec* UC = pool_BC.take();
+        kern->residual_Taylor_Green(1.0/Reynolds, UR->x, UR->y, UR->z);
+        fft(*UR, *UC);
+        C2V(*UC, u_out);
+        pool_BC.release(UC);
+        pool_BR.release(UR);
+    }
 
     void exact_solution(const T& Reynolds, T_vec& u_out)
     {       
-        exact_solution_sin(Reynolds, u_out);
+        exact_solution_Taylor_Green(Reynolds, u_out);
     }
 
 
@@ -865,13 +883,31 @@ private:
         if(solution_number == 0)
         {
             T Reynolds = 5.0;
-            T_vec u_manufactured, resid;
-            vec_ops->init_vectors(u_manufactured, resid); vec_ops->start_use_vectors(u_manufactured, resid); 
+            T_vec u_manufactured, resid, analytic_resid;
+            vec_ops->init_vectors(u_manufactured, resid, analytic_resid); vec_ops->start_use_vectors(u_manufactured, resid, analytic_resid); 
             exact_solution(Reynolds, u_manufactured);
+            auto div_manufactured = div_norm(u_manufactured);
+
+            write_solution_vec("u_manufactured_vec.pos", u_manufactured);
+            write_solution_abs("u_manufactured_abs.pos", u_manufactured);
             solution_norm = vec_ops->norm_l2(u_manufactured);
             F(u_manufactured, Reynolds, resid);
+            auto div_resid = div_norm(resid);
+
+            residual_Taylor_Green(Reynolds, analytic_resid);
+            auto div_analytic_resid = div_norm(analytic_resid);
+
+            std::cout << "divergence norms: " << "div_manufactured(" << div_manufactured << ") div_resid(" << div_resid << ") div_analytic_resid(" << div_analytic_resid << ")" << std::endl;
+
+            write_solution_vec("resid_vec.pos", resid);
+            write_solution_vec("analytic_resid_vec.pos", analytic_resid);
+            write_solution_abs("resid_abs.pos", resid);
+            write_solution_abs("analytic_resid_abs.pos", analytic_resid);            
+            vec_ops->add_mul(1, analytic_resid, resid);
+            write_solution_vec("diff_resid_vec.pos", resid);
+            write_solution_abs("diff_resid_abs.pos", resid);
             resid_norm = vec_ops->norm_l2(resid)/solution_norm;
-            vec_ops->stop_use_vectors(u_manufactured, resid); vec_ops->free_vectors(u_manufactured, resid); 
+            vec_ops->stop_use_vectors(u_manufactured, resid, analytic_resid); vec_ops->free_vectors(u_manufactured, resid, analytic_resid, analytic_resid);
         }
         return {solution_norm, resid_norm};
     }
@@ -918,8 +954,8 @@ private:
         //adjust pool sizes!!!
         pool_R.alloc_all(vec_ops_R, 1);
         pool_C.alloc_all(vec_ops_C, 1);
-        pool_BR.alloc_all(vec_ops_R, 5);
-        pool_BC.alloc_all(vec_ops_C, 6);        
+        pool_BR.alloc_all(vec_ops_R, 7);
+        pool_BC.alloc_all(vec_ops_C, 7);        
 
 
 
