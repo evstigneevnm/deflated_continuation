@@ -12,6 +12,7 @@
 #include <common/gpu_vector_operations.h>
 #include <string>
 #include <type_traits>
+#include <scfd/utils/cuda_ownutils.h>
 
 #define Blocks_x_ 32
 #define Blocks_y_ 16
@@ -70,7 +71,7 @@ int main(int argc, char const *argv[])
     real R = std::atof(argv[1]);
     size_t N = std::atoi(argv[2]);
 
-    init_cuda(-1);
+    scfd::utils::init_cuda(-1);
     size_t Nx = N;
     size_t Ny = N;
     size_t Nz = N;

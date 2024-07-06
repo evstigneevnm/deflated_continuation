@@ -13,6 +13,8 @@
 #include <common/gpu_matrix_file_operations.h>
 #include <external_libraries/lapack_wrap.h>
 
+
+//TODO: make a better test case
 int main(int argc, char const *argv[])
 {
     int N=100;

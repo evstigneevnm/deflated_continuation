@@ -81,8 +81,8 @@ cufft_test.bin: source/models/tests/cufft_test.cpp
 
 cufft_test_2D.bin: source/models/tests/cufft_test_2D.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/cufft_test_kernels.cu -c -o O/cufft_test_kernels.o 2>results.make
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/cufft_test_2D.cpp O/cufft_test_kernels.o $(LIBS2) -o cufft_test_2D.bin 2>results.make
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/cufft_test_2D_1.cpp O/cufft_test_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o cufft_test_2D_1.bin 2>results.make
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/cufft_test_2D.cpp O/cufft_test_kernels.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LIBS3) -o cufft_test_2D.bin 2>results.make
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/cufft_test_2D_1.cpp O/cufft_test_kernels.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LIBS3) -o cufft_test_2D_1.bin 2>results.make
 
 gpu_vector_operations.bin:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/gpu_vector_operations_kernels.cu -c -o O/gpu_vector_operations_kernels.o 2>results.make
@@ -97,7 +97,7 @@ gpu_vector_operations_ker:
 gpu_matrix_vector_operations_ker:
 	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)   source/common/gpu_matrix_vector_operations_kernels.cu -c -o O/gpu_matrix_vector_operations_kernels.o 2>results.make
 gpu_matrix_vector_operations.bin:
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/test_matrix_vector_operations.cpp $(LLAPACK) $(LIBS1) O/gpu_vector_operations_kernels.o O/gpu_reduction_ogita_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_matrix_vector_operations.bin 2>results.make	
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/test_matrix_vector_operations.cpp $(LLAPACK) $(LIBS3) O/gpu_vector_operations_kernels.o O/gpu_reduction_ogita_kernels.o O/gpu_matrix_vector_operations_kernels.o -o test_matrix_vector_operations.bin 2>results.make	
 
 
 Kuramoto_Sivashinskiy_2D_ker:
