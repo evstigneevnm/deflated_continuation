@@ -31,7 +31,8 @@ public:
     nfailed_(0),
     converged_(true),
     adaptation_name_("PID"),
-    k_safe(0.9)
+    k_safe(0.9),
+    number_of_ok_steps_(0)
     {
         // vec_ops_->init_vectors(delta_np1_, delta_n_, delta_nm1_);
         // vec_ops_->start_use_vectors(delta_np1_, delta_n_, delta_nm1_);
@@ -113,6 +114,7 @@ public:
 
         if(reject_step_)
         {
+            number_of_ok_steps_ = 0;
             dt_ *= 0.5; //divide by 2 if the step failed and try again.
 
             if( std::abs(dt_-dt_min_) <= std::numeric_limits<T>::epsilon() )
@@ -124,7 +126,12 @@ public:
         }
         else if(force_globalization_)
         {
-            dt_ *= 2.0; //some primitive flobalization method.
+            if( (number_of_ok_steps_++) > 5)
+            {
+                dt_ *= 1.5; //some primitive flobalization method.
+                number_of_ok_steps_ = 0;
+                log_->info_f("time_step_adaptation::force_globalization: timestep increased to %le", static_cast<double>(dt_) );
+            }
         }
         else
         {
@@ -175,6 +182,7 @@ protected:
     mutable bool reject_step_;
     mutable bool converged_;
     std::size_t nfailed_;
+    std::size_t number_of_ok_steps_;
     std::string adaptation_name_;
     std::deque<T> deltas;
     std::deque<T> timesteps;

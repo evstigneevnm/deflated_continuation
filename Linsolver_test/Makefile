@@ -39,6 +39,10 @@ LLAPACK = -L$(OPENBLAS_ROOT_PATH)/lib -lopenblas
 test_cpu_vector_operations.bin: test_cpu_vector_operations.cpp
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_cpu_vector_operations.cpp $(OPENMP) -o test_cpu_vector_operations.bin 2>results.make
 
+test_multivector.bin: source/common/tests/test_multivector.cpp
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_multivector.cpp $(OPENMP) -o test_multivector.bin 2>results.make
+
+
 test_cpu_glued_vector_operations.bin:
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_cpu_glued_vector_operations.cpp $(OPENMP) -o test_cpu_glued_vector_operations.bin 2>results.make
 
@@ -68,6 +72,9 @@ cpu_1st_call_alloc_test.bin: source/numerical_algos/lin_solvers/tests/cpu_1st_ca
 
 sm_test.bin: source/numerical_algos/lin_solvers/tests/sm_test.cpp
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/numerical_algos/lin_solvers/tests/sm_test.cpp -o sm_test.bin 2>results.make $(OPENMP)
+
+iterative_solvers_test.bin: source/numerical_algos/lin_solvers/tests/iterative_solvers_test.cpp
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/numerical_algos/lin_solvers/tests/iterative_solvers_test.cpp -o iterative_solvers_test.bin 2>results.make $(OPENMP)
 
 exact_linsolver_test.bin: source/numerical_algos/lin_solvers/tests/exact_solver_test.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/numerical_algos/lin_solvers/tests/exact_solver_test.cpp O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o exact_solver_test.bin 2>results.make 

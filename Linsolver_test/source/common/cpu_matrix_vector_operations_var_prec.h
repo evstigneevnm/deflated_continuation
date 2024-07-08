@@ -2,7 +2,8 @@
 #define __cpu_matrix_vector_operations_var_prec_H__
 
 
-
+#include <cmath>
+#include <random>
 #include <stdexcept>
 #include <vector> 
 #include <algorithm>
@@ -10,11 +11,36 @@
 #include <omp.h>
 #include <common/macros.h>
 
+#if defined(BOOST_MP_CPP_BIN_FLOAT_HPP)||defined(BOOST_MP_CPP_INT_HPP)
+#define __cpu_matrix_vector_operations_var_prec_H_use_boost__
+#endif
 
 template <class VectorOperations>
 struct cpu_matrix_vector_operations_var_prec
 {
-    
+private:
+    #ifdef __cpu_matrix_vector_operations_var_prec_H_use_boost__
+        template<class T>
+        auto sqrt(T val)const {return boost::multiprecision::sqrt(val);}
+        template<class T>
+        auto abs(T val)const {return boost::multiprecision::abs(val);}
+        template<class T>
+        auto fma(T a, T b, T c)const{return boost::multiprecision::fma(a,b,c);}
+
+
+    #else
+        template<class T>
+        auto sqrt(T val)const {return std::sqrt(val);}
+        template<class T>
+        auto abs(T val)const {return std::abs(val);}     
+        template<class T>
+        auto fma(T a, T b, T c)const {return std::fma(a,b,c);}
+
+    #endif
+
+
+
+public:
     using scalar_type = typename VectorOperations::scalar_type;
     using vector_type = typename VectorOperations::vector_type;
     using matrix_type = std::vector<scalar_type>;
@@ -54,7 +80,6 @@ struct cpu_matrix_vector_operations_var_prec
 
     void init_matrix(matrix_type& x)const 
     {
-
     } 
     template<class ...Args>
     void init_matrices(Args&&...args) const
@@ -88,11 +113,11 @@ struct cpu_matrix_vector_operations_var_prec
     {
         std::initializer_list<int>{((void)stop_use_matrix(std::forward<Args>(args)), 0 )...};
     }      
-    size_t get_rows()
+    size_t get_rows() const
     {
         return sz_rows;
     }
-    size_t get_cols()
+    size_t get_cols() const
     {
         return sz_cols;
     }
@@ -149,7 +174,7 @@ struct cpu_matrix_vector_operations_var_prec
         }        
     }
 
-    void set_matrix_value(matrix_type& mat, const scalar_type& val, const size_t row_number, const size_t col_number)
+    void set_matrix_value(matrix_type& mat, const scalar_type& val, const size_t row_number, const size_t col_number) const
     {
         mat[I2_R(row_number,col_number,sz_rows)] = val;
     }
@@ -159,6 +184,8 @@ struct cpu_matrix_vector_operations_var_prec
         assign_random(mat, static_cast<scalar_type>(0.0), static_cast<scalar_type>(1.0) );
 
     }
+
+    #ifdef __cpu_matrix_vector_operations_var_prec_H_use_boost__
     void assign_random(matrix_type& mat, scalar_type a, scalar_type b) const
     {
         #pragma omp parallel for
@@ -175,8 +202,26 @@ struct cpu_matrix_vector_operations_var_prec
             }
         }
     }
+    #else
+    void assign_random(matrix_type& mat, scalar_type a, scalar_type b) const
+    {
+        #pragma omp parallel for
+        for(size_t j=0;j<sz_rows;j++)
+        {
+            
+            std::independent_bits_engine<std::mt19937_64, std::numeric_limits<T>::digits, uint64_t> gen;
+            auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+            gen.seed( j ); //fix for debug
+            std::uniform_real_distribution<T> ur(a, b);
+            for(size_t k=0;k<sz_cols;k++)
+            {
+                mat[I2_R(j,k,sz_rows)] = ur(gen);
+            }
+        }
+    }
+    #endif
 
-    void make_zero_columns(const matrix_type& matA, size_t col_from, size_t col_to, matrix_type& retA)
+    void make_zero_columns(const matrix_type& matA, size_t col_from, size_t col_to, matrix_type& retA) const
     {
         for(size_t k = 0; k<sz_cols; ++k)
         {
@@ -201,7 +246,7 @@ struct cpu_matrix_vector_operations_var_prec
     //general GEMV operation
     //void gemv(const char op, size_t RowA, const T *A, size_t ColA, size_t LDimA, const T alpha, const T *x, const T beta, T *y);
     // y <- alpha op(A)x + beta y
-    void gemv(const char op, const matrix_type& mat, const scalar_type alpha, const vector_type& x, const scalar_type beta, vector_type& y)
+    void gemv(const char op, const matrix_type& mat, const scalar_type alpha, const vector_type& x, const scalar_type beta, vector_type& y) const
     {
         // cuBLAS->gemv<scalar_type>(op, sz_rows, mat, sz_cols, sz_rows, alpha, x, beta, y);
         
@@ -253,7 +298,7 @@ struct cpu_matrix_vector_operations_var_prec
     // dot product of each matrix colums with a vector starting from 0 up till column number max_col-1
     //  vector 'x' should be sized sz_rows, 'y' should be the size of max_col at least
     //  y = alpha.*A(:,0:max_col-1)'*x + beta.*y
-    void mat2column_dot_vec(const matrix_type& mat, size_t max_col, const scalar_type alpha, const vector_type& x, const scalar_type beta, vector_type& y)
+    void mat2column_dot_vec(const matrix_type& mat, size_t max_col, const scalar_type alpha, const vector_type& x, const scalar_type beta, vector_type& y) const
     {
         if(max_col<=sz_cols)
         {
@@ -285,7 +330,7 @@ struct cpu_matrix_vector_operations_var_prec
     // gemv of a matrix that starts from from 0 up till column number max_col-1
     //  vector 'x' should be sized max_col at least, 'y' should be sized sz_rows
      // y = alpha.*A(:,0:max_col-1)*x + beta.*y
-    void mat2column_mult_vec(const matrix_type& mat, size_t max_col, const scalar_type alpha, const vector_type& x, const scalar_type beta, vector_type& y)
+    void mat2column_mult_vec(const matrix_type& mat, size_t max_col, const scalar_type alpha, const vector_type& x, const scalar_type beta, vector_type& y) const
     {
         if(max_col<=sz_cols)
         {
@@ -318,7 +363,7 @@ struct cpu_matrix_vector_operations_var_prec
 
 
     // C = α op(A) + β B
-    void geam(const char opA, size_t RowAC, size_t ColBC, const scalar_type alpha, const matrix_type& A, const scalar_type beta, matrix_type& B, matrix_type& C)
+    void geam(const char opA, size_t RowAC, size_t ColBC, const scalar_type alpha, const matrix_type& A, const scalar_type beta, matrix_type& B, matrix_type& C) const
     {
         // cuBLAS->geam<scalar_type>(opA, RowAC, ColBC, alpha, A, RowAC,  beta, B, RowAC, C, ColBC);
         if(opA == 'T')
@@ -386,7 +431,7 @@ struct cpu_matrix_vector_operations_var_prec
         //         res = res + a_jk*a_jk;
         //     }
         // }
-        return boost::multiprecision::sqrt(res);
+        return sqrt(res);
     }
 
     //gemm of matrix matrix product. Should not be here, but let's keep it here for a while
@@ -399,7 +444,7 @@ struct cpu_matrix_vector_operations_var_prec
     //gemm of matrix matrix product. Should not be here, but let's keep it here for a while
     // C = α op ( A ) op ( B ) + β C
     // C_{j,k} = \sum_{l=0}^{colsA_rowsB} A_{j,l}*B_{l,k}, for j=1,..,colsA, k=1,..,rowsB
-    void gemm(const char opA, const char opB, const T alpha, size_t sz_row_A, size_t sz_col_A, const matrix_type& matA, size_t sz_row_B, size_t sz_col_B, size_t max_size_B, const matrix_type& matB, const T beta, matrix_type& matC)
+    void gemm(const char opA, const char opB, const T alpha, size_t sz_row_A, size_t sz_col_A, const matrix_type& matA, size_t sz_row_B, size_t sz_col_B, size_t max_size_B, const matrix_type& matB, const T beta, matrix_type& matC) const
     {
 
 
@@ -484,7 +529,7 @@ struct cpu_matrix_vector_operations_var_prec
     // C = α  A^T B + β C
     // A \in R^{NXm}, B \in R^{NXk}, C \in R^{mXk}
     // one can only change the size columns of B and C, i.e. the value of k
-    void mat_T_gemm_mat_N(const matrix_type& matA, const matrix_type& matB, size_t n_cols_B_C, const scalar_type alpha, const scalar_type beta, matrix_type& matC)
+    void mat_T_gemm_mat_N(const matrix_type& matA, const matrix_type& matB, size_t n_cols_B_C, const scalar_type alpha, const scalar_type beta, matrix_type& matC) const
     {
         if(n_cols_B_C<=sz_cols)
         { 
@@ -503,7 +548,7 @@ struct cpu_matrix_vector_operations_var_prec
     //      B: sz_col X max_col
     //      C: sz_row X max_col
     // with max_col <= sz_col
-    void mat2column_mult_mat(const matrix_type& matA, const matrix_type& matB, size_t max_col, const scalar_type alpha, const scalar_type beta, matrix_type& matC)
+    void mat2column_mult_mat(const matrix_type& matA, const matrix_type& matB, size_t max_col, const scalar_type alpha, const scalar_type beta, matrix_type& matC) const
     {
         if(max_col<=sz_cols)
         {        
@@ -517,7 +562,7 @@ struct cpu_matrix_vector_operations_var_prec
     }
 
 
-    void lup_decomposition(matrix_type& A, matrix_type& P)
+    void lup_decomposition(matrix_type& A, matrix_type& P) const
     {
         lup_decomp_s lup(A, sz_rows, sz_cols, machesp_);
         lup.permutation_matrix(P);
@@ -723,7 +768,7 @@ private:
 
                 for(size_t k = i; k < N; k++)
                 {
-                    auto abs_A = boost::multiprecision::abs( A[I2_R(k,i,N)] );
+                    auto abs_A = abs( A[I2_R(k,i,N)] );
                     if(abs_A > max_A)
                     { 
                         max_A = abs_A;
@@ -779,7 +824,7 @@ private:
     T two_prod(T &t, T a, T b) const // [1], pdf: 71, 169, 198, 
     {
         T p = a*b;
-        t = boost::multiprecision::fma(a, b, -p);
+        t = fma(a, b, -p);
         return p;
     }
 

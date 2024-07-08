@@ -48,7 +48,7 @@ int main()
     std::cout << file_name << " -> " << remove_extension(file_name) << std::endl;    
     file_name = "1.txt";
     std::cout << file_name << " -> " << remove_extension(file_name) << std::endl;    
-    file_name = "../../dwr.re/dfnwrf/Document/../dew/_324dede1.txt";
+    file_name = "../../dwr.re/dfnwrf/Document/../dew/_324d.e^d.e1.txt";
     std::cout << file_name << " -> " << remove_extension(file_name) << std::endl; 
     file_name = "~/Documents/problems/mouse.txt";
     std::cout << file_name << " -> " << remove_extension(file_name) << std::endl;

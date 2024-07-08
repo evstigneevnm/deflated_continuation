@@ -20,17 +20,14 @@
 #include <stdexcept>
 #include <cmath>
 #include <limits>
-#ifdef SCFD_ENABLE_NLOHMANN
-#include <nlohmann/json.hpp>
-#endif
 #include "detail/monitor_call_wrap.h"
-#include "detail/algo_utils_hierarchy.h"
-#include "detail/algo_params_hierarchy.h"
-#include "detail/algo_hierarchy_creator.h"
+// #include "detail/algo_utils_hierarchy.h"
+// #include "detail/algo_params_hierarchy.h"
+// #include "detail/algo_hierarchy_creator.h"
 #include "iter_solver_base.h"
 #include "detail/dense_operations.h"
 #include "detail/residual_regularization_dummy.h"
-#include "preconditioners/dummy.h"
+// #include "preconditioners/dummy.h"
 
 namespace numerical_algos
 {
@@ -45,16 +42,28 @@ namespace lin_solvers
 //Monitor concept:
 //TODOjj
 
-template
-<
-     class VectorOperations, class Monitor, class Log, 
-     class LinearOperator, class Preconditioner = preconditioners::dummy<VectorOperations,LinearOperator>,
-     class ResidualRegulariation = detail::residual_regularization_dummy,
-     class DenseOperations = detail::dense_operations<typename VectorOperations::Ord, typename VectorOperations::scalar_type> 
->
-class gmres : public iter_solver_base<VectorOperations, Monitor, Log, LinearOperator, Preconditioner>
+// template
+// <
+//      class VectorOperations, class Monitor, class Log, 
+//      class LinearOperator, class Preconditioner = preconditioners::dummy<VectorOperations,LinearOperator>,
+//      class ResidualRegulariation = detail::residual_regularization_dummy,
+//      class DenseOperations = detail::dense_operations<typename VectorOperations::Ord, typename VectorOperations::scalar_type> 
+// >
+template<
+        class LinearOperator,
+        class Preconditioner,
+        class VectorOperations,
+        class Monitor,
+        class Log,
+        class ResidualRegulariation = detail::residual_regularization_dummy,
+        class DenseOperations = detail::dense_operations<
+            std::ptrdiff_t, 
+            typename VectorOperations::scalar_type
+            > 
+        >
+class gmres : public iter_solver_base<LinearOperator, Preconditioner, VectorOperations, Monitor, Log>
 {
-    using parent_t = iter_solver_base<VectorOperations, Monitor, Log, LinearOperator, Preconditioner>;
+    using parent_t = iter_solver_base<LinearOperator, Preconditioner, VectorOperations, Monitor, Log>;
     using logged_obj_t = typename parent_t::logged_obj_t;
     using logged_obj_params_t = typename parent_t::logged_obj_params_t;
 
@@ -71,110 +80,23 @@ public:
     using residual_regulaization_t = ResidualRegulariation;
 
 
-    struct params : public logged_obj_params_t
+    struct params: public logged_obj_params_t
     {
         unsigned basis_size; //size of the krylov basis
         unsigned batch_size; //size of the batch size s.t. Ritz vector converhence is checked each batch_size inside the krylov bass size
         char preconditioner_side; //can be L for left and R for right
         bool reorthogonalization; //apply additional reorthogonalization in Gram-Schmidt process
-        typename Monitor::params monitor;
+        // typename Monitor::params monitor;
 
-        params(const std::string &log_prefix = "", const std::string &log_name = "gmres::") :
+        params(const std::string &log_prefix = "", const std::string &log_name = "gmres::"):
             logged_obj_params_t(0, log_prefix+log_name),
-            basis_size(20), 
+            basis_size(15), 
             batch_size(5), 
             preconditioner_side('R'), 
-            reorthogonalization(false), 
-            monitor( typename Monitor::params(this->log_msg_prefix) )
-        {
-        }
-        #ifdef SCFD_ENABLE_NLOHMANN
-        void from_json(const nlohmann::json& j)
-        {
-            basis_size = j.value("basis_size", basis_size);
-            batch_size = j.value("batch_size", batch_size);
-            preconditioner_side = j.value("preconditioner_side", preconditioner_side);
-            reorthogonalization = j.value("reorthogonalization", reorthogonalization);
-            monitor.from_json(j.at("monitor"));
-        }
-        nlohmann::json to_json() const
-        {
-            return
-                nlohmann::json
-                {
-                    {"type", "gmres"},
-                    {"basis_size", basis_size},
-                    {"batch_size", batch_size},
-                    {"preconditioner_side", preconditioner_side},
-                    {"reorthogonalization", reorthogonalization},
-                    {"monitor", monitor.to_json()}
-                };
-        }
-        #endif
-    };
-    struct utils
-    {
-        std::shared_ptr<vector_operations_type> vec_ops;
-        Log *log;
-        std::shared_ptr<residual_regulaization_t> residual_reg;
-        std::shared_ptr<dense_operations_t> dense_ops;
-        utils() = default;
-        utils(
-            std::shared_ptr<vector_operations_type> vec_ops_, Log *log_ = nullptr,
-            std::shared_ptr<residual_regulaization_t> residual_reg_ = std::make_shared<residual_regulaization_t>(),
-            std::shared_ptr<dense_operations_t> dense_ops_ = std::make_shared<dense_operations_t>()
-        ) : 
-            vec_ops(vec_ops_), log(log_), residual_reg(residual_reg_), dense_ops(dense_ops_) 
-        {
-        }
-    };
-    using preconditioner_params_hierarchy_type = typename numerical_algos::detail::algo_params_hierarchy<Preconditioner>::type;
-    struct params_hierarchy : public params
-    {
-        preconditioner_params_hierarchy_type preconditioner;
+            reorthogonalization(false)
+            // monitor( typename Monitor::params(this->log_msg_prefix) )
+        { }
 
-        params_hierarchy(const std::string &log_prefix = "", const std::string &log_name = "gmres::") : 
-            params(log_prefix, log_name),
-            preconditioner(this->log_msg_prefix)
-        {
-        }
-        params_hierarchy(
-            const params &prm_, 
-            const preconditioner_params_hierarchy_type &preconditioner_
-        ) : params(prm_), preconditioner(preconditioner_)
-        {
-        }
-        #ifdef SCFD_ENABLE_NLOHMANN
-        void from_json(const nlohmann::json& j)
-        {
-            params::from_json(j);
-            preconditioner.from_json(j.at("preconditioner"));
-        }
-        nlohmann::json to_json() const
-        {
-            nlohmann::json  j = params::to_json(),
-                            j_prec = preconditioner.to_json();
-            j["preconditioner"] = j_prec;
-            return j;
-        }
-        #endif
-    };
-
-    using preconditioner_utils_hierarchy_type = typename numerical_algos::detail::algo_utils_hierarchy<Preconditioner>::type;
-    struct utils_hierarchy : public utils
-    {
-        preconditioner_utils_hierarchy_type preconditioner;
-
-        utils_hierarchy() = default;
-        template<class ...Args>
-        utils_hierarchy(
-            preconditioner_utils_hierarchy_type preconditioner_,
-            Args... args
-        ) : 
-            utils(args...),
-            preconditioner(preconditioner_)
-        {        
-        }
     };
 
 private:
@@ -321,7 +243,7 @@ private:
         {
             // x = x + s[j] * V(j)
             //add_lin_comb(scalar_type mul_x, const vector_type& x, vector_type& y)
-            T_vec Vj = vec_ops_->at(V_, prms_.basis_size+1, j);
+            T_vec& Vj = vec_ops_->at(V_, prms_.basis_size+1, j);
             vec_ops_->add_lin_comb(s(j), (const T_vec)Vj, 1.0, x);          
         }
     }
@@ -342,14 +264,14 @@ public:
     }
 
     gmres(  
-        std::shared_ptr<vector_operations_type> vec_ops, 
+        const vector_operations_type *vec_ops,
         Log *log = nullptr,
         const params& prm = params(),
-        std::shared_ptr<preconditioner_type> prec = nullptr,
+        int obj_log_lev = 3,
         std::shared_ptr<residual_regulaization_t> residual_reg = std::make_shared<residual_regulaization_t>(),
         std::shared_ptr<dense_operations_t> dense_ops = std::make_shared<dense_operations_t>()
     ) : 
-        parent_t(std::move(vec_ops), log, prm, prm.monitor, std::move(prec) ), 
+        parent_t(vec_ops, log, obj_log_lev, "gmres::" ), 
         prms_(prm),
         residual_reg_(std::move(residual_reg)),
         dense_ops_(std::move(dense_ops))
@@ -359,32 +281,6 @@ public:
         init_all();
         init_error_L2_basic_type();
     }
-    gmres(  
-        std::shared_ptr<const linear_operator_type> A,
-        std::shared_ptr<vector_operations_type> vec_ops, 
-        Log *log = nullptr,
-        const params& prm = params(),
-        std::shared_ptr<preconditioner_type> prec = nullptr,
-        std::shared_ptr<residual_regulaization_t> residual_reg = std::make_shared<residual_regulaization_t>(),
-        std::shared_ptr<dense_operations_t> dense_ops = std::make_shared<dense_operations_t>()
-    ) : 
-        gmres(std::move(vec_ops),log,prm,std::move(prec),std::move(residual_reg),std::move(dense_ops))
-    {
-        parent_t::set_operator(std::move(A));
-    }
-
-    gmres(  
-        const utils_hierarchy& utils,
-        const params_hierarchy& prm = params_hierarchy()      
-    ) : 
-        gmres(  
-            utils.vec_ops, utils.log, prm,
-            numerical_algos::detail::algo_hierarchy_creator<preconditioner_type>::get(utils.preconditioner,prm.preconditioner),
-            utils.residual_reg, utils.dense_ops
-        )
-    {
-    }
-
 
     virtual bool solve(const linear_operator_type &A, const T_vec &b, T_vec &x)const
     {                
@@ -436,12 +332,13 @@ public:
             do
             {
                 T beta = vec_ops_->norm(r_);
-                T_vec V_0 = vec_ops_->at(V_, restart_+1, 0);
+                T_vec& V_0 = vec_ops_->at(V_, restart_+1, 0);
                 vec_ops_->scale(1.0/beta, r_);
                 vec_ops_->assign(r_, V_0);
                 zero_host_s(); // s(:) = 0;
                 dense_ops_->vector_at(s_, 0) = beta;
                 // std::cout << "s[0] = " << dense_ops_->vector_at(s_, 0) << std::endl;
+                // std::cout << V_0[0] << " <-> " << vec_ops_->at(V_, restart_+1, 0)[0] << std::endl;
                 i = -1;
                 do
                 {
@@ -455,10 +352,9 @@ public:
                     // Gram-Schmidt with iterative correction
                     for( int k = 0; k <= i; k++)
                     {
-                        T_vec V_k = vec_ops_->at(V_, restart_+1, k);
+                        T_vec& V_k = vec_ops_->at(V_, restart_+1, k);
                         T alpha = vec_ops_->scalar_prod(V_k, r_); // H(k,i) = (V[k],V[i+1])
                         // std::cout << "i = " << i << ", k = " << k << ", (v_k,r_) = " << alpha  << ", ||v_k|| = " << vec_ops_->norm(V_k) << std::endl;
-
                         vec_ops_->add_lin_comb(-alpha, V_k, 1.0, r_); // V(i+1) -= H(k, i) * V(k)
 
                         T c_norm = alpha;
@@ -493,7 +389,7 @@ public:
                     // H_[(i + 1)*restart_ + i] = h_ip;
                     dense_ops_->matrix_at(H_, i+1, i) = h_ip;
 
-                    T_vec V_ip1 = vec_ops_->at(V_, restart_+1, i+1);
+                    T_vec& V_ip1 = vec_ops_->at(V_, restart_+1, i+1);
                     
                     vec_ops_->scale(1.0/h_ip, r_);
                     vec_ops_->assign(r_, V_ip1);
@@ -507,7 +403,6 @@ public:
                     if((total_iterations%prms_.batch_size == 0)||(i+1 == restart_))
                     {
                         auto reduction_rate_prod = std::accumulate(reduction_rates.begin(), reduction_rates.end(), 1.0, std::multiplies<T>() );
-
                         logged_obj_t::info_f("iter = %i(%i), resid_estimate = %e, reduction = %.03f", total_iterations+1, i+1, resid_estimate, std::pow(reduction_rate_prod, 1.0/reduction_rates.size() ) );
                     }
                     if(total_iterations % prms_.batch_size == 0)
@@ -574,11 +469,11 @@ public:
                     dense_ops_->solve_upper_triangular_subsystem(H_, s_, s_h_, i+1);
                     // std::cout << "s_h_:" << std::endl;
                     // dense_ops_->print_col_vector(s_h_, 16);
-                        construct_solution(i, s_h_, y_);
-                        calc_right_precond_solution(y_);
-                        vec_ops_->add_lin_comb(1.0, y_, 1.0, x);
-                        calc_left_preconditioned_residual(A, x, b, r_);
-                        residual_reg_->apply(r_);   
+                    construct_solution(i, s_h_, y_);
+                    calc_right_precond_solution(y_);
+                    vec_ops_->add_lin_comb(1.0, y_, 1.0, x);
+                    calc_left_preconditioned_residual(A, x, b, r_);
+                    residual_reg_->apply(r_);   
                     // std::cout << "norm r = " << vec_ops_->norm(r_);
                     // exit(-1);
                 }
@@ -587,10 +482,11 @@ public:
             while(!monitor_.check_finished(x, r_) );
 
         }
-
         res = monitor_.converged();
         if(!res)
+        {
             logged_obj_t::error_f("solve: linear solver failed to converge");
+        }
         
         stop_use_all();
 
@@ -598,10 +494,7 @@ public:
     
     }
 
-    bool solve(const vector_type &b, vector_type &x)const
-    {
-        return solve(*parent_t::A_, b, x);
-    }
+
 };
 
 }

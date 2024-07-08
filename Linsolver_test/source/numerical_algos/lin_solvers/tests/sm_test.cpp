@@ -8,105 +8,27 @@
 //#include <numerical_algos/lin_solvers/bicgstab.h>
 #include <common/file_operations.h>
 #include <common/cpu_vector_operations.h>
+#include <common/cpu_matrix_vector_operations_var_prec.h>
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
-
+#include "test_matrix_liner_operator.h"
 
 using namespace numerical_algos::lin_solvers;
 using namespace numerical_algos::sherman_morrison_linear_system;
 
-typedef SCALAR_TYPE   real;
-typedef real*         vector_t;
+using real = SCALAR_TYPE;
+using vec_ops_t = cpu_vector_operations<real>;
+using vector_t = typename vec_ops_t::vector_type;
+using mat_ops_t = cpu_matrix_vector_operations_var_prec<vec_ops_t>;
+using matrix_t = typename mat_ops_t::matrix_type;
+using system_operator_t = system_operator<mat_ops_t>;
+using prec_operator_t = prec_operator<vec_ops_t, mat_ops_t>;
 
-typedef cpu_vector_operations<real> cpu_vector_operations_real;
-
-struct system_operator: public cpu_vector_operations_real
-{
-    int sz;
-    vector_t A;
-    system_operator(int sz_, vector_t& A_): 
-    sz(sz_), 
-    A(A_), 
-    cpu_vector_operations(sz_)
-    {
-    }
-
-    void apply(const vector_t& x, vector_t& f)const
-    {
-        matrix_vector_prod(x, f);
-        //assign(x, f);
-    }
-private:
-    void matrix_vector_prod(const vector_t &vec, vector_t &result)const
-    {
-
-        for (int i=0; i<sz; i++)
-        {
-            result[i] = 0;
-            for(int j=0;j<sz;j++)
-            {
-                result[i] += A[I2_R(i, j, sz)]*vec[j];
-            }
-        }
-    }
-
-};
-
-
-struct prec_operator:public cpu_vector_operations_real
-{
-    int sz;
-    vector_t iP;
-    vector_t some_vec;
-    const system_operator *op;
-
-    
-
-    prec_operator(int sz_, vector_t& iP_): 
-    sz(sz_), 
-    iP(iP_), 
-    cpu_vector_operations(sz_)
-    {
-        init_vector(some_vec); start_use_vector(some_vec);
-    }
-    ~prec_operator()
-    {
-        stop_use_vector(some_vec); free_vector(some_vec);
-    }
-
-    void set_operator(const system_operator *op_)
-    {
-        op = op_;
-    }
-
-    void apply(vector_t& x)const
-    {
-       matrix_vector_prod(x, some_vec);
-       assign(some_vec, x);
-    }
-
-private:
-
-    void matrix_vector_prod(vector_t &vec, real *result)const
-    {
-        
-        for (int i=0; i<sz; i++)
-        {
-            result[i] = 0;
-            for(int j=0;j<sz;j++)
-            {
-                result[i] += iP[I2_R(i, j, sz)]*vec[j];
-            }
-        }
-
-    }
-
-};
 
 typedef utils::log_std log_t;
-typedef default_monitor<cpu_vector_operations_real,log_t> monitor_t;
-//typedef bicgstabl<system_operator,prec_operator,cpu_vector_operations_real,monitor_t,log_t> lin_solver_bicgstabl_t;
+typedef default_monitor<vec_ops_t,log_t> monitor_t;
+//typedef bicgstabl<system_operator,prec_operator,vec_ops_t,monitor_t,log_t> lin_solver_bicgstabl_t;
 // Sherman Morrison class
-typedef sherman_morrison_linear_system_solve<system_operator,prec_operator,cpu_vector_operations_real,monitor_t,log_t,bicgstabl> sherman_morrison_linear_system_solve_t;
+typedef sherman_morrison_linear_system_solve<system_operator_t,prec_operator_t,vec_ops_t,monitor_t,log_t,bicgstabl> sherman_morrison_linear_system_solve_t;
 
 int main(int argc, char **args)
 {
@@ -122,18 +44,13 @@ int main(int argc, char **args)
     int basis_sz = std::atoi(args[5]);
     bool small_alpha = static_cast<bool>(std::stoi(args[6]));
 
-    int sz = file_operations::read_matrix_size("./dat_files/A.dat");
-    vector_t A, iP, x, x0, b, c, d;
-    cpu_vector_operations_real vec_ops(sz);
-
-
-    A=(vector_t) malloc(sz*sz*sizeof(real));
-    iP=(vector_t) malloc(sz*sz*sizeof(real));
-    x0=(vector_t) malloc(sz*sizeof(real));
-    x=(vector_t) malloc(sz*sizeof(real));
-    c=(vector_t) malloc(sz*sizeof(real));
-    d=(vector_t) malloc(sz*sizeof(real));
-    b=(vector_t) malloc(sz*sizeof(real));
+    int sz = file_operations::read_matrix_size_square("./dat_files/A.dat");
+    matrix_t A, iP;
+    vector_t x, x0, b, c, d;
+    vec_ops_t vec_ops(sz);
+    mat_ops_t mat_ops(sz, sz, &vec_ops);
+    mat_ops.init_matrices(A, iP); mat_ops.start_use_matrices(A, iP);
+    vec_ops.init_vectors(x0, x, c, d, b); vec_ops.start_use_vectors(x0, x, c, d, b);
 
     real alpha=1.0e-9;
     real beta=1.9;
@@ -150,8 +67,8 @@ int main(int argc, char **args)
 
     std::cout << sz << std::endl;
     log_t log;
-    system_operator Ax(sz, A);
-    prec_operator prec(sz, iP);
+    system_operator_t Ax(sz, &mat_ops, A);
+    prec_operator_t prec(sz, &vec_ops, &mat_ops, iP);
     
     monitor_t *mon;
     monitor_t *mon_original;
@@ -247,14 +164,10 @@ int main(int argc, char **args)
     // }  
 
     file_operations::write_vector<real>("./dat_files/x_orig.dat", sz, x);
-            
+           
 
-    free(A);
-    free(iP);
-    free(x0);
-    free(b);
-    free(c);
-    free(d);
-    free(x);
+    mat_ops.stop_use_matrices(A, iP); mat_ops.free_matrices(A, iP);
+    vec_ops.stop_use_vectors(x0, x, c, d, b); vec_ops.free_vectors(x0, x, c, d, b);
+
     return 0;
 }

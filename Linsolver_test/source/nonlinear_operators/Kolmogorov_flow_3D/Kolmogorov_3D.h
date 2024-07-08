@@ -561,14 +561,17 @@ public:
         physical_solution(u_in, uR0->x); 
         //this is to be changed to kernel in kern class!
         //don't copy the whole vector!
-        T_vec physical_host = vec_ops_R->view(uR0->x);
-        T val1 = physical_host[I3(int(Nx/3.0), int(Ny/3.0), int(Nz/3.0))];
-        T val2 = physical_host[I3(int(Nx/5.0), int(2.0*Ny/3.0), int(1.0*Nz/3.0))];
-        T val3 = physical_host[I3(int(Nx/4.0), int(Ny/5.0), int(Nz/5.0))];
-        T val4 = physical_host[I3(int(Nx/2.0)-1, int(Ny/2.0)-1, int(Nz/2)-1)];
+        // T_vec physical_host = vec_ops_R->view(uR0->x);
+        T val1 = 1;//physical_host[I3(int(Nx/3.0), int(Ny/3.0), int(Nz/3.0))];
+        T val2 = 1;//physical_host[I3(int(Nx/5.0), int(2.0*Ny/3.0), int(1.0*Nz/3.0))];
+        T val3 = 1;//physical_host[I3(int(Nx/4.0), int(Ny/5.0), int(Nz/5.0))];
+        T val4 = 1;//physical_host[I3(int(Nx/2.0)-1, int(Ny/2.0)-1, int(Nz/2)-1)];
         T val5 = vec_ops->norm_l2(u_in);
         T val6 = norm(u_in);
         T val7 = vec_ops_R->norm_l2(uR0->x);
+        val1 = val5;
+        val2 = val6;
+        val3 = val7;
 
         if(clear_vector)
         {

@@ -19,6 +19,8 @@ struct cpu_vector_operations
     // typedef T* vector_type;
     using scalar_type = T;
     using vector_type = std::vector<T>;//T*;
+    using multivector_type = std::vector<vector_type>;
+
     bool location;
     dot_product<T, vector_type>* dot = nullptr;
     threaded_reduction<scalar_type, vector_type>* threaded_dot = nullptr;
@@ -120,6 +122,42 @@ struct cpu_vector_operations
     {
         return check_is_valid_number(x);  
     }
+
+    //multivector operations:
+    void init_multivector(multivector_type& x, std::size_t m) const
+    {
+        x = multivector_type();
+        x.reserve(m);
+        for(std::size_t j=0;j<m;j++)
+        {
+            vector_type x_l;
+            init_vector(x_l);
+            x.push_back(x_l);
+        }
+    }
+    void free_multivector(multivector_type& x, std::size_t m) const
+    {
+        for(std::size_t j=0;j<m;j++)
+        {
+            free_vector(x[j]);
+        }    
+    }
+    void start_use_multivector(multivector_type& x, std::size_t m) const
+    {
+    }
+    void stop_use_multivector(multivector_type& x, std::size_t m) const
+    {
+    }
+    [[nodiscard]] vector_type& at(multivector_type& x, std::size_t m, std::size_t k_) const
+    {
+        if (k_ < 0 || k_>=m  ) 
+        {
+            throw std::out_of_range("cpu_vector_operations: multivector.at");
+        }
+        return x[k_];
+    }
+
+
     scalar_type scalar_prod(const vector_type &x, const vector_type &y, int use_high_prec_ = -1)const
     {
         // T res(0.f);
@@ -182,6 +220,10 @@ struct cpu_vector_operations
     scalar_type norm2_sq(const vector_type& x)const
     {
         return norm_sq(x);
+    }
+    scalar_type norm_rank1(const vector_type &x, const scalar_type val_x) const
+    {    
+        return std::sqrt(scalar_prod(x, x) + val_x*val_x);
     }
     scalar_type sum(const vector_type &x)
     {
@@ -286,6 +328,11 @@ struct cpu_vector_operations
         for (int i = 0;i < x.size();++i) 
             y[i] = mul_x*x[i] + mul_y*y[i];
     }
+    void add_lin_comb(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, vector_type& y) const
+    {
+        add_mul(mul_x, x, mul_y, y);
+    }
+
     //calc: z := mul_x*x + mul_y*y + mul_z*z
     void add_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, const vector_type& y, 
                             scalar_type mul_z, vector_type& z)const
@@ -297,6 +344,10 @@ struct cpu_vector_operations
         for (int i = 0;i < x.size();++i) 
             z[i] = mul_x*x[i] + mul_y*y[i] + mul_z*z[i];
     }
+    void add_lin_comb(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, const scalar_type mul_z, vector_type& z) const
+    {
+        add_mul(mul_x, x, mul_y, y, mul_z, z);
+    }    
     void make_abs_copy(const vector_type& x, vector_type& y)const
     {
         if(x.size() != y.size() )

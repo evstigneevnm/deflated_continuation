@@ -153,8 +153,8 @@ public:
             //nu_i, pi, ri are nu_{i-1}, p_{i-1}, r_{i-1}
             T   rho_i = vec_ops_->scalar_prod(ri, r_),
                 beta = (rho_i/rho_i_1)*(alpha/omega_i_1);
-            if (std::isnan(beta)) { logged_obj_t::info("solve: stop iterations because beta is ind"); not_valid_coeff_faced = true; break; }
-            if (std::isinf(beta)) { logged_obj_t::info("solve: stop iterations because beta is inf"); not_valid_coeff_faced = true; break; }
+            if (std::isnan(beta)) { logged_obj_t::info_f("solve: stop iterations because beta is ind"); not_valid_coeff_faced = true; break; }
+            if (std::isinf(beta)) { logged_obj_t::info_f("solve: stop iterations because beta is inf"); not_valid_coeff_faced = true; break; }
 
             //pi := ri - beta*omega_{i_1}*nu_i + beta*p_{i-1}
             vec_ops_->add_mul(T(1), ri, -beta*omega_i_1, nu_i, beta, pi);
@@ -169,8 +169,8 @@ public:
             //nu_i now is nu_i
 
             alpha = rho_i/vec_ops_->scalar_prod(nu_i, r_);
-            if (std::isnan(alpha)) { logged_obj_t::info("solve: stop iterations because alpha is nan"); not_valid_coeff_faced = true; break; }
-            if (std::isinf(alpha)) { logged_obj_t::info("solve: stop iterations because alpha is inf"); not_valid_coeff_faced = true; break; }
+            if (std::isnan(alpha)) { logged_obj_t::info_f("solve: stop iterations because alpha is nan"); not_valid_coeff_faced = true; break; }
+            if (std::isinf(alpha)) { logged_obj_t::info_f("solve: stop iterations because alpha is inf"); not_valid_coeff_faced = true; break; }
 
             //s := ri - alpha*nu_i
             vec_ops_->assign_mul(T(1), ri, -alpha, nu_i, s);
@@ -189,8 +189,8 @@ public:
             if (prec_ != NULL) prec_->apply(t);
 
             T omega_i = vec_ops_->scalar_prod(t, s)/vec_ops_->scalar_prod(t, t);
-            if (std::isnan(omega_i)) { logged_obj_t::info("solve: stop iterations because omega_i is nan"); not_valid_coeff_faced = true; break; }
-            if (std::isinf(omega_i)) { logged_obj_t::info("solve: stop iterations because omega_i is inf"); not_valid_coeff_faced = true; break; }
+            if (std::isnan(omega_i)) { logged_obj_t::info_f("solve: stop iterations because omega_i is nan"); not_valid_coeff_faced = true; break; }
+            if (std::isinf(omega_i)) { logged_obj_t::info_f("solve: stop iterations because omega_i is inf"); not_valid_coeff_faced = true; break; }
 
             //x := x + alpha*pi + omega_i*s
             vec_ops_->add_mul(alpha, pi, omega_i, s, T(1), x);

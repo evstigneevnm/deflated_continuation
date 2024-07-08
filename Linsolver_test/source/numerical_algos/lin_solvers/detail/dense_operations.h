@@ -249,11 +249,11 @@ public:
             }        
         }
     }   
-    Type& matrix_at(const matrix_type& A, const Card row, const Card col)
+    Type& matrix_at(const matrix_type& A, const Card row, const Card col) const
     {
         return A(row, col);
     }
-    Type& vector_at(const vector_type& x,  const Card j)
+    Type& vector_at(const vector_type& x,  const Card j) const
     {
         return x(j);
     }

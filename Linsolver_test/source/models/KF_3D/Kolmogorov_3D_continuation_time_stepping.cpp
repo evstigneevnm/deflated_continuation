@@ -47,6 +47,9 @@
 #include <time_stepper/time_stepper.h>
 
 
+
+
+
 int main(int argc, char const *argv[])
 {
     
@@ -191,7 +194,7 @@ int main(int argc, char const *argv[])
     time_step_adaptation_constant_t time_step_const(&vec_ops, &log, {0.0, simulation_time}, initial_dt);
     time_step_adaptation_tolerance_t time_step_tol(&vec_ops, &log, {0.0, simulation_time}, initial_dt);
 
-    time_step_tol.set_adaptation_method("I", 3);
+    time_step_tol.set_adaptation_method("H321", 3); //"I",3 //addaptiation type, ode solver order
     time_step_tol.set_parameters(1.0e-3);
 
     // time_step_explicit_t explicit_step(&vec_ops, &time_step_err_ctrl, &log, &kf3d_y, R, scheme_name);
@@ -201,7 +204,7 @@ int main(int argc, char const *argv[])
     
     //linsolver control
     unsigned int lin_solver_max_it = 1000;
-    real lin_solver_tol = 5.0e-6;
+    real lin_solver_tol = 5.0e-3;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;

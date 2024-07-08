@@ -10,7 +10,7 @@
 *    2 - inf update
 *    3 - nan update
 *    4 - wight update is too small
-*
+*    5 - linear solver failed
 */
 
 #include <cmath>
@@ -70,8 +70,13 @@ public:
     }
     
 
-    bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T lambda, T_vec& delta_x, int& result_status)
+    bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T lambda, T_vec& delta_x, int& result_status, bool lin_solver_converged = true)
     {
+        if(!lin_solver_converged)
+        {
+            result_status = 5;
+            // return true;
+        }
         bool finish = false;
         nonlin_op->F(x, lambda, Fx);
         T normFx = vec_ops->norm_l2(Fx);

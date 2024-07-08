@@ -60,13 +60,15 @@ private:
     static const int max_basis_sz_ = SCFD_GMRES_MAX_BASIS_SIZE;
     typedef scalar_type T;
     typedef vector_type T_vec;
-    typedef utils::logged_obj_base<Log> logged_obj_t;
     typedef iter_solver_base<
             LinearOperator,
             Preconditioner,
             VectorOperations,
             Monitor,
             Log> parent_t;
+                             
+    using logged_obj_t = typename parent_t::logged_obj_t;
+
 
     typedef vectors_arr_wrap_static<VectorOperations, 1>        buf_t;
     typedef typename buf_t::vectors_arr_use_wrap_type           buf_use_wrap_t;
