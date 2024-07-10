@@ -20,6 +20,7 @@ struct cpu_vector_operations
     using scalar_type = T;
     using vector_type = std::vector<T>;//T*;
     using multivector_type = std::vector<vector_type>;
+    using ordinal_type = std::ptrdiff_t;
 
     bool location;
     dot_product<T, vector_type>* dot = nullptr;

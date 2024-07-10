@@ -1,9 +1,14 @@
 #ifndef __KOLMOGOROV_3D_IMPL_CUH__
 #define __KOLMOGOROV_3D_IMPL_CUH__
 
-
+#include <limits>
+#include <stdexcept>
 #include <common/macros.h>
 #include <nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D_ker.h>
+#include <cassert>
+#include <thrust/sort.h>
+#include <thrust/execution_policy.h>
+#include <fstream>
 
 
 template<typename TC, typename TC_vec>
@@ -33,8 +38,8 @@ if ( index_in < sizeOfData )
 }
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::Laplace_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::Laplace_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace)
 {
     Laplace_Fourier_kernel<TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, grad_x, grad_y, grad_z, Laplace);
 }
@@ -71,8 +76,8 @@ if ( index_in < sizeOfData )
 }
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::Biharmonic_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Biharmonic)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::Biharmonic_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Biharmonic)
 {
     Biharmonic_Fourier_kernel<TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, grad_x, grad_y, grad_z, Biharmonic);
 }
@@ -106,8 +111,8 @@ if ( index_in < sizeOfData )
 }
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_Laplace(TR coeff, TC_vec Laplace, TC_vec ux, TC_vec uy, TC_vec uz)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_Laplace(TR coeff, TC_vec Laplace, TC_vec ux, TC_vec uy, TC_vec uz)
 {
     apply_Laplace_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, coeff, Laplace, ux, uy, uz);
 }
@@ -142,15 +147,15 @@ if ( index_in < sizeOfData )
 }
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_Laplace_Biharmonic(TR coeff, TC_vec Laplace, TR coeff_bihrmonic, TC_vec Biharmonic, TC_vec ux, TC_vec uy, TC_vec uz)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_Laplace_Biharmonic(TR coeff, TC_vec Laplace, TR coeff_bihrmonic, TC_vec Biharmonic, TC_vec ux, TC_vec uy, TC_vec uz)
 {
     apply_Laplace_Biharmonic_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, coeff, Laplace, coeff_bihrmonic, Biharmonic, ux, uy, uz);
 }
 
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
-__global__ void vec2complex_kernel(size_t N, T_vec v_in, TC_vec u_x, TC_vec u_y, TC_vec u_z)
+__global__ void vec2complex_imag_kernel(size_t N, T_vec v_in, TC_vec u_x, TC_vec u_y, TC_vec u_z)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i>=N-1) return; //N-1 due to zero in the begining
@@ -165,14 +170,39 @@ __global__ void vec2complex_kernel(size_t N, T_vec v_in, TC_vec u_x, TC_vec u_y,
 
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::vec2complex(TR_vec v_in, TC_vec u_x, TC_vec u_y, TC_vec u_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::vec2complex_imag(TR_vec v_in, TC_vec u_x, TC_vec u_y, TC_vec u_z)
 {
 
-    vec2complex_kernel<TR, TR_vec, TC, TC_vec><<<dimGrid1C, dimBlock1>>>(NC, v_in, u_x, u_y, u_z);
+
+    vec2complex_imag_kernel<TR, TR_vec, TC, TC_vec><<<dimGrid1C, dimBlock1>>>(NC, v_in, u_x, u_y, u_z);
 
 }
 
+
+template<typename T, typename T_vec, typename TC, typename TC_vec>
+__global__ void vec2complex_full_kernel(size_t N, T_vec v_in, TC_vec u_x, TC_vec u_y, TC_vec u_z)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i>=N-1) return; //N-1 due to zero in the begining
+    
+    u_x[0] = TC(0,0);
+    u_y[0] = TC(0,0);
+    u_z[0] = TC(0,0);
+
+    u_x[i+1] = TC(v_in[i], v_in[i + (N-1)] );
+    u_y[i+1] = TC(v_in[i+2*(N-1)], v_in[i+3*(N-1)]);
+    u_z[i+1] = TC(v_in[i+4*(N-1)], v_in[i+5*(N-1)]);
+
+}
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::vec2complex_full(TR_vec v_in, TC_vec u_x, TC_vec u_y, TC_vec u_z)
+{
+
+    vec2complex_full_kernel<TR, TR_vec, TC, TC_vec><<<dimGrid1C, dimBlock1>>>(NC, v_in, u_x, u_y, u_z);
+
+}
 
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
@@ -200,8 +230,8 @@ if ( index_in < sizeOfData )
 
 }
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::force_Fourier_sin(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::force_Fourier_sin(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z)
 {
     force_Fourier_sin_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(n_y, n_z, scale_const, Nx, Ny, Mz, Nx*Ny*Nz, force_x, force_y, force_z);
 }
@@ -232,8 +262,8 @@ if ( index_in < sizeOfData )
 
 }
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::force_Fourier_sin_cos(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::force_Fourier_sin_cos(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z)
 {
     force_Fourier_sin_cos_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(n_y, n_z, scale_const, Nx, Ny, Mz, Nx*Ny*Nz, force_x, force_y, force_z);
 }
@@ -265,8 +295,8 @@ if ( index_in < sizeOfData )
 
 }
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::force_ABC(TR_vec force_x, TR_vec force_y, TR_vec force_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::force_ABC(TR_vec force_x, TR_vec force_y, TR_vec force_z)
 {
     force_ABC_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNR, dimBlockN>>>(Nx, Ny, Nz, force_x, force_y, force_z);
 }
@@ -275,7 +305,7 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::force_ABC(T
 
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
-__global__ void complex2vec_kernel(size_t N, TC_vec u_x, TC_vec u_y, TC_vec u_z, T_vec v_out)
+__global__ void complex2vec_imag_kernel(size_t N, TC_vec u_x, TC_vec u_y, TC_vec u_z, T_vec v_out)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i>=N-1) return; //N-1 due to zero in the begining
@@ -286,14 +316,36 @@ __global__ void complex2vec_kernel(size_t N, TC_vec u_x, TC_vec u_y, TC_vec u_z,
 
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::complex2vec(TC_vec u_x, TC_vec u_y, TC_vec u_z, TR_vec v_out)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::complex2vec_imag(TC_vec u_x, TC_vec u_y, TC_vec u_z, TR_vec v_out)
 {
 
-    complex2vec_kernel<TR, TR_vec, TC, TC_vec><<<dimGrid1C, dimBlock1>>>(NC, u_x, u_y, u_z, v_out);
+    complex2vec_imag_kernel<TR, TR_vec, TC, TC_vec><<<dimGrid1C, dimBlock1>>>(NC, u_x, u_y, u_z, v_out);
 
 }
 
+template<typename T, typename T_vec, typename TC, typename TC_vec>
+__global__ void complex2vec_full_kernel(size_t N, TC_vec u_x, TC_vec u_y, TC_vec u_z, T_vec v_out)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i>=N-1) return; //N-1 due to zero in the begining
+    
+    v_out[i] = T(u_x[i+1].real());
+    v_out[i+(N-1)] = T(u_x[i+1].imag());
+    
+    v_out[i+2*(N-1)] = T(u_y[i+1].real());
+    v_out[i+3*(N-1)] = T(u_y[i+1].imag());    
+    
+    v_out[i+4*(N-1)] = T(u_z[i+1].real()); 
+    v_out[i+5*(N-1)] = T(u_z[i+1].imag());
+
+}
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::complex2vec_full(TC_vec u_x, TC_vec u_y, TC_vec u_z, TR_vec v_out)
+{
+    complex2vec_full_kernel<TR, TR_vec, TC, TC_vec><<<dimGrid1C, dimBlock1>>>(NC, u_x, u_y, u_z, v_out);
+}
 
 
 
@@ -319,8 +371,8 @@ if ( index_in < sizeOfData )
 
 }
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_grad(TC_vec v_in,  TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_grad(TC_vec v_in,  TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
 {
 
     apply_grad_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, v_in, grad_x, grad_y, grad_z, v_x, v_y, v_z);
@@ -350,8 +402,8 @@ if ( index_in < sizeOfData )
 }
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_div(TC_vec u_x, TC_vec u_y, TC_vec u_z,  TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v_out)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_div(TC_vec u_x, TC_vec u_y, TC_vec u_z,  TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v_out)
 {
 
     apply_div_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, u_x, u_y, u_z, grad_x, grad_y, grad_z, v_out);
@@ -386,8 +438,8 @@ if ( index_in < sizeOfData )
 }
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_projection(TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec Laplace,  TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_projection(TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec Laplace,  TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
 {
 
     apply_projection_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, u_x, u_y, u_z, Laplace, grad_x, grad_y, grad_z, v_x, v_y, v_z);
@@ -421,8 +473,8 @@ if ( index_in < sizeOfData )
 
 }
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_smooth(TR tau, TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_smooth(TR tau, TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z)
 {
 
     apply_smooth_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, tau, Laplace, v_x, v_y, v_z);
@@ -456,8 +508,8 @@ if ( index_in < sizeOfData )
     v_z[0] = TC(0,0);
 }
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::imag_vector(TC_vec v_x, TC_vec v_y, TC_vec v_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::imag_vector(TC_vec v_x, TC_vec v_y, TC_vec v_z)
 {
 
     imag_vector_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, v_x, v_y, v_z);
@@ -490,8 +542,8 @@ if ( index_in < sizeOfData )
 
 }
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_iLaplace(TC_vec Laplace, TC_vec v, TR coeff)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_iLaplace(TC_vec Laplace, TC_vec v, TR coeff)
 {
 
     apply_iLaplace_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, Laplace, v, coeff);
@@ -530,8 +582,8 @@ if ( index_in < sizeOfData )
 }
 
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_iLaplace3(TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_iLaplace3(TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff)
 {
 
     apply_iLaplace3_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, Laplace, v_x, v_y, v_z, coeff);
@@ -568,8 +620,8 @@ if ( index_in < sizeOfData )
 }
 
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_iLaplace3_Biharmonic3(TC_vec Laplace, TC_vec Biharmonic,  TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR coeff_bihrmonic)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_iLaplace3_Biharmonic3(TC_vec Laplace, TC_vec Biharmonic,  TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR coeff_bihrmonic)
 {
 
     apply_iLaplace3_Biharmonic3_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, Laplace, Biharmonic, v_x, v_y, v_z, coeff, coeff_bihrmonic);
@@ -607,8 +659,8 @@ if ( index_in < sizeOfData )
 }
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_iLaplace3_plus_E(TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR a, TR b)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_iLaplace3_plus_E(TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR a, TR b)
 {
 
     apply_iLaplace3_plus_E_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, Laplace, v_x, v_y, v_z, coeff, a, b);
@@ -646,8 +698,8 @@ if ( index_in < sizeOfData )
 }
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_iLaplace3_Biharmonic3_plus_E(TC_vec Laplace, TC_vec Biharmonic, TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR coeff_bihrmonic, TR a, TR b)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_iLaplace3_Biharmonic3_plus_E(TC_vec Laplace, TC_vec Biharmonic, TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR coeff_bihrmonic, TR a, TR b)
 {
 
     apply_iLaplace3_Biharmonic3_plus_E_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, Laplace, Biharmonic, v_x, v_y, v_z, coeff, coeff_bihrmonic, a, b);
@@ -665,16 +717,16 @@ __global__ void apply_abs_kernel(size_t N, T_vec ux, T_vec uy, T_vec uz, T_vec v
 
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_abs(TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_abs(TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v)
 {
     size_t NNX = Nx*Ny*Nz;
     dim3 blocks_x=(NNX+BLOCKSIZE)/BLOCKSIZE;
     apply_abs_kernel<TR, TR_vec, TC, TC_vec><<<blocks_x, dimBlock1>>>(NNX, ux, uy, uz, v);
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_abs(size_t Nx_l, size_t Ny_l, size_t Nz_l, TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_abs(size_t Nx_l, size_t Ny_l, size_t Nz_l, TR_vec ux, TR_vec uy, TR_vec uz, TR_vec v)
 {
     size_t NRR = Nx_l*Ny_l*Nz_l;
     dim3 blocks_x=(NRR+BLOCKSIZE)/BLOCKSIZE;
@@ -696,8 +748,8 @@ __global__ void apply_scale_inplace_kernel(size_t N, T scale, T_vec ux, T_vec uy
 }
 
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_scale_inplace(size_t Nx_l, size_t Ny_l, size_t Nz_l, TR scale, TR_vec ux, TR_vec uy, TR_vec uz)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_scale_inplace(size_t Nx_l, size_t Ny_l, size_t Nz_l, TR scale, TR_vec ux, TR_vec uy, TR_vec uz)
 {
     size_t NRR = Nx_l*Ny_l*Nz_l;
     dim3 blocks_x=(NRR+BLOCKSIZE)/BLOCKSIZE;
@@ -737,8 +789,8 @@ if ( index_in < sizeOfData )
 }
 
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::convert_size(size_t Nx_dest, size_t Ny_dest, size_t Mz_dest, TR scale, TC_vec ux_src_hat, TC_vec uy_src_hat, TC_vec uz_src_hat, TC_vec ux_dest_hat, TC_vec uy_dest_hat, TC_vec uz_dest_hat)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::convert_size(size_t Nx_dest, size_t Ny_dest, size_t Mz_dest, TR scale, TC_vec ux_src_hat, TC_vec uy_src_hat, TC_vec uz_src_hat, TC_vec ux_dest_hat, TC_vec uy_dest_hat, TC_vec uz_dest_hat)
 {
     convert_size_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, Nx_dest, Ny_dest, Mz_dest, scale, ux_src_hat, uy_src_hat, uz_src_hat, ux_dest_hat, uy_dest_hat, uz_dest_hat);
 }
@@ -757,16 +809,16 @@ __global__ void add_mul3_kernel(size_t N, TC alpha, TC_vec u_x, TC_vec u_y, TC_v
 
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::add_mul3(TC alpha, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::add_mul3(TC alpha, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
 {
 
     add_mul3_kernel<TC, TC_vec><<<dimGrid1C, dimBlock1>>>(Nx*Ny*Mz, alpha, u_x, u_y, u_z, v_x, v_y, v_z);
 
 }
 
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::add_mul3(TR alpha, TR_vec u_x, TR_vec u_y, TR_vec u_z, TR_vec v_x, TR_vec v_y, TR_vec v_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::add_mul3(TR alpha, TR_vec u_x, TR_vec u_y, TR_vec u_z, TR_vec v_x, TR_vec v_y, TR_vec v_z)
 {
 
     add_mul3_kernel<TR, TR_vec><<<dimGrid1R, dimBlock1>>>(Nx*Ny*Nz, alpha, u_x, u_y, u_z, v_x, v_y, v_z);
@@ -815,8 +867,8 @@ if ( index_in < sizeOfData )
 
 }
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_mask(TR alpha, TC_vec mask_2_3)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_mask(TR alpha, TC_vec mask_2_3)
 {
 
     apply_mask_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(alpha, Nx, Ny, Mz, mask_2_3);
@@ -878,8 +930,8 @@ if ( index_in < sizeOfData )
 
 }
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::apply_grad3(TC_vec u1, TC_vec u2, TC_vec u3, TC_vec mask, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v1_x, TC_vec v1_y, TC_vec v1_z, TC_vec v2_x, TC_vec v2_y, TC_vec v2_z, TC_vec v3_x, TC_vec v3_y, TC_vec v3_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_grad3(TC_vec u1, TC_vec u2, TC_vec u3, TC_vec mask, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v1_x, TC_vec v1_y, TC_vec v1_z, TC_vec v2_x, TC_vec v2_y, TC_vec v2_z, TC_vec v3_x, TC_vec v3_y, TC_vec v3_z)
 {
 
     apply_grad3_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, u1, u2, u3, mask, grad_x, grad_y, grad_z, v1_x, v1_y, v1_z, v2_x, v2_y, v2_z, v3_x, v3_y, v3_z);
@@ -920,8 +972,8 @@ if ( index_in < sizeOfData )
 
 }
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::multiply_advection(TR_vec Vx, TR_vec Vy, TR_vec Vz, TR_vec Fx_x, TR_vec Fx_y, TR_vec Fx_z, TR_vec Fy_x, TR_vec Fy_y, TR_vec Fy_z, TR_vec Fz_x, TR_vec Fz_y, TR_vec Fz_z, TR_vec resx, TR_vec resy, TR_vec resz)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::multiply_advection(TR_vec Vx, TR_vec Vy, TR_vec Vz, TR_vec Fx_x, TR_vec Fx_y, TR_vec Fx_z, TR_vec Fy_x, TR_vec Fy_y, TR_vec Fy_z, TR_vec Fz_x, TR_vec Fz_y, TR_vec Fz_z, TR_vec resx, TR_vec resy, TR_vec resz)
 {
     multiply_advection_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNR, dimBlockN>>>(Nx, Ny, Nz, Vx, Vy, Vz, Fx_x, Fx_y, Fx_z, Fy_x, Fy_y, Fy_z, Fz_x, Fz_y, Fz_z, resx, resy, resz);
 }
@@ -945,8 +997,8 @@ __global__ void negate3_kernel(size_t N, TC_vec v_x, TC_vec v_y, TC_vec v_z)
 
 
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::negate3(TC_vec v_x, TC_vec v_y, TC_vec v_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::negate3(TC_vec v_x, TC_vec v_y, TC_vec v_z)
 {
 
     negate3_kernel<TC, TC_vec><<<dimGrid1C, dimBlock1>>>(Nx*Ny*Mz, v_x, v_y, v_z);
@@ -971,8 +1023,8 @@ __global__ void copy3_kernel(TC_vec u_x, TC_vec u_y, TC_vec u_z, size_t N, TC_ve
 
 
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::copy3(TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::copy3(TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
 {
 
     copy3_kernel<TC, TC_vec><<<dimGrid1C, dimBlock1>>>(u_x, u_y, u_z, Nx*Ny*Mz, v_x, v_y, v_z);
@@ -997,8 +1049,8 @@ __global__ void copy_mul_poinwise_3_kernel(TC_vec mask, TC_vec u_x, TC_vec u_y, 
 
 
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::copy_mul_poinwise_3(TC_vec mask, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::copy_mul_poinwise_3(TC_vec mask, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
 {
 
     copy_mul_poinwise_3_kernel<TC, TC_vec><<<dimGrid1C, dimBlock1>>>(mask, u_x, u_y, u_z, Nx*Ny*Mz, v_x, v_y, v_z);
@@ -1039,12 +1091,384 @@ if ( index_in < sizeOfData )
 
 }
 }
-template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::B_ABC_exact(TR coeff, TR_vec ux, TR_vec uy, TR_vec uz)
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::B_ABC_exact(TR coeff, TR_vec ux, TR_vec uy, TR_vec uz)
 {
 
     B_ABC_exact_kernel<TR, TR_vec><<<dimGridNR, dimBlockN>>>(Nx, Ny, Nz, coeff, ux, uy, uz);
 }
+
+
+
+
+template<typename T, typename T_vec>
+__global__ void make_hermitian_symmetric_kernel(size_t Nx, size_t Ny, size_t Nz, T_vec u_in, T_vec u_out)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+//  assume that Z-direction is a reduced one.
+    u_out[I3(j,k,l)] = u_in[I3(j,k,l)];
+    if(j>Nx/2)
+        u_out[I3(j,0,0)] = conj(u_in[I3(Nx-j,0,0)]);
+    if(k>Ny/2)
+        u_out[I3(0,k,0)] = conj(u_in[I3(0,Ny-k,0)]);
+
+    if( (j>Nx/2)&&(k>Ny/2) )
+        u_out[I3(j,k,0)] = conj(u_in[I3(Nx-j,Ny-k,0)]);
+
+    if( (j<Nx/2)&&(k>Ny/2) )
+        u_out[I3(Nx-j,k,0)] = conj(u_in[I3(j, Ny-k,0)]);
+
+}
+}
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::make_hermitian_symmetric(TC_vec u_src, TC_vec u_dest)
+{
+    make_hermitian_symmetric_kernel<TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, u_src, u_dest);
+}
+
+
+
+template<typename TR, typename TC, typename TC_vec>
+__global__ void apply_translate_kernel(TR alpha, size_t Nx, size_t Ny, size_t Nz, TC_vec u_in, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TR varphi_x, TR varphi_y, TR varphi_z, TC_vec u_out)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+    u_out[I3(j,k,l)] = exp(-grad_x[j]*varphi_x/alpha)*exp(-grad_y[k]*varphi_y)*exp(-grad_z[l]*varphi_z)*u_in[I3(j,k,l)];
+
+
+}
+}
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_translate(TC_vec u_src, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TR varphi_x, TR varphi_y, TR varphi_z, TC_vec u_dest)
+{
+    apply_translate_kernel<TR, TC, TC_vec><<<dimGridNC, dimBlockN>>>(alpha, Nx, Ny, Mz, u_src, grad_x, grad_y, grad_z, varphi_x, varphi_y, varphi_z, u_dest);
+}
+
+
+
+template<typename TC_vec>
+__global__ void init_ind_keys_vals_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec u_src, int* index_keys_d, int* index_vals_d, bool add_x, bool add_y, bool add_z)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+    
+    int q,m,n;
+    q=l; //Z-coord
+    m=j; //Y-coord
+    if(j>=Nx/2)
+        m=j-Nx;    
+    n=k; //X-coord
+    if(k>=Ny/2)
+        n=k-Ny;   
+
+    index_keys_d[index_in] = int(add_z)*abs(q)+int(add_x)*abs(m)+int(add_y)*abs(n); //L1 norm
+
+    if( ( abs(u_src[I3(j,k,l)])<1.0e-7 ) || (index_keys_d[index_in] == 0) )//|| (abs(n)>0) )
+    {
+        index_keys_d[index_in] = Nx*Ny*Nz+1;
+    } 
+    index_vals_d[index_in] = I3(j,k,l); //I3(i, j, k, Nx, Ny, Nz) (i)*(Ny*Nz) + (j)*(Nz) + (k)
+
+}
+}
+
+
+template<typename TR, typename TC_vec>
+__global__ void init_values_by_indexes_kernel(size_t save_ammount, TC_vec u_src, int* index_vals_d, TR* values_vals_part_d)
+{
+    unsigned int idx = blockIdx.x * gridDim.x + threadIdx.x;
+    if(idx >= save_ammount) return;
+    // values_vals_part_d[idx] = arg(u_src[index_vals_d[idx]]);
+    auto val = log(u_src[index_vals_d[idx]]);
+    values_vals_part_d[idx] = val.imag();
+
+}
+
+template<class T>
+void write_file_debug(const std::string& f_name, size_t N, T* data_d)
+{
+    T* data = (T*) malloc( N*sizeof(T) );
+
+    device_2_host_cpy(data, data_d, N);
+
+    std::fstream s(f_name.c_str(), std::ios_base::out);
+    for(int j = 0; j<N;j++)
+    {
+        s << data[j] << std::endl;
+    }
+    s.close();
+
+    free(data);
+}
+
+
+
+template<class TR, class Mat>
+std::vector<int> pivoting(Mat& A, bool rhs_given)
+{
+    std::size_t rows = A.size();
+    std::size_t cols = A[0].size() - int(rhs_given);
+    if(rows<cols)
+    {
+        throw std::runtime_error("matrix of Fourier indexes A as rows < cols.");
+    }
+    // std::cout << "matix of size: " << rows << "X" << cols << std::endl;
+    std::size_t p_size = std::max(cols, rows);
+    std::vector<int> P;
+    for(int j=0;j<p_size;j++)
+    {
+        P.push_back(j);
+    }
+    P.push_back(0); //for determinant computation
+
+    for(int j=0;j<cols;j++)
+    {
+        int k = j+1;
+        if( std::abs(A[j][j]) < std::numeric_limits<TR>::epsilon() )
+        {
+            for(int k=j;k<rows;k++) 
+            {
+                if( std::abs(A[k][j]) > 100*std::numeric_limits<TR>::epsilon() )
+                {
+                    auto tmp = P[j];
+                    P[j] = P[k];
+                    P[k] = tmp;
+                    auto Arow_tmp = A[j];
+                    A[j] = A[k];
+                    A[k] = Arow_tmp;
+                    break;
+                }
+            }
+
+        }
+
+    }
+
+
+    return P;
+}
+
+template<class Mat>
+void print_matrix(Mat& A)
+{
+    for(auto &x_row: A)
+    {
+        for(auto &x: x_row)
+        {
+            std::cout << x << " ";
+        }
+        std::cout << ";" << std::endl;
+    }
+
+}
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+std::tuple<TR,TR,TR> nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::get_shift_phases(TC_vec u_src, std::tuple<bool,bool,bool> directions)
+{
+    
+
+
+    init_ind_keys_vals_kernel<TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, u_src, index_keys_d, index_vals_d, std::get<0>(directions), std::get<1>(directions), std::get<2>(directions) );
+
+
+    // write_file_debug("debug_index_keys_d.dat", NC, index_keys_d);
+    // write_file_debug("debug_index_vals_d.dat", NC, index_vals_d);
+
+
+    //if it fails, have to use thrust::stable_sort_by_key
+    thrust::sort_by_key(thrust::device, index_keys_d, index_keys_d + NC, index_vals_d); 
+
+    // write_file_debug("debug_index_keys_d_sort.dat", NC, index_keys_d);
+    // write_file_debug("debug_index_vals_d_sort.dat", NC, index_vals_d);
+
+
+    device_2_host_cpy(index_keys_part, index_keys_d, save_ammount);
+    device_2_host_cpy(index_vals_part, index_vals_d, save_ammount);
+
+    int blocks_=(save_ammount+BLOCKSIZE)/BLOCKSIZE;
+    dim3 dimGrid1_(blocks_);
+    init_values_by_indexes_kernel<TR, TC_vec><<<dimGrid1_, dimBlock1>>>(save_ammount, u_src, index_vals_d, values_vals_part_d);
+
+    device_2_host_cpy(values_vals_part, values_vals_part_d, save_ammount);
+    // write_file_debug("debug_vals_d_sort.dat", save_ammount, values_vals_part_d);
+
+
+
+    auto get_index = [&](int lexico_index) -> std::tuple<int, int, int>
+    {
+        int t1 =  int(std::floor(lexico_index/Mz)); 
+        int l = lexico_index - Mz*t1 ;
+        int j =  int(std::floor(t1/Ny)); 
+        int k = t1 - Ny * j ;
+
+        return {j,k,l};
+    };
+
+    auto get_fourier_index = [&](int lexico_index) -> std::tuple<int, int, int>
+    {
+        auto res = get_index(lexico_index);
+        auto j = std::get<0>(res);
+        auto k = std::get<1>(res);
+        auto l = std::get<2>(res);
+        auto q=l; //Z-coord
+        auto m=j; //Y-coord
+        if(j>=Nx/2)
+            m=j-Nx;    
+        auto n=k; //X-coord
+        if(k>=Ny/2)
+            n=k-Ny; 
+
+        return {m,n,q};
+    };
+
+    // std::cout << "index_vals_part[0] = " << index_vals_part[0] << std::endl;
+    // auto index0 = get_fourier_index( index_vals_part[0] );
+    // std::cout << "index 0 = " << std::get<0>(index0) << " index 1 = " << std::get<1>(index0) << " index 2 = " << std::get<2>(index0) << std::endl;
+    // std::cout << "index_vals_part[1] = " << index_vals_part[1] << std::endl;
+    // auto index1 = get_fourier_index( index_vals_part[1] );
+    // std::cout << "index 0 = " << std::get<0>(index1) << " index 1 = " << std::get<1>(index1) << " index 2 = " << std::get<2>(index1) << std::endl;
+
+    int system_size = int(std::get<0>(directions))+int(std::get<1>(directions))+int(std::get<2>(directions));
+    // std::cout << "system_size = " << system_size << std::endl;
+
+    using M_t = std::vector< std::vector<TR> >;
+    M_t A, Asub;
+
+    //first we collect all non-zero harminics into the system. This is done only for active dimensions
+    //then we pivot the matrix and find the matrix rank.
+    //if the rank is zero, return all zeros
+    //if the rank is not zero, but smaller than system_size, then we select non-zero entries and use those in the appropriate direction, the rest are returned as zeros.
+    //if the rank == system_size, then solve the system and return the values.
+
+    for(int j = 0; j<save_ammount; j++)
+    {
+        if(index_keys_part[j] > Nx*Ny*Mz ) break;
+
+        auto index1 = get_fourier_index( index_vals_part[j] );
+
+        std::vector<TR> Arow;
+        bool at_least_one_element  = false;
+        if(std::get<0>(directions))
+        {
+            Arow.push_back( TR(std::get<0>(index1)));
+            at_least_one_element = true;
+        }
+        if(std::get<1>(directions))
+        {
+            Arow.push_back( TR(std::get<1>(index1)));
+            at_least_one_element = true;
+        }        
+        if(std::get<2>(directions))
+        {
+            Arow.push_back( TR(std::get<2>(index1)));
+            at_least_one_element = true;
+        }
+        if(at_least_one_element)
+        {
+            Arow.push_back(values_vals_part[j]);
+        }
+        A.push_back(std::move(Arow));
+    }
+    if(A.size() == 0 ) //zero matrix, nothing to do! returning all zeros
+    {
+        // std::cout << "zero matrix";
+        return{0,0,0};
+    }
+    // print_matrix(A);
+
+    auto P = pivoting<TR, M_t>(A, true);
+
+    // for(auto& x: P)
+    // {
+    //     std::cout << x << std::endl;
+    // }
+
+    // print_matrix(A);
+    TR elements_sum = 0;
+    for(int j=0;j<system_size;j++)    
+    {
+        Asub.push_back(A[j]);
+        
+        for(auto &x: A[j])
+        {
+            elements_sum += std::abs(x);
+        }
+    }
+    // std::cout << "submatrix: " << std::endl;
+    // print_matrix(Asub);    
+    if(elements_sum == 0) //rank is zero, returing all zeros
+    {
+        // std::cout << "zero";
+        return {0,0,0};
+    }
+    std::vector<TR> diag;
+    TR diag_prod = 1;
+    TR sum_off_diag = 0;
+    std::vector<TR> solution(system_size, 0.0);
+
+    for(int j=0;j<system_size;j++)
+    {
+        diag.push_back(Asub[j][j]);
+
+        diag_prod *= std::abs(Asub[j][j]);
+        // for(int k=0;k<system_size;k++)
+        // {
+
+        // }
+    }
+    if(diag_prod < std::numeric_limits<TR>::epsilon() ) //degenerate system
+    {
+        std::cout << "hz";
+        return {0,0,0};
+    }
+    else //solve system
+    {
+        // std::cout << "ok";
+        solve_system(Asub, solution);
+        std::tuple<TR,TR,TR> ret = {0,0,0};
+        // for(auto &x: solution)
+        // {
+        //     std::cout << x << std::endl;
+        // }
+        return {solution[0], 0, solution[1]};
+    }
+
+    return {0,0,0};//{solution[0], solution[1], solution[2]};
+}
+
 
 
 

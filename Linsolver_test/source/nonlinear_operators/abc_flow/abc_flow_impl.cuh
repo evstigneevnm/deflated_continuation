@@ -1130,7 +1130,7 @@ std::tuple<TR,TR,TR> nonlinear_operators::abc_flow_ker<TR, TR_vec, TC, TC_vec>::
     if(failed)
     {
         // use manual selection of frequencies.
-
+        
     }
 
 

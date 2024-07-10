@@ -5,14 +5,18 @@
 *   Axillary class of funcitons for Kolmogorov 3D flow used in the Kolmogorov_3D class.
 *   The class implements explicit template specialization.
 */
+#include <tuple>
 #include <cstdio> //for printf
 #include <cuda_runtime.h>
 #include <cmath>
+//for low level operations
+#include <utils/cuda_support.h>
+
 
 namespace nonlinear_operators
 {
 
-template<typename TR, typename TR_vec, typename TC, typename TC_vec>
+template<typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
 struct Kolmogorov_3D_ker
 {
     Kolmogorov_3D_ker(TR alpha_, size_t Nx_, size_t Ny_, size_t Nz_, size_t Mz_, unsigned int BLOCKSIZE_x_, unsigned int BLOCKSIZE_y_):
@@ -21,8 +25,19 @@ struct Kolmogorov_3D_ker
         BLOCKSIZE = BLOCKSIZE_x*BLOCKSIZE_y;
         NR = Nx*Ny*Nz;
         NC = Nx*Ny*Mz;
-        N = 3*(NC - 1);
+        
+        if constexpr(PureImag)
+            N = 3*(NC - 1);
+        else
+            N = 6*(NC - 1);
+        
         calculate_cuda_grid();
+        index_keys_d = device_allocate<int>(NC);
+        index_vals_d = device_allocate<int>(NC);
+        index_vals_part = host_allocate<int>(save_ammount);
+        values_vals_part = host_allocate<TR>(save_ammount);
+        values_vals_part_d = device_allocate<TR>(save_ammount);
+        index_keys_part = host_allocate<int>(save_ammount);        
     }
 
     ~Kolmogorov_3D_ker()
@@ -40,9 +55,14 @@ struct Kolmogorov_3D_ker
 
     void force_ABC(TR_vec force_x, TR_vec force_y, TR_vec force_z);
 
-    void vec2complex(TR_vec v_in, TC_vec u_x, TC_vec u_y, TC_vec u_z);
+    void vec2complex_full(TR_vec v_in, TC_vec u_x, TC_vec u_y, TC_vec u_z);
 
-    void complex2vec(TC_vec u_x, TC_vec u_y, TC_vec u_z, TR_vec v_out);
+    void complex2vec_full(TC_vec u_x, TC_vec u_y, TC_vec u_z, TR_vec v_out);
+
+    void vec2complex_imag(TR_vec v_in, TC_vec u_x, TC_vec u_y, TC_vec u_z);
+
+    void complex2vec_imag(TC_vec u_x, TC_vec u_y, TC_vec u_z, TR_vec v_out);
+
 
     void apply_grad(TC_vec v_in,  TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v_x, TC_vec v_y, TC_vec v_z);
 
@@ -91,6 +111,12 @@ struct Kolmogorov_3D_ker
 
     void convert_size(size_t Nx_dest, size_t Ny_dest, size_t Mz_dest, TR scale, TC_vec ux_src_hat, TC_vec uy_src_hat, TC_vec uz_src_hat, TC_vec ux_dest_hat, TC_vec uy_dest_hat, TC_vec uz_dest_hat);
 
+    void make_hermitian_symmetric(TC_vec u_src_hat, TC_vec u_dest_hat);
+
+    void apply_translate(TC_vec u_in, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TR varphi_x, TR varphi_y, TR varphi_z, TC_vec u_out);
+
+    std::tuple<TR, TR, TR> get_shift_phases(TC_vec u_in, std::tuple<bool,bool,bool> directions);
+
 private:
     unsigned int BLOCKSIZE_x, BLOCKSIZE_y, BLOCKSIZE;
     size_t Nx, Ny, Nz, Mz;
@@ -106,7 +132,23 @@ private:
     dim3 dimGridNR;
     dim3 dimGridNC;
 
+    // translation fixing data
+    int* index_keys_d = nullptr;
+    int* index_vals_d = nullptr;
 
+    size_t save_ammount = std::min(size_t(Nx+Ny+Mz+2), NC); // we assume that probing 20 Fourier harminics is enough.
+    int* index_vals_part = nullptr;
+    TR* values_vals_part = nullptr;
+    TR* values_vals_part_d = nullptr;
+    int* index_keys_part = nullptr;
+
+    // struct min_nonzero_ind_s
+    // {
+        
+    //     size_t j1, k1, l1, j2, k2, j2, j3, k3, l3;
+    //     TR arg1, arg2, arg3;
+    // };
+    // min_nonzero_ind_s min_nonzero_ind;
 
     void calculate_cuda_grid()
     {
@@ -159,7 +201,71 @@ private:
         printf("    Complex grids: dimGrid: %dX%dX%d, dimBlock: %dX%dX%d. \n", dimGridNC.x, dimGridNC.y, dimGridNC.z, dimBlockN.x, dimBlockN.y, dimBlockN.z);
     }
 
+    //some helper functions on NXN matrix operations
+    template<class Mat, class Vec>
+    void solve_system(Mat& A, Vec& solution)
+    {
+        //just a stupid G-J elimination
+        //assume solution is already filled with zeroes
 
+        std::size_t N = A.size();
+        for (int i=0;i<N;i++)
+        {
+            for (int k=i+1;k<N;k++)
+            {
+                if (std::abs(A[i][i]) < std::abs(A[k][i]))
+                {
+                    for (int j=0;j<=3;j++) 
+                    {
+                        TR temp = A[i][j];
+                        A[i][j] = A[k][j];
+                        A[k][j] = temp;
+                    }
+                }
+            }
+        }
+        for (int i=0;i<N-1;i++)
+        {
+            for (int k=i+1;k<N;k++)
+            {
+                TR t = A[k][i]/A[i][i];
+                for (int j=0;j<=N;j++)
+                {
+                    A[k][j] = A[k][j]-t*A[i][j];
+                }
+            }
+        }
+
+        check_matrix_condition(A, N);
+        
+        for (int i=N-1;i>=0;i--)
+        {                
+            solution[i]=A[i][N];               
+            for (int j=i+1;j<N;j++)
+            {
+                if (j != i)
+                {
+                    solution[i] = solution[i]-A[i][j]*solution[j];
+                }
+            }
+            solution[i] = solution[i]/A[i][i];
+        }
+
+    }
+    template<class Mat>
+    void check_matrix_condition(const Mat& A, std::size_t N)
+    {
+        TR det=1.0;
+        for(int j=0;j<N;j++)
+            det*=A[j][j];
+
+        // std::cout << "det = " << det << std::endl;
+        if(( std::abs(det) < 1.0e-12 )||( !std::isfinite(det) ))
+        {
+            throw std::runtime_error("abc_flow_ker::check_matrix_condition: matrix determinant is zero or not finite, det = " + std::to_string(det) + "\n");
+        }
+
+    }
 
 };
 

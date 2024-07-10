@@ -113,7 +113,8 @@ public:
 
 //VecOpsR sized Nx*Ny*Nz;VecOpsC sized Nx*Ny*Mz; VecOps is the main vector operations sized 3*(Nx*Ny*Mz-1)
 template<class FFT_type, class VecOpsR, class VecOpsC, class VecOps,  
-unsigned int BLOCK_SIZE_x = 32, unsigned int BLOCK_SIZE_y = 16>
+unsigned int BLOCK_SIZE_x = 32, unsigned int BLOCK_SIZE_y = 16,
+bool PureImag = true>
 class Kolmogorov_3D
 {
 private:
@@ -143,7 +144,7 @@ private:
 
 
     //calss for low level CUDA kernels
-    typedef Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec> kern_t;
+    typedef Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag> kern_t;
     
 
 
@@ -771,7 +772,10 @@ public:
         }
 
         fft(*UR0, *UC0);
-        imag_vec(*UC0);
+        if constexpr (PureImag)
+        {
+            imag_vec(*UC0);
+        }
         project(*UC0);
         for(int st=0;st<steps;st++)
         {
@@ -832,6 +836,51 @@ public:
         return norm_;
     }
 
+
+    //finds sutable harmonics and uses them to translate the solution is such way 
+    //that imaginary part of the selected harminics is zero.
+    void translation_fix(const T_vec& u_in_, T_vec& u_out_)
+    {
+        BC_vec* UC0 = pool_BC.take();
+        BC_vec* UC1 = pool_BC.take();
+        V2C(u_in_, *UC0);  
+        auto res = shift_phases(*UC0);
+        auto varphi_x = std::get<0>(res);
+        auto varphi_y = std::get<1>(res);
+        auto varphi_z = std::get<2>(res);
+        // std::cout << "varphi_x = " << varphi_x << " varphi_y = " << varphi_y << " varphi_z = " << varphi_z << std::endl;
+        translate_solution(*UC0, varphi_x, varphi_y, varphi_z, *UC1);
+        C2V(*UC1, u_out_);
+        pool_BC.release(UC1);
+        pool_BC.release(UC0);
+    }
+
+
+    //translates the whole vector solution in direction, given by varphi_x, varphi_y, varphi_z
+    //returns x_translate_ vector that is transalted
+    void translate_solution(const T_vec& x_, TR varphi_x, TR varphi_y, TR varphi_z, T_vec& x_translate_)
+    {
+        BC_vec* UC0 = pool_BC.take();
+        BC_vec* UC1 = pool_BC.take();
+        V2C(x_, *UC0);  
+        translate_solution(*UC0, varphi_x, varphi_y, varphi_z, *UC1);
+        C2V(*UC1, x_translate_);
+        pool_BC.release(UC1);
+        pool_BC.release(UC0);
+    }
+
+    //enforces hermitian_symmetry (for real-valued functions in Fourier domain)
+    void hermitian_symmetry(const T_vec& x_, T_vec& x_symm_)
+    {
+        BC_vec* UC0 = pool_BC.take();
+        BC_vec* UC1 = pool_BC.take();
+        V2C(x_, *UC0);  
+        hermitian_symmetry(*UC0, *UC1);
+        C2V(*UC1, x_symm_);
+        pool_BC.release(UC1); 
+        pool_BC.release(UC0);        
+
+    }
 
 private:
     
@@ -960,7 +1009,10 @@ private:
         pool_BC.release(Vel_reduced);
         kern->multiply_advection(VelR->x, VelR->y, VelR->z, RdFx->x, RdFx->y, RdFx->z, RdFy->x, RdFy->y, RdFy->z, RdFz->x, RdFz->y, RdFz->z, resR->x, resR->y, resR->z);
         fft(*resR, ret);
-        imag_vec(ret); //make sure it's pure imag after approximate advection!
+        if constexpr (PureImag)
+        {
+           imag_vec(ret); //make sure it's pure imag after approximate advection!
+        }
         pool_BR.release(resR);
         pool_BR.release(RdFx);
         pool_BR.release(RdFy);
@@ -1074,11 +1126,17 @@ private:
 
     void V2C(const T_vec& u_in, BC_vec& U_out)
     {
-        kern->vec2complex(u_in, U_out.x, U_out.y, U_out.z);
+        if constexpr(PureImag)
+            kern->vec2complex_imag(u_in, U_out.x, U_out.y, U_out.z);
+        else
+            kern->vec2complex_full(u_in, U_out.x, U_out.y, U_out.z);
     }
     void C2V(const BC_vec& U_in, T_vec& u_out)
     {
-        kern->complex2vec(U_in.x, U_in.y, U_in.z, u_out);
+        if constexpr(PureImag)
+            kern->complex2vec_imag(U_in.x, U_in.y, U_in.z, u_out);
+        else
+            kern->complex2vec_full(U_in.x, U_in.y, U_in.z, u_out);
     }
 
     TR norm(const BC_vec& U_in)
@@ -1114,7 +1172,28 @@ private:
     }
 
 
+    std::tuple<TR,TR,TR> shift_phases(BC_vec& U_in)
+    {
+        auto varphis = kern->get_shift_phases(U_in.x, {true,false,true}); //test
+        return varphis;
+    }
     
+    void translate_solution(BC_vec& U_in, TR varphi_x, TR varphi_y, TR varphi_z, BC_vec& U_out)
+    {
+
+        kern->apply_translate(U_in.x, grad_x, grad_y, grad_z, varphi_x, varphi_y, varphi_z, U_out.x);
+        kern->apply_translate(U_in.y, grad_x, grad_y, grad_z, varphi_x, varphi_y, varphi_z, U_out.y);
+        kern->apply_translate(U_in.z, grad_x, grad_y, grad_z, varphi_x, varphi_y, varphi_z, U_out.z);
+        // hermitian_symmetry(U_out, U_out);
+        
+    }
+
+    void hermitian_symmetry(BC_vec& U, BC_vec& U_sym)
+    {
+        kern->make_hermitian_symmetric(U.x, U_sym.x);
+        kern->make_hermitian_symmetric(U.y, U_sym.y);
+        kern->make_hermitian_symmetric(U.z, U_sym.z);
+    }
 
 
 };
