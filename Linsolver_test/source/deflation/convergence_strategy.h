@@ -42,7 +42,7 @@ public:
         }
         stagnation_max = 10;
         maximum_norm_increase_ = 10.0;
-        newton_wight_threshold_ = 1.0e-7;
+        newton_wight_threshold_ = 1.0e-10;
     }
     ~convergence_strategy()
     {
@@ -87,7 +87,7 @@ public:
         T lambda1 = lambda;
         T normFx1 = update_solution(nonlin_op, x, lambda, delta_x, delta_lambda, x1, lambda1);
         
-        if(normFx<1.0e-2)
+        // if(normFx<1.0e-2)
         {
             while( (normFx1 - normFx) > maximum_norm_increase_ )
             {

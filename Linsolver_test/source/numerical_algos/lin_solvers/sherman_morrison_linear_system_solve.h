@@ -99,11 +99,6 @@ private:
             beta = beta_;
             gamma = scalar_type(1);
             v=0.0;
-            if((use_small_alpha)&&(alpha<alpha_threshold_))
-            {
-                // std::cout << "\n==============SMALL ALPHA===========\n";
-                small_alpha=true;
-            }
         }
         void set_vectors(const scalar_type& gamma_, const vector_type& c_, const vector_type& d_, const scalar_type& alpha_) const
         {
@@ -111,12 +106,7 @@ private:
             d = d_;
             alpha = alpha_;
             gamma = gamma_;
-            v=0.0;
-            if((use_small_alpha)&&(alpha<alpha_threshold_))
-            {
-                // std::cout << "\n==============SMALL ALPHA===========\n";
-                small_alpha=true;
-            }            
+            v=0.0;           
         }        
         void scale_solution(vector_type &u) const
         {
@@ -153,7 +143,10 @@ private:
             return z;
 
         }
-
+        void force_small_alpha() const
+        {
+            small_alpha = true;
+        }
         void apply(const vector_type& u, vector_type& f) const
         {
                         
@@ -220,11 +213,11 @@ private:
             beta_ = beta_p;
             alpha = alpha_;
             gamma_ = scalar_type(1.0);
-            if((alpha<alpha_threshold_)&&(use_small_alpha))
-            {
-                small_alpha=true;
-            } 
         }
+        void force_small_alpha() const
+        {
+            small_alpha = true;
+        }        
         void set_vectors(const scalar_type& gamma_p, const vector_type& c_, const vector_type& d_, const scalar_type& alpha_, const vector_type& b_p) const
         {
             b_ = b_p;
@@ -233,10 +226,7 @@ private:
             beta_ = 0;
             alpha = alpha_;
             gamma_ = gamma_p;
-            if((alpha<alpha_threshold_)&&(use_small_alpha))
-            {
-                small_alpha=true;
-            } 
+
         }        
         void set_inherited_preconditioner(const preconditioner_type *inherited_preconditioner_) const
         {
@@ -255,14 +245,17 @@ private:
                 vector_operations->assign_mul(-1.0, d, g); // g=-1/alpha*d
                 inherited_preconditioner->apply(x); // inv(A)u=>x
                 inherited_preconditioner->apply(g); // inv(A)g=>g
+
+                vector_operations->scale(1.0/gamma_, x);
+                vector_operations->scale(1.0/gamma_, g);
                 
-                scalar_type dot_prod_num = vector_operations->scalar_prod(c, x)/gamma_; // (c,Au):=(c,x)=>cx
-                scalar_type dot_prod_din = vector_operations->scalar_prod(c, g)/gamma_; // (c,Ag):=(c,g)=>cg
-                scalar_type mul_g=-dot_prod_num/(alpha+dot_prod_din);
+                scalar_type dot_prod_num = vector_operations->scalar_prod(c, x); // (c,Au):=(c,x)=>cx
+                scalar_type dot_prod_din = vector_operations->scalar_prod(c, g); // (c,Ag):=(c,g)=>cg
+                scalar_type mul_g=(beta_ - dot_prod_num)/(alpha-dot_prod_din);
                 // ( x/beta - g/beta*(cx)/(beta+cg) ) -> x
 
                 //calc: y := mul_x*x + mul_y*y
-                vector_operations->add_mul(mul_g/gamma_, g, scalar_type(1.0)/gamma_, x);
+                vector_operations->add_mul(-mul_g, g, 1.0, x);
 
             }
         }
@@ -317,7 +310,7 @@ public:
     {
         return &linear_solver_original;
     }
-    void is_small_alpha(bool use_small_alpha_)
+    void is_small_alpha(bool use_small_alpha_) const
     {
         oper.use_small_alpha = use_small_alpha_;
         prec.use_small_alpha = use_small_alpha_;
@@ -331,7 +324,9 @@ public:
         oper.set_inherited_linear_operator(&A);
         oper.set_vectors(c, d, alpha, b, beta);
         prec.set_vectors(c, d, alpha, b, beta);
-
+        is_small_alpha(true); //for extended system small alpha is always set to true! See python test script for details
+        oper.force_small_alpha();
+        prec.force_small_alpha();
         if( oper.is_small_alpha_used() )
         {
             bool flag1 = linear_solver.solve(oper, b, u);
@@ -342,11 +337,13 @@ public:
             // std::cout << "(-aa+alpha*gamma) = " << (-aa+alpha*gamma) << " v = " << v << std::endl;
             vec_ops_->add_mul(-v, r_, 1.0, u);
             flag = flag2&flag1;
+            printf("using small alpha = %le\n", alpha);
         }
         else
         {
             flag = linear_solver.solve(oper, oper.get_rhs(), u);
             v = oper.get_scalar(u);
+            printf("using normal alpha = %le\n", alpha); // not tu be used due to poor conditioning.
         }
         vec_ops_->assign_scalar(0.0, r_);
         A.apply(u, r_);
@@ -355,7 +352,7 @@ public:
         scalar_type r_sc_ = -beta+alpha*v+cTu;
         scalar_type residual_norm = vec_ops_->norm_rank1(r_, r_sc_);
         // std::cout << "actual residual = " << residual_norm << std::endl;
-        logged_obj_t::info_f("actual residual = %le, alpha = %le, beta = %le", static_cast<double>(residual_norm), static_cast<double>(alpha), static_cast<double>(beta) );
+        printf("actual relative residual = %le, alpha = %le, beta = %le\n", static_cast<double>(residual_norm)/static_cast<double>( vec_ops_->norm_rank1(b, beta) ), static_cast<double>(alpha), static_cast<double>(beta) );
         return flag;
     }
 
@@ -367,29 +364,36 @@ public:
         oper.set_inherited_linear_operator(&A);
         oper.set_vectors(gamma, c, d, alpha);
         prec.set_vectors(gamma, c, d, alpha, b); 
-
+        is_small_alpha(true); //for extended system small alpha is always set to true! See python test script for details
+        oper.force_small_alpha();
+        prec.force_small_alpha();
         if( oper.is_small_alpha_used() )
         {
+            //uses a block matrix format and uses Schur complement for 'v' varaible.
+            //u = 1/gamma*inv(A)b-1/gama*inv(A)d*v; v=c^Tu+alpha*v=0 =>
+            //v = (-1/gamma*c^T inv(A)b)/(alpha-1/gamma*c^Tinv(A)d)=(-c^Tinv(A)b)/(alpha*gamma-c^T inv(A)d).
             bool flag1 = linear_solver.solve(oper, b, u);
             bool flag2 = linear_solver.solve(oper, d, r_);
             scalar_type aa = vec_ops_->scalar_prod(c, r_);
             scalar_type ba = vec_ops_->scalar_prod(c, u);
             scalar_type v = -ba/(-aa+alpha*gamma);
             // std::cout << "(-aa+alpha*gamma) = " << (-aa+alpha*gamma) << " v = " << v << std::endl;
-            vec_ops_->add_mul(-v/gamma, r_, 1.0/gamma, u);  
+            vec_ops_->add_mul(-v/gamma, r_, 1.0/gamma, u);
             flag = flag2&flag1;
+            printf("using small alpha = %le\n", alpha);
         }
         else
         {
+            printf("using normal alpha = %le\n", alpha);
             flag = linear_solver.solve(oper, b, u);
             oper.scale_solution(u);
-        }    
+        } 
         A.apply(u, r_);
         vec_ops_->add_mul(-1.0, b, gamma, r_);
         scalar_type cTu = vec_ops_->scalar_prod(c, u);
         vec_ops_->add_mul(-cTu, d, static_cast<scalar_type>(alpha), r_);
-        scalar_type residual_norm = vec_ops_->norm(r_);
-        logged_obj_t::info_f("actual residual = %le, gamma = %le, alpha = %le", static_cast<double>(residual_norm), static_cast<double>(gamma), static_cast<double>(alpha) );
+        scalar_type residual_norm = vec_ops_->norm_l2(r_);
+        printf("actual relative residual = %le, gamma = %le, alpha = %le\n", static_cast<double>(residual_norm)/static_cast<double>( vec_ops_->norm_l2(b) ), static_cast<double>(gamma), static_cast<double>(alpha) );
 
         return flag;
     }
@@ -408,7 +412,7 @@ public:
 private:
     linear_solver_type linear_solver;
     linear_solver_original_type linear_solver_original;
-    const scalar_type alpha_threshold_ = 1.0e-4;
+    const scalar_type alpha_threshold_ = 1.0e-9;
 
     LinearOperator_SM_t oper;
     Preconditioner_SM_t prec;

@@ -191,7 +191,7 @@ public:
     {
         n_y_force = 1;
         n_z_force = 0;
-        scale_force = T(0.1);
+        scale_force = T(1.0);
 
         Mz=FFT->get_reduced_size();
         common_constructor_operation();
@@ -753,21 +753,24 @@ public:
 
     void randomize_vector(T_vec u_out, int steps_ = -1)
     {
-        
+        const int NN = 4;
         BC_vec* UC0 = pool_BC.take();
         BR_vec* UR0 = pool_BR.take();
 
         vec_ops_R->assign_random( UR0->x );
         vec_ops_R->assign_random( UR0->y );
         vec_ops_R->assign_random( UR0->z );
-        
-        //vec_ops_R->assign_scalar(0, UR0->x);
+        // vec_ops_R->assign_scalar( 0, UR0->x );
+        // vec_ops_R->assign_scalar(0, UR0->x);
         // vec_ops_R->assign_scalar(0, UR0->z);
+        // vec_ops_R->add_mul_scalar(0,100.0,UR0->x);
+        // vec_ops_R->add_mul_scalar(0,100.0,UR0->y);
+        // vec_ops_R->add_mul_scalar(0,100.0,UR0->z);
         int steps = steps_;
         if(steps_ == -1)
         {
             std::srand(unsigned(std::time(0))); //init new seed
-            steps = std::rand()%4 + 1;     // random from 1 to 4
+            steps = std::rand()%NN + 1;     // random from 1 to NN
 
         }
 
@@ -781,9 +784,8 @@ public:
         {
             smooth(TR(0.1), *UC0);
         }
-
         project(*UC0);
-        
+        // kern->add_mul3(1.0, forceABC.x, forceABC.y, forceABC.z, UC0->x, UC0->y, UC0->z);        
         C2V(*UC0, u_out);
 
         pool_BC.release(UC0);

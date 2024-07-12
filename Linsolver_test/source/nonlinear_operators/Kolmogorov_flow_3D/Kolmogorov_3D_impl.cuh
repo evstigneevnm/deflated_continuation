@@ -164,9 +164,9 @@ __global__ void vec2complex_imag_kernel(size_t N, T_vec v_in, TC_vec u_x, TC_vec
     u_y[0] = TC(0,0);
     u_z[0] = TC(0,0);
 
-    u_x[i+1] = TC(0, v_in[i]);
-    u_y[i+1] = TC(0, v_in[i+(N-1)]);
-    u_z[i+1] = TC(0, v_in[i+2*(N-1)]);    
+    u_x[i+1] = TC(0, v_in[i]*N);
+    u_y[i+1] = TC(0, v_in[i+(N-1)]*N);
+    u_z[i+1] = TC(0, v_in[i+2*(N-1)]*N);    
 
 }
 
@@ -310,9 +310,9 @@ __global__ void complex2vec_imag_kernel(size_t N, TC_vec u_x, TC_vec u_y, TC_vec
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i>=N-1) return; //N-1 due to zero in the begining
     
-    v_out[i] = T(u_x[i+1].imag());
-    v_out[i+(N-1)] = T(u_y[i+1].imag());
-    v_out[i+2*(N-1)] = T(u_z[i+1].imag());
+    v_out[i] = T(u_x[i+1].imag()/N);
+    v_out[i+(N-1)] = T(u_y[i+1].imag()/N);
+    v_out[i+2*(N-1)] = T(u_z[i+1].imag()/N);
 
 }
 
@@ -1451,7 +1451,7 @@ std::tuple<TR,TR,TR> nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_v
     }
     if(diag_prod < std::numeric_limits<TR>::epsilon() ) //degenerate system
     {
-        std::cout << "hz";
+        // std::cout << "hz";
         return {0,0,0};
     }
     else //solve system
@@ -1463,7 +1463,7 @@ std::tuple<TR,TR,TR> nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_v
         // {
         //     std::cout << x << std::endl;
         // }
-        return {solution[0], 0, solution[1]};
+        return {solution[0], 0, solution[1]}; //TODO: this should be brought to the format of direciton.
     }
 
     return {0,0,0};//{solution[0], solution[1], solution[2]};

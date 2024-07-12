@@ -147,7 +147,7 @@ int main(int argc, char const *argv[])
 
     std::cout << "input parameters: " << "\nN = " << N << "\none_over_alpha = " << one_over_alpha << "\nNx = " << Nx << " Ny = " << Ny << " Nz = " << Nz << "\nR = " << R << "\nsimulation_time = " << simulation_time << "\nscheme_name = " << scheme_name << "\ngpu_pci_id = " << gpu_pci_id << "\n";
 //  sqrt(L*scale_force)/(n R):
-    const real scale_force = 0.1;
+    const real scale_force = 1.0;
     std::cout << "reduced Reynolds number = " <<  std::sqrt(one_over_alpha*2*3.141592653589793238*scale_force)*R << std::endl;
     if(load_file)
     {
@@ -175,7 +175,7 @@ int main(int argc, char const *argv[])
     
     vec_file_ops_t file_ops(&vec_ops);
 
-    vec_t x0;
+    vec_t x0, x1;
 
     vec_ops.init_vector(x0); vec_ops.start_use_vector(x0);
 
@@ -187,7 +187,11 @@ int main(int argc, char const *argv[])
     }
     else
     {
-        kf3d_y.randomize_vector(x0);
+        vec_ops.init_vector(x1); vec_ops.start_use_vector(x1);
+        kf3d_y.randomize_vector(x1, 10);
+        kf3d_y.exact_solution(R, x0);
+        vec_ops.add_mul(-0.5, x1, x0);
+        vec_ops.stop_use_vector(x1); vec_ops.free_vector(x1);
     }
 
     time_step_err_ctrl_t time_step_err_ctrl(&vec_ops, &log, {0.0, simulation_time});

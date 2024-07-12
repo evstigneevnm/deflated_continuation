@@ -46,19 +46,22 @@ int main(int argc, char **args)
 
     int sz = file_operations::read_matrix_size_square("./dat_files/A.dat");
     matrix_t A, iP;
-    vector_t x, x0, b, c, d;
+    vector_t x, x0, x0_sm, x0_orig, b, c, d;
     vec_ops_t vec_ops(sz);
     mat_ops_t mat_ops(sz, sz, &vec_ops);
     mat_ops.init_matrices(A, iP); mat_ops.start_use_matrices(A, iP);
-    vec_ops.init_vectors(x0, x, c, d, b); vec_ops.start_use_vectors(x0, x, c, d, b);
+    vec_ops.init_vectors(x0, x0_sm, x, x0_orig, c, d, b); vec_ops.start_use_vectors(x0, x0_sm, x, x0_orig, c, d, b);
 
     real alpha=1.0e-9;
     real beta=1.9;
+    real gamma = 1.2e3;
     real v=0.0;
 
     file_operations::read_matrix<real>("./dat_files/A.dat",  sz, sz, A);
     file_operations::read_matrix<real>("./dat_files/iP.dat",  sz, sz, iP);
     file_operations::read_vector<real>("./dat_files/x0.dat",  sz, x0);
+    file_operations::read_vector<real>("./dat_files/x0_sm.dat",  sz, x0_sm); 
+    file_operations::read_vector<real>("./dat_files/x0_orig.dat",  sz, x0_orig);
     file_operations::read_vector<real>("./dat_files/b.dat",  sz, b);
     file_operations::read_vector<real>("./dat_files/c.dat",  sz, c);
     file_operations::read_vector<real>("./dat_files/d.dat",  sz, d);
@@ -103,10 +106,8 @@ int main(int argc, char **args)
     SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle_original()->set_basis_size(basis_sz);
 
-    SM->is_small_alpha(small_alpha);
-
     std::cout << "\n ========= \ntesting: rank1_update(A)u = b; v=f(u,b) \n";
-    vec_ops.assign_scalar(1.0, x);
+    vec_ops.assign_scalar(0.0, x);
     res_flag = SM->solve(Ax, c, d, alpha, b, beta, x, v);
     iters_performed = mon->iters_performed();
     log.info_f("linsolver total iterations = %i", iters_performed);
@@ -124,12 +125,12 @@ int main(int argc, char **args)
     std::cout << " v = " << v << std::endl;
 //  add_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, vector_type& y)const
     vec_ops.add_mul(1.0, x0, -1.0, x);
-    std::cout << "||x-x0|| = " << vec_ops.norm(x);
+    std::cout << "||x-x0||/||x|| = " << vec_ops.norm_l2(x)/vec_ops.norm_l2(x0) << std::endl; 
 
-    //test (beta A - 1/alpha d c^T) u = b;
-    std::cout << "\n ========= \ntesting: (beta A - 1/alpha d c^T) u = b \n";
-    vec_ops.assign_scalar(1.0, x);
-    res_flag = SM->solve(beta, Ax, alpha, c, d, b, x);
+    //test (gamma A - 1/alpha d c^T) u = b;
+    std::cout << "\n ========= \ntesting: (gamma A - 1/alpha d c^T) u = b \n";
+    vec_ops.assign_scalar(0.0, x);
+    res_flag = SM->solve(gamma, Ax, alpha, c, d, b, x);
     
     iters_performed = mon->iters_performed();
     log.info_f("linsolver total iterations = %i", iters_performed);
@@ -144,12 +145,13 @@ int main(int argc, char **args)
     //     std::cout << xxx.first << " " << xxx.second << std::endl;
     // } 
 
-    vec_ops.add_mul(1.0, x0, -1.0, x);
-    std::cout << "||x-x0|| = " << vec_ops.norm(x);
+    vec_ops.add_mul(1.0, x0_sm, -1.0, x);
+    std::cout << "||x-x0||/||x|| = " << vec_ops.norm_l2(x)/vec_ops.norm_l2(x0_sm) << std::endl;
 
     file_operations::write_vector<real>("./dat_files/x_sm.dat", sz, x);
 
     std::cout << "\n ========= \ntesting: A u = b \n";
+    vec_ops.assign_scalar(0.0, x);
     res_flag = SM->solve(Ax, b, x);
     iters_performed = mon->iters_performed();
     log.info("linsolver total iterations = %i", iters_performed);
@@ -164,10 +166,11 @@ int main(int argc, char **args)
     // }  
 
     file_operations::write_vector<real>("./dat_files/x_orig.dat", sz, x);
-           
+    vec_ops.add_mul(1.0, x0_orig, -1.0, x);
+    std::cout << "||x-x0||/||x|| = " << vec_ops.norm_l2(x)/vec_ops.norm_l2(x0_orig) << std::endl;            
 
     mat_ops.stop_use_matrices(A, iP); mat_ops.free_matrices(A, iP);
-    vec_ops.stop_use_vectors(x0, x, c, d, b); vec_ops.free_vectors(x0, x, c, d, b);
+    vec_ops.stop_use_vectors(x0, x, x0_sm, x0_orig, c, d, b); vec_ops.free_vectors(x0, x, x0_sm, x0_orig, c, d, b);
 
     return 0;
 }

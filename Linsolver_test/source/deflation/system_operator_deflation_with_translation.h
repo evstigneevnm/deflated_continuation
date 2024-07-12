@@ -41,7 +41,7 @@ public:
         nonlin_op->translation_fix(x, x_fixed);
         sol_storage->calc_distance(x, x_fixed, beta, c); //beta = 1/||x-x0_j||, c = (x-x0_j)
         vec_ops->add_mul_scalar(T(0), T(-beta), b); //b=-F(x,lambda)
-        std::cout << "distance = " << beta << " ";
+        std::cout << "tr distance = " << beta << " ";
         flag_lin_solver = SM_solver->solve(beta, *lin_op, T(1.0), c, f, b, d_x);
         d_lambda = 0;
         return flag_lin_solver;

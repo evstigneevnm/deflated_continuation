@@ -146,7 +146,7 @@ int main(int argc, char **args)
     size_t sz = file_operations::read_matrix_size_square("./dat_files/A.dat");
     std::cout << "matrix size is " << sz << "X" << sz << std::endl;
     T_mat A;
-    T_vec x, x0, b, c, d, r;
+    T_vec x, x0, x0_sm, b, c, d, r;
     vec_ops_t vec_ops( sz, &cublas );
     mat_ops_t mat_ops( sz, sz, vec_ops.get_cublas_ref() );
     vec_files_ops_t vec_files_ops(&vec_ops);
@@ -154,11 +154,12 @@ int main(int argc, char **args)
 
     mat_ops.init_matrix(A); 
     mat_ops.start_use_matrix(A);
-    vec_ops.init_vectors(x0, x, c, d, b, r);
-    vec_ops.start_use_vectors(x0, x, c, d, b, r);
+    vec_ops.init_vectors(x0,x0_sm, x, c, d, b, r);
+    vec_ops.start_use_vectors(x0, x0_sm, x, c, d, b, r);
 
     real alpha=1.0e-9;
     real beta=1.9;
+    real gamma = 1.2e3;
     real v=0.0;
     bool use_small_alpha = false;
     if(alpha<1.0e-8)
@@ -167,11 +168,11 @@ int main(int argc, char **args)
     }
 
     mat_files_ops.read_matrix("./dat_files/A.dat", A);
-        
     vec_files_ops.read_vector("./dat_files/x0.dat", x0);
     vec_files_ops.read_vector("./dat_files/b.dat", b);
     vec_files_ops.read_vector("./dat_files/c.dat", c);
     vec_files_ops.read_vector("./dat_files/d.dat", d);
+    vec_files_ops.read_vector("./dat_files/x0_sm.dat", x0_sm);    
 
     std::cout << "matrix size = " << sz << std::endl;
 
@@ -230,12 +231,11 @@ int main(int argc, char **args)
     vec_files_ops.write_vector("./dat_files/x_rank1_exact.dat", x);
     std::cout << "v = " << v << std::endl;
 
-    // vec_ops.add_mul(1.0, x0, -1.0, x);
-    // std::cout << "||x-x0|| = " << vec_ops.norm(x);
-
+    vec_ops.add_mul(1.0, x0, -1.0, x);
+    std::cout << "||x-x0||/||x|| = " << vec_ops.norm_l2(x)/vec_ops.norm_l2(x0);
     //test (beta A - 1/alpha d c^T) u = b;
-    std::cout << "\n ========= \ntesting: (beta A - 1/alpha d c^T) u = b \n";
-    res_flag = sm_linsolver.solve(beta, Ax, alpha, c, d, b, x);
+    std::cout << "\n ========= \ntesting: (gamma A - 1/alpha d c^T) u = b \n";
+    res_flag = sm_linsolver.solve(gamma, Ax, alpha, c, d, b, x);
     
     iters_performed = mon->iters_performed();
 
@@ -244,8 +244,8 @@ int main(int argc, char **args)
     else
         log.error("lin_solver returned fail result");    
     
-    // vec_ops.add_mul(1.0, x0, -1.0, x);
-    // std::cout << "||x-x0|| = " << vec_ops.norm(x);
+    vec_ops.add_mul(1.0, x0_sm, -1.0, x);
+    std::cout << "||x-x0||/||x|| = " << vec_ops.norm_l2(x)/vec_ops.norm_l2(x0_sm);
 
     vec_files_ops.write_vector("./dat_files/x_sm_exact.dat", x);
 
@@ -264,8 +264,8 @@ int main(int argc, char **args)
     
     mat_ops.stop_use_matrix(A);
     mat_ops.free_matrix(A); 
-    vec_ops.stop_use_vectors(x0, x, c, d, b, r);
-    vec_ops.free_vectors(x0, x, c, d, b, r);
+    vec_ops.stop_use_vectors(x0, x0_sm, x, c, d, b, r);
+    vec_ops.free_vectors(x0,x0_sm, x, c, d, b, r);
 
     if(res_flag)
         return 0;

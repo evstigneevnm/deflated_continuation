@@ -113,10 +113,9 @@ int main(int argc, char const *argv[])
         }
         real div_norm_exact = KF_3D.div_norm(x1);
         printf("exact solution norm = %le\n", vec_ops->norm_l2(x1));
-        printf("Divergence norm exact solution = %le\n", double(div_norm_exact) );
-        if(div_norm_exact > std::sqrt(std::numeric_limits<real>::epsilon() ) )
+        printf("Divergence norm exact solution = %le, %s\n", double(div_norm_exact), check_test_to_eps(div_norm_exact).first.c_str() );
+        if(!check_test_to_eps(div_norm_exact).second)
         {
-            std::cout << "FAILED" << std::endl;
             flag_ok = false;
         }
 
@@ -135,10 +134,9 @@ int main(int argc, char const *argv[])
         KF_3D.randomize_vector(x1, 5);
         printf("rand vec = %le\n", vec_ops->norm(x1) );
         auto div_norm_x1 = KF_3D.div_norm(x1);
-        printf("Divergence rand vec = %le\n",  div_norm_x1);
-        if(div_norm_x1 > std::sqrt(std::numeric_limits<real>::epsilon() ) )
+        printf("Divergence rand vec = %le, %s\n", double(div_norm_x1), check_test_to_eps(div_norm_x1).first.c_str() );
+        if(!check_test_to_eps(div_norm_x1).second)
         {
-            std::cout << "FAILED" << std::endl;
             flag_ok = false;
         }
 
@@ -155,31 +153,28 @@ int main(int argc, char const *argv[])
         KF_3D.set_linearization_point(x0, R);
         KF_3D.jacobian_u(dx, dy);
         div_norm = KF_3D.div_norm(dy);
-        printf("Divergence norm J_u = %le\n", double(div_norm) );
-        if(div_norm > std::sqrt(std::numeric_limits<real>::epsilon() ) )
+        printf("Divergence norm J_u = %le, %s\n", double(div_norm), check_test_to_eps(div_norm).first.c_str() );
+        if(!check_test_to_eps(div_norm).second)
         {
-            std::cout << "FAILED" << std::endl;
             flag_ok = false;
-        }        
+        }
         // KF_3D.write_solution_abs("testA.pos", dy);
         // KF_3D.write_solution_vec("testV.pos", dy);
         KF_3D.jacobian_alpha(dx);
         div_norm = KF_3D.div_norm(dx);
-        printf("Divergence norm J_alpha = %le\n", double(div_norm) );
-        if(div_norm > std::sqrt(std::numeric_limits<real>::epsilon() ) )
+        printf("Divergence norm J_alpha = %le, %s\n", double(div_norm), check_test_to_eps(div_norm).first.c_str() );
+        if(!check_test_to_eps(div_norm).second)
         {
-            std::cout << "FAILED" << std::endl;
             flag_ok = false;
-        }        
+        }
     //  check preconditioner
         KF_3D.preconditioner_jacobian_u(dy);
         div_norm = KF_3D.div_norm(dy);
-        printf("Divergence norm inv(M)J_u = %le\n", double(div_norm) );
-        if(div_norm > std::sqrt(std::numeric_limits<real>::epsilon() ) )
+        printf("Divergence norm inv(M)J_u = %le, %s\n", double(div_norm), check_test_to_eps(div_norm).first.c_str() );
+        if(!check_test_to_eps(div_norm).second)
         {
-            std::cout << "FAILED" << std::endl;
             flag_ok = false;
-        }        
+        }
         // KF_3D.write_solution_abs("testMA.pos", dy);
         // KF_3D.write_solution_vec("testMV.pos", dy);
         vec_ops->stop_use_vector(x0); vec_ops->free_vector(x0);
@@ -208,10 +203,9 @@ int main(int argc, char const *argv[])
         }
         real div_norm_exact = KF_3D.div_norm(x1);
         printf("exact solution norm = %le\n", vec_ops->norm_l2(x1));
-        printf("Divergence norm exact solution = %le\n", double(div_norm_exact) );
-        if(div_norm_exact > std::sqrt(std::numeric_limits<real>::epsilon() ) )
+        printf("Divergence norm exact solution = %le, %s\n", double(div_norm_exact), check_test_to_eps(div_norm_exact).first.c_str() );
+        if(!check_test_to_eps(div_norm_exact).second)
         {
-            std::cout << "FAILED" << std::endl;
             flag_ok = false;
         }
 
@@ -229,10 +223,9 @@ int main(int argc, char const *argv[])
         KF_3D.randomize_vector(x1, 5);
         real div_norm = KF_3D.div_norm(x1);
         printf("rand vec = %le\n", vec_ops->norm(x1) );
-        printf("Divergence rand vec = %le\n", div_norm);
-        if(div_norm > std::sqrt(std::numeric_limits<real>::epsilon() ) )
+        printf("Divergence rand vec = %le, %s\n", double(div_norm), check_test_to_eps(div_norm).first.c_str() );
+        if(!check_test_to_eps(div_norm).second)
         {
-            std::cout << "FAILED" << std::endl;
             flag_ok = false;
         }
         KF_3D.F(x1, R, x0);
@@ -258,21 +251,19 @@ int main(int argc, char const *argv[])
         // KF_3D.write_solution_vec("testV.pos", dy);
         KF_3D.jacobian_alpha(dx);
         div_norm = KF_3D.div_norm(dx);
-        printf("Divergence norm J_alpha = %le\n", double(div_norm) );
-        if(div_norm > std::sqrt(std::numeric_limits<real>::epsilon() ) )
+        printf("Divergence norm J_alpha = %le, %s\n", double(div_norm), check_test_to_eps(div_norm).first.c_str() );
+        if(!check_test_to_eps(div_norm).second)
         {
-            std::cout << "FAILED" << std::endl;
             flag_ok = false;
-        }        
+        }
     //  check preconditioner
         KF_3D.preconditioner_jacobian_u(dy);
         div_norm = KF_3D.div_norm(dy);
-        printf("Divergence norm inv(M)J_u = %le\n", double(div_norm) );
-        if(div_norm > std::sqrt(std::numeric_limits<real>::epsilon() ) )
+        printf("Divergence norm inv(M)J_u = %le, %s\n", double(div_norm), check_test_to_eps(div_norm).first.c_str() );
+        if(!check_test_to_eps(div_norm).second)
         {
-            std::cout << "FAILED" << std::endl;
             flag_ok = false;
-        }        
+        }
         // KF_3D.write_solution_abs("testMA.pos", dy);
         // KF_3D.write_solution_vec("testMV.pos", dy);
 

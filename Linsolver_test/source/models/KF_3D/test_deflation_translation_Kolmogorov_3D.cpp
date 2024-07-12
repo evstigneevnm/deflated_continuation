@@ -19,7 +19,7 @@
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 
-#include <deflation/system_operator_deflation.h>
+#include <deflation/system_operator_deflation_with_translation.h>
 #include <deflation/solution_storage.h>
 #include <deflation/convergence_strategy.h>
 #include <deflation/deflation_operator.h>
@@ -29,7 +29,7 @@
 
 #include <common/gpu_vector_operations.h>
 
-#include <models/KF_3D/test_deflation_typedefs_Kolmogorov_3D.h>
+#include <models/KF_3D/test_deflation_translation_typedefs_Kolmogorov_3D.h>
 
 int main(int argc, char const *argv[])
 {
@@ -56,11 +56,11 @@ int main(int argc, char const *argv[])
     init_cuda(-1);
 
     //linsolver control
-    unsigned int lin_solver_max_it = 2000;
-    real lin_solver_tol = 1.0e-3;
+    unsigned int lin_solver_max_it = 1000;
+    real lin_solver_tol = 1.0e-4;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 3;
+    unsigned int basis_sz = 4;
     //newton deflation control
     unsigned int newton_def_max_it = 2000;
     real newton_def_tol = 1.0e-9;
@@ -69,8 +69,8 @@ int main(int argc, char const *argv[])
 
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
     size_t Mz = CUFFT_C2R->get_reduced_size();
-    size_t Nv = real(3*(Nx*Ny*Mz-1));
-    real norm_wight = 1.0;//std::sqrt(Nv);
+    size_t Nv = 6*(Nx*Ny*Mz-1);
+    real norm_wight = std::sqrt(Nv);
 
 
     cublas_wrap *CUBLAS = new cublas_wrap();
@@ -126,12 +126,13 @@ int main(int argc, char const *argv[])
     convergence_newton_t *conv_newton = new convergence_newton_t(vec_ops, log, newton_def_tol, newton_def_max_it, real(1.0) );
     system_operator_t *system_operator = new system_operator_t(vec_ops, Ax, SM);
     
-    sol_storage_def->set_ignore_zero();
-    // vec x1;
-    // vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
-    // KF_3D->exact_solution(Rey, x1);
-    // sol_storage_def->set_known_solution(x1);
-    // vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
+    // sol_storage_def->set_ignore_zero();
+    
+    vec x1;
+    vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
+    KF_3D->exact_solution(Rey, x1);
+    sol_storage_def->set_known_solution(x1);
+    vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
 
     newton_t *newton = new newton_t(vec_ops, system_operator, conv_newton);
 
