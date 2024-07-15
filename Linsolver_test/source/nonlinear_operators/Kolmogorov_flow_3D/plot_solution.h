@@ -80,7 +80,7 @@ private:
     void write_out_file_pos(const std::string& f_name, const T_vec& U, int Nx, int Ny, int Nz, int what = 2)
     {
         T Xmin=0.0, Ymin=0.0, Zmin=0.0;
-
+        // T dx = 2*M_PI/Nx, dy = 2*M_PI/Ny, dz = M_PI/Nz;
 
 
 

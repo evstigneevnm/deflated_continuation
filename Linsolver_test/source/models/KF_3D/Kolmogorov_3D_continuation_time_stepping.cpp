@@ -126,7 +126,7 @@ int main(int argc, char const *argv[])
         std::cout << std::endl;
         return(0);       
     }    
-    real initial_dt = 1.0e-1;
+    real initial_dt = 1.0e-5;
     size_t N = std::stoul(argv[1]);
     real alpha = std::stof(argv[2]);
     int one_over_alpha = static_cast<int>(1.0/alpha);
@@ -207,8 +207,8 @@ int main(int argc, char const *argv[])
     
     
     //linsolver control
-    unsigned int lin_solver_max_it = 1000;
-    real lin_solver_tol = 5.0e-3;
+    unsigned int lin_solver_max_it = 200;
+    real lin_solver_tol = 1.0e-2;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;

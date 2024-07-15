@@ -10,7 +10,7 @@
 
 
 template<typename TC, typename TC_vec>
-__global__ void apply_curl_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec ux_in, TC_vec uy_in, TC_vec uz_in, TC_vec wx_out, TC_vec wy_out, TC_vec wz_out)
+__global__ void curl_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec ux_in, TC_vec uy_in, TC_vec uz_in, TC_vec wx_out, TC_vec wy_out, TC_vec wz_out)
 {
 unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
 unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
@@ -35,7 +35,7 @@ if ( index_in < sizeOfData )
 
 
 template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Taylor_Green_ker<TR, TR_vec, TC, TC_vec>::apply_curl(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec ux_in, TC_vec uy_in, TC_vec uz_in, TC_vec wx_out, TC_vec wy_out, TC_vec wz_out)
+void nonlinear_operators::Taylor_Green_ker<TR, TR_vec, TC, TC_vec>::curl(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec ux_in, TC_vec uy_in, TC_vec uz_in, TC_vec wx_out, TC_vec wy_out, TC_vec wz_out)
 {
     apply_curl_kernel<TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, grad_x, grad_y, grad_z, ux_in,  uy_in, uz_in, wx_out, wy_out, wz_out);
 }

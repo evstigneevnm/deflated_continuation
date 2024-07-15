@@ -173,8 +173,7 @@ private:
 
     T Lx;
     T Ly;
-    T Lz;    
-
+    T Lz;
     T homotopy_;
 
 public:
@@ -192,17 +191,16 @@ public:
         n_y_force = 1;
         n_z_force = 0;
         scale_force = T(1.0);
-
         Mz=FFT->get_reduced_size();
+        Lx = (T(1.0)/alpha)*T(2.0)*M_PI;
+        Ly = T(2.0)*M_PI;
+        Lz = T(2.0)*M_PI;        
         common_constructor_operation();
         kern = new kern_t(alpha, Nx, Ny, Nz, Mz, BLOCK_SIZE_x, BLOCK_SIZE_y);
         init_all_derivatives();
-        Lx = (T(1.0)/alpha)*T(2.0)*M_PI;
-        Ly = T(2.0)*M_PI;
-        Lz = T(2.0)*M_PI;
         plot = new plot_t(vec_ops_R_, Nx_, Ny_, Nz_, Lx, Ly, Lz);
 
-        std::cout << "Kolmogorov 3D===> nonlinear problem class self-testing:" << std::endl;
+        std::cout << "Kolmogorov 3D on " << Lx <<"X" << Ly << "X" << Lz << "===> nonlinear problem class self-testing:" << std::endl;
         for(unsigned int j=0;j<1;j++)
         {   
             auto manufactured_norm = manufactured_solution(j);
@@ -268,7 +266,7 @@ public:
         // vec_ops_C->assign_scalar(0.0,W.x);
         // vec_ops_C->assign_scalar(0.0,W.y);
         // vec_ops_C->assign_scalar(0.0,W.z);
-        B_V_nabla_F(U, U, W); //W:= (U, nabla) U
+        B_V_nabla_curl_F(U, U, W); //W:= (U, nabla) U
         kern->add_mul3(TC(-1.0,0), force.x, force.y, force.z, W.x, W.y, W.z); // force:= W-force
         project(W); // W:=P[W]
         kern->negate3(W.x, W.y, W.z); //W:=-W;
@@ -294,7 +292,7 @@ public:
         // vec_ops_C->assign_scalar(0.0,W.x);
         // vec_ops_C->assign_scalar(0.0,W.y);
         // vec_ops_C->assign_scalar(0.0,W.z);
-        B_V_nabla_F(U, U, W); //W:= (U, nabla) U
+        B_V_nabla_curl_F(U, U, W); //W:= (U, nabla) U
         kern->add_mul3(TC(-1.0,0), force.x, force.y, force.z, W.x, W.y, W.z); // force:= W-force
         project(W); // W:=P[W]
         kern->negate3(W.x, W.y, W.z); //W:=-W;       
@@ -361,12 +359,12 @@ public:
         // vec_ops_C->assign_scalar(0.0,dW->y);
         // vec_ops_C->assign_scalar(0.0,dW->z);
         project(dU);
-        B_V_nabla_F(U_0, dU, dV); //dV:= (dU, nabla) U_0
-        B_V_nabla_F(dU, U_0,*dW); //dW:= (U_0, nabla) dU
+        B_V_nabla_curl_F(U_0, dU, dV); //dV:= (dU, nabla) U_0
+        B_V_nabla_curl_F(dU, U_0,*dW); //dW:= (U_0, nabla) dU
         kern->add_mul3(TC(1.0,0), dW->x, dW->y, dW->z, dV.x, dV.y, dV.z); // dV:=dV+dW
-
-        kern->negate3(dV.x, dV.y, dV.z); // dV:=-dV
         project(dV); // dV:=P[dV]
+        kern->negate3(dV.x, dV.y, dV.z); // dV:=-dV
+        
         // vec_ops_C->assign_scalar(0.0,dV.x);
         // vec_ops_C->assign_scalar(0.0,dV.y);
         // vec_ops_C->assign_scalar(0.0,dV.z);
@@ -484,7 +482,7 @@ public:
         }
         else
         {
-            kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, Reynolds_0);
+            kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, Reynolds_0*Reynolds_0);
         }
         //project(dR);
     }
@@ -505,7 +503,7 @@ public:
     void preconditioner_jacobian_temporal_u(BC_vec& dR, T a, T b)
     {
         // project(dR);
-        kern->apply_iLaplace3_plus_E(Laplace, dR.x, dR.y, dR.z, Reynolds_0, a, b);
+        kern->apply_iLaplace3_plus_E(Laplace, dR.x, dR.y, dR.z, Reynolds_0*Reynolds_0, a, b);
         project(dR);
 
     }
@@ -744,7 +742,7 @@ public:
     void B_ABC_approx_solution(T_vec u_out)
     {
         BC_vec* UC = pool_BC.take();
-        B_V_nabla_F(forceABC, forceABC, *UC);
+        B_V_nabla_curl_F(forceABC, forceABC, *UC);
         project(*UC);
         C2V(*UC, u_out);
         pool_BC.release(UC);
@@ -819,15 +817,15 @@ public:
 
     }
 
-    //projects vector to div free space
     void project(T_vec& u_)
     {
-        BC_vec* UC0 = pool_BC.take();
-        V2C(u_, *UC0);        
-        project(*UC0);
-        C2V(*UC0, u_);
-        pool_BC.release(UC0);          
+        BC_vec* UC1 = pool_BC.take();
+        V2C(u_, *UC1);  
+        project(*UC1);
+        C2V(*UC1, u_);
+        pool_BC.release(UC1);
     }
+
 
     TR norm(const T_vec& u_in_)
     {
@@ -928,7 +926,9 @@ private:
             vec_ops->init_vectors(u_manufactured, resid); vec_ops->start_use_vectors(u_manufactured, resid); 
             exact_solution(Reynolds, u_manufactured);
             solution_norm = vec_ops->norm_l2(u_manufactured);
+            // write_solution_vec("exact_solution.pos", u_manufactured);
             F(u_manufactured, Reynolds, resid);
+            // write_solution_vec("residual.pos", resid);
             resid_norm = vec_ops->norm_l2(resid)/solution_norm;
             vec_ops->stop_use_vectors(u_manufactured, resid); vec_ops->free_vectors(u_manufactured, resid); 
         }
@@ -985,7 +985,7 @@ private:
     }
 
 
-    //advection operator in classical form as F := ((V, \nabla) F).
+    //advection operator in classical form as ((V, \nabla) F).
     //V, F and ret are block vectors.
     void B_V_nabla_F(const BC_vec& Vel, const BC_vec& Func, BC_vec& ret)
     {
@@ -1022,6 +1022,36 @@ private:
         pool_BR.release(VelR);
     }
 
+
+    //advection operator in rotational form as [V \cross curl(F)].
+    //V, F and ret are block vectors.
+    void B_V_nabla_curl_F(const BC_vec& Vel, const BC_vec& Func, BC_vec& ret)
+    {
+  
+        BC_vec* curl = pool_BC.take();
+        BC_vec* Vel_reduced = pool_BC.take();
+        kern->curl(grad_x, grad_y, grad_z, Func.x, Func.y, Func.z, curl->x, curl->y, curl->z, mask23);
+        kern->copy_mul_poinwise_3(mask23, Vel.x, Vel.y, Vel.z, Vel_reduced->x, Vel_reduced->y, Vel_reduced->z);
+        BR_vec* curlR = pool_BR.take();
+        BR_vec* VelR = pool_BR.take();
+        BR_vec* resR = pool_BR.take();  
+        ifft(*curl, *curlR);
+        ifft(*Vel_reduced, *VelR);
+        pool_BC.release(curl);
+        pool_BC.release(Vel_reduced);
+        kern->cross_real(VelR->x, VelR->y, VelR->z, curlR->x, curlR->y, curlR->z, resR->x, resR->y, resR->z);
+        fft(*resR, ret);
+        if constexpr (PureImag)
+        {
+           imag_vec(ret); //make sure it's pure imag after approximate advection!
+        }
+        pool_BR.release(resR);
+        pool_BR.release(curlR);
+        pool_BR.release(VelR);
+    }
+
+
+
     void init_all_derivatives()
     {
         set_gradient_coefficients_low_level();
@@ -1029,6 +1059,15 @@ private:
         set_Biharmonic_coefficients();
         set_force();
         kern->apply_mask(alpha, mask23);
+        // std::vector<TC> mask_h(Nx*Ny*Mz,0);
+        // device_2_host_cpy<TC>(mask_h.data(), mask23, Nx*Ny*Mz);
+        // std::vector<TR> mask_hr;
+        // for(auto &x: mask_h)
+        // {
+        //     mask_hr.push_back( x.real() );
+        // }
+    
+        // plot->write_out_file_pos("mask_v.pos", mask_hr.data(), Nx, Ny, Mz, 2);
     }
 
 
@@ -1049,6 +1088,18 @@ private:
 
     //projects fourier vector to the divergence free space
     void project(BC_vec& U_in_place)
+    {
+        if constexpr(PureImag)
+        {
+            kern->apply_projection(grad_x, grad_y, grad_z, Laplace, U_in_place.x, U_in_place.y, U_in_place.z);
+        }
+        else
+        {
+            kern->apply_full_projection(grad_x, grad_y, grad_z, Laplace, U_in_place.x, U_in_place.y, U_in_place.z);
+        }
+    }
+
+    void project_old(BC_vec& U_in_place)
     {
         
         C_vec* uC0 = pool_C.take();

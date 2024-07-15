@@ -39,7 +39,7 @@ struct Taylor_Green_ker
 
     }
 
-    void apply_curl(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec w_x, TC_vec w_y, TC_vec w_z);
+    void curl(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec w_x, TC_vec w_y, TC_vec w_z);
 
     void Laplace_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace);
     

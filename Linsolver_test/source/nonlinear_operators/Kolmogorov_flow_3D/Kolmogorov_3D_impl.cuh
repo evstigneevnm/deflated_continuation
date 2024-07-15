@@ -11,6 +11,119 @@
 #include <fstream>
 
 
+
+
+
+template<typename TC, typename TC_vec>
+__global__ void curl_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec ux_in, TC_vec uy_in, TC_vec uz_in, TC_vec wx_out, TC_vec wy_out, TC_vec wz_out)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+
+    wx_out[I3(j,k,l)] = grad_y[k]*uz_in[I3(j,k,l)] - grad_z[l]*uy_in[I3(j,k,l)];
+    wy_out[I3(j,k,l)] = -(grad_x[j]*uz_in[I3(j,k,l)] - grad_z[l]*ux_in[I3(j,k,l)]);
+    wz_out[I3(j,k,l)] = grad_x[j]*uy_in[I3(j,k,l)] - grad_y[k]*ux_in[I3(j,k,l)];
+
+}
+}
+
+template<typename TC, typename TC_vec>
+__global__ void curl_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec ux_in, TC_vec uy_in, TC_vec uz_in, TC_vec wx_out, TC_vec wy_out, TC_vec wz_out, TC_vec mask_2_3)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+    auto mask = mask_2_3[I3(j,k,l)];
+    wx_out[I3(j,k,l)] = (grad_y[k]*uz_in[I3(j,k,l)] - grad_z[l]*uy_in[I3(j,k,l)])*mask;
+    wy_out[I3(j,k,l)] = -(grad_x[j]*uz_in[I3(j,k,l)] - grad_z[l]*ux_in[I3(j,k,l)])*mask;
+    wz_out[I3(j,k,l)] = (grad_x[j]*uy_in[I3(j,k,l)] - grad_y[k]*ux_in[I3(j,k,l)])*mask;
+
+
+}
+}
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::curl(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec ux_in, TC_vec uy_in, TC_vec uz_in, TC_vec wx_out, TC_vec wy_out, TC_vec wz_out, TC_vec mask_2_3)
+{
+    
+    if(mask_2_3 == nullptr)
+    {
+        curl_kernel<TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, grad_x, grad_y, grad_z, ux_in,  uy_in, uz_in, wx_out, wy_out, wz_out);
+    }
+    else
+    {
+        curl_kernel<TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, grad_x, grad_y, grad_z, ux_in,  uy_in, uz_in, wx_out, wy_out, wz_out, mask_2_3);
+    }
+}
+
+
+
+
+template<typename T, typename T_vec, typename TC, typename TC_vec>
+__global__ void cross_real_kernel(size_t Nx, size_t Ny, size_t Nz, T_vec Vx, T_vec Vy, T_vec Vz, T_vec rot_x, T_vec rot_y, T_vec rot_z, T_vec resx, T_vec resy, T_vec resz)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+    T ux = Vx[I3(j,k,l)];
+    T uy = Vy[I3(j,k,l)];
+    T uz = Vz[I3(j,k,l)];
+
+    T wx = rot_x[I3(j,k,l)];
+    T wy = rot_y[I3(j,k,l)];
+    T wz = rot_z[I3(j,k,l)];    
+
+    resx[I3(j,k,l)] = uy*wz-uz*wy;
+
+    resy[I3(j,k,l)] = -(ux*wz-uz*wx);
+
+    resz[I3(j,k,l)] = ux*wy-uy*wx;
+
+    
+
+}
+}
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::cross_real(TR_vec Vx, TR_vec Vy, TR_vec Vz, TR_vec rot_x, TR_vec rot_y, TR_vec rot_z, TR_vec resx, TR_vec resy, TR_vec resz)
+{
+    cross_real_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNR, dimBlockN>>>(Nx, Ny, Nz, Vx, Vy, Vz, rot_x, rot_y, rot_z, resx, resy, resz);
+}
+
+
+
+
+
 template<typename TC, typename TC_vec>
 __global__ void Laplace_Fourier_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace)
 {
@@ -412,7 +525,7 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::a
 
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
-__global__ void apply_projection_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec Laplace,  TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+__global__ void apply_projection_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z)
 {
 unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
 unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
@@ -427,25 +540,74 @@ if ( index_in < sizeOfData )
     unsigned int j=xIndex, k=yIndex, l=zIndex;
 //  operation starts from here:
     
-    TC ddd = grad_x[j]*u_x[I3(j,k,l)] + grad_y[k]*u_y[I3(j,k,l)] + grad_z[l]*u_z[I3(j,k,l)];
+    TC ddd = grad_x[j]*v_x[I3(j,k,l)] + grad_y[k]*v_y[I3(j,k,l)] + grad_z[l]*v_z[I3(j,k,l)];
 
     T lap = Laplace[I3(j,k,l)].real(); //Laplace is assumed to have 1 at the zero wavenumber!
 
-    v_x[I3(j,k,l)] = u_x[I3(j,k,l)] - grad_x[j]*ddd/lap;
-    v_y[I3(j,k,l)] = u_y[I3(j,k,l)] - grad_y[k]*ddd/lap;
-    v_z[I3(j,k,l)] = u_z[I3(j,k,l)] - grad_z[l]*ddd/lap;
+    v_x[I3(j,k,l)] = v_x[I3(j,k,l)] - grad_x[j]*ddd/lap;
+    v_y[I3(j,k,l)] = v_y[I3(j,k,l)] - grad_y[k]*ddd/lap;
+    v_z[I3(j,k,l)] = v_z[I3(j,k,l)] - grad_z[l]*ddd/lap;
+    v_x[0] = TC(0,0);
+    v_y[0] = TC(0,0);
+    v_z[0] = TC(0,0);
 
 }
 }
 
 template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_projection(TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec Laplace,  TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_projection(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z)
 {
 
-    apply_projection_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, u_x, u_y, u_z, Laplace, grad_x, grad_y, grad_z, v_x, v_y, v_z);
+    apply_projection_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, grad_x, grad_y, grad_z, Laplace, v_x, v_y, v_z);
 
 }
 
+
+
+template<typename T, typename T_vec, typename TC, typename TC_vec>
+__global__ void apply_full_projection_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace,  TC_vec v_x, TC_vec v_y, TC_vec v_z)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+    
+
+    T lap = Laplace[I3(j,k,l)].real(); //Laplace is assumed to have 1 at the zero   wavenumber!
+    // lap = I3(j,k,l)==0?1:lap;
+
+    auto dx = grad_x[j];
+    auto dy = grad_y[k];
+    auto dz = grad_z[l];
+
+    auto mass = dx*v_x[I3(j,k,l)]+dy*v_y[I3(j,k,l)]+dz*v_z[I3(j,k,l)]; // div(v)=0 => (k,v)=0
+    auto iLmass = mass/lap; // inv(L)div(v):=(k,v)/|k|^2.
+
+    // gp:=grad(inv(L)div(v)):=i k_l((k,v)/|k|^2)
+    v_x[I3(j,k,l)] -= dx*iLmass;  // Id-gp
+    v_y[I3(j,k,l)] -= dy*iLmass; 
+    v_z[I3(j,k,l)] -= dz*iLmass;
+
+    v_x[0] = TC(0,0);
+    v_y[0] = TC(0,0);
+    v_z[0] = TC(0,0);
+
+}
+}
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_full_projection(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace, TC_vec vv_x, TC_vec vv_y, TC_vec vv_z)
+{
+
+    apply_full_projection_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, grad_x, grad_y, grad_z, Laplace, vv_x, vv_y, vv_z);
+}
 
 
 
@@ -855,8 +1017,8 @@ if ( index_in < sizeOfData )
     T kx=alpha*T(m);
     T ky=T(n);
     T kz=T(q);
-    T kxMax=alpha*T(Nx);
-    T kyMax=T(Ny);
+    T kxMax=alpha*T(Nx)*0.5; //due to +/-!
+    T kyMax=T(Ny)*0.5; //due to +/-!
     T kzMax=T(Nz);
 
     T sphere2=(kx*kx/(kxMax*kxMax)+ky*ky/(kyMax*kyMax)+kz*kz/(kzMax*kzMax));

@@ -45,6 +45,10 @@ struct Kolmogorov_3D_ker
 
     }
 
+    void curl(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec w_x, TC_vec w_y, TC_vec w_z, TC_vec mask_2_3 = nullptr);
+
+    void cross_real(TR_vec Vx, TR_vec Vy, TR_vec Vz, TR_vec rot_x, TR_vec rot_y, TR_vec rot_z, TR_vec resx, TR_vec resy, TR_vec resz);
+
     void Laplace_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace);
     
     void Biharmonic_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Biharmonic);
@@ -78,7 +82,9 @@ struct Kolmogorov_3D_ker
 
     void apply_iLaplace3_Biharmonic3(TC_vec Laplace, TC_vec Biharmonic,  TC_vec v_x, TC_vec v_y, TC_vec v_z, TR coeff, TR coeff_bihrmonic);
 
-    void apply_projection(TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec Laplace,  TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v_x, TC_vec v_y, TC_vec v_z);
+    void apply_projection(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z);
+
+    void apply_full_projection(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace, TC_vec vv_x, TC_vec vv_y, TC_vec vv_z);
 
     void apply_smooth(TR tau, TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z);
 
