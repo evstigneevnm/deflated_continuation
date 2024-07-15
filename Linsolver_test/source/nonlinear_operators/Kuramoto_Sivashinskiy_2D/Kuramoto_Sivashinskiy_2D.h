@@ -31,7 +31,7 @@ namespace nonlinear_operators
 
 
 template<class FFT_type, class VectorOperations_R, class VectorOperations_C, class VectorOperations_RC_reduced, 
-unsigned int BLOCK_SIZE_x=64, unsigned int BLOCK_SIZE_y=16>
+unsigned int BLOCK_SIZE_x=32, unsigned int BLOCK_SIZE_y=16>
 class Kuramoto_Sivashinskiy_2D
 {
 public:
@@ -93,6 +93,8 @@ public:
         vec_ops_C->stop_use_vector(u_0); vec_ops_C->free_vector(u_0);
         vec_ops_C->stop_use_vector(u_x_hat0); vec_ops_C->free_vector(u_x_hat0);
         vec_ops_C->stop_use_vector(u_y_hat0); vec_ops_C->free_vector(u_y_hat0);
+        vec_ops_C->stop_use_vector(mask23); vec_ops_C->free_vector(mask23);
+
 
         vec_ops_C->stop_use_vector(u_helper_in); vec_ops_C->free_vector(u_helper_in);
         vec_ops_C->stop_use_vector(u_helper_out); vec_ops_C->free_vector(u_helper_out);
@@ -120,12 +122,14 @@ public:
     void F(const TC_vec& u, const T alpha, TC_vec& v)
     {
         
-        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_x, u_x_hat);
-        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, TC(1.0,0.0), (const TC_vec&)gradient_y, u_y_hat);
+        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, (const TC_vec&)gradient_x, mask23, u_x_hat);
+        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, (const TC_vec&)gradient_y, mask23, u_y_hat);
         
+        vec_ops_C->mul_pointwise(TC(1,0), u, TC(1,0), mask23, u_helper_in);
+
         ifft(u_x_hat, u_x_ext);
         ifft(u_y_hat, u_y_ext);
-        ifft((TC_vec&)u, u_ext);
+        ifft(u_helper_in, u_ext);
 
         //z=x*y;
         vec_ops_R->mul_pointwise(1.0, u_x_ext, 1.0, u_ext, w1_ext);
@@ -175,9 +179,10 @@ public:
     {
         vec_ops_C->assign(u_0_,u_0);
         alpha_0=alpha_0_;
-        ifft((TC_vec&)u_0,u_ext_0);
-        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u_0, TC(1.0,0.0), (const TC_vec&)gradient_x, u_x_hat);
-        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u_0, TC(1.0,0.0), (const TC_vec&)gradient_y, u_y_hat);
+        vec_ops_C->mul_pointwise(TC(1,0), u_0, TC(1,0), mask23, u_helper_in);
+        ifft(u_helper_in, u_ext_0);
+        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u_0, (const TC_vec&)gradient_x, mask23, u_x_hat);
+        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u_0, (const TC_vec&)gradient_y, mask23, u_y_hat);
         ifft(u_x_hat,u_x_ext_0);
         ifft(u_y_hat,u_y_ext_0);
 
@@ -194,9 +199,10 @@ public:
     //returns vector dv as Jdu->dv, where J(u_0,alpha_0) linearized at (u_0, alpha_0) by set_linearization_point
     void jacobian_u(const TC_vec& du, TC_vec& dv)
     {
-        ifft((TC_vec&)du, du_ext);
-        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) du, TC(1.0,0.0), (const TC_vec&)gradient_x, u_x_hat);
-        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) du, TC(1.0,0.0), (const TC_vec&)gradient_y, u_y_hat);
+        vec_ops_C->mul_pointwise(TC(1,0), du, TC(1,0), mask23, u_helper_in);
+        ifft(u_helper_in, du_ext);
+        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) du, (const TC_vec&)gradient_x, mask23, u_x_hat);
+        vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) du, (const TC_vec&)gradient_y, mask23, u_y_hat);
         ifft(u_x_hat,du_x_ext);
         ifft(u_y_hat,du_y_ext);            
         vec_ops_R->mul_pointwise(1.0, du_x_ext, 1.0, u_ext_0, w1_ext_0);
@@ -485,7 +491,7 @@ private:
     
     TC_vec u_helper_in = nullptr;  //vector for using only R outside
     TC_vec u_helper_out = nullptr;  //vector for using only R outside
-
+    TC_vec mask23 = nullptr;
 
     T alpha_0=0.0;   // linearization point parameter
 
@@ -519,7 +525,7 @@ private:
         vec_ops_C->init_vector(u_0); vec_ops_C->start_use_vector(u_0); 
         vec_ops_C->init_vector(u_x_hat0); vec_ops_C->start_use_vector(u_x_hat0); 
         vec_ops_C->init_vector(u_y_hat0); vec_ops_C->start_use_vector(u_y_hat0); 
- 
+        vec_ops_C->init_vector(mask23); vec_ops_C->start_use_vector(mask23); 
         vec_ops_C->init_vector(u_helper_in); vec_ops_C->start_use_vector(u_helper_in); 
         vec_ops_C->init_vector(u_helper_out); vec_ops_C->start_use_vector(u_helper_out);
 
@@ -537,8 +543,52 @@ private:
         vec_ops_R->init_vector(du_x_ext); vec_ops_R->start_use_vector(du_x_ext);
         vec_ops_R->init_vector(du_y_ext); vec_ops_R->start_use_vector(du_y_ext);
         
-        plot = new plot_t(vec_ops_R, Nx, Ny, T(2*3.14159265358979), T(2*3.14159265358979) ) ;    
+        plot = new plot_t(vec_ops_R, Nx, Ny, T(2*3.14159265358979), T(2*3.14159265358979) ) ; 
+        form_mask();   
     }
+    template<class Vec>
+    void build_mask_matrix(int Nx, int Ny, Vec& mask_2_3)
+    {
+
+        int m,n;
+        for(int k=0;k<Ny;k++)
+        {  
+            n=k;
+            
+            for(int j=0;j<Nx;j++){
+                m=j; if(j>=Nx/2) m=j-Nx;
+                
+                T kx=m;
+                T ky=n;
+                T kxMax=Nx*0.5;
+                T kyMax=Ny;
+
+                T sphere2=sqrt( kx*kx/(kxMax*kxMax)+ky*ky/(kyMax*kyMax) );
+
+                //  2/3 limitation!
+                if(sphere2<2.0/3.0)
+                {
+                    mask_2_3[I2(j,k,Ny)]=1.0;
+                }
+                else
+                {
+                    mask_2_3[I2(j,k,Ny)]=0.0; //!
+                }
+
+            }
+        }  
+        mask_2_3[0]=0.0;
+    }
+
+    void form_mask()
+    {
+        
+        std::vector<TC> mask23_h(Nx*My, 0);
+        build_mask_matrix(Nx, My, mask23_h);
+        host_2_device_cpy<TC>(mask23, mask23_h.data() , Nx*My);
+
+    }
+
 
     void init_all_derivatives()
     {

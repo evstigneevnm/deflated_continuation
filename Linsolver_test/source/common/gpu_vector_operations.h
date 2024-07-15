@@ -618,13 +618,16 @@ struct gpu_vector_operations
     void add_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                             const scalar_type mul_z, vector_type& z)const;
     //calc: z := (mul_x*x)*(mul_y*y)
-    void mul_pointwise(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
-                        vector_type& z)const;
+    void mul_pointwise(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, vector_type& z)const;
     //calc: x := x*mul_y*y
     void mul_pointwise(vector_type& x, const scalar_type mul_y, const vector_type& y)const;
+    //calc: u := mul_x*x*y*z
+    void mul_pointwise(const scalar_type mul_x, const vector_type& x, const vector_type& y, const vector_type& z, vector_type& u)const;
+
     //calc: z := (mul_x*x)/(mul_y*y)
     void div_pointwise(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                         vector_type& z)const;
+
     //calc: x := x/(mul_y*y)
     void div_pointwise(vector_type& x, const scalar_type mul_y, const vector_type& y)const;
     //calc: z := mul_x*x + mul_y*y + mul_w*w + mul_z*z;

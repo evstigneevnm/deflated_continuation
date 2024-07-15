@@ -378,6 +378,21 @@ void gpu_vector_operations<T, BLOCK_SIZE>::mul_pointwise(const scalar_type mul_x
 //===
 
 template<typename T>
+__global__ void mul_pointwise_kernel(size_t N, const T mul_x, const T* x, const T* y, const T* z, T* u)
+{
+    size_t j = blockIdx.x*blockDim.x + threadIdx.x;
+    if(j>=N) return;
+
+    u[j] = mul_x*x[j]*y[j]*z[j];
+}
+
+template <typename T, int BLOCK_SIZE>
+void gpu_vector_operations<T, BLOCK_SIZE>::mul_pointwise(const scalar_type mul_x, const vector_type& x, const vector_type& y, const vector_type& z, vector_type& u)const
+{
+    mul_pointwise_kernel<scalar_type><<<dimGrid, dimBlock>>>(sz, mul_x, x, y, z, u);
+}
+//===
+template<typename T>
 __global__ void mul_pointwise_kernel(size_t N, T* x, const T mul_y, const T* y)
 {
     size_t j = blockIdx.x*blockDim.x + threadIdx.x;
