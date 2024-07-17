@@ -62,7 +62,7 @@ public:
             // nonlin_op->exact_solution(lambda_0, u_out);
             // vec_ops->add_mul_scalar(0.0, lambda_0, u_in);
             // vec_ops->add_mul(0.1, u_out, u_in);
-
+            
             try
             {
                 found_solution = newton->solve(nonlin_op, u_in, lambda_0, u_out, lambda);

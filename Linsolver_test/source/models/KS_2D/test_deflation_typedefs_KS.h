@@ -13,6 +13,7 @@
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/system_operator.h>
 
 #include <numerical_algos/lin_solvers/default_monitor.h>
+#include <numerical_algos/lin_solvers/bicgstab.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 

@@ -28,12 +28,16 @@ IBOOST = -I$(BOOST_ROOT_PATH)/include
 
 LCUDA = -L$(CUDA_ROOT_PATH)/lib64
 LBOOST = -L$(BOOST_ROOT_PATH)/lib
-LIBS1 = -lcublas -lcurand 
-LIBS2 = -lcufft $(LIBS1)
-LIBS3 = -lcusolver $(LIBS2)
-LIBSAll = -lcublas -lcurand -lcufft -lcusolver
+LIBS1 = $(LCUDA) -lcublas -lcurand 
+LIBS2 = $(LCUDA) -lcufft $(LIBS1)
+LIBS3 = $(LCUDA) -lcusolver $(LIBS2)
+LIBSAll = $(LCUDA) -lcublas -lcurand -lcufft -lcusolver
 LIBBOOST = -lboost_serialization
 LLAPACK = -L$(OPENBLAS_ROOT_PATH)/lib -lopenblas
+
+#clean
+clean:
+	rm *.bin O/*.o
 
 #component tests
 test_cpu_vector_operations.bin: test_cpu_vector_operations.cpp
@@ -76,6 +80,10 @@ sm_test.bin: source/numerical_algos/lin_solvers/tests/sm_test.cpp
 iterative_solvers_test.bin: source/numerical_algos/lin_solvers/tests/iterative_solvers_test.cpp
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/numerical_algos/lin_solvers/tests/iterative_solvers_test.cpp -o iterative_solvers_test.bin 2>results.make $(OPENMP)
 
+iterative_solvers_test_different_operators.bin: source/numerical_algos/lin_solvers/tests/iterative_solvers_test_different_operators.cpp
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/numerical_algos/lin_solvers/tests/iterative_solvers_test_different_operators.cpp -o iterative_solvers_test_different_operators.bin 2>results.make $(OPENMP)
+
+
 exact_linsolver_test.bin: source/numerical_algos/lin_solvers/tests/exact_solver_test.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/numerical_algos/lin_solvers/tests/exact_solver_test.cpp O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o exact_solver_test.bin 2>results.make 
 
@@ -112,6 +120,9 @@ Kuramoto_Sivashinskiy_2D_ker:
 
 test_Kuramoto_Sivashinskiy_2D_RHS.bin: source/models/KS_2D/test_Kuramoto_Sivashinskiy_2D_RHS.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KS_2D/test_Kuramoto_Sivashinskiy_2D_RHS.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o O/gpu_reduction_ogita_kernels.o $(LIBS2) -o test_Kuramoto_Sivashinskiy_2D_RHS.bin 2>results.make
+
+test_Kuramoto_Sivashinskiy_2D_Newton.bin: source/models/KS_2D/test_Kuramoto_Sivashinskiy_2D_Newton.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KS_2D/test_Kuramoto_Sivashinskiy_2D_Newton.cpp O/Kuramoto_Sivashinskiy_2D_ker.o O/gpu_vector_operations_kernels.o O/gpu_reduction_ogita_kernels.o $(LIBS2) -o test_Kuramoto_Sivashinskiy_2D_Newton.bin 2>results.make
 
 
 deflation_KS_2D_S: source/models/KS_2D/test_deflation_KS.cpp

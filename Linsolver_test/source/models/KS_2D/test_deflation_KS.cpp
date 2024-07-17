@@ -10,8 +10,8 @@ int main(int argc, char const *argv[])
 {
     
     init_cuda(-1);
-    size_t Nx=16;
-    size_t Ny=16;
+    size_t Nx=32;
+    size_t Ny=32;
     real norm_wight = real(1);//std::sqrt(real(Nx*Ny));
     real size_problem = real(1);//std::sqrt(real(Nx*Ny));
 
@@ -26,7 +26,7 @@ int main(int argc, char const *argv[])
     unsigned int newton_def_max_it = 350;
     real newton_def_tol = 5.0e-10;
 
-    real lambda_0 = 7.3;
+    real lambda_0 = 7.6;
     real a_val = 2.0;
     real b_val = 4.0;
 

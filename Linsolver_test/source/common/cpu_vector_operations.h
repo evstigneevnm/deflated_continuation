@@ -57,6 +57,10 @@ struct cpu_vector_operations
     {
         return get_default_size();
     }
+    size_t get_vector_size()const 
+    {
+        return get_default_size();
+    }
     size_t get_size(const vector_type& x)const
     {
         return x.size();

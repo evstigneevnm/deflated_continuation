@@ -26,17 +26,17 @@ void gpu_vector_operations<T, BLOCK_SIZE>::curandGenerateUniformDistribution(cur
 }
 
 template <>
-void gpu_vector_operations<float, 1024>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
+void gpu_vector_operations<float, BLOCK_SIZE_1D>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
 {
     CURAND_SAFE_CALL( curandGenerateUniform(gen, vector, sz) );
 }
 template <>
-void gpu_vector_operations<double, 1024>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
+void gpu_vector_operations<double, BLOCK_SIZE_1D>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
 {
     CURAND_SAFE_CALL( curandGenerateUniformDouble(gen, vector, sz) );
 }
 template <>
-void gpu_vector_operations<thrust::complex<float>, 1024>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
+void gpu_vector_operations<thrust::complex<float>, BLOCK_SIZE_1D>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
 {
     
     float* vector_real;
@@ -68,7 +68,7 @@ void gpu_vector_operations<thrust::complex<float>, 1024>::curandGenerateUniformD
     device_deallocate(vector_imag);
 }
 template <>
-void gpu_vector_operations<thrust::complex<double>, 1024>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
+void gpu_vector_operations<thrust::complex<double>, BLOCK_SIZE_1D>::curandGenerateUniformDistribution(curandGenerator_t gen, vector_type& vector)
 {
     double* vector_real;
     double* vector_imag;
@@ -114,12 +114,12 @@ void gpu_vector_operations<T, BLOCK_SIZE>::scale_adapter(scalar_type a, scalar_t
     add_mul_scalar(a, (b-a), vec);
 }
 template <>
-void gpu_vector_operations<thrust::complex<double>, 1024>::scale_adapter(scalar_type a, scalar_type b, vector_type& vec)
+void gpu_vector_operations<thrust::complex<double>, BLOCK_SIZE_1D>::scale_adapter(scalar_type a, scalar_type b, vector_type& vec)
 {
     scale_complex_vector<thrust::complex<double>, vector_type><<<dimGrid, dimBlock>>>(sz, a, b, vec);
 }
 template<>
-void gpu_vector_operations<thrust::complex<float>, 1024>::scale_adapter(scalar_type a, scalar_type b, vector_type& vec)
+void gpu_vector_operations<thrust::complex<float>, BLOCK_SIZE_1D>::scale_adapter(scalar_type a, scalar_type b, vector_type& vec)
 {
     scale_complex_vector<thrust::complex<float>, vector_type><<<dimGrid, dimBlock>>>(sz, a, b, vec);
 }

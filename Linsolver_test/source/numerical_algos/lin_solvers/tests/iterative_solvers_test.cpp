@@ -45,8 +45,8 @@ int main(int argc, char **args)
     int max_iters = sz/2;
     real rel_tol = 1.0e-6;
     bool use_precond_resid = 1;
-    int resid_recalc_freq = 3;
-    int basis_sz = 8;
+    int resid_recalc_freq = 1;
+    int basis_sz = 3;
     if(argc != 1)
     {
         max_iters = std::stoi(args[1]);
@@ -82,9 +82,9 @@ int main(int argc, char **args)
         vector_t x;
         vec_ops.init_vectors(x); vec_ops.start_use_vectors(x);
         gmres_t::params params;
-        params.basis_size = 80;
-        params.preconditioner_side = 'R';
-        params.reorthogonalization = true;
+        params.basis_size = 125;
+        params.preconditioner_side = 'L';
+        params.reorthogonalization = false;
 
         gmres_t gmres(&vec_ops, &log, params);
         gmres.set_preconditioner(&prec);

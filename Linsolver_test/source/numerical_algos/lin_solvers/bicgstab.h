@@ -88,7 +88,7 @@ public:
         resid_recalc_freq_(0)
     {
         bufs.init();
-        int sz=vec_ops->size();
+        int sz=vec_ops->get_vector_size();
         some_vec=(scalar_type*)malloc(sizeof(scalar_type)*sz);
         if(some_vec==NULL)
             throw std::runtime_error("bicgstab: failed to allocate memory");;

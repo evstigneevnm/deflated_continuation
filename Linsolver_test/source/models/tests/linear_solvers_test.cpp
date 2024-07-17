@@ -74,6 +74,7 @@ struct prec_operator:public cpu_vector_operations_real
 
     void set_operator(const system_operator *op_)
     {
+        std::cout << "prec_operator: operator is set." << std::endl;
         op=op_;
     }
 

@@ -5,6 +5,7 @@
 #include <utils/cuda_support.h>
 #include <external_libraries/cublas_wrap.h>
 #include <utils/curand_safe_call.h>
+#include <common/macros.h>
 #include <common/ogita/gpu_reduction_ogita.h>
 #include <random>
 #include <initializer_list>
@@ -106,7 +107,7 @@ struct vec_ops_vector_complex_type_help< thrust::complex<double>* >
 
 
 
-template <typename T, int BLOCK_SIZE = 1024>
+template <typename T, int BLOCK_SIZE = BLOCK_SIZE_1D>
 struct gpu_vector_operations
 {
     using scalar_type = T;
@@ -336,9 +337,9 @@ struct gpu_vector_operations
         std::ofstream check_file(f_name);
         for(size_t j=0; j<sz-1; j++)
         {
-            check_file << std::scientific << std::setprecision(16) << x_host[j] << std::endl;
+            check_file <<  x_host[j] << std::endl; //std::scientific << std::setprecision(16) <<
         }
-        check_file << std::scientific << std::setprecision(16) << x_host[sz-1];
+        check_file << x_host[sz-1]; //<< std::scientific << std::setprecision(16)
         check_file.close();
     }
     //DEBUG ENDS!

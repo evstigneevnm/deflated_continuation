@@ -92,7 +92,7 @@ public:
 
 
 
-private:
+public:
     
 
     void write_out_file_pos(const std::string& f_name, const T_vec& U, int Nx, int Ny, int what = 2)
@@ -110,7 +110,7 @@ private:
 
         fprintf( stream, "View");
         fprintf( stream, " '");
-        fprintf( stream, f_name.c_str());
+        fprintf( stream, "%s", f_name.c_str());
         fprintf( stream, "' {\n");
         fprintf( stream, "TIME{0};\n");
 

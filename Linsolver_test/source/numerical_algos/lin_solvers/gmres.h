@@ -292,10 +292,10 @@ public:
         //     throw std::logic_error("gmres::solve: use_precond_resid_ == false with non-empty preconditioner is not supported");
         // }
 
-        /*if (prec_ != nullptr) 
+        if (prec_ != nullptr) 
         {
             prec_->set_operator(&A);
-        }*/
+        }
 
         zero_host_H();
         monitor_call_wrap_t monitor_wrap(monitor_);

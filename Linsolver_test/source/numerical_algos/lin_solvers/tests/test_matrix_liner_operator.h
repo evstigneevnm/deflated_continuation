@@ -52,6 +52,7 @@ struct prec_operator
 
     void set_operator(const system_operator<MatOps> *op_)const
     {
+        std::cout << "prec_operator: operator is set." << std::endl;
         op = op_;
     }
 

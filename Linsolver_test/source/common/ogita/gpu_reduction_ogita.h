@@ -5,12 +5,13 @@
 #include <cstddef>
 #include <cmath>
 #include <utils/cuda_support.h>
+#include <common/macros.h>
 #include <thrust/complex.h>
 #include <common/ogita/gpu_reduction_ogita_type.h>
 
 
 
-template<class T, class T_vec, int BLOCK_SIZE = 1024, int threads_r = 64>
+template<class T, class T_vec, int BLOCK_SIZE = BLOCK_SIZE_1D, int threads_r = 64>
 class gpu_reduction_ogita
 {
 private:

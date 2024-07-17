@@ -329,15 +329,18 @@ public:
         prec.force_small_alpha();
         if( oper.is_small_alpha_used() )
         {
+           
             bool flag1 = linear_solver.solve(oper, b, u);
             bool flag2 = linear_solver.solve(oper, d, r_);
+            auto norm_u = vec_ops_->norm_l2(u);
+            auto norm_r = vec_ops_->norm_l2(r_);
             scalar_type aa = vec_ops_->scalar_prod(c, r_);
             scalar_type ba = vec_ops_->scalar_prod(c, u);
             v = (beta-ba)/(-aa+alpha);
-            // std::cout << "(-aa+alpha*gamma) = " << (-aa+alpha*gamma) << " v = " << v << std::endl;
+            std::cout << "||u|| = " << norm_u << " ||r|| = " << norm_r << " v = " << v << std::endl;
             vec_ops_->add_mul(-v, r_, 1.0, u);
             flag = flag2&flag1;
-            printf("using small alpha = %le\n", alpha);
+            printf("using small alpha BBBBB = %le\n", alpha);
         }
         else
         {
@@ -374,13 +377,16 @@ public:
             //v = (-1/gamma*c^T inv(A)b)/(alpha-1/gamma*c^Tinv(A)d)=(-c^Tinv(A)b)/(alpha*gamma-c^T inv(A)d).
             bool flag1 = linear_solver.solve(oper, b, u);
             bool flag2 = linear_solver.solve(oper, d, r_);
+            auto norm_u = vec_ops_->norm_l2(u);
+            auto norm_r = vec_ops_->norm_l2(r_);
             scalar_type aa = vec_ops_->scalar_prod(c, r_);
             scalar_type ba = vec_ops_->scalar_prod(c, u);
             scalar_type v = -ba/(-aa+alpha*gamma);
-            // std::cout << "(-aa+alpha*gamma) = " << (-aa+alpha*gamma) << " v = " << v << std::endl;
+            std::cout << "||u|| = " << norm_u << " ||r|| = " << norm_r << " (-aa+alpha*gamma) = " << (-aa+alpha*gamma) << " v = " << v << std::endl;
+            std::cout << "(-aa+alpha*gamma) = " << (-aa+alpha*gamma) << " v = " << v << std::endl;
             vec_ops_->add_mul(-v/gamma, r_, 1.0/gamma, u);
             flag = flag2&flag1;
-            printf("using small alpha = %le\n", alpha);
+            printf("using small alpha AAAAAA = %le\n", alpha);
         }
         else
         {
@@ -393,8 +399,12 @@ public:
         scalar_type cTu = vec_ops_->scalar_prod(c, u);
         vec_ops_->add_mul(-cTu, d, static_cast<scalar_type>(alpha), r_);
         scalar_type residual_norm = vec_ops_->norm_l2(r_);
-        printf("actual relative residual = %le, gamma = %le, alpha = %le\n", static_cast<double>(residual_norm)/static_cast<double>( vec_ops_->norm_l2(b) ), static_cast<double>(gamma), static_cast<double>(alpha) );
-
+        printf("actual relative residual = %le, gamma = %le, alpha = %le, ||c|| = %le, ||d|| = %le, ||b|| = %le\n", static_cast<double>(residual_norm)/static_cast<double>( vec_ops_->norm_l2(b) ), static_cast<double>(gamma), static_cast<double>(alpha), vec_ops_->norm(c), vec_ops_->norm(d), vec_ops_->norm(b) );
+        // vec_ops_->debug_view(c, "c_lin_solve.dat");
+        // vec_ops_->debug_view(d, "d_lin_solve.dat");
+        // vec_ops_->debug_view(b, "b_lin_solve.dat");
+        // vec_ops_->debug_view(c, "u_lin_solve.dat");
+        // exit(-1);
         return flag;
     }
 

@@ -1,5 +1,5 @@
 SCALAR_TYPE =-DSCALAR_TYPE=double
-CUDA_ROOT_PATH = /opt/cuda
+CUDA_ROOT_PATH = /opt/cuda_all/cuda_12.2
 GCC_ROOT_PATH = /usr/bin
 CUDA_ARCH = -gencode arch=compute_70,code=sm_70
 CPPSTD = c++17
