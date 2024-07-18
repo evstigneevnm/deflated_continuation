@@ -526,8 +526,8 @@ if ( index_in < sizeOfData )
     T kx=alpha*T(m);
     T ky=T(n);
     T kz=T(q);
-    T kxMax=alpha*T(Nx);
-    T kyMax=T(Ny);
+    T kxMax=alpha*T(Nx)*0.5;
+    T kyMax=T(Ny)*0.5;
     T kzMax=T(Nz);
 
     T sphere2=(kx*kx/(kxMax*kxMax)+ky*ky/(kyMax*kyMax)+kz*kz/(kzMax*kzMax));

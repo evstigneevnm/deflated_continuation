@@ -588,8 +588,8 @@ private:
         //adjust pool sizes!!!
         pool_R.alloc_all(vec_ops_R, 1);
         pool_C.alloc_all(vec_ops_C, 1);
-        pool_BR.alloc_all(vec_ops_R, 5);
-        pool_BC.alloc_all(vec_ops_C, 6);        
+        pool_BR.alloc_all(vec_ops_R, 7);
+        pool_BC.alloc_all(vec_ops_C, 7);        
 
 
 
@@ -603,6 +603,7 @@ private:
         BC_vec* CdFx = pool_BC.take();
         BC_vec* CdFy = pool_BC.take();
         BC_vec* CdFz = pool_BC.take();
+        BC_vec* Vel_reduced = pool_BC.take();
         
         BR_vec* RdFx = pool_BR.take();
         BR_vec* RdFy = pool_BR.take();
@@ -611,14 +612,19 @@ private:
 
         kern->apply_grad3(Func.x, Func.y, Func.z, mask23, grad_x, grad_y, grad_z, CdFx->x, CdFx->y, CdFx->z, CdFy->x, CdFy->y, CdFy->z, CdFz->x, CdFz->y, CdFz->z);
 
+        vec_ops_C->mul_pointwise(1, Vel.x, 1, mask23, Vel_reduced->x);
+        vec_ops_C->mul_pointwise(1, Vel.y, 1, mask23, Vel_reduced->y);
+        vec_ops_C->mul_pointwise(1, Vel.z, 1, mask23, Vel_reduced->z);
+
         ifft(*CdFx, *RdFx);
         ifft(*CdFy, *RdFy);
         ifft(*CdFz, *RdFz);
-        ifft(Vel, *VelR);
+        ifft(*Vel_reduced, *VelR);
         
         pool_BC.release(CdFx);
         pool_BC.release(CdFy);
         pool_BC.release(CdFz);
+        pool_BC.release(Vel_reduced);
 
         BR_vec* resR = pool_BR.take();
         kern->multiply_advection(VelR->x, VelR->y, VelR->z, RdFx->x, RdFx->y, RdFx->z, RdFy->x, RdFy->y, RdFy->z, RdFz->x, RdFz->y, RdFz->z, resR->x, resR->y, resR->z);
@@ -764,13 +770,19 @@ private:
     }
     void ifft(const TC_vec& u_hat_, TR_vec& u_)
     {
-        FFT->ifft(u_hat_, u_);
+        C_vec* u_tmp = pool_C.take();
+        vec_ops_C->assign(u_hat_, u_tmp->get_ref() );
+        FFT->ifft(u_tmp->get_ref(), u_);
         T scale = T(1.0)/(Nx*Ny*Nz);
         vec_ops_R->scale(scale, u_);
+        pool_C.release(u_tmp);
     }
     void fft(const TR_vec& u_, TC_vec& u_hat_)
     {
-        FFT->fft(u_, u_hat_);
+        R_vec* u_tmp = pool_R.take();
+        vec_ops_R->assign(u_, u_tmp->get_ref() );
+        FFT->fft(u_tmp->get_ref(), u_hat_);
+        pool_R.release(u_tmp);
     }
 
 
