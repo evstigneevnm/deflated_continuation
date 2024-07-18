@@ -34,9 +34,6 @@
 int main(int argc, char const *argv[])
 {
     
-    const int Blocks_x_ = 32;
-    const int Blocks_y_ = 16;
-
     using real = SCALAR_TYPE;
     using complex = thrust::complex<real>;
     using gpu_vector_operations_real_t = gpu_vector_operations<real>;
@@ -46,8 +43,7 @@ int main(int argc, char const *argv[])
     using KF_3D_t = nonlinear_operators::Kolmogorov_3D<cufft_type, 
             gpu_vector_operations_real_t, 
             gpu_vector_operations_complex_t, 
-            gpu_vector_operations_t,
-            Blocks_x_, Blocks_y_>;     
+            gpu_vector_operations_t>;     
 
     using linear_operator_K_3D_stiff_t = nonlinear_operators::linear_operator_K_3D_stiff<gpu_vector_operations_t, KF_3D_t>;
     using preconditioner_K_3D_stiff_t = nonlinear_operators::preconditioner_K_3D_stiff<gpu_vector_operations_t, KF_3D_t, linear_operator_K_3D_stiff_t>;

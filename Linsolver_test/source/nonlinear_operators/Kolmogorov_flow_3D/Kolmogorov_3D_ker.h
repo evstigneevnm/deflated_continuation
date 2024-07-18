@@ -86,7 +86,7 @@ struct Kolmogorov_3D_ker
 
     void apply_full_projection(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace, TC_vec vv_x, TC_vec vv_y, TC_vec vv_z);
 
-    void apply_smooth(TR tau, TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z);
+    void apply_smooth(TR tau, TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z, TC_vec v_x_out, TC_vec v_y_out, TC_vec v_z_out);
 
     void imag_vector(TC_vec v_x, TC_vec v_y, TC_vec v_z);
 

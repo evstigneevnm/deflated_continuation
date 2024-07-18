@@ -74,7 +74,7 @@ public:
     
 
 
-private:
+public:
     
 
     void write_out_file_pos(const std::string& f_name, const T_vec& U, int Nx, int Ny, int Nz, int what = 2)

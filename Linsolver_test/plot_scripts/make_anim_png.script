@@ -1,0 +1,13 @@
+
+frames_num = PostProcessing.NbViews;
+
+For num In { 0 : frames_num-1 }
+	View[num].Visible = 0;
+EndFor
+
+For num In { 0 : frames_num-1 }
+	View[num].Visible = 1;
+	Draw;
+	Print Sprintf("%04.0f.png", num);
+	View[num].Visible = 0;
+EndFor

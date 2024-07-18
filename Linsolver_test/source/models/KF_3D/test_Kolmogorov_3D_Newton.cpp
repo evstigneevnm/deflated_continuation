@@ -10,6 +10,7 @@
 #include <scfd/utils/log.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
+#include <numerical_algos/lin_solvers/gmres.h>
 
 #include <nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D.h>
 #include <nonlinear_operators/Kolmogorov_flow_3D/linear_operator_K_3D.h>
@@ -29,10 +30,6 @@
 
 
 
-#define Blocks_x_ 32
-#define Blocks_y_ 16
-
-
 
 int main(int argc, char const *argv[])
 {
@@ -45,8 +42,7 @@ int main(int argc, char const *argv[])
     typedef nonlinear_operators::Kolmogorov_3D<cufft_type, 
             gpu_vector_operations_real_t, 
             gpu_vector_operations_complex_t, 
-            gpu_vector_operations_t,
-            Blocks_x_, Blocks_y_> KF_3D_t;
+            gpu_vector_operations_t> KF_3D_t;
     typedef typename gpu_vector_operations_real_t::vector_type real_vec; 
     typedef typename gpu_vector_operations_complex_t::vector_type complex_vec;
     typedef typename gpu_vector_operations_t::vector_type vec;
@@ -72,7 +68,7 @@ int main(int argc, char const *argv[])
     
 
     // init_cuda(-1);
-    scfd::utils::init_cuda(-1);
+    scfd::utils::init_cuda(27); //-1
     // scfd::utils::init_cuda_persistent(3000);
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
@@ -114,8 +110,8 @@ int main(int argc, char const *argv[])
         gpu_vector_operations_t, KF_3D_t> lin_op_t;
     typedef nonlinear_operators::preconditioner_K_3D<
         gpu_vector_operations_t, KF_3D_t, lin_op_t> prec_t;    
-    typedef numerical_algos::lin_solvers::bicgstabl<
-        lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t> lin_solver_t;
+    // using lin_solver_t = numerical_algos::lin_solvers::gmres<lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t>;
+    using lin_solver_t = numerical_algos::lin_solvers::bicgstabl<lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t>;
 
     monitor_t *mon;
 
@@ -126,16 +122,28 @@ int main(int argc, char const *argv[])
     lin_op_t lin_op(KF_3D);
     prec_t prec(KF_3D);    
 
-    lin_solver_t lin_solver(vec_ops, &log3);
-    lin_solver.set_preconditioner(&prec);
 
+    //gmres native interface:
+    // lin_solver_t::params params;
+    // params.basis_size = 50;
+    // params.preconditioner_side = 'L';
+    // params.reorthogonalization = true;
+    // lin_solver_t lin_solver(vec_ops, &log3, params);
+    
+    //bcgstabl:
+    lin_solver_t lin_solver(vec_ops, &log3);
     lin_solver.set_use_precond_resid(use_precond_resid);
     lin_solver.set_resid_recalc_freq(resid_recalc_freq);
     lin_solver.set_basis_size(basis_sz);
+    //for all:
+    lin_solver.set_preconditioner(&prec);
     mon = &lin_solver.monitor();
-    mon->init(lin_solver_tol, real(0.f), lin_solver_max_it);
+    mon->init(lin_solver_tol, 0, lin_solver_max_it);
     mon->set_save_convergence_history(true);
     mon->set_divide_out_norms_by_rel_base(true);   
+
+
+
 
 
     vec x0, x1, dx, x_back, b;

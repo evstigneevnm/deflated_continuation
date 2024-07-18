@@ -277,9 +277,9 @@ __global__ void vec2complex_imag_kernel(size_t N, T_vec v_in, TC_vec u_x, TC_vec
     u_y[0] = TC(0,0);
     u_z[0] = TC(0,0);
 
-    u_x[i+1] = TC(0, v_in[i]*N);
-    u_y[i+1] = TC(0, v_in[i+(N-1)]*N);
-    u_z[i+1] = TC(0, v_in[i+2*(N-1)]*N);    
+    u_x[i+1] = TC(0, v_in[i]);
+    u_y[i+1] = TC(0, v_in[i+(N-1)]);
+    u_z[i+1] = TC(0, v_in[i+2*(N-1)]);    
 
 }
 
@@ -346,7 +346,7 @@ if ( index_in < sizeOfData )
 template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
 void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::force_Fourier_sin(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z)
 {
-    force_Fourier_sin_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(n_y, n_z, scale_const, Nx, Ny, Mz, Nx*Ny*Nz, force_x, force_y, force_z);
+    force_Fourier_sin_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(n_y, n_z, 0.5*scale_const, Nx, Ny, Mz, Nx*Ny*Nz, force_x, force_y, force_z);
 }
 
 
@@ -423,9 +423,9 @@ __global__ void complex2vec_imag_kernel(size_t N, TC_vec u_x, TC_vec u_y, TC_vec
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i>=N-1) return; //N-1 due to zero in the begining
     
-    v_out[i] = T(u_x[i+1].imag()/N);
-    v_out[i+(N-1)] = T(u_y[i+1].imag()/N);
-    v_out[i+2*(N-1)] = T(u_z[i+1].imag()/N);
+    v_out[i] = T(u_x[i+1].imag() );
+    v_out[i+(N-1)] = T(u_y[i+1].imag() );
+    v_out[i+2*(N-1)] = T(u_z[i+1].imag() );
 
 }
 
@@ -612,7 +612,7 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::a
 
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
-__global__ void apply_smooth_kernel(size_t Nx, size_t Ny, size_t Nz, T tau, TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+__global__ void apply_smooth_kernel(size_t Nx, size_t Ny, size_t Nz, T tau, TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z, TC_vec v_x_out, TC_vec v_y_out, TC_vec v_z_out)
 {
 unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
 unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
@@ -629,17 +629,20 @@ if ( index_in < sizeOfData )
     
     T il = tau*Laplace[I3(j,k,l)].real(); //Laplace is assumed to have 1 at the zero wavenumber!
 
-    v_x[I3(j,k,l)]/=(T(1.0)-il);
-    v_y[I3(j,k,l)]/=(T(1.0)-il);
-    v_z[I3(j,k,l)]/=(T(1.0)-il);
+    v_x_out[I3(j,k,l)] = v_x[I3(j,k,l)]/(1-il);
+    v_y_out[I3(j,k,l)] = v_y[I3(j,k,l)]/(1-il);
+    v_z_out[I3(j,k,l)] = v_z[I3(j,k,l)]/(1-il);
 
+    v_x_out[0] = 0;
+    v_y_out[0] = 0;
+    v_z_out[0] = 0;
 }
 }
 template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_smooth(TR tau, TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z)
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::apply_smooth(TR tau, TC_vec Laplace, TC_vec v_x, TC_vec v_y, TC_vec v_z, TC_vec v_x_out, TC_vec v_y_out, TC_vec v_z_out)
 {
 
-    apply_smooth_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, tau, Laplace, v_x, v_y, v_z);
+    apply_smooth_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, tau, Laplace, v_x, v_y, v_z, v_x_out, v_y_out, v_z_out);
 
 }
 
@@ -1025,7 +1028,7 @@ if ( index_in < sizeOfData )
 
     TC mask_val = TC((sphere2<=T(4.0/9.0)?(T(1)):(T(0))),0);
     mask_2_3[I3(j,k,l)] = mask_val;
-    mask_2_3[0]=TC(0,0);
+    // mask_2_3[0]=TC(0,0);
 
 }
 }

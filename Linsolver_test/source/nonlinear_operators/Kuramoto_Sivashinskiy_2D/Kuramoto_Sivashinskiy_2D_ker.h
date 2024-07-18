@@ -21,7 +21,7 @@ template<typename TC, typename T_vec_im, typename TC_vec>
 extern void R2C_(unsigned int BLOCK_SIZE, size_t Nx, size_t My, T_vec_im& arrayR_im, TC_vec& arrayC);
 
 template<typename T, typename T_C>
-extern void apply_smooth(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, T mult, T tau, T_C* Laplace, T_C* v);
+extern void apply_smooth(dim3 dimGrid, dim3 dimBlock, size_t Nx, size_t My, T tau, T_C* Laplace, T_C* v_in, T_C* v_out);
 
 
 #endif

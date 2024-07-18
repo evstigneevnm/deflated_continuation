@@ -17,6 +17,7 @@
 
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
+#include <numerical_algos/lin_solvers/gmres.h>
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 
 #include <deflation/system_operator_deflation.h>
@@ -56,13 +57,13 @@ int main(int argc, char const *argv[])
     init_cuda(-1);
 
     //linsolver control
-    unsigned int lin_solver_max_it = 2000;
+    unsigned int lin_solver_max_it = 300;
     real lin_solver_tol = 1.0e-3;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 3;
+    unsigned int basis_sz = 300;
     //newton deflation control
-    unsigned int newton_def_max_it = 2000;
+    unsigned int newton_def_max_it = 200;
     real newton_def_tol = 1.0e-9;
     real Power = 2.0;
 
@@ -70,7 +71,7 @@ int main(int argc, char const *argv[])
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
     size_t Mz = CUFFT_C2R->get_reduced_size();
     size_t Nv = real(3*(Nx*Ny*Mz-1));
-    real norm_wight = 1.0;//std::sqrt(Nv);
+    real norm_wight = std::sqrt(Nv);
 
 
     cublas_wrap *CUBLAS = new cublas_wrap();

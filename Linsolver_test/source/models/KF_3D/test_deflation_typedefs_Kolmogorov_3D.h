@@ -1,7 +1,5 @@
 #ifndef __TEST_DEFLATION_TYPEDEFS_H__
 #define __TEST_DEFLATION_TYPEDEFS_H__
-#define Blocks_x_ 32
-#define Blocks_y_ 16
 
 
     typedef SCALAR_TYPE real;
@@ -18,8 +16,7 @@
     typedef nonlinear_operators::Kolmogorov_3D<cufft_type, 
             gpu_vector_operations_real_t, 
             gpu_vector_operations_complex_t, 
-            gpu_vector_operations_t,
-            Blocks_x_, Blocks_y_> KF_3D_t;
+            gpu_vector_operations_t> KF_3D_t;
 
     typedef nonlinear_operators::linear_operator_K_3D<
         gpu_vector_operations_t, KF_3D_t> lin_op_t;
@@ -33,7 +30,9 @@
         gpu_vector_operations_t,
         monitor_t,
         log_t,
-        numerical_algos::lin_solvers::bicgstabl> sherman_morrison_linear_system_solve_t;
+        numerical_algos::lin_solvers::gmres> sherman_morrison_linear_system_solve_t; 
+        //numerical_algos::lin_solvers::bicgstabl
+        //numerical_algos::lin_solvers::gmres
 
     typedef deflation::newton_method_extended::convergence_strategy<
         gpu_vector_operations_t, 

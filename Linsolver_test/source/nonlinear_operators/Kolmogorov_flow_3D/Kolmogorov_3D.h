@@ -113,7 +113,7 @@ public:
 
 //VecOpsR sized Nx*Ny*Nz;VecOpsC sized Nx*Ny*Mz; VecOps is the main vector operations sized 3*(Nx*Ny*Mz-1)
 template<class FFT_type, class VecOpsR, class VecOpsC, class VecOps,  
-unsigned int BLOCK_SIZE_x = 32, unsigned int BLOCK_SIZE_y = 16,
+unsigned int BLOCK_SIZE_x = BLOCK_SIZE_X, unsigned int BLOCK_SIZE_y = BLOCK_SIZE_Y,
 bool PureImag = true>
 class Kolmogorov_3D
 {
@@ -195,10 +195,11 @@ public:
         Lx = (T(1.0)/alpha)*T(2.0)*M_PI;
         Ly = T(2.0)*M_PI;
         Lz = T(2.0)*M_PI;        
-        common_constructor_operation();
         kern = new kern_t(alpha, Nx, Ny, Nz, Mz, BLOCK_SIZE_x, BLOCK_SIZE_y);
-        init_all_derivatives();
         plot = new plot_t(vec_ops_R_, Nx_, Ny_, Nz_, Lx, Ly, Lz);
+        common_constructor_operation();
+        init_all_derivatives();
+        
 
         std::cout << "Kolmogorov 3D on " << Lx <<"X" << Ly << "X" << Lz << "===> nonlinear problem class self-testing:" << std::endl;
         for(unsigned int j=0;j<1;j++)
@@ -478,13 +479,13 @@ public:
         if(homotopy_ > 0.0)
         {
             auto homotopy_4 = homotopy_*homotopy_*homotopy_*homotopy_;
-            kern->apply_iLaplace3_Biharmonic3(Laplace, Biharmonic, dR.x, dR.y, dR.z, Reynolds_0, homotopy_4);
+            kern->apply_iLaplace3_Biharmonic3(Laplace, Biharmonic, dR.x, dR.y, dR.z, 1, homotopy_4); //Reynolds_0
         }
         else
         {
-            kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, Reynolds_0*Reynolds_0);
+            kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, 1); //Reynolds_0
         }
-        //project(dR);
+        // project(dR);
     }
     void preconditioner_jacobian_u(T_vec& dr)
     {
@@ -503,8 +504,8 @@ public:
     void preconditioner_jacobian_temporal_u(BC_vec& dR, T a, T b)
     {
         // project(dR);
-        kern->apply_iLaplace3_plus_E(Laplace, dR.x, dR.y, dR.z, Reynolds_0*Reynolds_0, a, b);
-        project(dR);
+        kern->apply_iLaplace3_plus_E(Laplace, dR.x, dR.y, dR.z, 1, a, b); //Reynolds_0
+        // project(dR);
 
     }
     void preconditioner_jacobian_temporal_u(T_vec& dr, T a, T b)
@@ -749,46 +750,87 @@ public:
     } 
 
 
-    void randomize_vector(T_vec u_out, int steps_ = -1)
+    void randomize_vector(T_vec u_out, int steps_ = -1, bool random = true)
     {
-        const int NN = 4;
-        BC_vec* UC0 = pool_BC.take();
-        BR_vec* UR0 = pool_BR.take();
-
-        vec_ops_R->assign_random( UR0->x );
-        vec_ops_R->assign_random( UR0->y );
-        vec_ops_R->assign_random( UR0->z );
-        // vec_ops_R->assign_scalar( 0, UR0->x );
-        // vec_ops_R->assign_scalar(0, UR0->x);
-        // vec_ops_R->assign_scalar(0, UR0->z);
-        // vec_ops_R->add_mul_scalar(0,100.0,UR0->x);
-        // vec_ops_R->add_mul_scalar(0,100.0,UR0->y);
-        // vec_ops_R->add_mul_scalar(0,100.0,UR0->z);
-        int steps = steps_;
-        if(steps_ == -1)
+        
+        if(random)
         {
             std::srand(unsigned(std::time(0))); //init new seed
-            steps = std::rand()%NN + 1;     // random from 1 to NN
+            const int NN = 10;
+            BC_vec* UC0 = pool_BC.take();
+            BR_vec* UR0 = pool_BR.take();
 
+            vec_ops_R->assign_random( UR0->x );
+            vec_ops_R->assign_random( UR0->y );
+            vec_ops_R->assign_random( UR0->z );
+            vec_ops_R->assign_scalar( 0, UR0->x );
+            // vec_ops_R->assign_scalar(0, UR0->x);
+            // vec_ops_R->assign_scalar(0, UR0->z);
+            // vec_ops_R->add_mul_scalar(0,100.0,UR0->x);
+            // vec_ops_R->add_mul_scalar(0,100.0,UR0->y);
+            // vec_ops_R->add_mul_scalar(0,100.0,UR0->z);
+            int steps = steps_;
+            TR dt = 0.1;
+            if(steps_ == -1)
+            {
+                steps = std::rand()%NN + 10;     // random from 1 to NN
+
+            }
+
+            fft(*UR0, *UC0);
+            if constexpr (PureImag)
+            {
+                imag_vec(*UC0);
+            }
+            for(int st=0;st<steps;st++)
+            {
+                smooth(dt, *UC0);
+            }
+
+            // kern->add_mul3(1.0, forceABC.x, forceABC.y, forceABC.z, UC0->x, UC0->y, UC0->z);        
+            T scale = 1.0e-7;
+            vec_ops_C->add_mul_scalar(0.0, scale, UC0->x);
+            vec_ops_C->add_mul_scalar(0.0, scale, UC0->y);
+            vec_ops_C->add_mul_scalar(0.0, scale, UC0->z);
+            project(*UC0);            
+            C2V(*UC0, u_out);
+            // write_solution_abs("random_vector.pos", u_out);
+
+            pool_BC.release(UC0);
+            pool_BR.release(UR0);     
         }
-
-        fft(*UR0, *UC0);
-        if constexpr (PureImag)
+        else
         {
-            imag_vec(*UC0);
-        }
-        project(*UC0);
-        for(int st=0;st<steps;st++)
-        {
-            smooth(TR(0.1), *UC0);
-        }
-        project(*UC0);
-        // kern->add_mul3(1.0, forceABC.x, forceABC.y, forceABC.z, UC0->x, UC0->y, UC0->z);        
-        C2V(*UC0, u_out);
+            // auto exp_func = [](int j, int k, int l, int shiftx, int shifty, int shiftz, T muu)
+            // {
+            //     return exp( -muu*((j-shiftx)*(j-shiftx)+(k-shifty)*(k-shifty))+(l-shiftz)*(l-shiftz) );
+            // };
+            // std::vector<T> uR_in_h(Nx*Ny*Nz,0);
 
-        pool_BC.release(UC0);
-        pool_BR.release(UR0);     
 
+            // for(int j=0;j<Nx;j++)
+            // {
+            //     for(int k=0;k<Ny;k++)
+            //     {
+            //         for(int l=0;l<Nz;l++)
+            //         {
+            //             T muu = 0.05;
+            //             uR_in_h[I2(j,k,Ny)] = exp_func(j,k,shift1,muu)-exp_func(j,k,shift2,muu);
+            //         }
+            //     }
+            // }        
+            // host_2_device_cpy(du_x_ext, uR_in_h.data(), Nx*Ny);
+            // fft(du_x_ext, u_helper_out);
+            
+            // C2R(u_helper_out, u_out);
+            // R2C(u_out,u_helper_out);
+
+            // C2R(u_helper_out, u_out);
+            // print_vec("rand_vec.dat", u_out);
+            // std::string file_name = "sooth_file_" + std::to_string(steps) + std::string(".pos");
+            // write_solution(file_name, u_out);            
+        }
+        // exit(1);
         // std::cout << "div norm = " << div_norm(u_out);
         // write_solution_vec("vec_i.pos", u_out);
     }
@@ -1059,6 +1101,7 @@ private:
         set_Biharmonic_coefficients();
         set_force();
         kern->apply_mask(alpha, mask23);
+        // vec_ops_C->assign_scalar(1.0, mask23);
         // std::vector<TC> mask_h(Nx*Ny*Mz,0);
         // device_2_host_cpy<TC>(mask_h.data(), mask23, Nx*Ny*Mz);
         // std::vector<TR> mask_hr;
@@ -1067,13 +1110,17 @@ private:
         //     mask_hr.push_back( x.real() );
         // }
     
-        // plot->write_out_file_pos("mask_v.pos", mask_hr.data(), Nx, Ny, Mz, 2);
+        // plot->write_out_file_pos("mask_v.pos", mask_hr.data(), Nx, Ny, Mz, 1);
+        // exit(1);
     }
 
 
     void smooth(TR tau, BC_vec& U_in_place)
     {
-        kern->apply_smooth(tau, Laplace, U_in_place.x, U_in_place.y, U_in_place.z);
+        BC_vec* UC1 = pool_BC.take();
+        kern->apply_smooth(tau, Laplace, U_in_place.x, U_in_place.y, U_in_place.z, UC1->x, UC1->y, UC1->z);
+        kern->add_mul3(TC(1.0,0), UC1->x, UC1->y, UC1->z, U_in_place.x, U_in_place.y, U_in_place.z); 
+        pool_BC.release(UC1);
     }
 
     void grad(const TC_vec& u_in, BC_vec& U_out)
@@ -1215,14 +1262,22 @@ private:
     }
     void ifft(const TC_vec& u_hat_, TR_vec& u_)
     {
-        FFT->ifft(u_hat_, u_);
+        C_vec* u_hat_tmp = pool_C.take();
+        vec_ops_C->assign(u_hat_, u_hat_tmp->get_ref());
+        FFT->ifft(u_hat_tmp->get_ref(), u_);
+        pool_C.release(u_hat_tmp);
         T scale = T(1.0)/(Nx*Ny*Nz);
         vec_ops_R->scale(scale, u_);
+        
+
     }
     void fft(const TR_vec& u_, TC_vec& u_hat_)
     {
-        FFT->fft(u_, u_hat_);
-    }
+        R_vec* u_tmp = pool_R.take();
+        vec_ops_R->assign(u_, u_tmp->get_ref());
+        FFT->fft(u_tmp->get_ref(), u_hat_);
+        pool_R.release(u_tmp);
+    }   
 
 
     std::tuple<TR,TR,TR> shift_phases(BC_vec& U_in)

@@ -263,6 +263,21 @@ public:
         free_all();
     }
 
+    //* //FOR CONSISTENCY, TO BE REMOVED LATER
+    void set_basis_size(int basis_sz) 
+    { 
+        free_host_();
+        free_all();
+        prms_.basis_size = basis_sz; 
+        dense_ops_->init(prms_.basis_size+1, prms_.basis_size);
+        init_host();
+        init_all();   
+        std::cout << "Krylov basis = "  << prms_.basis_size << std::endl;
+    }
+    void    set_use_precond_resid(bool use_precond_resid) { }
+    void    set_resid_recalc_freq(int resid_recalc_freq) { prms_.batch_size = resid_recalc_freq; }
+    void    set_preconditioner_side(char side) {prms_.preconditioner_side = side;}
+    //*/
     gmres(  
         const vector_operations_type *vec_ops,
         Log *log = nullptr,

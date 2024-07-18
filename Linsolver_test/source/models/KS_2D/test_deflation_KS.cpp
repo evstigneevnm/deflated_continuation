@@ -9,10 +9,10 @@
 int main(int argc, char const *argv[])
 {
     
-    init_cuda(-1);
-    size_t Nx=32;
-    size_t Ny=32;
-    real norm_wight = real(1);//std::sqrt(real(Nx*Ny));
+    init_cuda(27);
+    size_t Nx=512;
+    size_t Ny=512;
+    real norm_wight = std::sqrt(real(Nx*Ny));
     real size_problem = real(1);//std::sqrt(real(Nx*Ny));
 
     //linsolver control
@@ -21,12 +21,12 @@ int main(int argc, char const *argv[])
     real lin_solver_tol = 1.0e-3;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 3;
+    unsigned int basis_sz = 30;
     //newton deflation control
     unsigned int newton_def_max_it = 350;
-    real newton_def_tol = 5.0e-10;
+    real newton_def_tol = 5.0e-8;
 
-    real lambda_0 = 7.6;
+    real lambda_0 = 16.7;
     real a_val = 2.0;
     real b_val = 4.0;
 
@@ -111,6 +111,9 @@ int main(int argc, char const *argv[])
         std::ostringstream stringStream_vec;
         stringStream_vec << "u_im_out_" << (p) << ".dat";
         gpu_file_operations_functions::write_vector<real>(stringStream_vec.str(), Nx*My-1, (real_im_vec&)x, 3);
+        std::ostringstream stringStream_pos;
+        stringStream_pos << "u_out_" << (p) << ".pos";
+        KS2D->write_solution(stringStream_pos.str(), (const real_im_vec&)x);
         p++;
     }
    

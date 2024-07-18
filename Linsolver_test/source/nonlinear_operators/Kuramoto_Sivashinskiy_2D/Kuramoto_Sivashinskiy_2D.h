@@ -98,7 +98,7 @@ public:
 
 
         vec_ops_C->stop_use_vector(u_helper_in); vec_ops_C->free_vector(u_helper_in);
-        vec_ops_C->stop_use_vectors(u_helper_out, u_C_helper_fft); vec_ops_C->free_vectors(u_helper_out, u_C_helper_fft);
+        vec_ops_C->stop_use_vectors(u_helper_out, u_C_helper_fft, u_helper_out_1); vec_ops_C->free_vectors(u_helper_out, u_C_helper_fft, u_helper_out_1);
 
 
         vec_ops_R->stop_use_vector(w1_ext); vec_ops_R->free_vector(w1_ext);
@@ -176,13 +176,11 @@ public:
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, (const TC_vec&)gradient_x, mask23, u_x_hat);
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) u, (const TC_vec&)gradient_y, mask23, u_y_hat);
         
-        
-
-        vec_ops_C->mul_pointwise(TC(1,0), u, TC(1,0), mask23, u_helper_in);
+        vec_ops_C->mul_pointwise(TC(1,0), u, TC(1,0), mask23, u_helper_out);
 
         ifft(u_x_hat, u_x_ext);
         ifft(u_y_hat, u_y_ext);
-        ifft(u_helper_in, u_ext);
+        ifft(u_helper_out, u_ext);
         // print_complex_2d("u_x_hat.dat", u_x_hat);
         // print_complex_2d("u_y_hat.dat", u_y_hat);
 
@@ -215,8 +213,6 @@ public:
        
         // b_hat+v->v
         vec_ops_C->add_mul(TC(1.0), (const TC_vec&)b_hat, v);
-        // print_complex_2d("f_out.dat", v);
-        // exit(1);
     }
     void F(const T_vec_im& u, const T alpha, T_vec_im& v)
     {
@@ -275,8 +271,8 @@ public:
     //returns vector dv as Jdu->dv, where J(u_0,alpha_0) linearized at (u_0, alpha_0) by set_linearization_point
     void jacobian_u(const TC_vec& du, TC_vec& dv)
     {
-        vec_ops_C->mul_pointwise(TC(1,0), du, TC(1,0), mask23, u_helper_in);
-        ifft(u_helper_in, du_ext);
+        vec_ops_C->mul_pointwise(TC(1,0), du, TC(1,0), mask23, u_helper_out);
+        ifft(u_helper_out, du_ext);
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) du, (const TC_vec&)gradient_x, mask23, u_x_hat);
         vec_ops_C->mul_pointwise(TC(1.0,0.0), (const TC_vec&) du, (const TC_vec&)gradient_y, mask23, u_y_hat);
         ifft(u_x_hat,du_x_ext);
@@ -306,6 +302,12 @@ public:
                             TC(1.0), u_x_hat, TC(1.0), u_y_hat);
         // a_val_alpha*u_y_hat+b_hat+dv->dv
         vec_ops_C->add_mul(TC(a_val*alpha_0), u_y_hat, TC(1.0), b_hat, TC(1.0), dv);
+
+        // print_complex_2d("u_x_hat.dat", u_x_hat);
+        // print_complex_2d("u_x_hat.dat", u_y_hat);
+        
+        // print_complex_2d("df_out.dat", dv);
+        // exit(1);        
 
     }
     void jacobian_u(const T_vec_im& du, T_vec_im& dv)
@@ -482,27 +484,38 @@ public:
 
     void randomize_vector(T_vec_im& u_out, int steps_ = -1, bool random = true)
     {
+        std::srand(unsigned(std::time(0))); //init new seed
         if(random)
         {
+            const int NN = 4;            
             vec_ops_R->assign_random(du_x_ext);
             int steps = steps_;
             
             if(steps_ == -1)
             {
-                std::srand(unsigned(std::time(0))); //init new seed
-                steps = std::rand()%8 + 1;     // random from 1 to 8
-
+                steps = std::rand()%NN + 1;     // random from 1 to NN
             }        
 
 
             fourier_solution(du_x_ext, u_helper_out);
             //vec_ops_C->assign_scalar(TC(steps,0), u_helper_out);
-
+            T ww = std::pow(1.0*steps, 1.0/(1.0*steps) );
+            T dt = 0.1;
             for(int st=0;st<steps;st++)
             {
-                apply_smooth<T, TC>(dimGrid_F, dimBlock, Nx, My, T(10.0*steps), T(0.1), Laplace, u_helper_out);
+                apply_smooth<T, TC>(dimGrid_F, dimBlock, Nx, My, dt,  (TC_vec&)Laplace, u_helper_out, u_helper_out_1);
+                vec_ops_C->assign_mul(ww, u_helper_out_1, u_helper_out);
             }
-            C2R(u_helper_out, u_out);
+            vec_ops_C->normalize(u_helper_out_1);
+            vec_ops_C->scale(steps*Nx*Ny*steps/dt, u_helper_out_1);
+
+            C2R(u_helper_out_1, u_out);
+            // T_vec u_out_ph;
+            // vec_ops_R->init_vector(u_out_ph); vec_ops_R->start_use_vector(u_out_ph);
+            // physical_solution(u_out, u_out_ph);
+            // plot->write_to_disk("random_vector.pos", u_out_ph);
+            // vec_ops_R->stop_use_vector(u_out_ph); vec_ops_R->free_vector(u_out_ph);
+            // exit(1);
         }
         else
         {
@@ -525,6 +538,10 @@ public:
             }        
             host_2_device_cpy(du_x_ext, uR_in_h.data(), Nx*Ny);
             fft(du_x_ext, u_helper_out);
+            print_complex_2d("rand_vec_hat.dat", u_helper_out);
+            C2R(u_helper_out, u_out);
+            R2C(u_out,u_helper_out);
+            print_complex_2d("rand_vec_hat_c2v2c.dat", u_helper_out);
             C2R(u_helper_out, u_out);
             // print_vec("rand_vec.dat", u_out);
             // std::string file_name = "sooth_file_" + std::to_string(steps) + std::string(".pos");
@@ -588,6 +605,7 @@ private:
     TC_vec u_x_hat0=nullptr;
     TC_vec u_y_hat0=nullptr;
     TC_vec u_C_helper_fft = nullptr;
+    TC_vec u_helper_out_1 = nullptr;
 
     TC_vec u_helper_in = nullptr;  //vector for using only R outside
     TC_vec u_helper_out = nullptr;  //vector for using only R outside
@@ -628,7 +646,7 @@ private:
         vec_ops_C->init_vector(u_y_hat0); vec_ops_C->start_use_vector(u_y_hat0); 
         vec_ops_C->init_vector(mask23); vec_ops_C->start_use_vector(mask23); 
         vec_ops_C->init_vector(u_helper_in); vec_ops_C->start_use_vector(u_helper_in); 
-        vec_ops_C->init_vectors(u_helper_out, u_C_helper_fft); vec_ops_C->start_use_vectors(u_helper_out, u_C_helper_fft);
+        vec_ops_C->init_vectors(u_helper_out, u_C_helper_fft, u_helper_out_1); vec_ops_C->start_use_vectors(u_helper_out, u_C_helper_fft, u_helper_out_1);
 
         vec_ops_R->init_vector(w1_ext); vec_ops_R->start_use_vector(w1_ext); 
         vec_ops_R->init_vector(w2_ext); vec_ops_R->start_use_vector(w2_ext); 
@@ -658,17 +676,18 @@ private:
             n=k;
             
             for(int j=0;j<Nx;j++){
-                m=j; if(j>=Nx/2) m=j-Nx;
+                m=j; 
+                if(j>=Nx/2) m=j-Nx;
                 
                 T kx=m;
                 T ky=n;
-                T kxMax=Nx*0.5;
+                T kxMax=Nx;
                 T kyMax=Ny;
 
-                T sphere2=sqrt( kx*kx/(kxMax*kxMax)+ky*ky/(kyMax*kyMax) );
+                T sphere2 = 4*kx*kx/(kxMax*kxMax)+ky*ky/(kyMax*kyMax); //4 because maxNx/2
 
                 //  2/3 limitation!
-                if(sphere2<2.0/3.0)
+                if(sphere2<4.0/9.0)
                 {
                     mask_2_3[I2(j,k,Ny)]=TC(1.0,0);
                 }

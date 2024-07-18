@@ -5,6 +5,7 @@
 #include <common/macros.h>
 
 #include <utils/cuda_support.h>
+#include <scfd/utils/trash_cuda_memory.h>
 #include <utils/log.h>
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
@@ -25,8 +26,6 @@
 #include <common/gpu_file_operations.h>
 #include <common/gpu_vector_operations.h>
 
-#define Blocks_x_ 32
-#define Blocks_y_ 16
 
 int main(int argc, char const *argv[])
 {
@@ -45,8 +44,8 @@ int main(int argc, char const *argv[])
         gpu_vector_operations_real_t, 
         gpu_vector_operations_complex_t, 
         gpu_vector_operations_t,
-        Blocks_x_, 
-        Blocks_y_> KS_2D;
+        BLOCK_SIZE_X, 
+        BLOCK_SIZE_Y> KS_2D;
 
     typedef nonlinear_operators::linear_operator_KS_2D<
         gpu_vector_operations_t, KS_2D> lin_op_t;
@@ -61,11 +60,9 @@ int main(int argc, char const *argv[])
     using vec_file_ops_t = gpu_file_operations<gpu_vector_operations_t>;
     using real_file_ops_t = gpu_file_operations<gpu_vector_operations_real_t>;
 
-    // using lin_solver_t = numerical_algos::lin_solvers::bicgstabl<
-        // lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t>; //numerical_algos::lin_solvers::gmres
+    // using lin_solver_t = numerical_algos::lin_solvers::bicgstabl<lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t>;
 
- using lin_solver_t = numerical_algos::lin_solvers::gmres<
-        lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t>; //numerical_algos::lin_solvers::gmres
+    using lin_solver_t = numerical_algos::lin_solvers::gmres<lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t>;
 
     typedef nonlinear_operators::newton_method::convergence_strategy<
         gpu_vector_operations_t, 
@@ -88,8 +85,9 @@ int main(int argc, char const *argv[])
 
     
     init_cuda(27);
-    size_t Nx = 16;
-    size_t Ny = 16;
+    scfd::utils::trash_cuda_memory();
+    size_t Nx = 512;
+    size_t Ny = 512;
     real norm_wight = real(1);//std::sqrt(real(Nx*Ny));
     real size_problem = real(1);//std::sqrt(real(Nx*Ny));
 
@@ -97,7 +95,7 @@ int main(int argc, char const *argv[])
 
     //lin_solver control
      unsigned int lin_solver_max_it = 1000;
-    real lin_solver_tol = 1.0e-2;
+    real lin_solver_tol = 1.0e-6;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 2;
@@ -105,7 +103,7 @@ int main(int argc, char const *argv[])
     unsigned int newton_max_it = 350;
     real newton_tol = 5.0e-10;
 
-    real lambda_0 = 7.3;
+    real lambda_0 = 4.7;
     real a_val = 2.0;
     real b_val = 4.0;
 
@@ -132,7 +130,7 @@ int main(int argc, char const *argv[])
     // printf("GridsFourier = (%i,%i,%i)\n", Grids_F.x, Grids_F.y, Grids_F.z);
     log_t log;
     log_t log3;
-    log3.set_verbosity(3);
+    log3.set_verbosity(0);
 
     KS_2D* KS2D_p = &KS2D;
     lin_op_t lin_op(KS2D_p);
@@ -144,6 +142,7 @@ int main(int argc, char const *argv[])
     monitor_t *mon;
     
     //setup linsolver
+    //bcgstabl:
     // lin_solver_t lin_solver(&vec_ops, &log3);
     // lin_solver.set_preconditioner(&prec);
     // lin_solver_t* lin_solver_p = &lin_solver;
@@ -152,19 +151,19 @@ int main(int argc, char const *argv[])
     // lin_solver.set_resid_recalc_freq(resid_recalc_freq);
     // lin_solver.set_basis_size(basis_sz);
     // mon = &lin_solver.monitor();
-    // mon->init(lin_solver_tol, real(0.f), lin_solver_max_it);
+    // mon->init(lin_solver_tol, real(0), lin_solver_max_it);
     // mon->set_save_convergence_history(true);
     // mon->set_divide_out_norms_by_rel_base(true);   
-
+    //gmres:
     lin_solver_t::params params;
     params.basis_size = 100;
-    params.preconditioner_side = 'L';
+    params.preconditioner_side = 'R';
     params.reorthogonalization = true;
 
     lin_solver_t gmres(&vec_ops, &log3, params);
     gmres.set_preconditioner(&prec);
     mon = &gmres.monitor();
-    mon->init(lin_solver_tol, real(0.f), lin_solver_max_it);
+    mon->init(lin_solver_tol, real(0), lin_solver_max_it);
     mon->set_save_convergence_history(true);
     mon->set_divide_out_norms_by_rel_base(true);      
     lin_solver_t* lin_solver_p = &gmres;
@@ -176,10 +175,14 @@ int main(int argc, char const *argv[])
 
     vec x0;
     vec_ops.init_vector(x0); vec_ops.start_use_vector(x0);
-    KS2D.randomize_vector(x0, 0, false);
+    KS2D.randomize_vector(x0, -1, true);
     bool converged = newton.solve(&KS2D, x0, lambda_0);
-    log.info_f("solution norm = %le", vec_ops.norm_l2(x0) );
-    KS2D.write_solution("u.pos", x0);
+    auto solution_norm = vec_ops.norm_l2(x0);
+    log.info_f("solution norm = %le", solution_norm);
+    if((solution_norm > 1.0e-2)&&(converged))
+    {
+        KS2D.write_solution("u.pos", x0);
+    }
 
     vec_ops.stop_use_vector(x0); vec_ops.free_vector(x0);
 
