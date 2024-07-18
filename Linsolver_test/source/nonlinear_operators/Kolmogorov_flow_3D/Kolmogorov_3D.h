@@ -209,7 +209,8 @@ public:
         // vec_ops_C->assign_scalar(0.0,W.x);
         // vec_ops_C->assign_scalar(0.0,W.y);
         // vec_ops_C->assign_scalar(0.0,W.z);
-        B_V_nabla_F(U, U, W); //W:= (U, nabla) U
+        // B_V_nabla_F(U, U, W); //W:= (U, nabla) U
+        B_V_nabla_curl_F(U, U, W);
         kern->add_mul3(TC(-1.0,0), force.x, force.y, force.z, W.x, W.y, W.z); // force:= W-force
         project(W); // W:=P[W]
         kern->negate3(W.x, W.y, W.z); //W:=-W;
@@ -242,8 +243,10 @@ public:
         // vec_ops_C->assign_scalar(0.0,dW->y);
         // vec_ops_C->assign_scalar(0.0,dW->z);
         project(dU);
-        B_V_nabla_F(U_0, dU, dV); //dV:= (dU, nabla) U_0
-        B_V_nabla_F(dU, U_0,*dW); //dW:= (U_0, nabla) dU
+        B_V_nabla_curl_F(U_0, dU, dV);
+        B_V_nabla_curl_F(dU, U_0,*dW);
+        // B_V_nabla_F(U_0, dU, dV); //dV:= (dU, nabla) U_0
+        // B_V_nabla_F(dU, U_0,*dW); //dW:= (U_0, nabla) dU
         kern->add_mul3(TC(1.0,0), dW->x, dW->y, dW->z, dV.x, dV.y, dV.z); // dV:=dV+dW
 
         kern->negate3(dV.x, dV.y, dV.z); // dV:=-dV
@@ -639,6 +642,35 @@ private:
         pool_BR.release(VelR);
 
     }
+
+    //advection operator in rotational form as [V \cross curl(F)].
+    //V, F and ret are block vectors.
+    void B_V_nabla_curl_F(const BC_vec& Vel, const BC_vec& Func, BC_vec& ret)
+    {
+  
+        BC_vec* curl = pool_BC.take();
+        BC_vec* Vel_reduced = pool_BC.take();
+        kern->curl(grad_x, grad_y, grad_z, Func.x, Func.y, Func.z, curl->x, curl->y, curl->z, mask23);
+        vec_ops_C->mul_pointwise(1, Vel.x, 1, mask23, Vel_reduced->x);
+        vec_ops_C->mul_pointwise(1, Vel.y, 1, mask23, Vel_reduced->y);
+        vec_ops_C->mul_pointwise(1, Vel.z, 1, mask23, Vel_reduced->z);
+
+        BR_vec* curlR = pool_BR.take();
+        BR_vec* VelR = pool_BR.take();
+        BR_vec* resR = pool_BR.take();  
+        ifft(*curl, *curlR);
+        ifft(*Vel_reduced, *VelR);
+        pool_BC.release(curl);
+        pool_BC.release(Vel_reduced);
+        kern->cross_real(VelR->x, VelR->y, VelR->z, curlR->x, curlR->y, curlR->z, resR->x, resR->y, resR->z);
+        fft(*resR, ret);
+        imag_vec(ret); //make sure it's pure imag after approximate advection!
+        pool_BR.release(resR);
+        pool_BR.release(curlR);
+        pool_BR.release(VelR);
+    }
+
+
 
     void init_all_derivatives()
     {

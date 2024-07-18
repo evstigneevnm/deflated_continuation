@@ -28,6 +28,10 @@ struct Kolmogorov_3D_ker
 
     }
 
+    void curl(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec u_x, TC_vec u_y, TC_vec u_z, TC_vec w_x, TC_vec w_y, TC_vec w_z, TC_vec mask_2_3 = nullptr);
+
+    void cross_real(TR_vec Vx, TR_vec Vy, TR_vec Vz, TR_vec rot_x, TR_vec rot_y, TR_vec rot_z, TR_vec resx, TR_vec resy, TR_vec resz);
+        
     void Laplace_Fourier(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace);
 
     void force_Fourier(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z);

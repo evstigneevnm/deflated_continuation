@@ -7,6 +7,114 @@
 
 
 template<typename TC, typename TC_vec>
+__global__ void curl_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec ux_in, TC_vec uy_in, TC_vec uz_in, TC_vec wx_out, TC_vec wy_out, TC_vec wz_out)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+
+    wx_out[I3(j,k,l)] = grad_y[k]*uz_in[I3(j,k,l)] - grad_z[l]*uy_in[I3(j,k,l)];
+    wy_out[I3(j,k,l)] = -(grad_x[j]*uz_in[I3(j,k,l)] - grad_z[l]*ux_in[I3(j,k,l)]);
+    wz_out[I3(j,k,l)] = grad_x[j]*uy_in[I3(j,k,l)] - grad_y[k]*ux_in[I3(j,k,l)];
+
+}
+}
+
+template<typename TC, typename TC_vec>
+__global__ void curl_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec ux_in, TC_vec uy_in, TC_vec uz_in, TC_vec wx_out, TC_vec wy_out, TC_vec wz_out, TC_vec mask_2_3)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+    auto mask = mask_2_3[I3(j,k,l)];
+    wx_out[I3(j,k,l)] = (grad_y[k]*uz_in[I3(j,k,l)] - grad_z[l]*uy_in[I3(j,k,l)])*mask;
+    wy_out[I3(j,k,l)] = -(grad_x[j]*uz_in[I3(j,k,l)] - grad_z[l]*ux_in[I3(j,k,l)])*mask;
+    wz_out[I3(j,k,l)] = (grad_x[j]*uy_in[I3(j,k,l)] - grad_y[k]*ux_in[I3(j,k,l)])*mask;
+
+
+}
+}
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::curl(TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec ux_in, TC_vec uy_in, TC_vec uz_in, TC_vec wx_out, TC_vec wy_out, TC_vec wz_out, TC_vec mask_2_3)
+{
+    
+    if(mask_2_3 == nullptr)
+    {
+        curl_kernel<TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, grad_x, grad_y, grad_z, ux_in,  uy_in, uz_in, wx_out, wy_out, wz_out);
+    }
+    else
+    {
+        curl_kernel<TC, TC_vec><<<dimGridNC, dimBlockN>>>(Nx, Ny, Mz, grad_x, grad_y, grad_z, ux_in,  uy_in, uz_in, wx_out, wy_out, wz_out, mask_2_3);
+    }
+}
+
+
+
+
+template<typename T, typename T_vec, typename TC, typename TC_vec>
+__global__ void cross_real_kernel(size_t Nx, size_t Ny, size_t Nz, T_vec Vx, T_vec Vy, T_vec Vz, T_vec rot_x, T_vec rot_y, T_vec rot_z, T_vec resx, T_vec resy, T_vec resz)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+    T ux = Vx[I3(j,k,l)];
+    T uy = Vy[I3(j,k,l)];
+    T uz = Vz[I3(j,k,l)];
+
+    T wx = rot_x[I3(j,k,l)];
+    T wy = rot_y[I3(j,k,l)];
+    T wz = rot_z[I3(j,k,l)];    
+
+    resx[I3(j,k,l)] = uy*wz-uz*wy;
+
+    resy[I3(j,k,l)] = -(ux*wz-uz*wx);
+
+    resz[I3(j,k,l)] = ux*wy-uy*wx;
+
+    
+
+}
+}
+template <typename TR, typename TR_vec, typename TC, typename TC_vec>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::cross_real(TR_vec Vx, TR_vec Vy, TR_vec Vz, TR_vec rot_x, TR_vec rot_y, TR_vec rot_z, TR_vec resx, TR_vec resy, TR_vec resz)
+{
+    cross_real_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNR, dimBlockN>>>(Nx, Ny, Nz, Vx, Vy, Vz, rot_x, rot_y, rot_z, resx, resy, resz);
+}
+
+
+
+template<typename TC, typename TC_vec>
 __global__ void Laplace_Fourier_kernel(size_t Nx, size_t Ny, size_t Nz, TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec Laplace)
 {
 unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
