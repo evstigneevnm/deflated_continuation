@@ -138,6 +138,7 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::force_Fouri
 
 
 
+
 template<typename T, typename T_vec, typename TC, typename TC_vec>
 __global__ void force_ABC_kernel(size_t Nx, size_t Ny, size_t Nz, T_vec force_x, T_vec force_y, T_vec force_z)
 {
