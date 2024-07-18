@@ -6,8 +6,8 @@ SCALAR_TYPE =-DSCALAR_TYPE=double
 NVCC = /usr/local/cuda/bin/nvcc
 GCC = /usr/bin/gcc
 
-NVCCFLAGS = -Wno-deprecated-gpu-targets -O3 -arch=sm_70 -std=c++17
-GCCFLAGS = -O3 -std=c++17
+NVCCFLAGS = -Wno-deprecated-gpu-targets -g -arch=sm_70 -std=c++17
+GCCFLAGS = -g -std=c++17
 ICUDA = -I/usr/local/cuda
 IPROJECT = -I source/
 IBOOST = -I/usr/local/boost_1_66_0

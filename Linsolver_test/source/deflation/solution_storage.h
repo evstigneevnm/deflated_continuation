@@ -80,8 +80,8 @@ private:
         distance_der = T(p)/(std::pow(vec_ops->norm_l2(x), p+T(2.0))*(elements_number+1)); //distance to zero
         //calc: y := mul_x*x
         // c = distance_der*(x-0)
-        vec_ops->assign_mul(distance_der/norm_weight, x, c);
-        //xxx vec_ops->assign_scalar(0.0, c);
+        // vec_ops->assign_mul(distance_der/norm_weight, x, c);
+        vec_ops->assign_scalar(0.0, c);
         for(int j=0;j<elements_number;j++)
         {
             //calc: z := mul_x*x + mul_y*y

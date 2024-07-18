@@ -1,0 +1,3 @@
+source/nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D_impl.cuh(133): error: too many arguments for class template "nonlinear_operators::Kolmogorov_3D_ker"
+
+1 error detected in the compilation of "source/nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D_ker.cu".

@@ -158,7 +158,7 @@ private:
     FFT_type *FFT;
     kern_t* kern;
     plot_t* plot;
-
+    const int n_y = 1, n_z = 0;
 
 public:
     Kolmogorov_3D(T alpha_, size_t Nx_, size_t Ny_, size_t Nz_,
@@ -314,7 +314,7 @@ public:
     void preconditioner_jacobian_u(BC_vec& dR)
     {
         project(dR);
-        kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, Reynolds_0);
+        kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, 1./Reynolds_0);
 
     }
     void preconditioner_jacobian_u(T_vec& dr)
@@ -728,7 +728,7 @@ private:
    
     void set_force()
     {
-        kern->force_Fourier(1, force.x, force.y, force.z);
+        kern->force_Fourier(n_y, n_z, 1, force.x, force.y, force.z);
         
         
         kern->force_ABC(forceABC_R.x, forceABC_R.y, forceABC_R.z);

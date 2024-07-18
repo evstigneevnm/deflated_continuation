@@ -105,7 +105,7 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::vec2complex
 
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
-__global__ void force_Fourier_kernel(int n, size_t Nx, size_t Ny, size_t Nz, size_t scale, TC_vec force_x, TC_vec force_y, TC_vec force_z)
+__global__ void force_Fourier_sin_kernel(int n_y, int n_z, T scale_const, size_t Nx, size_t Ny, size_t Nz, size_t scale, TC_vec force_x, TC_vec force_y, TC_vec force_z)
 {
 unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
 unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
@@ -124,15 +124,25 @@ if ( index_in < sizeOfData )
     force_y[I3(j,k,l)] = TC(0,0);
     force_z[I3(j,k,l)] = TC(0,0);
 
-    force_x[I3(0,n,n)]=TC(0, -T(scale)*0.25 );
-    force_x[I3(0,Ny-n,n)]=TC(0, -T(scale)*0.25 );
+    force_x[I3(0,n_y,n_z)]=TC(0, T(scale)*scale_const );
+    force_x[I3(0,Ny-n_y,n_z)]=TC(0, -T(scale)*scale_const );
 
 }
 }
 template <typename TR, typename TR_vec, typename TC, typename TC_vec>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::force_Fourier(int n, TC_vec force_x, TC_vec force_y, TC_vec force_z)
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec>::force_Fourier(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z)
 {
-    force_Fourier_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(n, Nx, Ny, Mz, Nx*Ny*Nz, force_x, force_y, force_z);
+
+    TR mlt = 1;
+    if(n_y>0)
+    {
+        mlt = mlt*0.5;
+    }
+    if(n_z>0)
+    {
+        mlt = mlt*0.5;
+    }    
+    force_Fourier_sin_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(n_y, n_z, mlt*scale_const, Nx, Ny, Mz, Nx*Ny*Nz, force_x, force_y, force_z);
 }
 
 
