@@ -149,7 +149,7 @@ struct gpu_vector_operations
             host_2_device_cpy<scalar_type>(x, x_host, sz);
     }
     //sets a vector from a host vector. 
-    void set(vector_type& x_host_, vector_type& x_) const
+    void set(vector_type x_host_, vector_type& x_) const
     {
         if(x_!=nullptr)
             host_2_device_cpy<scalar_type>(x_, x_host_, sz);

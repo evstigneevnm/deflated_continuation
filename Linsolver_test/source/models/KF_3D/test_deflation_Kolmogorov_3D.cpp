@@ -63,6 +63,7 @@ int main(int argc, char const *argv[])
     unsigned int newton_def_max_it = 2000;
     real newton_def_tol = 1.0e-9;
     real Power = 2.0;
+    real update_weight = 0.5;
 
 
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
@@ -100,7 +101,7 @@ int main(int argc, char const *argv[])
     SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle()->set_basis_size(basis_sz);
 
-    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops, log, newton_def_tol, newton_def_max_it, real(0.5), true );
+    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops, log, newton_def_tol, newton_def_max_it, update_weight, true );
 
     sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops, 50, norm_wight, Power);
     system_operator_def_t *system_operator_def = new system_operator_def_t(vec_ops, Ax, SM, sol_storage_def);

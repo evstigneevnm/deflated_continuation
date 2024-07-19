@@ -149,6 +149,7 @@ private:
 
     //data all passed to constructor as pointers
     T alpha;
+    T Lx, Ly, Lz;
     vec_R_t *vec_ops_R;
     vec_C_t *vec_ops_C;
     vec_ops_t *vec_ops;
@@ -171,13 +172,13 @@ public:
     FFT(FFT_), 
     alpha(alpha_)
     {
+        Lx = (T(1.0)/alpha)*T(2.0)*M_PI;
+        Ly = T(2.0)*M_PI;
+        Lz = T(2.0)*M_PI;
         Mz=FFT->get_reduced_size();
         common_constructor_operation();
         kern = new kern_t(alpha, Nx, Ny, Nz, Mz, BLOCK_SIZE_x, BLOCK_SIZE_y);
         init_all_derivatives();
-        T Lx = (T(1.0)/alpha)*T(2.0)*M_PI;
-        T Ly = T(2.0)*M_PI;
-        T Lz = T(2.0)*M_PI;
         plot = new plot_t(vec_ops_R_, Nx_, Ny_, Nz_, Lx, Ly, Lz);
     }
 
@@ -209,8 +210,8 @@ public:
         // vec_ops_C->assign_scalar(0.0,W.x);
         // vec_ops_C->assign_scalar(0.0,W.y);
         // vec_ops_C->assign_scalar(0.0,W.z);
-        // B_V_nabla_F(U, U, W); //W:= (U, nabla) U
-        B_V_nabla_curl_F(U, U, W);
+        B_V_nabla_F(U, U, W); //W:= (U, nabla) U
+        // B_V_nabla_curl_F(U, U, W);
         kern->add_mul3(TC(-1.0,0), force.x, force.y, force.z, W.x, W.y, W.z); // force:= W-force
         project(W); // W:=P[W]
         kern->negate3(W.x, W.y, W.z); //W:=-W;
@@ -243,10 +244,10 @@ public:
         // vec_ops_C->assign_scalar(0.0,dW->y);
         // vec_ops_C->assign_scalar(0.0,dW->z);
         project(dU);
-        B_V_nabla_curl_F(U_0, dU, dV);
-        B_V_nabla_curl_F(dU, U_0,*dW);
-        // B_V_nabla_F(U_0, dU, dV); //dV:= (dU, nabla) U_0
-        // B_V_nabla_F(dU, U_0,*dW); //dW:= (U_0, nabla) dU
+        // B_V_nabla_curl_F(U_0, dU, dV);
+        // B_V_nabla_curl_F(dU, U_0,*dW);
+        B_V_nabla_F(U_0, dU, dV); //dV:= (dU, nabla) U_0
+        B_V_nabla_F(dU, U_0,*dW); //dW:= (U_0, nabla) dU
         kern->add_mul3(TC(1.0,0), dW->x, dW->y, dW->z, dV.x, dV.y, dV.z); // dV:=dV+dW
 
         kern->negate3(dV.x, dV.y, dV.z); // dV:=-dV
@@ -317,7 +318,7 @@ public:
     void preconditioner_jacobian_u(BC_vec& dR)
     {
         project(dR);
-        kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, 1./Reynolds_0);
+        kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, 1.0);
 
     }
     void preconditioner_jacobian_u(T_vec& dr)
@@ -457,40 +458,97 @@ public:
     } 
 
 
-    void randomize_vector(T_vec u_out, int steps_ = -1)
+    void randomize_vector(T_vec& u_out, int steps_ = -1, bool random = false)
     {
-        
-        BC_vec* UC0 = pool_BC.take();
-        BR_vec* UR0 = pool_BR.take();
-
-        vec_ops_R->assign_random(UR0->x);
-        vec_ops_R->assign_random(UR0->y);
-        vec_ops_R->assign_random(UR0->z);
-        
-        //vec_ops_R->assign_scalar(0, UR0->x);
-        // vec_ops_R->assign_scalar(0, UR0->z);
-        int steps = steps_;
-        if(steps_ == -1)
+        if(random)
         {
-            std::srand(unsigned(std::time(0))); //init new seed
-            steps = std::rand()%8 + 1;     // random from 1 to 8
+            BC_vec* UC0 = pool_BC.take();
+            BR_vec* UR0 = pool_BR.take();
 
+            vec_ops_R->assign_random(UR0->x);
+            vec_ops_R->assign_random(UR0->y);
+            vec_ops_R->assign_random(UR0->z);
+            
+            //vec_ops_R->assign_scalar(0, UR0->x);
+            // vec_ops_R->assign_scalar(0, UR0->z);
+            int steps = steps_;
+            if(steps_ == -1)
+            {
+                std::srand(unsigned(std::time(0))); //init new seed
+                steps = std::rand()%8 + 1;     // random from 1 to 8
+
+            }
+
+            fft(*UR0, *UC0);
+            imag_vec(*UC0);
+            project(*UC0);
+            for(int st=0;st<steps;st++)
+            {
+                smooth(TR(0.1), *UC0);
+            }
+
+            C2V(*UC0, u_out);
+            pool_BC.release(UC0);
+            pool_BR.release(UR0);     
+
+            // std::cout << "div norm = " << div_norm(u_out);
+            // write_solution_vec("vec_i.pos", u_out);
+        }
+        else
+        {
+            // std::cout << "Lx = " << Lx << " Ly = " << Ly << " Lz = " << Lz << std::endl;
+            
+            auto exp_func = [&](int j, int k, int l, TR shift_x, TR shift_y, TR shift_z, T muu)
+            {
+                auto x = (1.0*j/Nx)*Lx - shift_x;
+                auto y = (1.0*k/Ny)*Ly - shift_y;
+                auto z = (1.0*l/Nz)*Lz - shift_z;
+
+                return exp(-muu*(x*x+y*y+z*z) );
+            };
+            std::vector<T> ux_h(Nx*Ny*Nz,0);
+            std::vector<T> uy_h(Nx*Ny*Nz,0);
+            std::vector<T> uz_h(Nx*Ny*Nz,0);
+            T muu = 1;
+            
+            for(int j=0;j<Nx;j++)
+            {
+                for(int k=0;k<Ny;k++)
+                {
+                    for(int l=0;l<Nz;l++)
+                    {
+                    
+                        ux_h[I3(j,k,l)] = exp_func(j,k,l,Lx/3,2*Ly/3,2*Lz/3, muu)+exp_func(j,k,l,2*Lx/3,2*Ly/3,2*Lz/3, muu);
+                        uy_h[I3(j,k,l)] = exp_func(j,k,l,Lx/3,Ly/2,Lz/2, muu)+exp_func(j,k,l,2*Lx/3,Ly/2,Lz/2, muu);
+                        uz_h[I3(j,k,l)] = exp_func(j,k,l,Lx/3,Ly/3,Lz/3, muu)+exp_func(j,k,l,2*Lx/3,Ly/3,Lz/3, muu);
+
+                    }
+                }
+            }   
+
+
+
+            BC_vec* UC0 = pool_BC.take();
+            BR_vec* UR0 = pool_BR.take();
+
+            vec_ops_R->set(ux_h.data(), UR0->x);
+            vec_ops_R->set(uy_h.data(), UR0->y);
+            vec_ops_R->set(uz_h.data(), UR0->z);
+
+            fft(*UR0, *UC0);
+            imag_vec(*UC0);
+            project(*UC0);
+            C2V(*UC0, u_out);
+            pool_BR.release(UR0); 
+            pool_BC.release(UC0);
+            
+
+            // std::cout << "rand div norm = " << div_norm(u_out) << std::endl;
+            // write_solution_vec("vec_i.pos", u_out);
+            // exit(1);
         }
 
-        fft(*UR0, *UC0);
-        imag_vec(*UC0);
-        project(*UC0);
-        for(int st=0;st<steps;st++)
-        {
-            smooth(TR(0.1), *UC0);
-        }
 
-        C2V(*UC0, u_out);
-        pool_BC.release(UC0);
-        pool_BR.release(UR0);     
-
-        // std::cout << "div norm = " << div_norm(u_out);
-        // write_solution_vec("vec_i.pos", u_out);
     }
     
 

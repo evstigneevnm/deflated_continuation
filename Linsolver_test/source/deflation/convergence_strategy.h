@@ -78,7 +78,7 @@ public:
         }
 
         iterations++;
-        log->info_f("deflation::convergence: iteration %i, residuals n: %le, n+1: %le",iterations, (double)normFx, (double)normFx1);
+        log->info_f("deflation::convergence: iteration %i, residuals n: %le, n+1: %le, reduction: %.2lf",iterations, (double)normFx, (double)normFx1, (double)normFx1/normFx );
 
         if(std::isnan(normFx))
         {
