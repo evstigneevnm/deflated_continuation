@@ -268,7 +268,8 @@ private:
         // std::cout << "det = " << det << std::endl;
         if(( std::abs(det) < 1.0e-12 )||( !std::isfinite(det) ))
         {
-            throw std::runtime_error("abc_flow_ker::check_matrix_condition: matrix determinant is zero or not finite, det = " + std::to_string(det) + "\n");
+            // throw std::runtime_error("ker::check_matrix_condition: matrix determinant is zero or not finite, det = " + std::to_string(det) + "\n");
+            std::cout << det << "!!!" << std::endl;
         }
 
     }

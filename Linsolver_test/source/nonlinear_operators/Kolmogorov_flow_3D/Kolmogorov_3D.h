@@ -595,9 +595,9 @@ public:
     void exact_solution_sin_cos(const T& Reynolds, T_vec& u_out)
     {
         BC_vec* UA = pool_BC.take();
-        vec_ops_C->assign_mul(TC(Reynolds,0), force.x, UA->x);
-        vec_ops_C->assign_mul(TC(Reynolds,0), force.y, UA->y);
-        vec_ops_C->assign_mul(TC(Reynolds,0), force.z, UA->z);        
+        vec_ops_C->assign_mul(TC(Reynolds,0)*0.5, force.x, UA->x);
+        vec_ops_C->assign_mul(TC(Reynolds,0)*0.5, force.y, UA->y);
+        vec_ops_C->assign_mul(TC(Reynolds,0)*0.5, force.z, UA->z);        
         C2V(*UA, u_out);
         pool_BC.release(UA);        
     }
@@ -614,7 +614,14 @@ public:
 
     void exact_solution(const T& Reynolds, T_vec& u_out)
     {       
-        exact_solution_sin(Reynolds, u_out);
+        if(n_z_force>0)
+        {
+            exact_solution_sin_cos(Reynolds, u_out);
+        }
+        else
+        {
+            exact_solution_sin(Reynolds, u_out);
+        }
     }
 
 

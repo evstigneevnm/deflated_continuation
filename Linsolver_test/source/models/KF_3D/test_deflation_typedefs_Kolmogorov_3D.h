@@ -16,7 +16,7 @@
     typedef nonlinear_operators::Kolmogorov_3D<cufft_type, 
             gpu_vector_operations_real_t, 
             gpu_vector_operations_complex_t, 
-            gpu_vector_operations_t> KF_3D_t;
+            gpu_vector_operations_t, 32, 16, false> KF_3D_t;
 
     typedef nonlinear_operators::linear_operator_K_3D<
         gpu_vector_operations_t, KF_3D_t> lin_op_t;
@@ -41,7 +41,14 @@
 
     typedef deflation::solution_storage<gpu_vector_operations_t> sol_storage_def_t;
 
-    typedef deflation::system_operator_deflation<
+    // typedef deflation::system_operator_deflation<
+    //     gpu_vector_operations_t, 
+    //     KF_3D_t,
+    //     lin_op_t,
+    //     sherman_morrison_linear_system_solve_t,
+    //     sol_storage_def_t> system_operator_def_t;
+
+    typedef deflation::system_operator_deflation_with_translation<
         gpu_vector_operations_t, 
         KF_3D_t,
         lin_op_t,

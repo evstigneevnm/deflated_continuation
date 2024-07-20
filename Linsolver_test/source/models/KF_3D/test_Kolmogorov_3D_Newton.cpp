@@ -82,13 +82,13 @@ int main(int argc, char const *argv[])
 
     //linsolver control
     unsigned int lin_solver_max_it = 1000;
-    real lin_solver_tol = 1.0e-2;
+    real lin_solver_tol = 1.0e-3;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 3;
     //newton deflation control
     unsigned int newton_def_max_it = 250;
-    real newton_def_tol = 1.0e-10;
+    real newton_def_tol = 5.0e-9;
 
 
 
@@ -110,8 +110,8 @@ int main(int argc, char const *argv[])
         gpu_vector_operations_t, KF_3D_t> lin_op_t;
     typedef nonlinear_operators::preconditioner_K_3D<
         gpu_vector_operations_t, KF_3D_t, lin_op_t> prec_t;    
-    // using lin_solver_t = numerical_algos::lin_solvers::gmres<lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t>;
-    using lin_solver_t = numerical_algos::lin_solvers::bicgstabl<lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t>;
+    using lin_solver_t = numerical_algos::lin_solvers::gmres<lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t>;
+    // using lin_solver_t = numerical_algos::lin_solvers::bicgstabl<lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t>;
 
     monitor_t *mon;
 
@@ -124,17 +124,17 @@ int main(int argc, char const *argv[])
 
 
     //gmres native interface:
-    // lin_solver_t::params params;
-    // params.basis_size = 50;
-    // params.preconditioner_side = 'L';
-    // params.reorthogonalization = true;
-    // lin_solver_t lin_solver(vec_ops, &log3, params);
+    lin_solver_t::params params;
+    params.basis_size = 40;
+    params.preconditioner_side = 'L';
+    params.reorthogonalization = true;
+    lin_solver_t lin_solver(vec_ops, &log3, params);
     
     //bcgstabl:
-    lin_solver_t lin_solver(vec_ops, &log3);
-    lin_solver.set_use_precond_resid(use_precond_resid);
-    lin_solver.set_resid_recalc_freq(resid_recalc_freq);
-    lin_solver.set_basis_size(basis_sz);
+    // lin_solver_t lin_solver(vec_ops, &log3);
+    // lin_solver.set_use_precond_resid(use_precond_resid);
+    // lin_solver.set_resid_recalc_freq(resid_recalc_freq);
+    // lin_solver.set_basis_size(basis_sz);
     //for all:
     lin_solver.set_preconditioner(&prec);
     mon = &lin_solver.monitor();

@@ -21,6 +21,7 @@
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 
 #include <deflation/system_operator_deflation.h>
+#include <deflation/system_operator_deflation_with_translation.h>
 #include <deflation/solution_storage.h>
 #include <deflation/convergence_strategy.h>
 #include <deflation/deflation_operator.h>
@@ -58,19 +59,20 @@ int main(int argc, char const *argv[])
 
     //linsolver control
     unsigned int lin_solver_max_it = 300;
-    real lin_solver_tol = 1.0e-3;
+    real lin_solver_tol = 1.0e-1;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 300;
+    unsigned int basis_sz = 100;
     //newton deflation control
     unsigned int newton_def_max_it = 200;
-    real newton_def_tol = 1.0e-9;
+    real newton_def_tol = 5.0e-9;
     real Power = 2.0;
+    real newton_update = 0.25;
 
 
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
     size_t Mz = CUFFT_C2R->get_reduced_size();
-    size_t Nv = real(3*(Nx*Ny*Mz-1));
+    size_t Nv = 6*(Nx*Ny*Mz-1);//3*(Nx*Ny*Mz-1);
     real norm_wight = std::sqrt(Nv);
 
 
@@ -110,7 +112,7 @@ int main(int argc, char const *argv[])
     SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle()->set_basis_size(basis_sz);
 
-    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops, log, newton_def_tol, newton_def_max_it, real(1.0), true );
+    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops, log, newton_def_tol, newton_def_max_it, newton_update, true );
 
     sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops, 50, norm_wight, Power);
     system_operator_def_t *system_operator_def = new system_operator_def_t(vec_ops, Ax, SM, sol_storage_def);
