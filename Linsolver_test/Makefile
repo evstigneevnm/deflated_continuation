@@ -18,6 +18,10 @@ LIBS1 = $(LCUDA) -lcublas -lcurand
 LIBS2 = $(LCUDA) -lcufft -lcublas -lcurand 
 LIBBOOST = -lboost_serialization
 
+#clean all
+clean:
+	rm *.bin O/*.o
+
 #all targets
 cpu_1st_call_alloc_test: source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp
 	$(GCC) $(GCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp -o cpu_1st_call_alloc_test_float.bin
