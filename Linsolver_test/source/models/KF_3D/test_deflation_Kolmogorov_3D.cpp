@@ -28,12 +28,15 @@
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
 #include <common/gpu_vector_operations.h>
+#include <common/gpu_file_operations.h>
 
 #include <models/KF_3D/test_deflation_typedefs_Kolmogorov_3D.h>
 
 int main(int argc, char const *argv[])
 {
-    
+    using vec_file_ops_t = gpu_file_operations<gpu_vector_operations_t>;
+
+
     if(argc != 4)
     {
         std::cout << argv[0] << " alpha R N:\n 0<alpha<=1, R is the Reynolds number, N = 2^n- discretization in one direction\n";
@@ -78,6 +81,7 @@ int main(int argc, char const *argv[])
     gpu_vector_operations_real_t *vec_ops_R = new gpu_vector_operations_real_t(Nx*Ny*Nz, CUBLAS);
     gpu_vector_operations_complex_t *vec_ops_C = new gpu_vector_operations_complex_t(Nx*Ny*Mz, CUBLAS);
     gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(Nv, CUBLAS);
+    vec_file_ops_t file_ops(vec_ops);
 
     KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
 
@@ -130,12 +134,12 @@ int main(int argc, char const *argv[])
     unsigned int p=0;
     for(auto &x: *sol_storage_def)
     {        
-        
+        std::string f_name_save("res_" + std::to_string(p) + ".dat");
         std::string f_name_vec("vec_" + std::to_string(p) + ".pos");
         std::string f_name_abs("abs_" + std::to_string(p) + ".pos");      
+        file_ops.write_vector(f_name_save, (vec&)x);
         KF_3D->write_solution_vec(f_name_vec, (vec&)x);
         KF_3D->write_solution_abs(f_name_abs, (vec&)x);
-
         p++;
     }
    

@@ -160,6 +160,7 @@ private:
     kern_t* kern;
     plot_t* plot;
     const int n_y = 1, n_z = 0;
+    const TR force_weight = 0.25;
 
 public:
     Kolmogorov_3D(T alpha_, size_t Nx_, size_t Ny_, size_t Nz_,
@@ -210,8 +211,8 @@ public:
         // vec_ops_C->assign_scalar(0.0,W.x);
         // vec_ops_C->assign_scalar(0.0,W.y);
         // vec_ops_C->assign_scalar(0.0,W.z);
-        B_V_nabla_F(U, U, W); //W:= (U, nabla) U
-        // B_V_nabla_curl_F(U, U, W);
+        // B_V_nabla_F(U, U, W); //W:= (U, nabla) U
+        B_V_nabla_curl_F(U, U, W);
         kern->add_mul3(TC(-1.0,0), force.x, force.y, force.z, W.x, W.y, W.z); // force:= W-force
         project(W); // W:=P[W]
         kern->negate3(W.x, W.y, W.z); //W:=-W;
@@ -244,10 +245,10 @@ public:
         // vec_ops_C->assign_scalar(0.0,dW->y);
         // vec_ops_C->assign_scalar(0.0,dW->z);
         project(dU);
-        // B_V_nabla_curl_F(U_0, dU, dV);
-        // B_V_nabla_curl_F(dU, U_0,*dW);
-        B_V_nabla_F(U_0, dU, dV); //dV:= (dU, nabla) U_0
-        B_V_nabla_F(dU, U_0,*dW); //dW:= (U_0, nabla) dU
+        B_V_nabla_curl_F(U_0, dU, dV);
+        B_V_nabla_curl_F(dU, U_0,*dW);
+        // B_V_nabla_F(U_0, dU, dV); //dV:= (dU, nabla) U_0
+        // B_V_nabla_F(dU, U_0,*dW); //dW:= (U_0, nabla) dU
         kern->add_mul3(TC(1.0,0), dW->x, dW->y, dW->z, dV.x, dV.y, dV.z); // dV:=dV+dW
 
         kern->negate3(dV.x, dV.y, dV.z); // dV:=-dV
@@ -318,7 +319,7 @@ public:
     void preconditioner_jacobian_u(BC_vec& dR)
     {
         project(dR);
-        kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, 1.0);
+        kern->apply_iLaplace3(Laplace, dR.x, dR.y, dR.z, Reynolds_0);
 
     }
     void preconditioner_jacobian_u(T_vec& dr)
@@ -458,7 +459,7 @@ public:
     } 
 
 
-    void randomize_vector(T_vec& u_out, int steps_ = -1, bool random = false)
+    void randomize_vector(T_vec& u_out, int steps_ = -1, bool random = true)
     {
         if(random)
         {
@@ -818,7 +819,7 @@ private:
    
     void set_force()
     {
-        kern->force_Fourier(n_y, n_z, 1, force.x, force.y, force.z);
+        kern->force_Fourier(n_y, n_z, force_weight, force.x, force.y, force.z);
         
         
         kern->force_ABC(forceABC_R.x, forceABC_R.y, forceABC_R.z);
