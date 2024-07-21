@@ -65,7 +65,7 @@
         vec_ops_real_im,
         monitor_t,
         log_t,
-        numerical_algos::lin_solvers::gmres> sherman_morrison_linear_system_solve_t;
+        numerical_algos::lin_solvers::bicgstabl> sherman_morrison_linear_system_solve_t;
         // numerical_algos::lin_solvers::bicgstabl
         // numerical_algos::lin_solvers::gmres
 

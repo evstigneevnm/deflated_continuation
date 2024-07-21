@@ -30,11 +30,12 @@
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
 #include <common/gpu_vector_operations.h>
-
+#include <common/gpu_file_operations.h>
 #include <models/KF_3D/test_deflation_typedefs_Kolmogorov_3D.h>
 
 int main(int argc, char const *argv[])
 {
+    using vec_file_ops_t = gpu_file_operations<gpu_vector_operations_t>;
     
     if(argc != 6)
     {
@@ -58,21 +59,21 @@ int main(int argc, char const *argv[])
     init_cuda(-1);
 
     //linsolver control
-    unsigned int lin_solver_max_it = 300;
+    unsigned int lin_solver_max_it = 100;
     real lin_solver_tol = 1.0e-1;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 100;
     //newton deflation control
-    unsigned int newton_def_max_it = 200;
+    unsigned int newton_def_max_it = 1000;
     real newton_def_tol = 5.0e-9;
-    real Power = 2.0;
-    real newton_update = 0.25;
+    real Power = 1.0;
+    real newton_update = 0.5;
 
 
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
     size_t Mz = CUFFT_C2R->get_reduced_size();
-    size_t Nv = 6*(Nx*Ny*Mz-1);//3*(Nx*Ny*Mz-1);
+    size_t Nv = 3*(Nx*Ny*Mz-1);
     real norm_wight = std::sqrt(Nv);
 
 
@@ -82,6 +83,7 @@ int main(int argc, char const *argv[])
     gpu_vector_operations_real_t *vec_ops_R = new gpu_vector_operations_real_t(Nx*Ny*Nz, CUBLAS);
     gpu_vector_operations_complex_t *vec_ops_C = new gpu_vector_operations_complex_t(Nx*Ny*Mz, CUBLAS);
     gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(Nv, CUBLAS);
+    vec_file_ops_t file_ops(vec_ops);
 
     if(high_prec == 1)
     {
@@ -151,7 +153,9 @@ int main(int argc, char const *argv[])
     {        
         
         std::string f_name_vec("vec_" + std::to_string(p) + ".pos");
-        std::string f_name_abs("abs_" + std::to_string(p) + ".pos");      
+        std::string f_name_abs("abs_" + std::to_string(p) + ".pos");  
+        std::string f_name_save("res_" + std::to_string(p) + ".dat");
+        file_ops.write_vector(f_name_save, (vec&)x);  
         KF_3D->write_solution_vec(f_name_vec, (vec&)x);
         KF_3D->write_solution_abs(f_name_abs, (vec&)x);
 
