@@ -105,4 +105,8 @@ KF2D_bd: source/models/KF_2D/KF2D_bd.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KF_2D/KF2D_bd.cpp O/Kolmogorov_2D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBBOOST) $(LIBS2)  -o KF2D_bd.bin 2>results.make	
 
 KF3D_view: source/models/KF_3D/view_solution.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/view_solution.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBS2)  -o KF3D_view_solution.bin 2>results.make		
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/view_solution.cpp O/Kolmogorov_3D_ker.o O/gpu_vector_operations_kernels.o $(LCUDA) $(LIBS2)  -o KF3D_view_solution.bin 2>results.make	
+
+
+ker:
+	make clean gpu_vector_operations_ker Kolmogorov_3D_ker
