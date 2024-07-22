@@ -28,12 +28,12 @@
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
 #include <common/gpu_vector_operations.h>
-
+#include <common/gpu_file_operations.h>
 #include <models/KF_3D/test_deflation_translation_typedefs_Kolmogorov_3D.h>
 
 int main(int argc, char const *argv[])
 {
-    
+    using vec_file_ops_t = gpu_file_operations<gpu_vector_operations_t>;
     if(argc != 6)
     {
         std::cout << argv[0] << " alpha R N high_prec homotopy:\n 0<alpha<=1, R is the Reynolds number, N = 2^n- discretization in one direction\n high_prec=(0/1) use(1) or not(0) high precision reduciton methods \n";
@@ -79,6 +79,7 @@ int main(int argc, char const *argv[])
     gpu_vector_operations_real_t *vec_ops_R = new gpu_vector_operations_real_t(Nx*Ny*Nz, CUBLAS);
     gpu_vector_operations_complex_t *vec_ops_C = new gpu_vector_operations_complex_t(Nx*Ny*Mz, CUBLAS);
     gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(Nv, CUBLAS);
+    vec_file_ops_t file_ops(vec_ops);
 
     if(high_prec == 1)
     {
@@ -139,7 +140,7 @@ int main(int argc, char const *argv[])
   
     deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops, log, newton_def, 5);
 
-    
+    deflation_op->save_norms("deflation_norms_NS.dat");
     deflation_op->execute_all(Rey, KF_3D, sol_storage_def);
     //deflation_op->find_add_solution(Rey, KF_3D, sol_storage_def);
     
@@ -149,7 +150,9 @@ int main(int argc, char const *argv[])
     {        
         
         std::string f_name_vec("vec_" + std::to_string(p) + ".pos");
-        std::string f_name_abs("abs_" + std::to_string(p) + ".pos");      
+        std::string f_name_abs("abs_" + std::to_string(p) + ".pos");  
+        std::string f_name_save("res_" + std::to_string(p) + ".dat");
+        file_ops.write_vector(f_name_save, (vec&)x);  
         KF_3D->write_solution_vec(f_name_vec, (vec&)x);
         KF_3D->write_solution_abs(f_name_abs, (vec&)x);
 

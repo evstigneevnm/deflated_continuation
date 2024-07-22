@@ -22,6 +22,8 @@ private:
     typedef utils::logged_obj_base<logging> logged_obj_t;
 
 public:    
+    using norms_storage_type = std::vector<T>;
+
     convergence_strategy(vector_operations*& vec_ops_, logging*& log_, T tolerance_, unsigned int maximum_iterations_, T newton_wight_, bool store_norms_history_ = false, bool verbose_ = true):
     vec_ops(vec_ops_),
     log(log_),

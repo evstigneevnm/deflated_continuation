@@ -770,7 +770,7 @@ public:
             vec_ops_R->assign_random( UR0->x );
             vec_ops_R->assign_random( UR0->y );
             vec_ops_R->assign_random( UR0->z );
-            vec_ops_R->assign_scalar( 0, UR0->x );
+            // vec_ops_R->assign_scalar( 0, UR0->x );
             // vec_ops_R->assign_scalar(0, UR0->x);
             // vec_ops_R->assign_scalar(0, UR0->z);
             // vec_ops_R->add_mul_scalar(0,100.0,UR0->x);
@@ -795,7 +795,7 @@ public:
             }
 
             // kern->add_mul3(1.0, forceABC.x, forceABC.y, forceABC.z, UC0->x, UC0->y, UC0->z);        
-            T scale = 1.0e-7;
+            T scale = 1.0;
             vec_ops_C->add_mul_scalar(0.0, scale, UC0->x);
             vec_ops_C->add_mul_scalar(0.0, scale, UC0->y);
             vec_ops_C->add_mul_scalar(0.0, scale, UC0->z);

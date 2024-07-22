@@ -9,7 +9,7 @@
 int main(int argc, char const *argv[])
 {
     
-    init_cuda(27);
+    init_cuda(-1);
     size_t Nx=512;
     size_t Ny=512;
     real norm_wight = std::sqrt(real(Nx*Ny));
@@ -21,10 +21,11 @@ int main(int argc, char const *argv[])
     real lin_solver_tol = 1.0e-3;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 30;
+    unsigned int basis_sz = 3;
     //newton deflation control
-    unsigned int newton_def_max_it = 350;
-    real newton_def_tol = 5.0e-8;
+    unsigned int newton_def_max_it = 1000;
+    real newton_def_tol = 5.0e-9;
+    real newton_update_weight = 0.5;
 
     real lambda_0 = 16.7;
     real a_val = 2.0;
@@ -69,7 +70,7 @@ int main(int argc, char const *argv[])
     SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle()->set_basis_size(basis_sz);
 
-    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops_R_im, log, newton_def_tol, newton_def_max_it, real(1), true );
+    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops_R_im, log, newton_def_tol, newton_def_max_it, newton_update_weight, true );
     sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops_R_im, 50, norm_wight);
     system_operator_def_t *system_operator_def = new system_operator_def_t(vec_ops_R_im, Ax, SM, sol_storage_def);
     newton_def_t *newton_def = new newton_def_t(vec_ops_R_im, system_operator_def, conv_newton_def);
@@ -94,7 +95,7 @@ int main(int argc, char const *argv[])
 
     deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R_im, log, newton_def, 5);
 
-    
+    deflation_op->save_norms("deflation_norms_convergence.dat");
     deflation_op->execute_all(lambda_0, KS2D, sol_storage_def);
     //deflation_op->find_solution(lambda_0, KS2D, sol_storage_def);
     

@@ -60,7 +60,7 @@ int main(int argc, char const *argv[])
 
     //linsolver control
     unsigned int lin_solver_max_it = 100;
-    real lin_solver_tol = 1.0e-1;
+    real lin_solver_tol = 5.0e-1;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
     unsigned int basis_sz = 100;
@@ -143,7 +143,7 @@ int main(int argc, char const *argv[])
   
     deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops, log, newton_def, 5);
 
-    
+    deflation_op->save_norms("deflation_norms_NS.dat");
     deflation_op->execute_all(Rey, KF_3D, sol_storage_def);
     //deflation_op->find_add_solution(Rey, KF_3D, sol_storage_def);
     

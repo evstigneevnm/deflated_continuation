@@ -9,6 +9,9 @@
 *  -- execute all - calls find and store untill all solutions are found.
 */
 #include <exception>
+#include <vector>
+#include <string>
+#include <fstream>
 
 namespace deflation
 {
@@ -77,6 +80,10 @@ public:
             {
                 log->info_f("deflation::retrying, attempt %i\n", retries);
             }
+            if( !norms_file_name_.empty() )
+            {
+                all_norms.push_back( *newton->get_convergence_strategy_handle()->get_norms_history_handle() );
+            }        
         }
         if(found_solution)
         {
@@ -102,10 +109,14 @@ public:
         return found_solution;
     }
 
+    void save_norms(const std::string& file_name)
+    {
+        norms_file_name_ = file_name;
+    }
+
     void execute_all(T lambda_0, NonlinearOperator* nonlin_op, SolutionStorage* sol_storage)
     {
         bool found_solution = true;
-        
         number_of_solutions = 0;
         while(found_solution)
         {
@@ -118,6 +129,13 @@ public:
             
         }
         log->info_f("deflation::========== found %i solutions for parameter %lf ======", number_of_solutions, (double)lambda_0);        
+
+        if( !norms_file_name_.empty() )
+        {
+            write_norm_file();
+        }
+
+
     }
 
 
@@ -128,6 +146,41 @@ private:
     unsigned int number_of_solutions;
     T_vec u_in, u_out, u_out_1;
     Logging* log;
+    std::string norms_file_name_;
+    std::vector<std::vector<T>> all_norms;
+
+
+    void write_norm_file()
+    {
+        std::size_t N = all_norms.size();
+        std::size_t max_size = 0;
+        for(auto& x: all_norms) max_size = x.size()>max_size?x.size():max_size; 
+        std::cout << "N = " << N << std::endl;
+        std::cout << "max_size = " << max_size << std::endl;
+        std::ofstream f(norms_file_name_, std::ofstream::out);
+        if (!f) throw std::runtime_error("deflation_operator::write_norm_file: error while opening file " + norms_file_name_);
+
+        for(std::size_t k=0;k<max_size;k++)
+        {
+            for(std::size_t j=0;j<N;j++)
+            {
+                auto size_l = all_norms[j].size();
+                if(k>=size_l)
+                {
+                    f << ",";
+                }
+                else
+                {
+                    f << all_norms[j][k] << ",";
+                }
+
+            }
+            f << std::endl;
+        }
+        f.close();
+
+    }
+
 
 };
 
