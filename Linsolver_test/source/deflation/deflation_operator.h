@@ -124,9 +124,9 @@ public:
             if(found_solution)
             {
                 number_of_solutions++;
-                log->info_f("deflation::========== found %i solutions ==========", number_of_solutions);
             }
-            
+            log->info_f("deflation::========== found %i solutions ==========", number_of_solutions);
+
         }
         log->info_f("deflation::========== found %i solutions for parameter %lf ======", number_of_solutions, (double)lambda_0);        
 

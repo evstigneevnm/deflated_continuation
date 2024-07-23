@@ -26,10 +26,13 @@ int main(int argc, char const *argv[])
     unsigned int newton_def_max_it = 1000;
     real newton_def_tol = 5.0e-9;
     real newton_update_weight = 0.5;
+    std::size_t max_failed_attempts = 3;
 
-    real lambda_0 = 16.7;
+    real lambda_0 = 5.0;
     real a_val = 2.0;
     real b_val = 4.0;
+
+
 
     fft_t *CUFFT_C2R = new fft_t(Nx, Ny);
     size_t My=CUFFT_C2R->get_reduced_size();
@@ -93,9 +96,9 @@ int main(int argc, char const *argv[])
     vec_ops_R->init_vector(u_out_ph); vec_ops_R->start_use_vector(u_out_ph);
 
 
-    deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R_im, log, newton_def, 5);
+    deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R_im, log, newton_def, max_failed_attempts);
 
-    deflation_op->save_norms("deflation_norms_convergence.dat");
+    deflation_op->save_norms("deflation_norms_KS.dat");
     deflation_op->execute_all(lambda_0, KS2D, sol_storage_def);
     //deflation_op->find_solution(lambda_0, KS2D, sol_storage_def);
     
