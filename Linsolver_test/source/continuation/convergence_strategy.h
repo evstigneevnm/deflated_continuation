@@ -24,7 +24,7 @@ private:
     typedef utils::logged_obj_base<logging> logged_obj_t;
 
 public:    
-    convergence_strategy(vector_operations*& vec_ops_, logging*& log_, T tolerance_ = T(1.0e-6), unsigned int maximum_iterations_ = 100, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true):
+    convergence_strategy(vector_operations*& vec_ops_, logging*& log_, T tolerance_ = T(1.0e-6), unsigned int maximum_iterations_ = 100, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true, T maximum_norm_increase = 0.0):
     vec_ops(vec_ops_),
     log(log_),
     iterations(0),
@@ -46,7 +46,7 @@ public:
         norms_storage.reserve(maximum_iterations+1);
         relaxed_tolerance_reached.reserve(maximum_iterations);
         stagnation_max = 10;
-        maximum_norm_increase_ = 2.0;
+        maximum_norm_increase_ = maximum_norm_increase;
         newton_wight_threshold_ = 1.0e-12;
     }
     ~convergence_strategy()
@@ -56,7 +56,7 @@ public:
         vec_ops->stop_use_vector(Fx); vec_ops->free_vector(Fx);
     }
 
-    void set_convergence_constants(T tolerance_, unsigned int maximum_iterations_, T relax_tolerance_factor_, int relax_tolerance_steps_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true, unsigned int stagnation_max_ = 10, T maximum_norm_increase_p = 2.0, T newton_wight_threshold_p = 1.0e-12)
+    void set_convergence_constants(T tolerance_, unsigned int maximum_iterations_, T relax_tolerance_factor_, int relax_tolerance_steps_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true, unsigned int stagnation_max_ = 10, T maximum_norm_increase_p = 0.0, T newton_wight_threshold_p = 1.0e-12)
     {
         tolerance = tolerance_;
         tolerance_0 = tolerance_;
@@ -192,9 +192,9 @@ public:
             {
                 while( (normFx1 - normFx) > maximum_norm_increase_*normFx )
                 {
-                    newton_wight *= 0.5;
+                    newton_wight *= 0.7;
                     normFx1 = update_solution(nonlin_op, x, lambda, delta_x, delta_lambda, x1, lambda1);
-                    // log->info_f("continuation::convergence: weight update from %le to %le with weight: %le and weight threshold: %le ", normFx, normFx1, newton_wight,  newton_wight_threshold_);
+                    log->info_f("continuation::convergence: increase threshold: %.01f, weight update from %le to %le with weight: %le and weight threshold: %le ", maximum_norm_increase_, normFx, normFx1, newton_wight,  newton_wight_threshold_);
                     if(newton_wight < newton_wight_threshold_)
                     {
                         result_status = 4;
@@ -208,7 +208,7 @@ public:
                 lambda = lambda1;
                 vec_ops->assign(x1, x);
             }
-            if( std::abs(normFx1 - normFx) < 1.0e-3*normFx )
+            if( std::abs(normFx1 - normFx) < 1.0e-6*normFx )
             {
                 stagnation++;
             }

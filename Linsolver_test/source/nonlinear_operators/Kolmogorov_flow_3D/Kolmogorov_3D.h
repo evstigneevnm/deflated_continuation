@@ -152,7 +152,7 @@ private:
 
 private:
     unsigned int BLOCK_SIZE = BLOCK_SIZE_x*BLOCK_SIZE_y;
-
+    bool sin_cos;
     //data all passed to constructor as pointers
     T alpha;
     vec_R_t *vec_ops_R;
@@ -177,16 +177,18 @@ private:
     T homotopy_;
 
 public:
+    //TODO: fix sincos and n_z_formce magic by using human readable parameters!
     Kolmogorov_3D(T alpha_, size_t Nx_, size_t Ny_, size_t Nz_,
         vec_R_t* vec_ops_R_, 
         vec_C_t* vec_ops_C_, 
         vec_R_t* vec_ops_,
-        FFT_type* FFT_): 
+        FFT_type* FFT_, bool sin_cos_p = true): 
     Nx(Nx_), Ny(Ny_), Nz(Nz_), 
     vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), vec_ops(vec_ops_),
     FFT(FFT_), 
     alpha(alpha_),
-    homotopy_(0.0)
+    homotopy_(0.0),
+    sin_cos(sin_cos_p)
     {
         n_y_force = 1;
         n_z_force = 0;
@@ -224,6 +226,16 @@ public:
         common_distructor_operations();
         delete kern;
         delete plot;
+    }
+
+    //set to use rhs that is pure real
+    //this can only be used by extended solver with PureImag = false
+    void set_non_imag_rhs()
+    {
+        if constexpr(!PureImag)
+        {
+            sin_cos = false;
+        }
     }
 
     // homotopy value
@@ -561,17 +573,17 @@ public:
         physical_solution(u_in, uR0->x); 
         //this is to be changed to kernel in kern class!
         //don't copy the whole vector!
-        // T_vec physical_host = vec_ops_R->view(uR0->x);
-        T val1 = 1;//physical_host[I3(int(Nx/3.0), int(Ny/3.0), int(Nz/3.0))];
-        T val2 = 1;//physical_host[I3(int(Nx/5.0), int(2.0*Ny/3.0), int(1.0*Nz/3.0))];
-        T val3 = 1;//physical_host[I3(int(Nx/4.0), int(Ny/5.0), int(Nz/5.0))];
-        T val4 = 1;//physical_host[I3(int(Nx/2.0)-1, int(Ny/2.0)-1, int(Nz/2)-1)];
+        T_vec physical_host = vec_ops_R->view(uR0->x);
+        T val1 = physical_host[I3(int(Nx/3.0), int(Ny/3.0), int(Nz/3.0))];
+        T val2 = physical_host[I3(int(Nx/5.0), int(2.0*Ny/3.0), int(1.0*Nz/3.0))];
+        T val3 = physical_host[I3(int(Nx/4.0), int(Ny/5.0), int(Nz/5.0))];
+        T val4 = physical_host[I3(int(Nx/2.0)-1, int(Ny/2.0)-1, int(Nz/2)-1)];
         T val5 = vec_ops->norm_l2(u_in);
         T val6 = norm(u_in);
         T val7 = vec_ops_R->norm_l2(uR0->x);
-        val1 = val5;
-        val2 = val6;
-        val3 = val7;
+        // val1 = val5;
+        // val2 = val6;
+        // val3 = val7;
 
         if(clear_vector)
         {
@@ -601,6 +613,15 @@ public:
         C2V(*UA, u_out);
         pool_BC.release(UA);        
     }
+    void exact_solution_sin_sin(const T& Reynolds, T_vec& u_out)
+    {
+        BC_vec* UA = pool_BC.take();
+        vec_ops_C->assign_mul(TC(Reynolds,0)*0.5, force.x, UA->x);
+        vec_ops_C->assign_mul(TC(Reynolds,0)*0.5, force.y, UA->y);
+        vec_ops_C->assign_mul(TC(Reynolds,0)*0.5, force.z, UA->z);        
+        C2V(*UA, u_out);
+        pool_BC.release(UA);        
+    }    
     void exact_solution_sin(const T& Reynolds, T_vec& u_out)
     {
         T n = T(n_y_force);
@@ -616,10 +637,20 @@ public:
     {       
         if(n_z_force>0)
         {
-            exact_solution_sin_cos(Reynolds, u_out);
+            if(sin_cos)
+            {
+                std::cout << "exact_solution_sin_cos" << std::endl;
+                exact_solution_sin_cos(Reynolds, u_out);
+            }
+            else
+            {
+                std::cout << "exact_solution_sin_sin" << std::endl;
+                exact_solution_sin_sin(Reynolds, u_out);
+            }
         }
         else
         {
+            std::cout << "exact_solution_sin" << std::endl;
             exact_solution_sin(Reynolds, u_out);
         }
     }
@@ -795,7 +826,7 @@ public:
             }
 
             // kern->add_mul3(1.0, forceABC.x, forceABC.y, forceABC.z, UC0->x, UC0->y, UC0->z);        
-            T scale = 1.0;
+            T scale = 0.1;
             vec_ops_C->add_mul_scalar(0.0, scale, UC0->x);
             vec_ops_C->add_mul_scalar(0.0, scale, UC0->y);
             vec_ops_C->add_mul_scalar(0.0, scale, UC0->z);
@@ -897,7 +928,11 @@ public:
         auto varphi_x = std::get<0>(res);
         auto varphi_y = std::get<1>(res);
         auto varphi_z = std::get<2>(res);
-        // std::cout << "varphi_x = " << varphi_x << " varphi_y = " << varphi_y << " varphi_z = " << varphi_z << std::endl;
+        std::cout << "varphi_x = " << varphi_x << " varphi_y = " << varphi_y << " varphi_z = " << varphi_z << std::endl;
+        // varphi_z = 0;
+        // varphi_x = 0;
+        varphi_y = 0;
+        varphi_z = 0;
         translate_solution(*UC0, varphi_x, varphi_y, varphi_z, *UC1);
         C2V(*UC1, u_out_);
         pool_BC.release(UC1);
@@ -1222,8 +1257,16 @@ private:
     void set_force()
     {
         //kern->force_Fourier_cos_sin(n_y_force, n_z_force, scale_force, force.x, force.y, force.z);
-        kern->force_Fourier_sin(n_y_force, n_z_force, scale_force, force.x, force.y, force.z);
+        if(sin_cos)
+        {
+            kern->force_Fourier_sin(n_y_force, n_z_force, scale_force, force.x, force.y, force.z);
+        }
+        else
+        {
+            kern->force_Fourier_sin_sin(n_y_force, n_z_force, scale_force, force.x, force.y, force.z);
+        }
         
+
         kern->force_ABC(forceABC_R.x, forceABC_R.y, forceABC_R.z);
 
         fft(forceABC_R, forceABC);
@@ -1275,7 +1318,6 @@ private:
         pool_C.release(u_hat_tmp);
         T scale = T(1.0)/(Nx*Ny*Nz);
         vec_ops_R->scale(scale, u_);
-        
 
     }
     void fft(const TR_vec& u_, TC_vec& u_hat_)
@@ -1289,7 +1331,7 @@ private:
 
     std::tuple<TR,TR,TR> shift_phases(BC_vec& U_in)
     {
-        auto varphis = kern->get_shift_phases(U_in.x, {true,false,true}); //test
+        auto varphis = kern->get_shift_phases(U_in.x, {true,false,false}); //test
         return varphis;
     }
     
@@ -1299,7 +1341,7 @@ private:
         kern->apply_translate(U_in.x, grad_x, grad_y, grad_z, varphi_x, varphi_y, varphi_z, U_out.x);
         kern->apply_translate(U_in.y, grad_x, grad_y, grad_z, varphi_x, varphi_y, varphi_z, U_out.y);
         kern->apply_translate(U_in.z, grad_x, grad_y, grad_z, varphi_x, varphi_y, varphi_z, U_out.z);
-        // hermitian_symmetry(U_out, U_out);
+        hermitian_symmetry(U_out, U_out);
         
     }
 

@@ -188,7 +188,7 @@ int main(int argc, char const *argv[])
     else
     {
         vec_ops.init_vector(x1); vec_ops.start_use_vector(x1);
-        kf3d_y.randomize_vector(x1, 10);
+        kf3d_y.randomize_vector(x1);
         kf3d_y.exact_solution(R, x0);
         vec_ops.add_mul(-0.5, x1, x0);
         vec_ops.stop_use_vector(x1); vec_ops.free_vector(x1);

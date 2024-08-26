@@ -57,6 +57,8 @@ struct Kolmogorov_3D_ker
 
     void force_Fourier_sin_cos(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z);    
 
+    void force_Fourier_sin_sin(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z);
+
     void force_ABC(TR_vec force_x, TR_vec force_y, TR_vec force_z);
 
     void vec2complex_full(TR_vec v_in, TC_vec u_x, TC_vec u_y, TC_vec u_z);

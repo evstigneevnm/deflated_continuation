@@ -11,6 +11,7 @@
 #include <utils/log.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
+#include <numerical_algos/lin_solvers/gmres.h>
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 
 #include <nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D.h>
@@ -71,6 +72,14 @@ int main(int argc, char const *argv[])
             monitor_t,
             log_t
             >;
+    // using lin_solver_t =  numerical_algos::lin_solvers::gmres
+    //         <
+    //         lin_op_t,
+    //         prec_t,
+    //         gpu_vector_operations_t,
+    //         monitor_t,
+    //         log_t
+    //         >;            
     using convergence_newton_t =  nonlinear_operators::newton_method::convergence_strategy
             <
             gpu_vector_operations_t, 
@@ -101,7 +110,8 @@ int main(int argc, char const *argv[])
             gpu_vector_operations_t,
             monitor_t,
             log_t,
-            numerical_algos::lin_solvers::bicgstabl
+            // numerical_algos::lin_solvers::bicgstabl
+            numerical_algos::lin_solvers::gmres
             >;
     using knots_t = container::knots<T>;
     using container_helper_t = container::curve_helper_container<gpu_vector_operations_t>;
@@ -181,33 +191,36 @@ int main(int argc, char const *argv[])
     monitor_t *mon;
     log_t log;
     log_t log3;
-    log3.set_verbosity(2);
+    log3.set_verbosity(0);
     lin_op_t lin_op(KF_3D);
     prec_t prec(KF_3D);      
 
     //linsolver control
     unsigned int lin_solver_max_it = 3000;
-    T lin_solver_tol = 5.0e-2;
+    T lin_solver_tol = 1.0e-1;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 3;
+    unsigned int basis_sz = 15;
+    //extended linsolver control
+    unsigned int lin_solver_max_it_ex = 3000;
+    T lin_solver_tol_ex = 1.0e-1;
+    unsigned int use_precond_resid_ex = 1;
+    unsigned int resid_recalc_freq_ex = 1;
+    unsigned int basis_sz_ex = 500;    
     //newton continuation control
     unsigned int newton_cont_max_it = 250;
     T newton_cont_tol = 1.0e-9;
-    //extended linsolver control
-    unsigned int extended_lin_solver_max_it = 300;
-    T extended_lin_solver_tol = 5.0e-2;
-    unsigned int extended_use_precond_resid = 1;
-    unsigned int extended_resid_recalc_freq = 1;
-    unsigned int extended_basis_sz = 3;
     //exended newton continuation control
-    unsigned int newton_cont_maximum_iterations =  15;
+    unsigned int newton_cont_maximum_iterations =  55;
     T newton_cont_update_wight_maximum = 1.0;
     bool newton_cont_save_norms_history = true;
     bool newton_cont_verbose  = true;
     T newton_cont_tolerance = 1.0e-9;
-    T newton_cont_relax_tolerance_factor = 100.0;
+    T newton_cont_relax_tolerance_factor = 300.0;
     unsigned int newton_cont_relax_tolerance_steps = 2;
+    unsigned int newton_stagnation_p_max = 10;
+    T newton_maximum_norm_increase = 0.01;
+
 
     lin_solver_t lin_solver(vec_ops, &log3);
     lin_solver.set_preconditioner(&prec);
@@ -240,12 +253,12 @@ int main(int argc, char const *argv[])
     sherman_morrison_linear_system_solve_t SM(&prec, vec_ops, &log3);
     
     mon = &SM.get_linsolver_handle()->monitor();
-    mon->init(lin_solver_tol, T(0), lin_solver_max_it);
+    mon->init(lin_solver_tol, T(0), lin_solver_max_it_ex);
     mon->set_save_convergence_history(true);
     mon->set_divide_out_norms_by_rel_base(true);
-    SM.get_linsolver_handle()->set_use_precond_resid(use_precond_resid);
-    SM.get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
-    SM.get_linsolver_handle()->set_basis_size(basis_sz);
+    SM.get_linsolver_handle()->set_use_precond_resid(use_precond_resid_ex);
+    SM.get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq_ex);
+    SM.get_linsolver_handle()->set_basis_size(basis_sz_ex);
 
     container_helper_t container_helper(vec_ops);
     sol_storage_def_t solution_storage(vec_ops, 1, 1.0);
@@ -258,8 +271,8 @@ int main(int argc, char const *argv[])
 
     continuate_t continuate(vec_ops, file_ops, (log_t*) &log, KF_3D, lin_op_p, &knots, &SM, newton);
 
-    continuate.set_newton(newton_cont_tolerance, newton_cont_maximum_iterations, newton_cont_relax_tolerance_factor, newton_cont_relax_tolerance_steps, newton_cont_update_wight_maximum, newton_cont_save_norms_history, newton_cont_verbose);
-    continuate.set_steps(steps, dS_0, dS_0*4.0, direciton, 0.05, 0.05, 5);
+    continuate.set_newton(newton_cont_tolerance, newton_cont_maximum_iterations, newton_cont_relax_tolerance_factor, newton_cont_relax_tolerance_steps, newton_cont_update_wight_maximum, newton_cont_save_norms_history, newton_cont_verbose, newton_stagnation_p_max, newton_maximum_norm_increase);
+    continuate.set_steps(steps, dS_0, dS_0*2.0, direciton, 0.1, 0.1, 5);
 
     if (file_name!="none")
     {

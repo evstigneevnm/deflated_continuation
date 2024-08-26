@@ -33,7 +33,9 @@
         gpu_vector_operations_t,
         monitor_t,
         log_t,
-        numerical_algos::lin_solvers::bicgstabl> sherman_morrison_linear_system_solve_t;
+        numerical_algos::lin_solvers::gmres> sherman_morrison_linear_system_solve_t;
+        //numerical_algos::lin_solvers::bicgstabl
+        //numerical_algos::lin_solvers::gmres
 
     typedef deflation::newton_method_extended::convergence_strategy<
         gpu_vector_operations_t, 

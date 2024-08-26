@@ -59,11 +59,11 @@ int main(int argc, char const *argv[])
     init_cuda(-1);
 
     //linsolver control
-    unsigned int lin_solver_max_it = 200;
+    unsigned int lin_solver_max_it = 300;
     real lin_solver_tol = 6.0e-1;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 200;
+    unsigned int basis_sz = 300;
     //newton deflation control
     unsigned int newton_def_max_it = 1000;
     real newton_def_tol = 5.0e-9;

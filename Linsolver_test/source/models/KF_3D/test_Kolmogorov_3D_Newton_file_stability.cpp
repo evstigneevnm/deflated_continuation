@@ -11,6 +11,7 @@
 #include <utils/log.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
+#include <numerical_algos/lin_solvers/gmres.h>
 
 #include <nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D.h>
 #include <nonlinear_operators/Kolmogorov_flow_3D/linear_operator_K_3D.h>
@@ -32,6 +33,7 @@
 #include <stability/IRAM/iram_process.hpp>
 #include <stability/stability_analysis.hpp>
 
+#include <time_stepper/time_step_adaptation_error_control.h>
 #include <time_stepper/explicit_time_step.h>
 #include <time_stepper/time_stepper.h>
 
@@ -101,7 +103,7 @@ int main(int argc, char const *argv[])
     real lin_solver_tol = 5.0e-4;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 3;
+    unsigned int basis_sz = 500;//3;
     //newton deflation control
     unsigned int newton_def_max_it = 250;
     real newton_def_tol = 1.0e-9;
@@ -136,15 +138,19 @@ int main(int argc, char const *argv[])
     using prec_t = nonlinear_operators::preconditioner_K_3D<
         gpu_vector_operations_t, KF_3D_t, lin_op_t>;
     using prec_shifted_t = nonlinear_operators::preconditioner_K_3D_shifted<gpu_vector_operations_t, KF_3D_t, lin_op_shifted_t>;
-    using lin_solver_t = numerical_algos::lin_solvers::bicgstabl<
+     // numerical_algos::lin_solvers::gmres
+     // numerical_algos::lin_solvers::bicgstabl
+    using lin_solver_t = numerical_algos::lin_solvers::gmres<
         lin_op_t,prec_t,gpu_vector_operations_t,monitor_t,log_t>;
-    using lin_solver_shifted_t = numerical_algos::lin_solvers::bicgstabl<
+    using lin_solver_shifted_t = numerical_algos::lin_solvers::gmres<
         lin_op_shifted_t,prec_shifted_t,gpu_vector_operations_t,monitor_t,log_t>;
 
 //  eigensolver config
     using Cayley_system_op_t = stability::system_operator_Cayley_transform<gpu_vector_operations_t, KF_3D_t, lin_op_shifted_t, lin_solver_shifted_t, log_t>;
     using arnoldi_t = numerical_algos::eigen_solvers::arnoldi_process<gpu_vector_operations_t, gpu_matrix_vector_operations_t, Cayley_system_op_t, log_t>;
-    using iram_t = stability::IRAM::iram_process<gpu_vector_operations_t, gpu_matrix_vector_operations_t, lapack_wrap_t, arnoldi_t, Cayley_system_op_t, lin_op_t, log_t>;
+    using lapack_wrap_t = lapack_wrap<real>;
+    // using iram_t = stability::IRAM::iram_process<gpu_vector_operations_t, gpu_matrix_vector_operations_t, lapack_wrap_t, arnoldi_t, Cayley_system_op_t, lin_op_t, log_t>;
+    using iram_t = stability::IRAM::iram_process<gpu_vector_operations_t, gpu_matrix_vector_operations_t, lapack_wrap_t, lin_op_t, log_t, Cayley_system_op_t>;
 
 
     // newton with convergence strategy config
@@ -223,8 +229,7 @@ int main(int argc, char const *argv[])
     real mu = -10.0;
     Cayler_sys_op.set_sigma_and_mu(sigma, mu);
 
-    arnoldi_t arnoldi(vec_ops, vec_ops_small, mat_ops, mat_ops_small, &Cayler_sys_op, log_p);
-    iram_t iram(vec_ops, mat_ops, vec_ops_small, mat_ops_small, &lapack, &arnoldi, &Cayler_sys_op, lin_op_p, log_p);
+    iram_t iram(vec_ops, mat_ops, vec_ops_small, mat_ops_small, &lapack, lin_op_p, log_p, &Cayler_sys_op);
     iram.set_verbocity(true);
     iram.set_target_eigs("LR");
     iram.set_number_of_desired_eigenvalues(k);
@@ -273,11 +278,18 @@ int main(int argc, char const *argv[])
     else
     {
         real simulation_time = 10.0;
-        using time_step_t = time_steppers::explicit_time_step<gpu_vector_operations_t, KF_3D_t, log_t>;
-        using time_stepper_t = time_steppers::time_stepper<gpu_vector_operations_t, KF_3D_t, time_step_t,log_t>;
-        time_step_t explicit_step(vec_ops, KF_3D, log_p);
-        time_stepper_t time_stpr(vec_ops, KF_3D, &explicit_step, log_p);
-        explicit_step.set_time_step(5.0e-3);
+        using time_step_err_ctrl_t = time_steppers::time_step_adaptation_error_control<gpu_vector_operations_t, log_t>;
+        using time_step_explicit_t = time_steppers::explicit_time_step<gpu_vector_operations_t, KF_3D_t, log_t, time_step_err_ctrl_t>; //time_step_err_ctrl_t time_step_adaptation_tolerance_t time_step_adaptation_constant_t
+        using time_stepper_explicit_t = time_steppers::time_stepper<gpu_vector_operations_t, KF_3D_t, time_step_explicit_t, log_t>;
+
+        time_step_err_ctrl_t time_step_err_ctrl(vec_ops, &log, {0.0, simulation_time});
+
+        time_step_explicit_t explicit_step(vec_ops, &time_step_err_ctrl, &log, KF_3D, Rey, "RKDP45");
+        time_stepper_explicit_t time_stepper(vec_ops, KF_3D, &explicit_step, &log);
+
+        // time_step_t explicit_step(vec_ops, KF_3D, log_p);
+        // time_stepper_t time_stepper(vec_ops, KF_3D, &explicit_step, log_p);
+        // explicit_step.set_time_step(5.0e-3);
 
         KF_3D->exact_solution(Rey, x0);
         KF_3D->write_solution_abs("x_1a.pos", x0);
@@ -285,17 +297,17 @@ int main(int argc, char const *argv[])
         stabl->execute(x0, Rey);
         
         log.info_f("executing time stepper with time = %.2e", simulation_time);
-        time_stpr.set_parameter(Rey);
-        time_stpr.set_time(50.0);
-        time_stpr.set_initial_conditions(x0, 1.0e-2);
-        time_stpr.get_results(x0);
+        time_stepper.set_parameter(Rey);
+        // time_stepper.set_time(50.0);
+        time_stepper.set_initial_conditions(x0, 1.0e-2);
+        time_stepper.get_results(x0);
         KF_3D->write_solution_abs("x_1a_pert.pos", x0);
-        time_stpr.execute();
-        time_stpr.save_norms("probe_1.dat");
-        time_stpr.get_results(x0);
+        time_stepper.execute();
+        time_stepper.save_norms("probe_1.dat");
+        time_stepper.get_results(x0);
         KF_3D->write_solution_abs("x_1a_sim.pos", x0);        
 
-        time_stpr.reset();
+        time_stepper.reset();
 
         KF_3D->exact_solution(Rey2, x1);
         KF_3D->write_solution_abs("x_2a.pos", x1);
@@ -303,14 +315,14 @@ int main(int argc, char const *argv[])
         stabl->execute(x1, Rey2);
         
         log.info_f("executing time stepper with time = %.2e", simulation_time);
-        time_stpr.set_parameter(Rey2);
-        time_stpr.set_time(1500.0);
-        time_stpr.set_initial_conditions(x1, 1.0e-2);
-        time_stpr.get_results(x1);
+        time_stepper.set_parameter(Rey2);
+        // time_stepper.set_time(1500.0);
+        time_stepper.set_initial_conditions(x1, 1.0e-2);
+        time_stepper.get_results(x1);
         KF_3D->write_solution_abs("x_2a_pert.pos", x1);
-        time_stpr.execute();
-        time_stpr.save_norms("probe_2.dat");   
-        time_stpr.get_results(x1);
+        time_stepper.execute();
+        time_stepper.save_norms("probe_2.dat");   
+        time_stepper.get_results(x1);
         KF_3D->write_solution_abs("x_2a_sim.pos", x1);             
     }
 

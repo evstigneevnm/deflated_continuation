@@ -26,30 +26,39 @@ int main(int argc, char const *argv[])
     using sys_op_t = stability::system_operator_stability<vec_ops_t, mat_ops_t, log_t>;
     using lin_op_t = stability::linear_operator<vec_ops_t, mat_ops_t>;
     using lapack_wrap_t = lapack_wrap<real>;
-    using iram_t = stability::IRAM::iram_process<vec_ops_t, mat_ops_t, lapack_wrap_t, lin_op_t, log_t, sys_op_t>;
+    using iram_t = stability::IRAM::iram_process<vec_ops_t, mat_ops_t, lapack_wrap_t, lin_op_t, log_t>;//, sys_op_t>;
 
-    if((argc != 3)&&(argc != 4))
+    bool testing = false;
+    if(argc == 1)
+    {
+        std::cout << "Usage: " << argv[0] << " matrix_file_A matrix_file_P(A) (v0_file)" << std::endl;  
+        std::cout << "running in testin mode for default 'dat_files/A.dat' and 'dat_files/iP.dat' " << std::endl;
+        testing = true;
+    }    
+    else if((argc != 3)&&(argc != 4))
     {
         std::cout << "Usage: " << argv[0] << " matrix_file_A matrix_file_P(A) (v0_file)" << std::endl;  
         return 0; 
     }
-    std::string A_file_name(argv[1]);
-    std::string PA_file_name(argv[2]);
+
+    std::string A_file_name("dat_files/A.dat");
+    std::string PA_file_name("dat_files/iP.dat");
     std::string v_file_name("none");
     if(argc == 4)
     {
         v_file_name = std::string(argv[3]);
     }
+    if(!testing)
+    {
+        A_file_name = std::string(argv[1]);
+        PA_file_name = std::string(argv[2]);
+    }
     auto NN = file_operations::read_matrix_size(A_file_name);
     size_t N = NN.first;
-    if(init_cuda(4) == 0)
-    {
-        return 0;
-    }
+    init_cuda(-1);
     std::cout << "system size = " << N << std::endl;
-    unsigned int m = 20;
     unsigned int k0 = 6;
-
+    unsigned int m = k0*4;
 
     cublas_wrap CUBLAS(true);
     lapack_wrap_t lapack(m);
@@ -83,7 +92,7 @@ int main(int argc, char const *argv[])
     sys_op.set_matrix_ptr(PA);
 
 
-    iram_t IRAM(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &lapack, &lin_op, &log, &sys_op);
+    iram_t IRAM(&vec_ops_N, &mat_ops_N, &vec_ops_m, &mat_ops_m, &lapack, &lin_op, &log);//, &sys_op);
         
     IRAM.set_target_eigs("LR");
     IRAM.set_number_of_desired_eigenvalues(k0);
@@ -96,12 +105,14 @@ int main(int argc, char const *argv[])
     }
     IRAM.set_verbocity(true);
     
+    std::cout << "starting iram." << std::endl;
     // std::vector<T_vec> eigv_real;
     // std::vector<T_vec> eigv_imag;
 
     // auto eigs = IRAM.execute(eigv_real, eigv_imag);
     auto eigs = IRAM.execute();
 
+    unsigned int k0_obtained = eigs.size();
     // std::cout << std::scientific;
     for(auto &e: eigs)
     {
@@ -116,13 +127,66 @@ int main(int argc, char const *argv[])
         // std::cout << e << std::endl;
     }
 
+    if(testing)
+    {
+        //reference first 10 LR values
+        decltype(eigs) ref_eigs = 
+        {
+            {61.65033990538935,0},
+            {60.69448617862329,1.386007408795112},
+            {60.69448617862329,-1.386007408795112},
+            {60.227813877994684,2.350252930708263},
+            {60.227813877994684,-2.350252930708263},
+            {60.1031534800608,+7.770486796895777},
+            {60.1031534800608,-7.770486796895777},
+            {59.782528167140384,+3.6899204030892423},
+            {59.782528167140384,-3.6899204030892423},
+            {59.67160212284957,+0.4537965010096829},
+            {59.67160212284957,-0.4537965010096829}
+        };
+        
+        std::vector<real> diff;
+        for(int j=0;j<k0_obtained;j++)
+        {
+            auto ref = ref_eigs[j];
+            auto ref2 = ref_eigs[j+1];
+            auto e = eigs[j];
+            // std::cout << ref << "  " << e << std::endl;
+            if(std::abs(ref.imag()) > 1.0e-12 )
+            {
+                auto v1 = std::abs(e - ref); 
+                auto v2 = std::abs(e - ref2);
+                diff.push_back( std::min(v1,v2) );
+            }
+            else
+            {
+                diff.push_back( std::abs(e - ref) );
+            }
+        }
+        log.info("error vs reference:");
+        for(auto &e: diff)
+        {
+            log.info_f("%le", e);
+        }
+        auto ref_diff = std::accumulate(diff.cbegin(), diff.cend(), 0);
 
-    vec_ops_N.stop_use_vector(v0); vec_ops_N.free_vector(v0);
-    mat_ops_A.stop_use_matrix(PA); mat_ops_A.free_matrix(PA);
-    mat_ops_A.stop_use_matrix(A); mat_ops_A.free_matrix(A);
+        vec_ops_N.stop_use_vector(v0); vec_ops_N.free_vector(v0);
+        mat_ops_A.stop_use_matrix(PA); mat_ops_A.free_matrix(PA);
+        mat_ops_A.stop_use_matrix(A); mat_ops_A.free_matrix(A);
 
-
-
-
-    return 0;
+        if(ref_diff < 1.0e-8)
+        {
+            log.info("PASS");
+            return 0;
+        }
+        else
+        {
+            log.info("FAILED");
+            return 1;
+        }
+    }
+    else
+    {
+        return 0;
+    }
 }

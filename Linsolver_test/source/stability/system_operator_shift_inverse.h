@@ -10,7 +10,7 @@ namespace stability
 {
 
 /**
- * @brief      System operator for the Cayley tranformation (A-sigma*E)u^{n+1}=(A+mu*E)u^{n} Eigenvalues at (r,*) are mapped to unit circle, where r = (sigma - mu)/2
+ * @brief      System operator for shift-inverse tranformation (A-sigma*E)u^{n+1}=(A+mu*E)u^{n} Eigenvalues at (r,*) are mapped to unit circle, where r = (sigma - mu)/2
  *
  * @tparam     VectorOperations    { description }
  * @tparam     NonlinearOperator   { description }

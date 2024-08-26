@@ -12,6 +12,7 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <limits>
 
 namespace deflation
 {
@@ -28,7 +29,8 @@ public:
     vec_ops(vec_ops_),
     log(log_),
     newton(newton_),
-    max_retries(max_retries_)
+    max_retries(max_retries_),
+    max_soltions_(std::numeric_limits<unsigned int>::max())
     {
         number_of_solutions = 0;
         vec_ops->init_vector(u_in); vec_ops->start_use_vector(u_in);
@@ -117,6 +119,7 @@ public:
     void execute_all(T lambda_0, NonlinearOperator* nonlin_op, SolutionStorage* sol_storage)
     {
         bool found_solution = true;
+        max_soltions_ = sol_storage->get_number_of_reserved_solutions();
         number_of_solutions = 0;
         while(found_solution)
         {
@@ -126,7 +129,11 @@ public:
                 number_of_solutions++;
             }
             log->info_f("deflation::========== found %i solutions ==========", number_of_solutions);
-
+            if(number_of_solutions >= max_soltions_)
+            {
+                log->info_f("deflation:: reached maximum number of found solutions.");
+                break;
+            }
         }
         log->info_f("deflation::========== found %i solutions for parameter %lf ======", number_of_solutions, (double)lambda_0);        
 
@@ -143,6 +150,7 @@ private:
     VectorOperations* vec_ops;
     NewtonMethod* newton;
     unsigned int max_retries;
+    unsigned int max_soltions_;
     unsigned int number_of_solutions;
     T_vec u_in, u_out, u_out_1;
     Logging* log;

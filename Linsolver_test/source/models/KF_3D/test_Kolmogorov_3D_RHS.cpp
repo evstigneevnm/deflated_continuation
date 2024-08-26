@@ -187,6 +187,8 @@ int main(int argc, char const *argv[])
     {
         auto vec_ops = std::make_shared<gpu_vector_operations_t>(6*(Nx*Ny*Mz-1), CUBLAS);
         KF_3D_full_t KF_3D(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops.get(), CUFFT_C2R);
+        
+        KF_3D.set_non_imag_rhs();
 
         vec_ops->init_vector(x0); vec_ops->start_use_vector(x0);
         vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);

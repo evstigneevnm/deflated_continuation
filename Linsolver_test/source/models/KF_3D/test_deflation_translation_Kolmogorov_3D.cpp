@@ -17,6 +17,7 @@
 
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
+#include <numerical_algos/lin_solvers/gmres.h>
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 
 #include <deflation/system_operator_deflation_with_translation.h>
@@ -56,16 +57,18 @@ int main(int argc, char const *argv[])
     init_cuda(-1);
 
     //linsolver control
-    unsigned int lin_solver_max_it = 1000;
-    real lin_solver_tol = 1.0e-4;
+    unsigned int lin_solver_max_it = 200;
+    real lin_solver_tol = 6.0e-1;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 4;
+    unsigned int basis_sz = 100;
     //newton deflation control
-    unsigned int newton_def_max_it = 2000;
+    unsigned int newton_def_max_it = 1000;
     real newton_def_tol = 1.0e-9;
     real Power = 2.0;
-
+    real newton_update = 0.5;
+    int max_deflation_attempts = 5;
+    int max_solutions = 100;
 
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
     size_t Mz = CUFFT_C2R->get_reduced_size();
@@ -88,8 +91,8 @@ int main(int argc, char const *argv[])
         vec_ops -> use_high_precision();
     }
 
-    KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
-
+    KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R, false);
+    KF_3D->set_non_imag_rhs();
     KF_3D->set_homotopy_value(homotopy);
     log_t *log = new log_t();
     log->set_verbosity(1);
@@ -110,9 +113,9 @@ int main(int argc, char const *argv[])
     SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle()->set_basis_size(basis_sz);
 
-    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops, log, newton_def_tol, newton_def_max_it, real(1.0), true );
+    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops, log, newton_def_tol, newton_def_max_it, newton_update, true );
 
-    sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops, 50, norm_wight, Power);
+    sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops, max_solutions, norm_wight, Power);
     system_operator_def_t *system_operator_def = new system_operator_def_t(vec_ops, Ax, SM, sol_storage_def);
     newton_def_t *newton_def = new newton_def_t(vec_ops, system_operator_def, conv_newton_def);
 
@@ -124,7 +127,7 @@ int main(int argc, char const *argv[])
     SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
     SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
     SM->get_linsolver_handle_original()->set_basis_size(basis_sz);    
-    convergence_newton_t *conv_newton = new convergence_newton_t(vec_ops, log, newton_def_tol, newton_def_max_it, real(1.0) );
+    convergence_newton_t *conv_newton = new convergence_newton_t(vec_ops, log, newton_def_tol, newton_def_max_it, newton_update );
     system_operator_t *system_operator = new system_operator_t(vec_ops, Ax, SM);
     
     // sol_storage_def->set_ignore_zero();
@@ -133,14 +136,17 @@ int main(int argc, char const *argv[])
     vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
     KF_3D->exact_solution(Rey, x1);
     sol_storage_def->set_known_solution(x1);
+    // KF_3D->write_solution_vec("vec_i.pos", x1);
+    // KF_3D->write_solution_abs("abs_i.pos", x1);
+    // file_ops.write_vector("res_i.dat", x1);
     vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
 
     newton_t *newton = new newton_t(vec_ops, system_operator, conv_newton);
 
   
-    deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops, log, newton_def, 5);
+    deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops, log, newton_def, max_deflation_attempts);
 
-    deflation_op->save_norms("deflation_norms_NS.dat");
+    deflation_op->save_norms("deflation_translation_norms_NS.dat");
     deflation_op->execute_all(Rey, KF_3D, sol_storage_def);
     //deflation_op->find_add_solution(Rey, KF_3D, sol_storage_def);
     
@@ -149,12 +155,12 @@ int main(int argc, char const *argv[])
     for(auto &x: *sol_storage_def)
     {        
         
-        std::string f_name_vec("vec_" + std::to_string(p) + ".pos");
-        std::string f_name_abs("abs_" + std::to_string(p) + ".pos");  
-        std::string f_name_save("res_" + std::to_string(p) + ".dat");
-        file_ops.write_vector(f_name_save, (vec&)x);  
-        KF_3D->write_solution_vec(f_name_vec, (vec&)x);
-        KF_3D->write_solution_abs(f_name_abs, (vec&)x);
+        // std::string f_name_vec("vec_" + std::to_string(p) + ".pos");
+        // std::string f_name_abs("abs_" + std::to_string(p) + ".pos");  
+        // std::string f_name_save("res_" + std::to_string(p) + ".dat");
+        // file_ops.write_vector(f_name_save, (vec&)x);  
+        // KF_3D->write_solution_vec(f_name_vec, (vec&)x);
+        // KF_3D->write_solution_abs(f_name_abs, (vec&)x);
 
         p++;
     }

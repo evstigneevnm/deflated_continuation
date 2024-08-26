@@ -17,15 +17,17 @@ public:
     typedef typename VectorOperations::vector_type  T_vec;
 
     
-    solution_storage(VectorOperations* vec_ops_, int number_of_solutions_, T norm_weight_, T P_ = T(2.0)):
+    solution_storage(VectorOperations* vec_ops_, unsigned int number_of_solutions, T norm_weight_, T P_ = T(2.0)):
     vec_ops(vec_ops_),
     norm_weight(norm_weight_),
     P(P_),
-    ignore_zero_(false)
+    ignore_zero_(false),
+    number_of_solutions_(number_of_solutions)
     {
         //reserve elements in container
         //each is of size about 60 bytes => can reserve more =)
-        container.reserve(number_of_solutions_);
+        
+        container.reserve(number_of_solutions);
         vec_ops->init_vector(distance_help); vec_ops->start_use_vector(distance_help);
         vec_ops->init_vector(x0_); vec_ops->start_use_vector(x0_);
         vec_ops->assign_scalar(static_cast<T>(0.0), x0_);
@@ -87,6 +89,11 @@ public:
         beta = distance;
     }
 
+    unsigned int get_number_of_reserved_solutions() const
+    {
+        return number_of_solutions_;
+    }
+
 
 private:
     T distance = 1;
@@ -96,6 +103,7 @@ private:
     T norm_weight;
     T P; //power of the distance
     bool ignore_zero_;
+    unsigned int number_of_solutions_;
 
     unsigned int elements_number = 0;
     VectorOperations* vec_ops;
@@ -104,7 +112,7 @@ private:
     {
         T distance_der;
 
-        vec_ops->assign_mul(static_cast<T>(1.0), x, static_cast<T>(-1.0), x0_, distance_help);
+        vec_ops->assign_mul(static_cast<T>(1.0), x_translate, static_cast<T>(-1.0), x0_, distance_help);
         distance = T(1)/(pow(vec_ops->norm_l2(distance_help),p)*(elements_number+1)); //distance to zero
         if(ignore_zero_)
             distance = 0;
@@ -120,12 +128,12 @@ private:
         {
             //calc: z := mul_x*x + mul_y*y
             //distance_help := x - container[j].get_ref()
-            vec_ops->assign_mul(T(1), x, T(-1), container[j].get_ref(), distance_help);
-            
-            vec_ops->assign_mul(T(1), x_translate, T(-1), container[j].get_ref(), distance_help_translate);
+            // vec_ops->assign_mul(T(1), x, T(-1), container[j].get_ref(), distance_help);
+            vec_ops->assign_mul(T(1), x_translate, T(-1), container[j].get_ref(), distance_help);
+            // vec_ops->assign_mul(T(1), x_translate, T(-1), container[j].get_ref(), distance_help_translate);
 
-            distance += T(1)/(pow(vec_ops->norm_l2(distance_help_translate),p)*(elements_number+1));
-            distance_der = T(p)/(pow(vec_ops->norm_l2(distance_help_translate),p+T(2.0))*(elements_number+1));
+            distance += T(1)/(pow(vec_ops->norm_l2(distance_help),p)*(elements_number+1));
+            distance_der = T(p)/(pow(vec_ops->norm_l2(distance_help),p+T(2.0))*(elements_number+1));
             //calc: y := mul_x*x + mul_y*y
             //c := c + distance_der*distance_help
             vec_ops->add_mul(distance_der/norm_weight, distance_help, T(1), c);

@@ -45,7 +45,7 @@ int main(int argc, char const *argv[])
             gpu_vector_operations_real_t, 
             gpu_vector_operations_complex_t, 
             gpu_vector_operations_t,
-            Blocks_x_, Blocks_y_> KF_3D_t;
+            Blocks_x_, Blocks_y_, false> KF_3D_t;
     typedef gpu_file_operations<gpu_vector_operations_t> gpu_file_operations_t;
 
 
@@ -63,7 +63,7 @@ int main(int argc, char const *argv[])
 
     cufft_type *CUFFT_C2R = new cufft_type(Nx, Ny, Nz);
     size_t Mz = CUFFT_C2R->get_reduced_size();
-    size_t Nv = real(3*(Nx*Ny*Mz-1));
+    size_t Nv = real(6*(Nx*Ny*Mz-1));
 
     size_t scale = 4;
     size_t Nx_vis = Nx*scale;
