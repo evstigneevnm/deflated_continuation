@@ -37,9 +37,9 @@ int main(int argc, char const *argv[])
 {
     using vec_file_ops_t = gpu_file_operations<gpu_vector_operations_t>;
     
-    if(argc != 6)
+    if((argc != 7)&&(argc != 9))
     {
-        std::cout << argv[0] << " alpha R N high_prec homotopy:\n 0<alpha<=1, R is the Reynolds number, N = 2^n- discretization in one direction\n high_prec=(0/1) use(1) or not(0) high precision reduciton methods \n";
+        std::cout << argv[0] << " alpha R N high_prec homotopy nz [folder \"file_name_regex\"]:\n 0<alpha<=1, R is the Reynolds number, N = 2^n- discretization in one direction\n high_prec=(0/1) use(1) or not(0) high precision reduciton methods\n nz = 0,1,2,... is the forcing term in Z direction\n  optional: folder is the path to the folder, where previously found solutions are\n  optional: \"file_name_regex\" IN QUOTES is the regular expression for the solution files  \n";
         return(0);       
     }
 
@@ -48,13 +48,25 @@ int main(int argc, char const *argv[])
     size_t N = std::stoi(argv[3]);
     int high_prec = std::stoi(argv[4]);
     real homotopy = std::stof(argv[5]);
+    int nz = std::stoi(argv[6]);
     int one_over_alpha = int(1/alpha);
+    std::string folder_saved_solutions;
+    std::string regex_saved_solutions;
+
+    if(argc == 9)
+    {
+        folder_saved_solutions = std::string(argv[7]);
+        regex_saved_solutions = std::string(argv[8]);
+    }
 
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
     size_t Nz = N;
-    std::cout << "Testing deflation.\nUsing alpha = " << alpha << ", high precision = " << high_prec << ", homotopy = " << homotopy << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << std::endl;
-
+    std::cout << "Testing deflation.\nUsing " << "nz = " << nz << "alpha = " << alpha << ", high precision = " << high_prec << ", homotopy = " << homotopy << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << std::endl;
+    if( !folder_saved_solutions.empty() )
+    {
+        std::cout << "folder_saved_solutions = " << folder_saved_solutions << ", regex_saved_solutions = " << regex_saved_solutions << std::endl;
+    }
     
     init_cuda(-1);
 
@@ -63,7 +75,7 @@ int main(int argc, char const *argv[])
     real lin_solver_tol = 6.0e-1;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 300;
+    unsigned int basis_sz = 800;
     //newton deflation control
     unsigned int newton_def_max_it = 1000;
     real newton_def_tol = 5.0e-9;
@@ -92,7 +104,7 @@ int main(int argc, char const *argv[])
         vec_ops -> use_high_precision();
     }
 
-    KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
+    KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R, true, nz);
 
     KF_3D->set_homotopy_value(homotopy);
     log_t *log = new log_t();
@@ -138,6 +150,24 @@ int main(int argc, char const *argv[])
     // sol_storage_def->set_known_solution(x1);
     // vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
 
+    unsigned int p=0;
+    if( !folder_saved_solutions.empty() )
+    {
+        auto solution_files = file_operations::match_file_names(folder_saved_solutions, regex_saved_solutions);
+        vec x1;
+        vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
+        for(auto &v: solution_files)
+        {   
+
+            file_ops.read_vector(v, (vec&)x1);
+            sol_storage_def->push_back(x1);
+            std::cout << "added data from " << v << " to deflation storage as solution number "  << p << std::endl;
+            p++;
+        }
+        vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
+    }
+
+
     newton_t *newton = new newton_t(vec_ops, system_operator, conv_newton);
 
   
@@ -148,18 +178,21 @@ int main(int argc, char const *argv[])
     //deflation_op->find_add_solution(Rey, KF_3D, sol_storage_def);
     
 
-    unsigned int p=0;
+    unsigned int counter = 0; //to output only new data
     for(auto &x: *sol_storage_def)
     {        
-        
-        std::string f_name_vec("vec_" + std::to_string(p) + ".pos");
-        std::string f_name_abs("abs_" + std::to_string(p) + ".pos");  
-        std::string f_name_save("res_" + std::to_string(p) + ".dat");
-        file_ops.write_vector(f_name_save, (vec&)x);  
-        KF_3D->write_solution_vec(f_name_vec, (vec&)x);
-        KF_3D->write_solution_abs(f_name_abs, (vec&)x);
+        counter++;
+        if( counter >= p)
+        {
+            std::string f_name_vec("vec_" + std::to_string(p) + ".pos");
+            std::string f_name_abs("abs_" + std::to_string(p) + ".pos");  
+            std::string f_name_save("res_" + std::to_string(p) + ".dat");
+            file_ops.write_vector(f_name_save, (vec&)x);  
+            KF_3D->write_solution_vec(f_name_vec, (vec&)x);
+            KF_3D->write_solution_abs(f_name_abs, (vec&)x);
 
-        p++;
+            p++;
+        }
     }
    
 

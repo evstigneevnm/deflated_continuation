@@ -16,15 +16,16 @@
 
 int main(int argc, char const *argv[])
 {
-    if(argc!=5)
+    if(argc!=6)
     {
         printf("=======================================================\n");
-        printf("Usage: %s alpha N input_file output_file_names, where:\n", argv[0]);
+        printf("Usage: %s alpha N input_file output_file_names nz, where:\n", argv[0]);
         printf("    0<alpha<=1 ;\n");
         printf("    N is the discretization in one 2\\pi direction;\n");
         printf("    input_file is the file name of the column vector of the probelm;\n");
         printf("    output_file_names is the name of files withough extension to be placed, i.e:\n"); 
         printf("     if output_file_names = 'fff', then the program will generate files fff_vec.pos and fff_abs.pos.\n");
+        printf("    nz - force value in the Z direction.\n");
         printf("=======================================================\n");
         return 0;
     }
@@ -54,6 +55,7 @@ int main(int argc, char const *argv[])
     int one_over_alpha = int(1/alpha);
     std::string input_file_name(argv[3]);
     std::string output_file_name_prefix(argv[4]);
+    int nz = std::stoi(argv[5]);
 
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
@@ -79,7 +81,7 @@ int main(int argc, char const *argv[])
     gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(Nv, CUBLAS);
     gpu_file_operations_t *file_ops = new gpu_file_operations_t(vec_ops);
 
-    KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
+    KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R, true, nz);
 
     vec b;
 

@@ -6,11 +6,46 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <algorithm>
+#include <filesystem>
+#include <iostream>
+#include <regex>
+#include <vector>
+
 #include <common/macros.h>
 
 
 namespace file_operations
 {
+
+
+
+std::vector<std::string> match_file_names(const std::string& path, const std::string& regex_mask)
+{
+    std::regex rx(regex_mask);
+
+    const std::filesystem::path current_folder{path};
+
+    std::vector<std::string> matched_file_names;
+
+    for(auto const& dir_entry: std::filesystem::directory_iterator{current_folder})
+    {
+        std::string path_and_file_name( dir_entry.path() );
+
+        std::ptrdiff_t number_of_matches = std::distance( std::sregex_iterator(path_and_file_name.begin(), path_and_file_name.end(), rx ), std::sregex_iterator() );
+        if(number_of_matches > 0)
+        {
+            matched_file_names.push_back(path_and_file_name);
+        }
+
+    }
+    std::sort( matched_file_names.begin(), matched_file_names.end() );
+    
+    return matched_file_names;
+}
+
+
+
 
 template <class T, class T_vec>
 void write_2_vectors_by_side(const std::string &f_name, size_t N, const T_vec& vec1,  const T_vec& vec2, unsigned int prec=16, char sep = ' ')

@@ -128,6 +128,9 @@ public:
             T beta =  - orthogonal_projection(x, lambda); //beta = -orth_proj
             T alpha = lambda_0_s;
 
+            // auto N = vec_ops->get_vector_size();
+            // double N_ = 1.0*N;
+            // vec_ops->scale(1.0/N_, x_0_s);
             flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, d_x, d_lambda);
             
         }  
@@ -166,7 +169,8 @@ private:
         vec_ops->assign_mul(T(1), x_1, T(-1), x_0, dx); //dx = x_1-x_0
         T x_proj = vec_ops->scalar_prod(dx, x_0_s); //(dx,x_0_s)
         T lambda_proj = (lambda_1 - lambda_0)*lambda_0_s;
-        
+        // auto N = vec_ops->get_vector_size();
+        // double N_ = 1.0*N;
         return (x_proj + lambda_proj - ds_l);
 
     }

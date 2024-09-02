@@ -358,10 +358,10 @@ public:
 
             for(auto &x: local_container)
             {
-                debug_file << x.lambda << " ";
+                debug_file << std::setprecision(16) << x.lambda << " ";
                 for(auto &y: x.vector_norms)
                 {
-                    debug_file << y << " ";  //print all avaliable norms!
+                    debug_file << std::setprecision(16) << y << " ";  //print all avaliable norms!
                 }
                 debug_file << x.id_file_name << std::endl;
             }
@@ -376,10 +376,10 @@ public:
         std::ofstream f(f_name.c_str(), std::ofstream::out);
         for(auto &x: container)
         {
-            f << x.lambda << " ";
+            f << std::setprecision(16) << x.lambda << " ";
             for(auto &y: x.vector_norms)
             {
-                f << y << " ";  //print all avaliable norms!
+                f << std::setprecision(16) << y << " ";  //print all avaliable norms!
             }
             f << x.id_file_name << std::endl;
         }

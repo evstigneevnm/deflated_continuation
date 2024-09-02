@@ -182,16 +182,17 @@ public:
         vec_R_t* vec_ops_R_, 
         vec_C_t* vec_ops_C_, 
         vec_R_t* vec_ops_,
-        FFT_type* FFT_, bool sin_cos_p = true): 
+        FFT_type* FFT_, bool sin_cos_p = true, int n_z_force_p = 0): 
     Nx(Nx_), Ny(Ny_), Nz(Nz_), 
     vec_ops_R(vec_ops_R_), vec_ops_C(vec_ops_C_), vec_ops(vec_ops_),
     FFT(FFT_), 
     alpha(alpha_),
     homotopy_(0.0),
-    sin_cos(sin_cos_p)
+    sin_cos(sin_cos_p),
+    n_y_force(1),
+    n_z_force(n_z_force_p)
     {
-        n_y_force = 1;
-        n_z_force = 0;
+
         scale_force = T(0.25);
         Mz=FFT->get_reduced_size();
         Lx = (T(1.0)/alpha)*T(2.0)*M_PI;

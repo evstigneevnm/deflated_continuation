@@ -13,8 +13,24 @@ def main():
     file_name = sys.argv[1]
     pddata = pd.read_csv(file_name, header = None)
     nvols = pddata.shape[1]
+    p = 0;
+    q = 0;
+    t = 0;
+    limit_p = 10
+    limit_q = 7
     for j in range(0, nvols):
-        plt.semilogy( np.multiply(pddata[pddata.columns[j]], 1.0e-2), '-.', label = j)
+        if np.isnan((pddata[pddata.columns[j]]) ).any():
+            p = p + 1
+        if not np.isnan((pddata[pddata.columns[j]]) ).any():
+            q = q + 1
+        if p<limit_p and np.isnan((pddata[pddata.columns[j]]) ).any():
+            plt.semilogy( np.multiply(pddata[pddata.columns[j]], 1.0), '-.', label = t)
+            t = t + 1
+        if q<limit_q and not np.isnan((pddata[pddata.columns[j]]) ).any():
+            plt.semilogy( np.multiply(pddata[pddata.columns[j]], 1.0), '-.', label = t)
+            t = t + 1
+
+
     # plt.legend(title="Newton attempt", ncol=2, framealpha=0.4)
     print("number of attempts = ", nvols)
     plt.xlabel("Iteration")

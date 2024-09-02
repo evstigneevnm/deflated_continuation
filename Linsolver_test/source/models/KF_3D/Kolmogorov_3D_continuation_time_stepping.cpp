@@ -133,6 +133,7 @@ int main(int argc, char const *argv[])
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
     size_t Nz = N;
+    int nz = 1;
     real R = std::stof(argv[3]);
     real simulation_time = std::stof(argv[4]);
     std::string scheme_name(argv[5]);
@@ -179,7 +180,7 @@ int main(int argc, char const *argv[])
 
     vec_ops.init_vector(x0); vec_ops.start_use_vector(x0);
 
-    KF_3D_t kf3d_y(alpha, Nx, Ny, Nz, &vec_ops_r, &vec_ops_c, &vec_ops, &cufft_c2r);
+    KF_3D_t kf3d_y(alpha, Nx, Ny, Nz, &vec_ops_r, &vec_ops_c, &vec_ops, &cufft_c2r, true, nz);
 
     if(load_file)
     {

@@ -177,7 +177,7 @@ public:
         ds = ds*0.2;
         log->info_f("predictor::ds is decreased to %le", (double)ds);
         attempts++;
-        if(ds<ds_0*T(0.0001))
+        if(ds<ds_0*T(1.0e-10))
         {
             log->info_f("predictor::ds decrease. Max attempts reached with ds = %le", (double)ds);
             return true;
@@ -213,7 +213,7 @@ public:
             }
             else
             {
-                ds = std::min(ds*T(1.5), ds_max);
+                ds = std::min(ds*T(1.25), ds_max);
                 log->info_f("predictor::ds is increased to %le", (double)ds);
             }
             attempts_increase = 0;
