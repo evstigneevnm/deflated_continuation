@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <limits>
 #include <utility>
-#include <time_stepper/detail/all_methods_enum.h>
+#include "all_methods_enum.h"
 
 
 namespace time_steppers
@@ -239,9 +239,6 @@ struct butcher_tables
         tables.emplace("SDIRK2A1",std::move(set_table(SDIRK2A1)) ); 
         tables.emplace("ESDIRK3A2",std::move(set_table(ESDIRK3A2)) ); 
         tables.emplace("SDIRK3A3",std::move(set_table(SDIRK3A3)) ); 
-        
-        
-
     }
     tableu set_table(const methods& method_p) const
     {
@@ -425,8 +422,48 @@ private:
 
 };
 
-
 }
+
+std::string get_scheme_type_by_name(const std::string& name)
+{
+    detail::butcher_tables bt;
+    detail::composite_butcher_tables ct;  
+    // ERK, SDIRK, DIRK, IRK
+    std::string ret_type = "";
+    bool found = false;
+    using table_type = detail::tableu::type;
+    for(auto &v: bt.get_list_of_table_names() )
+    {
+        if(v == name)
+        {
+            found = true;
+            auto table = bt.set_table_by_name(v);
+            if( table.get_type() == table_type::ERK )
+            {
+                ret_type = "explicit";
+            }
+            else
+            {
+                ret_type = "implicit";
+            }
+            break;
+        }
+    }
+    for( auto &v: ct.get_list_of_table_names() )
+    {
+        if(v == name)
+        {
+            found = true;
+            ret_type = "imex";
+        }
+    }
+    if(!found)
+    {
+        throw std::runtime_error("provided name " + name + " is not found in tables, no such schemes.");
+    }
+    return ret_type;
+}
+
 }
 
 

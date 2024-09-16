@@ -6,19 +6,22 @@
 #include <time_stepper/system_operator.h>
 #include <time_stepper/convergence_strategy.h>
 #include <numerical_algos/newton_solvers/newton_solver.h>
-
+#include "generic_time_step.h"
+#include "detail/all_methods_enum.h"
+#include "detail/butcher_tables.h"
 
 namespace time_steppers
 {
 
 
 template<class VectorOperations, class NonlinearOperator, class LinearOperator, class LinearSolver, class Log, class TimeStepAdaptation>
-class implicit_time_step
+class implicit_time_step: public time_steppers::generic_time_step<VectorOperations>
 {
 public:
+    using parent_t = generic_time_step<VectorOperations>;
     using T = typename VectorOperations::scalar_type;
     using T_vec = typename VectorOperations::vector_type;
-    using table_t = time_steppers::detail::tableu;
+    using table_t = time_steppers::detail::tableu;//typename parent_t::table_type;
 
     implicit_time_step(VectorOperations* vec_ops_p, TimeStepAdaptation* time_step_adapt_p, Log* log_, NonlinearOperator* nonlin_op_p, LinearOperator* lin_op_p, LinearSolver* lin_solver_p, T param_p = 1.0, const std::string& method_p = "IE"):
     vec_ops_(vec_ops_p), 
@@ -126,7 +129,7 @@ public:
         time_step_adapt_->pre_execte_step();
     }
 
-    auto get_iteration()const
+    std::size_t get_iteration()const
     {
         return (time_step_adapt_->get_iteration());
     }
@@ -158,7 +161,7 @@ public:
     bool execute_forced_dt(const T dt_forced_p, const T_vec& in_p, T_vec& out_p)
     {
         auto t = time_step_adapt_->get_time();
-        rk_step(in_p, dt_forced_p, t);
+        rk_step_dirk(in_p, dt_forced_p, t);
         vec_ops_->assign(v1_helper_, out_p);
         time_step_adapt_->force_set_timestep(dt_forced_p);
         ++(*time_step_adapt_);

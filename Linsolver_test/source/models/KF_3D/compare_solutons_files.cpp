@@ -1,6 +1,116 @@
+#include <iostream>
+#include <cstdio>
+#include <string>
+#include <vector>
+
+#include <common/macros.h>
+#include <external_libraries/cufft_wrap.h>
+#include <external_libraries/cublas_wrap.h>
+#include <utils/cuda_support.h>
+#include <nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D.h>
+#include <common/gpu_vector_operations.h>
+#include <common/gpu_file_operations.h>
+
+
+using real = SCALAR_TYPE;
+using gpu_vector_operations_t = gpu_vector_operations<real>;
+using vec = gpu_vector_operations_t::vector_type;
+
+int main (int argc, char *argv[])
+{
+
+    
+    using vec_file_ops_t = gpu_file_operations<gpu_vector_operations_t>;
+
+    if(argc != 5)
+    {
+        std::cout << argv[0] << " alpha N folder \"file_name_regex\":\n 0<alpha<=1, N = 2^n- discretization in one direction\n folder is the path to the folder, where previously found solutions are\n \"file_name_regex\" IN QUOTES is the regular expression for the solution files  \n";
+        return(0);       
+    }
+    real alpha = std::stof(argv[1]);
+    size_t N = std::stoi(argv[2]);
+    std::string folder_saved_solutions(argv[3]);
+    std::string regex_saved_solutions(argv[4]);    
+    auto solution_files = file_operations::match_file_names(folder_saved_solutions, regex_saved_solutions);
+    int one_over_alpha = int(1/alpha);
+    size_t Nx = N*one_over_alpha;
+    size_t Ny = N;
+    size_t Nz = N;    
+    size_t Mz = N/2+1;
+    size_t Nv = 3*(Nx*Ny*Mz-1);
+    
+
+    init_cuda(-1);
+    cublas_wrap *CUBLAS = new cublas_wrap();
+    CUBLAS->set_pointer_location_device(false);    
+    gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(Nv, CUBLAS);
+    vec_file_ops_t file_ops(vec_ops);
+
+    auto n_solution = solution_files.size();
+    
+    std::ofstream f_corr_matrix("correlation_matrix.csv", std::ofstream::out);
+    if (!f_corr_matrix) throw std::runtime_error("error while opening file \"correlation_matrix.csv\"");
 
 
 
-int int main (int argc, char *argv[]) {
-  return 0;
+    //TODO: it's better to use allocator
+    std::vector<vec> vecs;
+    for(auto &v: solution_files)
+    {   
+        vec x;
+        vec_ops->init_vector(x); vec_ops->start_use_vector(x);
+        file_ops.read_vector(v, (vec&)x);
+        vecs.push_back(x);
+        std::cout << "added data from " << v << " to storage" << std::endl;
+    }
+    
+    std::vector< std::pair<std::string, std::string> > same_vectors; 
+    std::cout << "correlation matrix: ";
+    vec dd;
+    vec_ops->init_vector(dd); vec_ops->start_use_vector(dd);
+    for(std::size_t j = 0;j<n_solution;j++)
+    {
+        for(std::size_t k = 0;k<n_solution;k++)
+        {
+            auto x = vecs[j];
+            auto y = vecs[k];
+            vec_ops->assign_mul(-1.0, x, 1.0, y, dd);
+            auto solution_norm = vec_ops->norm(x);
+            if(solution_norm < 1.0)
+            {
+                solution_norm = 1.0;
+            }
+            auto diff_norm = vec_ops->norm(dd)/solution_norm;
+            f_corr_matrix << diff_norm;
+            if(k < n_solution-1)  f_corr_matrix << ",";
+
+            if(j<=k)
+            {
+                if( ( diff_norm < 1.0e-4 )&&(j!=k) )
+                {
+                    same_vectors.push_back( {solution_files[j], solution_files[k]} );
+                }
+            }
+        }
+        f_corr_matrix << std::endl;
+    }
+    vec_ops->stop_use_vector(dd); vec_ops->free_vector(dd);
+    std::cout << " \"correlation_matrix.csv\" done." << std::endl;
+
+    for(auto& v: same_vectors)
+    {
+        std::cout << "names: (" << v.first << ")(" << v.second << ")" << std::endl;
+    }
+    std::cout << std::endl;
+
+    for(auto &x: vecs)
+    {
+        vec_ops->stop_use_vector(x); vec_ops->free_vector(x);
+    }
+    
+    delete vec_ops;
+    delete CUBLAS;
+
+
+    return 0;
 }

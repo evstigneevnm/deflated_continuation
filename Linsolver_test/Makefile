@@ -178,6 +178,9 @@ file_stability_newton_Kolmogorov_3D: source/models/KF_3D/test_Kolmogorov_3D_Newt
 deflation_Kolmogorov_3D: source/models/KF_3D/test_deflation_Kolmogorov_3D.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/test_deflation_Kolmogorov_3D.cpp O/Kolmogorov_3D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o  $(LIBS2) -o deflation_Kolmogorov_3D.bin 2>results.make
 
+compare_soluitons_files: source/models/KF_3D/compare_solutons_files.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/compare_solutons_files.cpp O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o  $(LIBS2) -o compare_solutions_files.bin 2>results.make
+
 deflation_translation_Kolmogorov_3D: source/models/KF_3D/test_deflation_translation_Kolmogorov_3D.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/test_deflation_translation_Kolmogorov_3D.cpp O/Kolmogorov_3D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o  $(LIBS2) -o deflation_translation_Kolmogorov_3D.bin 2>results.make
 

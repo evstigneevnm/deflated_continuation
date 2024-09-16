@@ -7,6 +7,7 @@
 #include <vector>
 #include <utility>
 #include <limits>
+#include "generic_time_step.h"
 #include "detail/all_methods_enum.h"
 #include "detail/butcher_tables.h"
 
@@ -17,14 +18,15 @@ namespace time_steppers
 
 
 template<class VectorOperations, class NonlinearOperator, class StiffOperator, class StiffSolver, class Log, class TimeStepAdaptation>
-class explicit_implicit_time_step
+class explicit_implicit_time_step: public time_steppers::generic_time_step<VectorOperations>
 {
 public:
+    using parent_t = generic_time_step<VectorOperations>;
     using T = typename VectorOperations::scalar_type;
     using T_vec = typename VectorOperations::vector_type;
     using method_type = detail::methods;
-    using table_t = time_steppers::detail::tableu;
-    using composite_table_t = std::pair<table_t, table_t>;
+    using table_type = time_steppers::detail::tableu;//typename parent_t::table_type;
+    using composite_table_type = std::pair<table_type, table_type>;
 
     explicit_implicit_time_step(VectorOperations* vec_ops_p, TimeStepAdaptation* time_step_adapt_p, Log* log_, NonlinearOperator* nonlin_op_p, StiffOperator* stiff_operator_p, StiffSolver* stiff_solver_p, T param_p = 1.0,  const std::string& method_p = "IMEX_TR2"):
     vec_ops_(vec_ops_p), 
@@ -79,7 +81,7 @@ public:
         time_step_adapt_->pre_execte_step();
     }
 
-    auto get_iteration()const
+    std::size_t get_iteration()const
     {
         return (time_step_adapt_->get_iteration());
     }
@@ -174,7 +176,7 @@ private:
     StiffSolver* stiff_solver_;
     Log* log;
     detail::composite_butcher_tables table_generator;
-    composite_table_t table; //<table.first, table.second>:=<Explicit, Implicit>
+    composite_table_type table; //<table.first, table.second>:=<Explicit, Implicit>
     std::string method_;
     size_t n_stages_;
 
