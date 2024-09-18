@@ -7,7 +7,7 @@
 #include <thrust/complex.h>
 #include <utils/cuda_support.h>
 
-#include <utils/init_cuda.h>
+#include <scfd/utils/init_cuda.h>
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
 
@@ -30,6 +30,7 @@
 #include <time_stepper/time_step_adaptation_error_control.h>
 #include <time_stepper/explicit_time_step.h>
 #include <time_stepper/time_stepper.h>
+#include <time_stepper/distance_to_points.h>
 
 
 int main(int argc, char const *argv[])
@@ -60,11 +61,12 @@ int main(int argc, char const *argv[])
     using monitor_t = numerical_algos::lin_solvers::default_monitor<gpu_vector_operations_t,log_t>;
     using time_step_err_ctrl_t = time_steppers::time_step_adaptation_error_control<gpu_vector_operations_t, log_t>;
     using time_step_t = time_steppers::explicit_time_step<gpu_vector_operations_t, abc_flow_t, log_t, time_step_err_ctrl_t>;
-    using time_stepper_t = time_steppers::time_stepper<gpu_vector_operations_t, abc_flow_t, time_step_t, log_t>;
+    using distance_to_points_t = time_steppers::distance_to_points<gpu_vector_operations_t, abc_flow_t>;
+    using time_stepper_t = time_steppers::time_stepper<gpu_vector_operations_t, abc_flow_t, time_step_t, log_t, distance_to_points_t>;
 
-    if((argc < 5)||(argc > 6))
+    if((argc < 5)||(argc > 7))
     {
-        std::cout << argv[0] << " N R time method state_file(optional)\n  R -- Reynolds number,\n  N = 2^n- discretization in one direction. \n  time - simmulation time. \n";
+        std::cout << argv[0] << " N R time method [state_file skip_solution_plot_time](optional)\n  R -- Reynolds number,\n  N = 2^n- discretization in one direction. \n  time - simmulation time. \n   skip_solution_plot_time - to save solution files at given time intervals. \n";
          std::cout << " method - name of the scheme: EE, HE, RK33SSP, RK43SSP, RKDP45, RK64SSP" << std::endl;
         return(0);       
     }    
@@ -77,10 +79,15 @@ int main(int argc, char const *argv[])
     std::string scheme_name(argv[4]);
     bool load_file = false;
     std::string load_file_name;
-    if(argc == 6)
+    if((argc == 6)||(argc == 7))
     {
         load_file = true;
         load_file_name = std::string(argv[5]);
+    }
+    real skip_solution_plot_time = 0;
+    if(argc == 7)
+    {
+        skip_solution_plot_time = std::stof(argv[6]);
     }
     auto method = time_steppers::detail::methods::EXPLICIT_EULER;
     if(scheme_name == "EE")
@@ -111,8 +118,8 @@ int main(int argc, char const *argv[])
     {
         throw std::logic_error("incorrect method string type provided.");
     }
-
-    utils::init_cuda(-1);
+    int gpu_pci_id = 28;
+    scfd::utils::init_cuda(gpu_pci_id);
 
     cufft_type cufft_c2r(Nx, Ny, Nz);
     size_t Mz = cufft_c2r.get_reduced_size();
@@ -136,6 +143,9 @@ int main(int argc, char const *argv[])
 
     abc_flow_t abc_flow(Nx, Ny, Nz, &vec_ops_r, &vec_ops_c, &vec_ops, &cufft_c2r);
 
+    distance_to_points_t distance_to_points(&vec_ops, &abc_flow);
+    distance_to_points.set_drop_solutions(skip_solution_plot_time, "t_abc_abs.pos");
+
     if(load_file)
     {
         file_ops.read_vector(load_file_name, x0);
@@ -147,8 +157,8 @@ int main(int argc, char const *argv[])
 
     time_step_err_ctrl_t time_step_err_ctrl(&vec_ops, &log, {0.0, simulation_time});
 
-    time_step_t explicit_step(&vec_ops, &time_step_err_ctrl,  &log, &abc_flow, R, method);//explicit_step(&vec_ops, &abc_flow, &log);
-    time_stepper_t time_stepper(&vec_ops, &abc_flow, &explicit_step, &log);
+    time_step_t explicit_step(&vec_ops, &time_step_err_ctrl,  &log, &abc_flow, R, scheme_name);//explicit_step(&vec_ops, &abc_flow, &log);
+    time_stepper_t time_stepper(&vec_ops, &abc_flow, &explicit_step, &log, &distance_to_points);
     
     log.info_f("executing time stepper with time = %.2le", simulation_time);
 

@@ -48,6 +48,7 @@
 #include <time_stepper/explicit_implicit_time_step.h>
 #include <time_stepper/implicit_time_step.h>
 #include <time_stepper/distance_to_points.h>
+#include <time_stepper/external_management_save_solution.h>
 #include <time_stepper/time_stepper.h>
 
 
@@ -110,16 +111,17 @@ int main(int argc, char const *argv[])
     // using time_stepper_imex_t = time_steppers::time_stepper<gpu_vector_operations_t, KF_3D_t, time_step_imex_t, log_t>;    
     // using time_stepper_implicit_t = time_steppers::time_stepper<gpu_vector_operations_t, KF_3D_t, time_step_implicit_t, log_t>;
 
-    using distance_to_points_t = time_steppers::distance_to_points<gpu_vector_operations_t>;
+    using distance_to_points_t = time_steppers::distance_to_points<gpu_vector_operations_t, KF_3D_t>;
+    // using save_solution_on_skip_t = time_steppers::detail::external_management_save_solution<gpu_vector_operations_t, KF_3D_t>;
     using time_stepper_t = time_steppers::time_stepper<gpu_vector_operations_t, KF_3D_t, time_step_generic_t, log_t, distance_to_points_t>;
 
 
     using timer_t = scfd::utils::cuda_timer_event;
 
-    if((argc < 7)||(argc > 10))
+    if((argc < 7)||(argc > 11))
     {
         
-        std::cout << argv[0] << " N alpha R time method GPU_PCI_ID [state_file folder \"file_name_regex\"](optional)\n   0<alpha<=1 - torus stretching parameter,\n R -- Reynolds number,\n  N = 2^n- discretization in one direction. \n  time - simulation time. \n  folder - for the points daata";
+        std::cout << argv[0] << " N alpha R time method GPU_PCI_ID [state_file folder \"file_name_regex\" skip_solution_plot_time](optional)\n   0<alpha<=1 - torus stretching parameter,\n R -- Reynolds number,\n  N = 2^n- discretization in one direction. \n  time - simulation time. \n  folder - for the points data,\n   skip_solution_plot_time - to save solution files at given time intervals\n";
         std::cout << " method - name of the scheme:" << std::endl;
 
         time_steppers::detail::butcher_tables tables;
@@ -152,19 +154,23 @@ int main(int argc, char const *argv[])
     int gpu_pci_id = std::stoi(argv[6]);
     bool load_file = false;
     std::string load_file_name;
-    if((argc == 8)||(argc == 10))
+    if((argc == 8)||(argc == 10)||(argc == 11))
     {
         load_file = true;
         load_file_name = std::string(argv[7]);
     }
     std::string folder_saved_solutions;
     std::string regex_saved_solutions; 
-    if(argc == 10)
+    if((argc == 10)||(argc == 11))
     {
         folder_saved_solutions = std::string(argv[8]);
         regex_saved_solutions = std::string(argv[9]);
     }
-
+    real time_skip = 0;
+    if(argc == 11)
+    {
+        time_skip = std::stof(argv[10]);
+    }
 
     std::cout << "input parameters: " << "\nN = " << N << "\none_over_alpha = " << one_over_alpha << "\nNx = " << Nx << " Ny = " << Ny << " Nz = " << Nz << "\nR = " << R << "\nsimulation_time = " << simulation_time << "\nscheme_name = " << scheme_name << "\ngpu_pci_id = " << gpu_pci_id << "\n";
 //  sqrt(L*scale_force)/(n R):
@@ -195,8 +201,6 @@ int main(int argc, char const *argv[])
     size_t N_global = 3*(Nx*Ny*Mz-1);
     gpu_vector_operations_t vec_ops(N_global, &cublas);
     
-    distance_to_points_t distance_to_points(&vec_ops);
-
     vec_file_ops_t file_ops(&vec_ops);
 
     vec_t x0, x1;
@@ -204,6 +208,8 @@ int main(int argc, char const *argv[])
     vec_ops.init_vector(x0); vec_ops.start_use_vector(x0);
 
     KF_3D_t kf3d_y(alpha, Nx, Ny, Nz, &vec_ops_r, &vec_ops_c, &vec_ops, &cufft_c2r, true, nz);
+
+    distance_to_points_t distance_to_points(&vec_ops, &kf3d_y);
 
     if(load_file)
     {
@@ -238,7 +244,8 @@ int main(int argc, char const *argv[])
     time_step_tol.set_parameters(1.0e-5);
 
 
-    
+    distance_to_points.set_drop_solutions(time_skip, "t_abs.pos");
+
     
     //linsolver control
     unsigned int lin_solver_max_it = 200;
@@ -278,8 +285,6 @@ int main(int argc, char const *argv[])
     std::shared_ptr<time_step_implicit_t> implicit_step;
     std::shared_ptr<time_stepper_t> time_stepper;
 
-
-
     if(scheme_type == "implicit")
     {
         implicit_step = std::make_shared<time_step_implicit_t>(&vec_ops, &time_step_tol, &log3, &kf3d_y, &lin_op, &lin_solver, R, scheme_name); //& time_step_err_ctrl
@@ -309,6 +314,9 @@ int main(int argc, char const *argv[])
     time_stepper->set_initial_conditions(x0);
     // time_stepper.get_results(x0);
     // time_stepper.set_skip(1000);
+
+
+
     timer_t e1,e2;
     e1.record();
     time_stepper->execute();
