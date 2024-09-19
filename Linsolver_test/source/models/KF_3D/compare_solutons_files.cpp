@@ -11,26 +11,41 @@
 #include <common/gpu_vector_operations.h>
 #include <common/gpu_file_operations.h>
 
+#include <nonlinear_operators/save_norms_from_file.h>
 
+#define Blocks_x_ 32
+#define Blocks_y_ 16
 using real = SCALAR_TYPE;
+using complex = thrust::complex<real>;
+using gpu_vector_operations_real_t = gpu_vector_operations<real>;
+using gpu_vector_operations_complex_t = gpu_vector_operations<complex>;
 using gpu_vector_operations_t = gpu_vector_operations<real>;
+using gpu_file_operations_t = gpu_file_operations<gpu_vector_operations_t>;
+using cufft_type = cufft_wrap_R2C<real>;
+using KF_3D_t = nonlinear_operators::Kolmogorov_3D<cufft_type, 
+        gpu_vector_operations_real_t, 
+        gpu_vector_operations_complex_t, 
+        gpu_vector_operations_t,
+        Blocks_x_, Blocks_y_>;
+
 using vec = gpu_vector_operations_t::vector_type;
+using vec_file_ops_t = gpu_file_operations<gpu_vector_operations_t>;
+using save_norms_t = nonlinear_operators::save_norms_from_file<gpu_vector_operations_t, vec_file_ops_t, KF_3D_t>;
 
 int main (int argc, char *argv[])
 {
 
-    
-    using vec_file_ops_t = gpu_file_operations<gpu_vector_operations_t>;
-
-    if(argc != 5)
+    if(argc != 7)
     {
-        std::cout << argv[0] << " alpha N folder \"file_name_regex\":\n 0<alpha<=1, N = 2^n- discretization in one direction\n folder is the path to the folder, where previously found solutions are\n \"file_name_regex\" IN QUOTES is the regular expression for the solution files  \n";
+        std::cout << argv[0] << " nz alpha R N folder \"file_name_regex\":\n nz = 0/1(z component force), 0<alpha<=1, R - Reynolds number, N = 2^n- discretization in one direction\n folder is the path to the folder, where previously found solutions are\n \"file_name_regex\" IN QUOTES is the regular expression for the solution files  \n";
         return(0);       
     }
-    real alpha = std::stof(argv[1]);
-    size_t N = std::stoi(argv[2]);
-    std::string folder_saved_solutions(argv[3]);
-    std::string regex_saved_solutions(argv[4]);    
+    int nz = std::stoi(argv[1]);
+    real alpha = std::stof(argv[2]);
+    real R = std::stof(argv[3]);
+    size_t N = std::stoi(argv[4]);
+    std::string folder_saved_solutions(argv[5]);
+    std::string regex_saved_solutions(argv[6]);    
     auto solution_files = file_operations::match_file_names(folder_saved_solutions, regex_saved_solutions);
     int one_over_alpha = int(1/alpha);
     size_t Nx = N*one_over_alpha;
@@ -48,12 +63,25 @@ int main (int argc, char *argv[])
 
     auto n_solution = solution_files.size();
     
+
+    //saving bifurcation norms in a file
+    {
+        cufft_type cufft_c2r(Nx, Ny, Nz);
+        gpu_vector_operations_real_t vec_ops_r(Nx*Ny*Nz, CUBLAS);
+        gpu_vector_operations_complex_t vec_ops_c(Nx*Ny*Mz, CUBLAS);
+        KF_3D_t kf3d_y(alpha, Nx, Ny, Nz, &vec_ops_r, &vec_ops_c, vec_ops, &cufft_c2r, true, nz);
+        save_norms_t save_norms(vec_ops, &file_ops, &kf3d_y);
+        std::stringstream ss;
+        ss << "debug_curve_" << R << ".dat";
+        auto save_file_name(ss.str()); 
+        save_norms.save_norms_all_files(save_file_name, R, folder_saved_solutions, regex_saved_solutions);
+        std::cout << "saved norms in " << save_file_name << std::endl;
+    }
+
     std::ofstream f_corr_matrix("correlation_matrix.csv", std::ofstream::out);
     if (!f_corr_matrix) throw std::runtime_error("error while opening file \"correlation_matrix.csv\"");
 
-
-
-    //TODO: it's better to use allocator
+        //TODO: it's better to use allocator
     std::vector<vec> vecs;
     for(auto &v: solution_files)
     {   
