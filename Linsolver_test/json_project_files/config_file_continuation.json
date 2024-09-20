@@ -1,0 +1,48 @@
+{
+    // expecting "input_file_name R direction" to be command line parameters
+    "skip_output": 10,
+    "steps": 3000,
+    "R_min": 10.0,
+    "R_max": 50.0,
+    "high_prec": 1,
+    "N": 64,
+    "alpha": 1.0,
+    "dS_0": 10.0,
+    "dSmax": 10.0,
+    "dSdec_mult":0.25,
+    "dSinc_mult":-0.05,
+    "nz": 1, //1 for generalized, 0 for classic Kf3D
+    "solvers_config":{
+        "linear_solver":{
+            "max_iterations":3000,
+            "tolerance": 1.0e-1,
+            "use_precond_resid": 1,
+            "resid_recalc_freq": 1,
+            "basis_sz":15
+        },
+        "newton_method":{
+            "max_iterations": 250,
+            "tolerance": 1.0e-9
+        },
+        "linear_solver_extended":{
+            "max_iterations":3000,
+            "tolerance": 1.0e-1,
+            "use_precond_resid": 1,
+            "resid_recalc_freq": 1,
+            "basis_sz":900
+        },
+        "newton_method_extended":{
+            "max_iterations": 55,
+            "update_wight_maximum": 1.0,
+            "save_norms_history": true,
+            "verbose": true,
+            "relax_tolerance_factor": 300.0,
+            "relax_tolerance_steps": 2,
+            "stagnation_p_max": 10,
+            "maximum_norm_increase": 0.01,
+            "tolerance": 1.0e-9
+        }  
+    }
+
+}
+
