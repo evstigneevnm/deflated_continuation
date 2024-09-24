@@ -229,6 +229,9 @@ Kolmogorov_3D_perodic_orbit_stabilization: source/models/KF_3D/Kolmogorov_3D_per
 test_Kolmogorov_3D_stiff_solve: source/models/KF_3D/test_Kolmogorov_3D_stiff_solve.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/test_Kolmogorov_3D_stiff_solve.cpp O/Kolmogorov_3D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LIBS3) $(LLAPACK) -o test_Kolmogorov_3D_stiff_solve.bin 2>results.make
 
+Kolmogorov_3D_lyapunov_exponents: source/models/KF_3D/Kolmogorov_3D_lyapunov_exponents.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/Kolmogorov_3D_lyapunov_exponents.cpp O/Kolmogorov_3D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o Kolmogorov_3D_lyapunov_exponents.bin 2>results.make
+
 
 # abc_flow
 abc_flow_ker: source/nonlinear_operators/abc_flow/abc_flow_ker.cu

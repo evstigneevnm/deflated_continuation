@@ -118,6 +118,8 @@ int main(int argc, char const *argv[])
 
     using timer_t = scfd::utils::cuda_timer_event;
 
+    
+
     if((argc < 7)||(argc > 11))
     {
         

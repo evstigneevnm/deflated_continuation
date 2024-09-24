@@ -53,7 +53,7 @@ class lyapunov_exponents
     mutable std::vector< std::array<T, GluedVectors-1> > exponents_ = {};
 
 public:
-    lyapunov_exponents(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p,  Log* log_p, T iteration_time, T param_p = 1.0, method_type method_p = method_type::RKDP45, T dt_initial_p = 1.0/500.0):
+    lyapunov_exponents(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p,  Log* log_p, T iteration_time, T param_p = 1.0, const std::string& scheme_name = "RKDP45", T dt_initial_p = 1.0/500.0):
     vec_ops_(vec_ops_p),
     nonlin_op_(nonlin_op_p),
     log_(log_p),
@@ -64,7 +64,7 @@ public:
         g_vec_ops_ = glued_nonlin_op_->get_glued_vec_ops();
 
         time_step_adopt_ = new time_step_adopt_t(g_vec_ops_, log_, {0, iteration_time}, dt_initial_p );
-        single_step_ = new single_step_t(g_vec_ops_, time_step_adopt_, log_, glued_nonlin_op_, param_p, method_p);
+        single_step_ = new single_step_t(g_vec_ops_, time_step_adopt_, log_, glued_nonlin_op_, param_p, scheme_name);
         time_advance_ = new time_stepper_t(g_vec_ops_, glued_nonlin_op_, single_step_, log_);
         set_parameter(param_p);
         g_vec_ops_->init_vector(glued_vec_); g_vec_ops_->start_use_vector(glued_vec_);
