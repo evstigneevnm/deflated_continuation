@@ -1331,17 +1331,19 @@ if ( index_in < sizeOfData )
     u_x[I3(j,k,l)] = 0;
     u_y[I3(j,k,l)] = 0;
     u_z[I3(j,k,l)] = 0;
+    T val = magnitude_x*sin(nx*x + phase_z)+magnitude_y*sin(ny*y + phase_y) + magnitude_z*sin(nz*z + phase_z);
+
     if constexpr (direction == 0)
     {
-        u_x[I3(j,k,l)] = magnitude_x*sin(nx*x + phase_z)+magnitude_y*sin(ny*y + phase_y) + magnitude_z*sin(nz*z + phase_z);
+        u_x[I3(j,k,l)] = val;
     }    
     else if constexpr (direction == 1)
     {
-        u_y[I3(j,k,l)] = magnitude_x*sin(nx*x + phase_z)+magnitude_y*sin(ny*y + phase_y) + magnitude_z*sin(nz*z + phase_z);
+        u_y[I3(j,k,l)] = val;
     }
     else if constexpr (direction == 2)
     {
-        u_z[I3(j,k,l)] = magnitude_x*sin(nx*x + phase_z)+magnitude_y*sin(ny*y + phase_y) + magnitude_z*sin(nz*z + phase_z);
+        u_z[I3(j,k,l)] = val;
     }
 }    
 }

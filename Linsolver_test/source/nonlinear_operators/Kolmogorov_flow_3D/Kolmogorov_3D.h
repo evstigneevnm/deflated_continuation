@@ -794,7 +794,7 @@ public:
         kern->sinus_perturbation(0, magnitude_x, nx, phase_x, magnitude_y, ny, phase_y, magnitude_z, nz, phase_z, UR->x, UR->y, UR->z);
         BC_vec* UC = pool_BC.take();
         fft(*UR, *UC);
-        project(*UC);
+        // project(*UC);
         C2V(*UC, u_out);
         pool_BC.release(UC);
         pool_BR.release(UR);
@@ -807,7 +807,7 @@ public:
         kern->sinus_perturbation(1, magnitude_x, nx, phase_x, magnitude_y, ny, phase_y, magnitude_z, nz, phase_z, UR->x, UR->y, UR->z);
         BC_vec* UC = pool_BC.take();
         fft(*UR, *UC);
-        project(*UC);
+        // project(*UC);
         C2V(*UC, u_out);
         pool_BC.release(UC);
         pool_BR.release(UR);
@@ -819,7 +819,7 @@ public:
         kern->sinus_perturbation(2, magnitude_x, nx, phase_x, magnitude_y, ny, phase_y, magnitude_z, nz, phase_z, UR->x, UR->y, UR->z);
         BC_vec* UC = pool_BC.take();
         fft(*UR, *UC);
-        project(*UC);
+        // project(*UC);
         C2V(*UC, u_out);
         pool_BC.release(UC);
         pool_BR.release(UR);
