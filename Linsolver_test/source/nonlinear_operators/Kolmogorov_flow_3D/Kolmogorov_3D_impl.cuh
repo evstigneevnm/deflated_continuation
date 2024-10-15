@@ -1328,6 +1328,9 @@ if ( index_in < sizeOfData )
     T y = T(k)*T(2.0*M_PI)/T(Ny);
     T z = T(l)*T(2.0*M_PI)/T(Nz);
 
+    u_x[I3(j,k,l)] = 0;
+    u_y[I3(j,k,l)] = 0;
+    u_z[I3(j,k,l)] = 0;
     if constexpr (direction == 1)
     {
         u_y[I3(j,k,l)] = magnitude*(sin(ny*y) + sin(nz*z) );
