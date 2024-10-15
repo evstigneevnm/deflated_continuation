@@ -62,10 +62,10 @@ int main(int argc, char const *argv[])
     std::string use_manual_newton(argv[5]);
     int gpu_pci_id = std::stoi(argv[6]);
     real homotopy = std::stof(argv[7]);    
-    real pert_ny = std::stoi(argv[8]);
-    real pert_phase_y = std::stoi(argv[9]);
-    real pert_nz = std::stoi(argv[10]);
-    real pert_phase_z = std::stoi(argv[11]);
+    real pert_ny = std::stof(argv[8]);
+    real pert_phase_y = std::stof(argv[9]);
+    real pert_nz = std::stof(argv[10]);
+    real pert_phase_z = std::stof(argv[11]);
     real pert_magnitude = std::stof(argv[12]);
 
     std::string file_name;
@@ -74,15 +74,11 @@ int main(int argc, char const *argv[])
         file_name = std::move(std::string(argv[13]));
     }
     
-
-    // init_cuda(-1);
-    scfd::utils::init_cuda(gpu_pci_id); //-1
-    // scfd::utils::init_cuda_persistent(3000);
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
     size_t Nz = N;
     std::cout << "Using: " << "nz = " << nz << ", alpha = " << alpha << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << ", using manual Newton first = " << use_manual_newton << ", homotopy = " << homotopy << std::endl;
-    std::cout << "perturbationY_ny_wavenumber = " <<  pert_ny << ", perturbationY_ny_phase = " <<  pert_phase_y << ", perturbationY_nz_wavenumber = " << ", perturbationY_nz_phase = " <<  pert_phase_z  << pert_nz << ", perturbation_Y_magnitude = " << pert_magnitude << std::endl;
+    std::cout << "perturbationY_ny_wavenumber = " <<  pert_ny << ", perturbationY_ny_phase = " <<  pert_phase_y << ", perturbationY_nz_wavenumber = " << pert_nz << ", perturbationY_nz_phase = " <<  pert_phase_z  << pert_nz << ", perturbation_Y_magnitude = " << pert_magnitude << std::endl;
     
     if(pert_ny + pert_nz == 0)
     {
@@ -98,6 +94,9 @@ int main(int argc, char const *argv[])
         std::cout << "using data from file: " << file_name << std::endl;
     }
 
+    // init_cuda(-1);
+    scfd::utils::init_cuda(gpu_pci_id); //-1
+    // scfd::utils::init_cuda_persistent(3000);
 
     //linsolver control
     unsigned int lin_solver_max_it = 1000;
