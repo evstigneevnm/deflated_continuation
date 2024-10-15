@@ -48,9 +48,9 @@ int main(int argc, char const *argv[])
     typedef typename gpu_vector_operations_t::vector_type vec;
     using vec_file_ops_t = gpu_file_operations<gpu_vector_operations_t>;
 
-    if((argc < 11)||(argc > 12))
+    if((argc < 13)||(argc > 14))
     {
-        std::cout << argv[0] << " nz alpha R N use_manual_newton pci_id homotopy perturbationY_ny_wavenumber perturbationY_nz_wavenumber perturbationY_magnitude control_file(optional):\n nz = {0,1,...} - Z direction wavenumber, 0<alpha<=1, R is the Reynolds number, N = 2^n- discretization in one direction, use_manual_newton(y/n), 0 <= homotopy <= 1, control_file (file path + name)\n";
+        std::cout << argv[0] << " nz alpha R N use_manual_newton pci_id homotopy perturbationY_ny_wavenumber perturbationY_ny_phase perturbationY_nz_wavenumber perturbationY_nz_phase perturbationY_magnitude control_file(optional):\n nz = {0,1,...} - Z direction wavenumber, 0<alpha<=1, R is the Reynolds number, N = 2^n- discretization in one direction, use_manual_newton(y/n), 0 <= homotopy <= 1, control_file (file path + name)\n";
         return(0);       
     }
     
@@ -62,15 +62,16 @@ int main(int argc, char const *argv[])
     std::string use_manual_newton(argv[5]);
     int gpu_pci_id = std::stoi(argv[6]);
     real homotopy = std::stof(argv[7]);    
-
-    int pert_ny = std::stoi(argv[8]);
-    int pert_nz = std::stoi(argv[9]);
-    real pert_magnitude = std::stof(argv[10]);
+    real pert_ny = std::stoi(argv[8]);
+    real pert_phase_y = std::stoi(argv[9]);
+    real pert_nz = std::stoi(argv[10]);
+    real pert_phase_z = std::stoi(argv[11]);
+    real pert_magnitude = std::stof(argv[12]);
 
     std::string file_name;
-    if(argc == 12)
+    if(argc == 14)
     {
-        file_name = std::move(std::string(argv[11]));
+        file_name = std::move(std::string(argv[13]));
     }
     
 
@@ -81,7 +82,7 @@ int main(int argc, char const *argv[])
     size_t Ny = N;
     size_t Nz = N;
     std::cout << "Using: " << "nz = " << nz << ", alpha = " << alpha << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << ", using manual Newton first = " << use_manual_newton << ", homotopy = " << homotopy << std::endl;
-    std::cout << "perturbationY_ny_wavenumber = " <<  pert_ny << "perturbationY_nz_wavenumber = " << pert_nz << ", perturbation_Y_magnitude = " << pert_magnitude << std::endl;
+    std::cout << "perturbationY_ny_wavenumber = " <<  pert_ny << ", perturbationY_ny_phase = " <<  pert_phase_y << ", perturbationY_nz_wavenumber = " << ", perturbationY_nz_phase = " <<  pert_phase_z  << pert_nz << ", perturbation_Y_magnitude = " << pert_magnitude << std::endl;
     
     if(pert_ny + pert_nz == 0)
     {
@@ -143,7 +144,7 @@ int main(int argc, char const *argv[])
 
     //gmres native interface:
     lin_solver_t::params params;
-    params.basis_size = 40;
+    params.basis_size = 500;
     params.preconditioner_side = 'L';
     params.reorthogonalization = true;
     lin_solver_t lin_solver(vec_ops, &log3, params);
@@ -184,10 +185,11 @@ int main(int argc, char const *argv[])
 
     if(pert_ny + pert_nz > 0)
     {
-        KF_3D->exact_solution(Rey, x0);
+        real factor = (Rey-pert_magnitude)/Rey;
+        KF_3D->exact_solution(Rey, x0, factor);
         printf("exact solution norm = %le, div = %le\n", vec_ops->norm(x0), KF_3D->div_norm(x0));
         vec_ops->assign_scalar(0, x1);
-        KF_3D->sinus_perturbation_y(pert_magnitude, pert_ny, pert_nz, x1);
+        KF_3D->sinus_perturbation_y(pert_magnitude, pert_ny, pert_phase_y, pert_nz, pert_phase_z, x1);
         vec_ops->add_mul(1.0, x1, x0);
         KF_3D->write_solution_abs("x_0.pos", x0);
     }

@@ -634,25 +634,25 @@ public:
         pool_BC.release(UA);        
     }
 
-    void exact_solution(const T& Reynolds, T_vec& u_out)
+    void exact_solution(const T& Reynolds, T_vec& u_out, T scale = 1.0)
     {       
         if(n_z_force>0)
         {
             if(sin_cos)
             {
                 std::cout << "exact_solution_sin_cos" << std::endl;
-                exact_solution_sin_cos(Reynolds, u_out);
+                exact_solution_sin_cos(Reynolds*scale, u_out);
             }
             else
             {
                 std::cout << "exact_solution_sin_sin" << std::endl;
-                exact_solution_sin_sin(Reynolds, u_out);
+                exact_solution_sin_sin(Reynolds*scale, u_out);
             }
         }
         else
         {
             std::cout << "exact_solution_sin" << std::endl;
-            exact_solution_sin(Reynolds, u_out);
+            exact_solution_sin(Reynolds*scale, u_out);
         }
     }
 
@@ -789,10 +789,10 @@ public:
     } 
     
 
-    void sinus_perturbation_y(T magnitude, int ny, int nz, T_vec& u_out)
+    void sinus_perturbation_y(T magnitude, T ny, T phase_y, T nz, T phase_z, T_vec& u_out)
     {
         BR_vec* UR = pool_BR.take();
-        kern->sinus_perturbation(1, magnitude, ny, nz, UR->x, UR->y, UR->z);
+        kern->sinus_perturbation(1, magnitude, ny, phase_y, nz, phase_z, UR->x, UR->y, UR->z);
         BC_vec* UC = pool_BC.take();
         fft(*UR, *UC);
         project(*UC);
@@ -801,10 +801,10 @@ public:
         pool_BR.release(UR);
     }
 
-    void sinus_perturbation_z(T magnitude, int ny, int nz, T_vec& u_out)
+    void sinus_perturbation_z(T magnitude, T ny, T phase_y, T nz, T phase_z, T_vec& u_out)
     {
         BR_vec* UR = pool_BR.take();
-        kern->sinus_perturbation(2, magnitude, ny, nz, UR->x, UR->y, UR->z);
+        kern->sinus_perturbation(2, magnitude, ny, phase_y, nz, phase_z, UR->x, UR->y, UR->z);
         BC_vec* UC = pool_BC.take();
         fft(*UR, *UC);
         project(*UC);
