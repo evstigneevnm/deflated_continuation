@@ -1308,7 +1308,7 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::B
 
 
 template<int direction, typename T, typename T_vec>
-__global__ void sinus_perturbation_ker(T alpha, size_t Nx, size_t Ny, size_t Nz, T magnitude, T ny, T phase_y, T nz, T phase_z, T_vec u_x, T_vec u_y, T_vec u_z)
+__global__ void sinus_perturbation_ker(T alpha, size_t Nx, size_t Ny, size_t Nz, T magnitude_x, T nx, T phase_x, T magnitude_y, T ny, T phase_y, T magnitude_z, T nz, T phase_z, T_vec u_x, T_vec u_y, T_vec u_z)
 {
 unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
 unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
@@ -1331,28 +1331,36 @@ if ( index_in < sizeOfData )
     u_x[I3(j,k,l)] = 0;
     u_y[I3(j,k,l)] = 0;
     u_z[I3(j,k,l)] = 0;
-    if constexpr (direction == 1)
+    if constexpr (direction == 0)
     {
-        u_y[I3(j,k,l)] = magnitude*(sin(ny*y + phase_y) + sin(nz*z + phase_z) );
+        u_x[I3(j,k,l)] = magnitude_x*sin(nx*x + phase_z)+magnitude_y*sin(ny*y + phase_y) + magnitude_z*sin(nz*z + phase_z);
+    }    
+    else if constexpr (direction == 1)
+    {
+        u_y[I3(j,k,l)] = magnitude_x*sin(nx*x + phase_z)+magnitude_y*sin(ny*y + phase_y) + magnitude_z*sin(nz*z + phase_z);
     }
-    if constexpr (direction == 2)
+    else if constexpr (direction == 2)
     {
-        u_z[I3(j,k,l)] = magnitude*(sin(ny*y + phase_y) + sin(nz*z + phase_z) );
+        u_z[I3(j,k,l)] = magnitude_x*sin(nx*x + phase_z)+magnitude_y*sin(ny*y + phase_y) + magnitude_z*sin(nz*z + phase_z);
     }
 }    
 }
 
 
 template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
-void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::sinus_perturbation(int direction, TR magnitude, TR ny, TR phase_y, TR nz, TR phase_z, TR_vec u_x, TR_vec u_y, TR_vec u_z)
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::sinus_perturbation(int direction, TR magnitude_x, TR nx, TR phase_x, TR magnitude_y, TR ny, TR phase_y, TR magnitude_z, TR nz, TR phase_z, TR_vec u_x, TR_vec u_y, TR_vec u_z)
 {
-    if (direction == 1)
+    if (direction == 0)
     {
-        sinus_perturbation_ker<1, TR, TR_vec><<<dimGridNR, dimBlockN>>>(alpha, Nx, Ny, Nz, magnitude, ny, phase_y, nz, phase_z, u_x, u_y, u_z);
+        sinus_perturbation_ker<0, TR, TR_vec><<<dimGridNR, dimBlockN>>>(alpha, Nx, Ny, Nz, magnitude_x, nx, phase_x, magnitude_y, ny, phase_y, magnitude_z, nz, phase_z, u_x, u_y, u_z);
+    }
+    else if (direction == 1)
+    {
+        sinus_perturbation_ker<1, TR, TR_vec><<<dimGridNR, dimBlockN>>>(alpha, Nx, Ny, Nz, magnitude_x, nx, phase_x, magnitude_y, ny, phase_y, magnitude_z, nz, phase_z, u_x, u_y, u_z);
     }
     else if (direction == 2)
     {
-        sinus_perturbation_ker<2, TR, TR_vec><<<dimGridNR, dimBlockN>>>(alpha, Nx, Ny, Nz, magnitude, ny, phase_y, nz, phase_z, u_x, u_y, u_z);
+        sinus_perturbation_ker<2, TR, TR_vec><<<dimGridNR, dimBlockN>>>(alpha, Nx, Ny, Nz, magnitude_x, nx, phase_x, magnitude_y, ny, phase_y, magnitude_z, nz, phase_z, u_x, u_y, u_z);
     }
 }
 

@@ -189,7 +189,7 @@ int main(int argc, char const *argv[])
         KF_3D->exact_solution(Rey, x0, factor);
         printf("exact solution norm = %le, div = %le\n", vec_ops->norm(x0), KF_3D->div_norm(x0));
         vec_ops->assign_scalar(0, x1);
-        KF_3D->sinus_perturbation_y(pert_magnitude, pert_ny, pert_phase_y, pert_nz, pert_phase_z, x1);
+        KF_3D->sinus_perturbation_x(0, 0, 0, pert_magnitude, pert_ny, pert_phase_y, pert_magnitude, pert_nz, pert_phase_z, x1);
         // vec_ops->add_mul(1.0, x1, x0);
         vec_ops->mul_pointwise(x0, 1.0, x1);
         KF_3D->write_solution_abs("x_0.pos", x0);
