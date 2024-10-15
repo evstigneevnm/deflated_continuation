@@ -346,14 +346,14 @@ if ( index_in < sizeOfData )
 template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
 void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::force_Fourier_sin(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z)
 {
-    // if(n_y>0)
-    // {
-    //     scale_const*=0.5;
-    // }
-    // if(n_z>0)
-    // {
-    //     scale_const*=0.5;
-    // }
+    if(n_y>0)
+    {
+        scale_const*=0.5;
+    }
+    if(n_z>0)
+    {
+        scale_const*=0.5;
+    }
 
     force_Fourier_sin_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(n_y, n_z, scale_const, Nx, Ny, Mz, Nx*Ny*Nz, force_x, force_y, force_z);
 }

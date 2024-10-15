@@ -193,7 +193,7 @@ public:
     n_z_force(n_z_force_p)
     {
 
-        scale_force = T(0.25);
+        scale_force = T(1.0);
         Mz=FFT->get_reduced_size();
         Lx = (T(1.0)/alpha)*T(2.0)*M_PI;
         Ly = T(2.0)*M_PI;
