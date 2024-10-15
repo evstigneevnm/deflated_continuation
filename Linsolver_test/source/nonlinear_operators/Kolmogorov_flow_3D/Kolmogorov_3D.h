@@ -787,7 +787,31 @@ public:
         C2V(*UC, u_out);
         pool_BC.release(UC);
     } 
+    
 
+    void sinus_perturbation_y(T magnitude, int ny, int nz, T_vec& u_out)
+    {
+        BR_vec* UR = pool_BR.take();
+        kern->sinus_perturbation(1, magnitude, ny, nz, UR->x, UR->y, UR->z);
+        BC_vec* UC = pool_BC.take();
+        fft(*UR, *UC);
+        project(*UC);
+        C2V(*UC, u_out);
+        pool_BC.release(UC);
+        pool_BR.release(UR);
+    }
+
+    void sinus_perturbation_z(T magnitude, int ny, int nz, T_vec& u_out)
+    {
+        BR_vec* UR = pool_BR.take();
+        kern->sinus_perturbation(2, magnitude, ny, nz, UR->x, UR->y, UR->z);
+        BC_vec* UC = pool_BC.take();
+        fft(*UR, *UC);
+        project(*UC);
+        C2V(*UC, u_out);
+        pool_BC.release(UC);
+        pool_BR.release(UR);
+    }
 
     void randomize_vector(T_vec u_out, int steps_ = -1, bool random = true)
     {

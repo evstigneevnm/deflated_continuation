@@ -69,6 +69,7 @@ struct Kolmogorov_3D_ker
 
     void complex2vec_imag(TC_vec u_x, TC_vec u_y, TC_vec u_z, TR_vec v_out);
 
+    void sinus_perturbation(int direction, TR magnitude, int ny, int nz, TR_vec u_x, TR_vec u_y, TR_vec u_z);
 
     void apply_grad(TC_vec v_in,  TC_vec grad_x, TC_vec grad_y, TC_vec grad_z, TC_vec v_x, TC_vec v_y, TC_vec v_z);
 
