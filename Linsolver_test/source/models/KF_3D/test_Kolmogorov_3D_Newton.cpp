@@ -185,6 +185,7 @@ int main(int argc, char const *argv[])
     if(pert_ny + pert_nz > 0)
     {
         real factor = (Rey-pert_magnitude)/Rey;
+        printf("factor = %f\n", factor);
         KF_3D->exact_solution(Rey, x0, factor);
         printf("exact solution norm = %le, div = %le\n", vec_ops->norm(x0), KF_3D->div_norm(x0));
         vec_ops->assign_scalar(0, x1);
