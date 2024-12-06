@@ -193,7 +193,7 @@ public:
     n_z_force(n_z_force_p)
     {
 
-        scale_force = T(0.25);
+        scale_force = T(1.0);
         Mz=FFT->get_reduced_size();
         Lx = (T(1.0)/alpha)*T(2.0)*M_PI;
         Ly = T(2.0)*M_PI;
@@ -634,25 +634,25 @@ public:
         pool_BC.release(UA);        
     }
 
-    void exact_solution(const T& Reynolds, T_vec& u_out)
+    void exact_solution(const T& Reynolds, T_vec& u_out, T scale = 1.0)
     {       
         if(n_z_force>0)
         {
             if(sin_cos)
             {
                 std::cout << "exact_solution_sin_cos" << std::endl;
-                exact_solution_sin_cos(Reynolds, u_out);
+                exact_solution_sin_cos(Reynolds*scale, u_out);
             }
             else
             {
                 std::cout << "exact_solution_sin_sin" << std::endl;
-                exact_solution_sin_sin(Reynolds, u_out);
+                exact_solution_sin_sin(Reynolds*scale, u_out);
             }
         }
         else
         {
             std::cout << "exact_solution_sin" << std::endl;
-            exact_solution_sin(Reynolds, u_out);
+            exact_solution_sin(Reynolds*scale, u_out);
         }
     }
 
@@ -787,7 +787,43 @@ public:
         C2V(*UC, u_out);
         pool_BC.release(UC);
     } 
+    
+    void sinus_perturbation_x(T magnitude_x, T nx, T phase_x, T magnitude_y, T ny, T phase_y, T magnitude_z, T nz, T phase_z, T_vec& u_out)
+    {
+        BR_vec* UR = pool_BR.take();
+        kern->sinus_perturbation(0, magnitude_x, nx, phase_x, magnitude_y, ny, phase_y, magnitude_z, nz, phase_z, UR->x, UR->y, UR->z);
+        BC_vec* UC = pool_BC.take();
+        fft(*UR, *UC);
+        // project(*UC);
+        C2V(*UC, u_out);
+        pool_BC.release(UC);
+        pool_BR.release(UR);
+    }
 
+
+    void sinus_perturbation_y(T magnitude_x, T nx, T phase_x, T magnitude_y, T ny, T phase_y, T magnitude_z, T nz, T phase_z, T_vec& u_out)
+    {
+        BR_vec* UR = pool_BR.take();
+        kern->sinus_perturbation(1, magnitude_x, nx, phase_x, magnitude_y, ny, phase_y, magnitude_z, nz, phase_z, UR->x, UR->y, UR->z);
+        BC_vec* UC = pool_BC.take();
+        fft(*UR, *UC);
+        // project(*UC);
+        C2V(*UC, u_out);
+        pool_BC.release(UC);
+        pool_BR.release(UR);
+    }
+
+    void sinus_perturbation_z(T magnitude_x, T nx, T phase_x, T magnitude_y, T ny, T phase_y, T magnitude_z, T nz, T phase_z, T_vec& u_out)
+    {
+        BR_vec* UR = pool_BR.take();
+        kern->sinus_perturbation(2, magnitude_x, nx, phase_x, magnitude_y, ny, phase_y, magnitude_z, nz, phase_z, UR->x, UR->y, UR->z);
+        BC_vec* UC = pool_BC.take();
+        fft(*UR, *UC);
+        // project(*UC);
+        C2V(*UC, u_out);
+        pool_BC.release(UC);
+        pool_BR.release(UR);
+    }
 
     void randomize_vector(T_vec u_out, int steps_ = -1, bool random = true)
     {

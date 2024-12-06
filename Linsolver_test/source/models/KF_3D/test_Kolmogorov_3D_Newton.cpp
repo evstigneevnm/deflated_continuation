@@ -48,37 +48,57 @@ int main(int argc, char const *argv[])
     typedef typename gpu_vector_operations_t::vector_type vec;
     using vec_file_ops_t = gpu_file_operations<gpu_vector_operations_t>;
 
-    if((argc < 6)||(argc > 7))
+    if((argc < 15)||(argc > 16))
     {
-        std::cout << argv[0] << " alpha R N use_manual_newton homotopy(optional) control_file(optional):\n 0<alpha<=1, R is the Reynolds number, N = 2^n- discretization in one direction, use_manual_newton(y/n), 0 <= homotopy <= 1, control_file (file path + name)\n";
+        std::cout << argv[0] << " nz alpha R N use_manual_newton pci_id homotopy perturbationY_nx_wavenumber perturbationY_nx_phase perturbationY_ny_wavenumber perturbationY_ny_phase perturbationY_nz_wavenumber perturbationY_nz_phase perturbationY_magnitude control_file(optional):\n nz = {0,1,...} - Z direction wavenumber, 0<alpha<=1, R is the Reynolds number, N = 2^n- discretization in one direction, use_manual_newton(y/n), 0 <= homotopy <= 1, control_file (file path + name)\n";
         return(0);       
     }
     
-    real alpha = std::stof(argv[1]);
-    real Rey = std::stof(argv[2]);
-    size_t N = std::stoi(argv[3]);
+    int nz = std::stoi(argv[1]);
+    real alpha = std::stof(argv[2]);
+    real Rey = std::stof(argv[3]);
+    size_t N = std::stoi(argv[4]);
     int one_over_alpha = int(1/alpha);
-    std::string use_manual_newton(argv[4]);
-    real homotopy = std::stof(argv[5]);    
+    std::string use_manual_newton(argv[5]);
+    int gpu_pci_id = std::stoi(argv[6]);
+    real homotopy = std::stof(argv[7]);    
+    real pert_nx = std::stof(argv[8]);
+    real pert_phase_x = std::stof(argv[9]);
+    real pert_ny = std::stof(argv[10]);
+    real pert_phase_y = std::stof(argv[11]);
+    real pert_nz = std::stof(argv[12]);
+    real pert_phase_z = std::stof(argv[13]);
+    real pert_magnitude = std::stof(argv[14]);
+
     std::string file_name;
-    if(argc == 7)
+    if(argc == 16)
     {
-        file_name = std::move(std::string(argv[6]));
+        file_name = std::move(std::string(argv[15]));
     }
     
-
-    // init_cuda(-1);
-    scfd::utils::init_cuda(27); //-1
-    // scfd::utils::init_cuda_persistent(3000);
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
     size_t Nz = N;
-    std::cout << "Using alpha = " << alpha << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << ", using manual Newton first = " << use_manual_newton << ", homotopy = " << homotopy << std::endl;
+    std::cout << "Using: " << "nz = " << nz << ", alpha = " << alpha << ", Reynolds = " << Rey << ", with discretization: " << Nx << "X" << Ny << "X" << Nz << ", using manual Newton first = " << use_manual_newton << ", homotopy = " << homotopy << std::endl;
+    std::cout << "perturbationY_nx_wavenumber = " <<  pert_nx << ", perturbationY_nx_phase = " <<  pert_phase_x  << ", perturbationY_ny_wavenumber = " <<  pert_ny << ", perturbationY_ny_phase = " <<  pert_phase_y << ", perturbationY_nz_wavenumber = " << pert_nz << ", perturbationY_nz_phase = " <<  pert_phase_z  << pert_nz << ", perturbation_Y_magnitude = " << pert_magnitude << std::endl;
+    
+    if(pert_nx + pert_ny + pert_nz == 0)
+    {
+        std::cout << "using random or from file initial vector " << std::endl;
+    }
+    else
+    {
+        std::cout << "using exact solution with perturbation " << std::endl;
+    }
+
     if(!file_name.empty())
     {
         std::cout << "using data from file: " << file_name << std::endl;
     }
 
+    // init_cuda(-1);
+    scfd::utils::init_cuda(gpu_pci_id); //-1
+    // scfd::utils::init_cuda_persistent(3000);
 
     //linsolver control
     unsigned int lin_solver_max_it = 1000;
@@ -101,7 +121,7 @@ int main(int argc, char const *argv[])
     gpu_vector_operations_complex_t *vec_ops_C = new gpu_vector_operations_complex_t(Nx*Ny*Mz, CUBLAS);
     gpu_vector_operations_t *vec_ops = new gpu_vector_operations_t(3*(Nx*Ny*Mz-1), CUBLAS);
     
-    KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
+    KF_3D_t *KF_3D = new KF_3D_t(alpha, Nx, Ny, Nz, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R, true, nz);
     // linear solver config
     typedef scfd::utils::log_std log_t;
     typedef numerical_algos::lin_solvers::default_monitor<
@@ -125,7 +145,7 @@ int main(int argc, char const *argv[])
 
     //gmres native interface:
     lin_solver_t::params params;
-    params.basis_size = 40;
+    params.basis_size = 500;
     params.preconditioner_side = 'L';
     params.reorthogonalization = true;
     lin_solver_t lin_solver(vec_ops, &log3, params);
@@ -163,6 +183,21 @@ int main(int argc, char const *argv[])
     {
         file_ops.read_vector(file_name, x0);
     }
+
+    if(pert_nx + pert_ny + pert_nz > 0)
+    {
+        real factor = (Rey-pert_magnitude)/Rey;
+        printf("factor = %f\n", factor);
+        KF_3D->exact_solution(Rey, x0, factor);
+        printf("exact solution norm = %le, div = %le\n", vec_ops->norm(x0), KF_3D->div_norm(x0));
+        vec_ops->assign_scalar(0, x1);
+        KF_3D->sinus_perturbation_x(pert_magnitude, pert_nx, pert_phase_x, pert_magnitude, pert_ny, pert_phase_y, pert_magnitude, pert_nz, pert_phase_z, x1);
+        // vec_ops->add_mul(1.0, x1, x0);
+        vec_ops->mul_pointwise(x0, 1.0, x1);
+        KF_3D->write_solution_abs("x_0.pos", x0);
+    }
+
+
     vec_ops->assign(x0, x_back);
     printf("initial solution norm = %le, div = %le\n", vec_ops->norm(x0), KF_3D->div_norm(x0));
 

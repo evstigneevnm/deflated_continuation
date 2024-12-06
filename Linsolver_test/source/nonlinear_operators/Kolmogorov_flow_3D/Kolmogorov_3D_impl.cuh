@@ -346,14 +346,14 @@ if ( index_in < sizeOfData )
 template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
 void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::force_Fourier_sin(int n_y, int n_z, TR scale_const, TC_vec force_x, TC_vec force_y, TC_vec force_z)
 {
-    // if(n_y>0)
-    // {
-    //     scale_const*=0.5;
-    // }
-    // if(n_z>0)
-    // {
-    //     scale_const*=0.5;
-    // }
+    if(n_y>0)
+    {
+        scale_const*=0.5;
+    }
+    if(n_z>0)
+    {
+        scale_const*=0.5;
+    }
 
     force_Fourier_sin_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNC, dimBlockN>>>(n_y, n_z, scale_const, Nx, Ny, Mz, Nx*Ny*Nz, force_x, force_y, force_z);
 }
@@ -425,7 +425,7 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::f
 
 
 template<typename T, typename T_vec, typename TC, typename TC_vec>
-__global__ void force_ABC_kernel(size_t Nx, size_t Ny, size_t Nz, T_vec force_x, T_vec force_y, T_vec force_z)
+__global__ void force_ABC_kernel(T alpha, size_t Nx, size_t Ny, size_t Nz, T_vec force_x, T_vec force_y, T_vec force_z)
 {
 unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
 unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
@@ -440,7 +440,7 @@ if ( index_in < sizeOfData )
     unsigned int j=xIndex, k=yIndex, l=zIndex;
 //  operation starts from here:
 
-    T x = T(j)*T(4.0*M_PI)/T(Nx);
+    T x = T(j)*T(2.0*M_PI/alpha)/T(Nx);
     T y = T(k)*T(2.0*M_PI)/T(Ny);
     T z = T(l)*T(2.0*M_PI)/T(Nz);
 
@@ -453,7 +453,7 @@ if ( index_in < sizeOfData )
 template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
 void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::force_ABC(TR_vec force_x, TR_vec force_y, TR_vec force_z)
 {
-    force_ABC_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNR, dimBlockN>>>(Nx, Ny, Nz, force_x, force_y, force_z);
+    force_ABC_kernel<TR, TR_vec, TC, TC_vec><<<dimGridNR, dimBlockN>>>(alpha, Nx, Ny, Nz, force_x, force_y, force_z);
 }
 
 
@@ -1306,6 +1306,65 @@ void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::B
 }
 
 
+
+template<int direction, typename T, typename T_vec>
+__global__ void sinus_perturbation_ker(T alpha, size_t Nx, size_t Ny, size_t Nz, T magnitude_x, T nx, T phase_x, T magnitude_y, T ny, T phase_y, T magnitude_z, T nz, T phase_z, T_vec u_x, T_vec u_y, T_vec u_z)
+{
+unsigned int t1, xIndex, yIndex, zIndex, index_in, gridIndex;
+unsigned int sizeOfData=(unsigned int) Nx*Ny*Nz;
+gridIndex = blockIdx.y * gridDim.x + blockIdx.x;
+index_in = ( gridIndex * blockDim.y + threadIdx.y )*blockDim.x + threadIdx.x;
+if ( index_in < sizeOfData )
+{
+    t1 =  index_in/Nz; 
+    zIndex = index_in - Nz*t1 ;
+    xIndex =  t1/Ny; 
+    yIndex = t1 - Ny * xIndex ;
+    unsigned int j=xIndex, k=yIndex, l=zIndex;
+//  operation starts from here:
+
+//  assume that Z-direction is a reduced one.
+    T x = T(j)*T(2.0*M_PI/alpha)/T(Nx);
+    T y = T(k)*T(2.0*M_PI)/T(Ny);
+    T z = T(l)*T(2.0*M_PI)/T(Nz);
+
+    u_x[I3(j,k,l)] = 0;
+    u_y[I3(j,k,l)] = 0;
+    u_z[I3(j,k,l)] = 0;
+    T val = magnitude_x*sin(nx*x + phase_z)+magnitude_y*sin(ny*y + phase_y) + magnitude_z*sin(nz*z + phase_z);
+
+    if constexpr (direction == 0)
+    {
+        u_x[I3(j,k,l)] = val;
+    }    
+    else if constexpr (direction == 1)
+    {
+        u_y[I3(j,k,l)] = val;
+    }
+    else if constexpr (direction == 2)
+    {
+        u_z[I3(j,k,l)] = val;
+    }
+}    
+}
+
+
+template <typename TR, typename TR_vec, typename TC, typename TC_vec, bool PureImag>
+void nonlinear_operators::Kolmogorov_3D_ker<TR, TR_vec, TC, TC_vec, PureImag>::sinus_perturbation(int direction, TR magnitude_x, TR nx, TR phase_x, TR magnitude_y, TR ny, TR phase_y, TR magnitude_z, TR nz, TR phase_z, TR_vec u_x, TR_vec u_y, TR_vec u_z)
+{
+    if (direction == 0)
+    {
+        sinus_perturbation_ker<0, TR, TR_vec><<<dimGridNR, dimBlockN>>>(alpha, Nx, Ny, Nz, magnitude_x, nx, phase_x, magnitude_y, ny, phase_y, magnitude_z, nz, phase_z, u_x, u_y, u_z);
+    }
+    else if (direction == 1)
+    {
+        sinus_perturbation_ker<1, TR, TR_vec><<<dimGridNR, dimBlockN>>>(alpha, Nx, Ny, Nz, magnitude_x, nx, phase_x, magnitude_y, ny, phase_y, magnitude_z, nz, phase_z, u_x, u_y, u_z);
+    }
+    else if (direction == 2)
+    {
+        sinus_perturbation_ker<2, TR, TR_vec><<<dimGridNR, dimBlockN>>>(alpha, Nx, Ny, Nz, magnitude_x, nx, phase_x, magnitude_y, ny, phase_y, magnitude_z, nz, phase_z, u_x, u_y, u_z);
+    }
+}
 
 
 template<typename T, typename T_vec>

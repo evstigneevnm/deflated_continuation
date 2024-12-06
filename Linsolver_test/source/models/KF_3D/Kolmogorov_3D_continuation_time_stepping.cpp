@@ -120,10 +120,10 @@ int main(int argc, char const *argv[])
 
     
 
-    if((argc < 7)||(argc > 11))
+    if((argc < 8)||(argc > 12))
     {
         
-        std::cout << argv[0] << " N alpha R time method GPU_PCI_ID [state_file folder \"file_name_regex\" skip_solution_plot_time](optional)\n   0<alpha<=1 - torus stretching parameter,\n R -- Reynolds number,\n  N = 2^n- discretization in one direction. \n  time - simulation time. \n  folder - for the points data,\n   skip_solution_plot_time - to save solution files at given time intervals\n";
+        std::cout << argv[0] << " nz N alpha R time method GPU_PCI_ID [state_file folder \"file_name_regex\" skip_solution_plot_time](optional)\n   nz = {0,1,2,...} - Z direction forcing wavenumber, calssical Y direction forcing for nz=0,\n   0<alpha<=1 - torus stretching parameter,\n R -- Reynolds number,\n  N = 2^n- discretization in one direction. \n  time - simulation time. \n  folder - for the points data,\n   skip_solution_plot_time - to save solution files at given time intervals\n";
         std::cout << " method - name of the scheme:" << std::endl;
 
         time_steppers::detail::butcher_tables tables;
@@ -143,38 +143,38 @@ int main(int argc, char const *argv[])
         return(0);       
     }    
     real initial_dt = 1.0e-15;
-    size_t N = std::stoul(argv[1]);
-    real alpha = std::stof(argv[2]);
+    int nz = std::stoi(argv[1]);
+    size_t N = std::stoul(argv[2]);
+    real alpha = std::stof(argv[3]);
     int one_over_alpha = static_cast<int>(1.0/alpha);
     size_t Nx = N*one_over_alpha;
     size_t Ny = N;
     size_t Nz = N;
-    int nz = 1;
-    real R = std::stof(argv[3]);
-    real simulation_time = std::stof(argv[4]);
-    std::string scheme_name(argv[5]);
-    int gpu_pci_id = std::stoi(argv[6]);
+    real R = std::stof(argv[4]);
+    real simulation_time = std::stof(argv[5]);
+    std::string scheme_name(argv[6]);
+    int gpu_pci_id = std::stoi(argv[7]);
     bool load_file = false;
     std::string load_file_name;
-    if((argc == 8)||(argc == 10)||(argc == 11))
+    if((argc == 9)||(argc == 11)||(argc == 12))
     {
         load_file = true;
-        load_file_name = std::string(argv[7]);
+        load_file_name = std::string(argv[8]);
     }
     std::string folder_saved_solutions;
     std::string regex_saved_solutions; 
-    if((argc == 10)||(argc == 11))
+    if((argc == 11)||(argc == 12))
     {
-        folder_saved_solutions = std::string(argv[8]);
-        regex_saved_solutions = std::string(argv[9]);
+        folder_saved_solutions = std::string(argv[9]);
+        regex_saved_solutions = std::string(argv[10]);
     }
     real time_skip = 0;
-    if(argc == 11)
+    if(argc == 12)
     {
-        time_skip = std::stof(argv[10]);
+        time_skip = std::stof(argv[11]);
     }
 
-    std::cout << "input parameters: " << "\nN = " << N << "\none_over_alpha = " << one_over_alpha << "\nNx = " << Nx << " Ny = " << Ny << " Nz = " << Nz << "\nR = " << R << "\nsimulation_time = " << simulation_time << "\nscheme_name = " << scheme_name << "\ngpu_pci_id = " << gpu_pci_id << "\n";
+    std::cout << "input parameters: " << "\nnz = " << nz << "\nN = " << N << "\none_over_alpha = " << one_over_alpha << "\nNx = " << Nx << " Ny = " << Ny << " Nz = " << Nz << "\nR = " << R << "\nsimulation_time = " << simulation_time << "\nscheme_name = " << scheme_name << "\ngpu_pci_id = " << gpu_pci_id << "\n";
 //  sqrt(L*scale_force)/(n R):
     const real scale_force = 1.0;
     std::cout << "reduced Reynolds number = " <<  std::sqrt(one_over_alpha*2*3.141592653589793238*scale_force)*R << std::endl;
