@@ -34,7 +34,8 @@ int main(int argc, char const *argv[])
 {
     const int Blocks_x_ = 64;
     const int Blocks_y_ = 16;
-    
+    const int number_of_exponents = 16;
+
     using real = SCALAR_TYPE;
     using complex = thrust::complex<real>;
     using gpu_vector_operations_real_t = gpu_vector_operations<real>;
@@ -56,7 +57,7 @@ int main(int argc, char const *argv[])
     using log_t = utils::log_std;
     using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t,log_t>;
 
-    using lyapunov_exp_t = time_steppers::lyapunov_exponents<vec_ops_t, KF_3D_t, time_steppers::time_step_adaptation_error_control, time_steppers::explicit_time_step, log_t, 6>;
+    using lyapunov_exp_t = time_steppers::lyapunov_exponents<vec_ops_t, KF_3D_t, time_steppers::time_step_adaptation_error_control, time_steppers::explicit_time_step, log_t, number_of_exponents>;
 
 
 
