@@ -87,13 +87,15 @@ public:
         char preconditioner_side; //can be L for left and R for right
         bool reorthogonalization; //apply additional reorthogonalization in Gram-Schmidt process
         // typename Monitor::params monitor;
+        bool do_restart_on_false_ritz_convergence;
 
         params(const std::string &log_prefix = "", const std::string &log_name = "gmres::"):
             logged_obj_params_t(0, log_prefix+log_name),
             basis_size(15), 
             batch_size(5), 
             preconditioner_side('R'), 
-            reorthogonalization(false)
+            reorthogonalization(false),
+            do_restart_on_false_ritz_convergence(false)
             // monitor( typename Monitor::params(this->log_msg_prefix) )
         { }
 
@@ -430,8 +432,10 @@ public:
 
                     if ( resid_estimate < monitor_.tol() ) //fix to tol
                     {
-                        vec_ops_->assign(x, x_tmp_);
                         logged_obj_t::info_f("resid_estimate = %e monitor_.tol() = %e", resid_estimate, monitor_.tol());
+                        
+                        if (prms_.do_restart_on_false_ritz_convergence) break;
+                        vec_ops_->assign(x, x_tmp_);
                     //      check real solution
                     // Ritz value may not be acurate in approx arithmetics
                         dense_ops_->solve_upper_triangular_subsystem(H_, s_, s_h_, i+1);
