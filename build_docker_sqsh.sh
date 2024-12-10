@@ -35,7 +35,7 @@ while getopts ":c:d:" option; do
 done
 
 if [[ $setc == 1 ]] && [[ $setd == 1 ]]; then
-	exec_docker="docker build -f $docker_file . -t $image_name"
+	exec_docker="docker build -f $docker_file . -t $image_name --no-cache"
 	echo $exec_docker
 	eval " $exec_docker"
 	exec_enroot="enroot import dockerd://$image_name"

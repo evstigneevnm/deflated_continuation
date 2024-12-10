@@ -6,5 +6,5 @@ CPPSTD = c++17
 TARGET_GCC = -O3
 TARGET_NVCC = -O3
 BOOST_ROOT_PATH = /usr/include
-OPENBLAS_ROOT_PATH = /opt/OpenBLAS
+OPENBLAS_ROOT_PATH = /usr/include
 

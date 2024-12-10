@@ -185,7 +185,7 @@ deflation_translation_Kolmogorov_3D: source/models/KF_3D/test_deflation_translat
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/KF_3D/test_deflation_translation_Kolmogorov_3D.cpp O/Kolmogorov_3D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o  $(LIBS2) -o deflation_translation_Kolmogorov_3D.bin 2>results.make
 
 KF3D_bd: source/models/KF_3D/KF3D_bd_json.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IBOOST) $(IPROJECT) source/models/KF_3D/KF3D_bd_json.cpp O/Kolmogorov_3D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBS2) $(LLAPACK) -o KF3D_bd_json.bin 2>results.make	
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IBOOST) $(IPROJECT) source/models/KF_3D/KF3D_bd_json.cpp O/Kolmogorov_3D_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBSAll) $(LLAPACK) -o KF3D_bd_json.bin 2>results.make	
 
 Kolmogorov_2D_ker: source/nonlinear_operators/Kolmogorov_flow_2D/Kolmogorov_2D_ker.cu
 	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)  source/nonlinear_operators/Kolmogorov_flow_2D/Kolmogorov_2D_ker.cu -c -o O/Kolmogorov_2D_ker.o 2>results.make
@@ -251,7 +251,7 @@ abc_bd_deb: source/models/abc_flow/abc_bd_json.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IBOOST) $(IPROJECT) source/models/abc_flow/abc_bd_json.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBS2) $(LLAPACK) -o abc_bd_json.bin 2>results.make	
 
 abc_bd_rel: source/models/abc_flow/abc_bd_json.cpp
-	$(NVCC) $(NVCCFLAGS) -O3 $(SCALAR_TYPE) $(ICUDA) $(IBOOST) $(IPROJECT) source/models/abc_flow/abc_bd_json.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBS2) $(LLAPACK) -o abc_bd_json.bin 2>results.make	
+	$(NVCC) $(NVCCFLAGS) -O3 $(SCALAR_TYPE) $(ICUDA) $(IBOOST) $(IPROJECT) source/models/abc_flow/abc_bd_json.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBS3) $(LLAPACK) -o abc_bd_json.bin 2>results.make	
 
 
 abc_bd: source/models/abc_flow/abc_bd_json.cpp
@@ -264,10 +264,10 @@ abc_flow_time_stepping: source/models/abc_flow/abc_flow_time_stepping.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_time_stepping.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o abc_flow_time_stepping.bin 2>results.make
 
 abc_flow_perodic_orbit_stabilization: source/models/abc_flow/abc_flow_perodic_orbit_stabilization.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_perodic_orbit_stabilization.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LIBS2) $(LLAPACK) -o abc_flow_perodic_orbit_stabilization.bin 2>results.make
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_perodic_orbit_stabilization.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LIBS3) $(LLAPACK) -o abc_flow_perodic_orbit_stabilization.bin 2>results.make
 
 abc_flow_lyapunov_exponents: source/models/abc_flow/abc_flow_lyapunov_exponents.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_lyapunov_exponents.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o O/gpu_matrix_vector_operations_kernels.o $(LIBS2) -o abc_flow_lyapunov_exponents.bin 2>results.make
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_lyapunov_exponents.cpp O/abc_flow_ker.o O/gpu_reduction_ogita_kernels.o O/gpu_vector_operations_kernels.o $(LIBS2) -o abc_flow_lyapunov_exponents.bin 2>results.make
 
 
 test_butcher_tables: source/time_stepper/tests/butcher_tables.cpp

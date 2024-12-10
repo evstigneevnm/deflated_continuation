@@ -24,7 +24,7 @@ private:
 public:    
     using norms_storage_type = std::vector<T>;
 
-    convergence_strategy(vector_operations*& vec_ops_, logging*& log_, T tolerance_, unsigned int maximum_iterations_, T newton_wight_, bool store_norms_history_ = false, bool verbose_ = true):
+    convergence_strategy(vector_operations*& vec_ops_, logging*& log_, T tolerance_ = 1.0e-6, unsigned int maximum_iterations_= 1000, T newton_wight_=0.5, bool store_norms_history_ = false, bool verbose_ = true):
     vec_ops(vec_ops_),
     log(log_),
     iterations(0),
@@ -48,6 +48,21 @@ public:
     {
         vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
         vec_ops->stop_use_vector(Fx); vec_ops->free_vector(Fx);
+    }
+
+    void set_convergence_constants(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true, unsigned int stagnation_max_ = 10)
+    {
+        tolerance = tolerance_;
+        maximum_iterations = maximum_iterations_;
+        newton_wight_initial = newton_wight_;
+
+        store_norms_history = store_norms_history_;
+        verbose = verbose_;
+        // stagnation_max = stagnation_max_;
+        if(store_norms_history)
+        {
+            norms_evolution.reserve(maximum_iterations);
+        }        
     }
 
 

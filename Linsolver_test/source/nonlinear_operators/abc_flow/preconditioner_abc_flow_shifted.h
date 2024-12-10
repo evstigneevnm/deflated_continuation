@@ -39,7 +39,7 @@ public:
     void apply(T_vec& x)const
     {
         auto ab = lin_op->get_a_b();
-        nonlin_op->preconditioner_jacobian_temporal_u(x, ab.a, ab.b);
+        nonlin_op->preconditioner_jacobian_temporal_u(x, ab.first, ab.second);
     }
 
 private:
