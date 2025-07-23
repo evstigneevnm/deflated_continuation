@@ -39,44 +39,14 @@ int main(int argc, char const *argv[])
         }
     }
 
-    auto method = time_steppers::detail::methods::EXPLICIT_EULER;
-    if(scheme_name == "EE")
-    {
-        method = time_steppers::detail::methods::EXPLICIT_EULER;
-    }
-    else if(scheme_name == "RKDP45")
-    {
-        method = time_steppers::detail::methods::RKDP45;
-    }
-    else if(scheme_name == "RK33SSP")
-    {
-        method = time_steppers::detail::methods::RK33SSP;
-    }    
-    else if(scheme_name == "RK43SSP")
-    {
-        method = time_steppers::detail::methods::RK43SSP;
-    } 
-    else if(scheme_name == "RK64SSP")
-    {
-        method = time_steppers::detail::methods::RK64SSP;
-    }     
-    else if(scheme_name == "HE")
-    {
-        method = time_steppers::detail::methods::HEUN_EULER;
-    }  
-    else
-    {
-        throw std::logic_error("incorrect method string type provided.");
-    }
 
-    T ref_error = std::numeric_limits<T>::epsilon();
 
 
     log.info("test glued poincate linear operator.");
     vec_ops_t vec_ops(3);
     nlin_op_t rossler(&vec_ops, 2, 0.2, 0.2, 5.7);
-    poincare_map_operator_t poincare_map(&vec_ops, &rossler, &log, 1000.0, 5.7, method);
-    glued_poincare_map_linear_op_t poincare_map_x(&vec_ops, &rossler, &log, 1000.0, 5.7, method);
+    poincare_map_operator_t poincare_map(&vec_ops, &rossler, &log, 1000.0, 5.7, scheme_name);
+    glued_poincare_map_linear_op_t poincare_map_x(&vec_ops, &rossler, &log, 1000.0, 5.7, scheme_name);
     
     vec_t xb, x0, v0, v1;
     vec_ops.init_vectors(xb,x0,v0,v1); vec_ops.start_use_vectors(xb,x0,v0,v1);

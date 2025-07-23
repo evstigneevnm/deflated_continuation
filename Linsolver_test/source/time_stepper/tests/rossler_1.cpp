@@ -27,6 +27,14 @@
 namespace nonlinear_operators
 {
 
+/**
+ * @brief      { rossler  operator }
+ *
+ * @tparam     VectorOperations  { abstract Vector operations }
+ * The problem is given in the form: u_t = F(u), where F is on the RHS
+ * 
+ */
+
 template<class VectorOperations>
 struct rossler //https://en.wikipedia.org/wiki/R%C3%B6ssler_attractor
 {
@@ -148,39 +156,10 @@ int main(int argc, char const *argv[])
     time_step_const_t time_step_const(&vec_ops, &log);
     time_step_err_ctrl_t time_step_err_ctrl(&vec_ops, &log);
 
-    auto method = time_steppers::detail::methods::EXPLICIT_EULER;
-    if(scheme_name == "EE")
-    {
-        method = time_steppers::detail::methods::EXPLICIT_EULER;
-    }
-    else if(scheme_name == "RKDP45")
-    {
-        method = time_steppers::detail::methods::RKDP45;
-    }
-    else if(scheme_name == "RK33SSP")
-    {
-        method = time_steppers::detail::methods::RK33SSP;
-    }    
-    else if(scheme_name == "RK43SSP")
-    {
-        method = time_steppers::detail::methods::RK43SSP;
-    } 
-    else if(scheme_name == "RK64SSP")
-    {
-        method = time_steppers::detail::methods::RK64SSP;
-    }     
-    else if(scheme_name == "HE")
-    {
-        method = time_steppers::detail::methods::HEUN_EULER;
-    }  
-    else
-    {
-        throw std::logic_error("incorrect method string type provided.");
-    }
     auto mu = rossler.get_selected_parameter_value();
 
-    single_step_const_t explicit_step_const(&vec_ops, &time_step_const, &log, &rossler, mu, method);
-    single_step_err_ctrl_t explicit_step_err_control(&vec_ops, &time_step_err_ctrl, &log, &rossler, mu, method);
+    single_step_const_t explicit_step_const(&vec_ops, &time_step_const, &log, &rossler, mu, scheme_name);
+    single_step_err_ctrl_t explicit_step_err_control(&vec_ops, &time_step_err_ctrl, &log, &rossler, mu, scheme_name);
     
     time_stepper_const_t time_stepper_const(&vec_ops, &rossler, &explicit_step_const, &log);
     time_stepper_err_ctrl_t time_stepper_err_ctrl(&vec_ops, &rossler, &explicit_step_err_control, &log);

@@ -66,7 +66,7 @@ void write_2_vectors_by_side(const std::string &f_name, size_t N, const T_vec& v
 
 
 template <class T>
-void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec=19)
+void write_vector(const std::string &f_name, size_t N, const T *vec, unsigned int prec=19)
 {
         std::ofstream f(f_name.c_str(), std::ofstream::out);
         if (!f) throw std::runtime_error("print_vector: error while opening file " + f_name);
@@ -82,7 +82,7 @@ void write_vector(const std::string &f_name, size_t N, T *vec, unsigned int prec
         f.close();
 }
 template <class T, class Vector>
-void write_vector(const std::string &f_name, size_t N, Vector& vec, unsigned int prec=19)
+void write_vector(const std::string &f_name, size_t N, const Vector& vec, unsigned int prec=19)
 {
         std::ofstream f(f_name.c_str(), std::ofstream::out);
         if (!f) throw std::runtime_error("print_vector: error while opening file " + f_name);

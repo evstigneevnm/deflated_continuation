@@ -27,36 +27,6 @@ int main(int argc, char const *argv[])
     vec_ops_t vec_ops(3);
     nlin_op_t rossler(&vec_ops, 2, 0.2, 0.2, 5.7);
 
-    auto method = time_steppers::detail::methods::EXPLICIT_EULER;
-    if(scheme_name == "EE")
-    {
-        method = time_steppers::detail::methods::EXPLICIT_EULER;
-    }
-    else if(scheme_name == "RKDP45")
-    {
-        method = time_steppers::detail::methods::RKDP45;
-    }
-    else if(scheme_name == "RK33SSP")
-    {
-        method = time_steppers::detail::methods::RK33SSP;
-    }    
-    else if(scheme_name == "RK43SSP")
-    {
-        method = time_steppers::detail::methods::RK43SSP;
-    } 
-    else if(scheme_name == "RK64SSP")
-    {
-        method = time_steppers::detail::methods::RK64SSP;
-    }     
-    else if(scheme_name == "HE")
-    {
-        method = time_steppers::detail::methods::HEUN_EULER;
-    }  
-    else
-    {
-        throw std::logic_error("incorrect method string type provided.");
-    }
-
     glued_nonlin_op_t glued_nonlin_op(&vec_ops, &rossler);
     glued_vec_t x,v;
     glued_nonlin_op.glued_vector_operations()->init_vector(x);

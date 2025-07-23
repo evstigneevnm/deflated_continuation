@@ -42,8 +42,13 @@ public:
         reduce(n0_reduced_);
     }
 
+    T get_parameter() const
+    {
+        return lambda_;
+    }
+
     // R^{n} -> R^{n-1}
-    // this causes some problems with vector operations! It is remed for now
+    // this causes some problems with vector operations logic! It is remmed for now
     // void project_to(const T current_time, const T_vec& current_point, const T_vec& x0_p, T_vec& x1_p)const 
     // {
     //     // vn1_proj = vn1 - f.*section_1.n'*vn1./(section_1.n'*f);
@@ -98,7 +103,7 @@ public:
 
     }
 
-    // retrns std::pair<T,T>: (error, distance)
+    // returns std::pair<T,T>: (error, distance)
     std::pair<T, T> intersection(const T_vec& x_from, const T_vec& x_to)const
     {
         // error = section.n'*(xn1 - section.value);

@@ -84,38 +84,7 @@ int main(int argc, char const *argv[])
         c_param = std::stof(argv[4]);
         max_time_simlation = std::stof(argv[5]);
     }
-    auto method = time_steppers::detail::methods::EXPLICIT_EULER;
-    if(scheme_name == "EE")
-    {
-        method = time_steppers::detail::methods::EXPLICIT_EULER;
-    }
-    else if(scheme_name == "RKDP45")
-    {
-        method = time_steppers::detail::methods::RKDP45;
-    }
-    else if(scheme_name == "RK33SSP")
-    {
-        method = time_steppers::detail::methods::RK33SSP;
-    }    
-    else if(scheme_name == "RK43SSP")
-    {
-        method = time_steppers::detail::methods::RK43SSP;
-    } 
-    else if(scheme_name == "RK64SSP")
-    {
-        method = time_steppers::detail::methods::RK64SSP;
-    }     
-    else if(scheme_name == "HE")
-    {
-        method = time_steppers::detail::methods::HEUN_EULER;
-    }  
-    else
-    {
-        throw std::logic_error("incorrect method string type provided.");
-    }
-    real ref_error = std::numeric_limits<real>::epsilon();
-
-
+ 
 
     log_t log;
     log.info("test periodic orbit stabilization for rossler operator.");
@@ -132,7 +101,7 @@ int main(int argc, char const *argv[])
 
     auto mu = rossler.get_selected_parameter_value();
 
-    periodic_orbit_nonlinear_operator_t periodic_orbit_nonlin_op(&vec_ops, &rossler, &log, 100.0, mu, method);
+    periodic_orbit_nonlinear_operator_t periodic_orbit_nonlin_op(&vec_ops, &rossler, &log, 100.0, mu, scheme_name);
 
     auto periodic_orbit_lin_op = periodic_orbit_nonlin_op.linear_operator;
 

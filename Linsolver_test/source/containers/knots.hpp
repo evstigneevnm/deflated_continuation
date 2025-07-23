@@ -55,7 +55,6 @@ public:
     void add_element(container_t vec_)
     {
         container.insert(container.end(), std::make_move_iterator(vec_.begin()), std::make_move_iterator(vec_.end()) );
-        
         unique_and_sort();
     }
     

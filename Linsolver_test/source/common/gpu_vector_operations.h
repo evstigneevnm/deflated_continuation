@@ -116,7 +116,7 @@ struct gpu_vector_operations
     //typedef typename gpu_vector_operations_type::vec_ops_scalar_complex_type_help<T>::norm_type Tsc;
     using norm_type = typename gpu_vector_operations_type::vec_ops_scalar_complex_type_help<scalar_type>::norm_type;
     using vector_type_real = typename gpu_vector_operations_type::vec_ops_vector_complex_type_help<vector_type>::vec_type;
-    using Tsc = norm_type ;
+    using Tsc = norm_type;
     bool location;
     using gpu_reduction_hp_t = gpu_reduction_ogita<T, vector_type>;
 

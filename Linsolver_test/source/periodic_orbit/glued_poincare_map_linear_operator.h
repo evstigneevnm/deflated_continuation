@@ -10,7 +10,7 @@ namespace periodic_orbit
 
 //
 //class VectorOperations, class NonlinearOperator, class Log, class TimeStepAdaptation
-template<class VectorOperations, class NonlinearOperator, template<class, class, class>class TimeStepAdaptation, template<class, class, class, class> class SingleStepper, class Hyperplane, class Log >
+template<class VectorOperations, class NonlinearOperator, template<class, class, class>class TimeStepAdaptation, template<class, class, class, class> class SingleStepper, class Hyperplane, class Log>
 class glued_poincare_map_linear_operator
 {
 
@@ -18,6 +18,8 @@ class glued_poincare_map_linear_operator
     using T_vec = typename VectorOperations::vector_type;   
 
     using glued_nonlinear_operator_t = detail::glued_nonlinear_operator_and_jacobian<VectorOperations, NonlinearOperator>;
+    using glued_nonlinear_operator_alpha_t = detail::glued_nonlinear_operator_and_jacobian<VectorOperations, NonlinearOperator, true>;
+
     using gvec_ops_t = typename glued_nonlinear_operator_t::glued_vector_operations_type;
 
     using T_gvec = typename glued_nonlinear_operator_t::vector_type;
@@ -150,27 +152,39 @@ class glued_poincare_map_linear_operator
     };    
 
     using time_step_adopt_t = TimeStepAdaptation<gvec_ops_t, Log, ::time_steppers::detail::positive_preserving_dummy<gvec_ops_t> >;
-    using single_step_t = SingleStepper<gvec_ops_t, glued_nonlinear_operator_t, Log, time_step_adopt_t>;
 
+    using single_step_t = SingleStepper<gvec_ops_t, glued_nonlinear_operator_t, Log, time_step_adopt_t>;
+    using single_step_alpha_t = SingleStepper<gvec_ops_t, glued_nonlinear_operator_alpha_t, Log, time_step_adopt_t>;
+    
     using external_management_t = external_management<single_step_t>;
+    using external_management_alpha_t = external_management<single_step_alpha_t>;
+
     //making a custom timestepper to section
     using time_stepper_t = ::time_steppers::time_stepper<gvec_ops_t, glued_nonlinear_operator_t, single_step_t, Log, external_management_t>;
+    using time_stepper_alpha_t = ::time_steppers::time_stepper<gvec_ops_t, glued_nonlinear_operator_alpha_t, single_step_alpha_t, Log, external_management_alpha_t>;
 
-    using method_type = ::time_steppers::detail::methods;
     
     time_step_adopt_t* time_step_adopt_;
+
     single_step_t* single_step_;
-    ::time_steppers::detail::methods method_;
+    single_step_alpha_t *single_step_alpha_;
 
     external_management_t* external_;
+    external_management_alpha_t* external_alpha_;
+
     time_stepper_t* time_advance_;
+    time_stepper_alpha_t* time_advance_alpha_;
+
     glued_nonlinear_operator_t* glued_nonlin_op_;
+    glued_nonlinear_operator_alpha_t* glued_nonlin_alpha_op_;
+
     gvec_ops_t* g_vec_ops_;
 
-public:
-//VectorOperations* vec_ops_p, TimeStepAdaptation* time_step_adapt_p, Log* log_, NonlinearOperator* nonlin_op_p = nullptr, T param_p = 1.0,  method_type method_p = method_type::RKDP45
 
-    glued_poincare_map_linear_operator(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p,  Log* log_p, T max_time, T param_p = 1.0, method_type method_p = method_type::RKDP45, T dt_initial_p = 1.0/500.0):
+public:
+//VectorOperations* vec_ops_p, TimeStepAdaptation* time_step_adapt_p, Log* log_, NonlinearOperator* nonlin_op_p = nullptr, T param_p = 1.0,  const std::string& method_p = "RKDP45"
+
+    glued_poincare_map_linear_operator(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p,  Log* log_p, T max_time, T param_p = 1.0, const std::string& method_p = "RKDP45", T dt_initial_p = 1.0/500.0):
     vec_ops_(vec_ops_p),
     nonlin_op_(nonlin_op_p),
     log_(log_p)
@@ -178,38 +192,52 @@ public:
         
         glued_nonlin_op_ = new glued_nonlinear_operator_t(vec_ops_, nonlin_op_);
         g_vec_ops_ = glued_nonlin_op_->get_glued_vec_ops();
+        glued_nonlin_alpha_op_ = new glued_nonlinear_operator_alpha_t(vec_ops_, nonlin_op_);
 
         time_step_adopt_ = new time_step_adopt_t(g_vec_ops_, log_, {0,max_time}, dt_initial_p );
         single_step_ = new single_step_t(g_vec_ops_, time_step_adopt_, log_, glued_nonlin_op_, param_p, method_p);
+        single_step_alpha_ = new single_step_alpha_t(g_vec_ops_, time_step_adopt_, log_, glued_nonlin_alpha_op_, param_p, method_p);
+
         external_ = new external_management_t(vec_ops_, nonlin_op_, single_step_, log_);
+        external_alpha_ = new external_management_alpha_t(vec_ops_, nonlin_op_, single_step_alpha_, log_);
 
         time_advance_ = new time_stepper_t(g_vec_ops_, glued_nonlin_op_, single_step_, log_, external_);
-        
+        time_advance_alpha_ = new time_stepper_alpha_t(g_vec_ops_, glued_nonlin_alpha_op_, single_step_alpha_, log_, external_alpha_);
+
         set_parameter(param_p);
 
         g_vec_ops_->init_vector(glued_vec_); g_vec_ops_->start_use_vector(glued_vec_);
+        vec_ops_->init_vector(x0); vec_ops_->start_use_vector(x0);
 
     }
     ~glued_poincare_map_linear_operator()
     {
+        vec_ops_->stop_use_vector(x0); vec_ops_->free_vector(x0);
         g_vec_ops_->stop_use_vector(glued_vec_); g_vec_ops_->free_vector(glued_vec_); 
         delete external_;
+        delete external_alpha_;
         delete single_step_;
+        delete single_step_alpha_;
         delete time_step_adopt_;
+        delete glued_nonlin_alpha_op_;
         delete glued_nonlin_op_;
         delete time_advance_;
+        delete time_advance_alpha_;
 
     }
 
-    void set_method(method_type method_p)
+    void set_method(const std::string& method_p)
     {
         single_step_->scheme(method_p);
+        single_step_alpha_->scheme(method_p);
     }
 
     void set_parameter(const T param_p)
     {
         external_->set_parameter(param_p);
+        external_alpha_->set_parameter(param_p);
         time_advance_->set_parameter(param_p);
+        time_advance_alpha_->set_parameter(param_p);
     }
 
     T get_period_estmate_time()const 
@@ -221,6 +249,7 @@ public:
     {
         hyperplane_pair_ = hyperplane_pair_p;
         external_->set_hyperplane(hyperplane_pair_.second);
+        external_alpha_->set_hyperplane(hyperplane_pair_.second);
     }
     
     void apply(const T_vec& v_in, T_vec& v_out)const
@@ -245,12 +274,58 @@ public:
         external_->save_period_estmate_norms(file_name_);
     }
 
+    //set hyperplanes must be done before this call
+    void F_and_jacobian_alpha(T_vec& x_out, T_vec& x_lambda_out)const
+    {
+        Hyperplane* plane_0 = hyperplane_pair_.first;
+        Hyperplane* plane_1 = hyperplane_pair_.second;
+        plane_0->get_initial_point( glued_vec_.comp(0) );
+        // nonlin_op_->jacobian_alpha(glued_vec_.comp(0), plane_0->get_parameter(), x_lambda_out);
+        vec_ops_->assign(glued_vec_.comp(0), glued_vec_.comp(1));
+        plane_0->restore_from( glued_vec_.comp(1) );
+        vec_ops_->assign(glued_vec_.comp(0), x0); //save initial point
+        time_advance_alpha_->reset();
+        external_alpha_->reset();
+        time_advance_alpha_->set_initial_conditions(glued_vec_);
+        time_advance_alpha_->execute();
+        time_advance_alpha_->get_results(glued_vec_);
+        auto period_time = time_advance_alpha_->get_simulated_time();
+        plane_1->project_to(period_time, glued_vec_.comp(0), glued_vec_.comp(1));
+        
+        vec_ops_->add_mul(1.0, x0, -1.0, glued_vec_.comp(0), 0.0, x_out);
+        
+        vec_ops_->assign(glued_vec_.comp(1), x_lambda_out);   
+    }
+
+    //set hyperplanes must be done before this call
+    void F_and_jacobian_alpha(const T_vec& x_in_p, const T lambda, T_vec& x_out, T_vec& x_lambda_out)const
+    {
+        hyperplane_pair_.first->update(0.0, x_in_p, lambda);
+        hyperplane_pair_.first->get_initial_point( glued_vec_.comp(0) );
+        // nonlin_op_->jacobian_alpha(x_in_p, lambda, x_lambda_out);
+        vec_ops_->assign(glued_vec_.comp(0), glued_vec_.comp(1));
+        hyperplane_pair_.first->restore_from( glued_vec_.comp(1) );
+        vec_ops_->assign(glued_vec_.comp(0), x0); //save initial point for the F
+        time_advance_alpha_->reset();
+        external_alpha_->reset();
+        time_advance_alpha_->set_initial_conditions(glued_vec_);
+        time_advance_alpha_->execute();
+        time_advance_alpha_->get_results(glued_vec_);
+        auto period_time = time_advance_alpha_->get_simulated_time();
+        hyperplane_pair_.second->project_to(period_time, glued_vec_.comp(0), glued_vec_.comp(1));
+        
+        vec_ops_->add_mul(1.0, x_in_p, -1.0, glued_vec_.comp(0), 0.0, x_out);
+        vec_ops_->assign(glued_vec_.comp(1), x_lambda_out);
+    }
+
+
 private:
     VectorOperations* vec_ops_;
     NonlinearOperator* nonlin_op_;
     Log* log_;
     std::pair<Hyperplane*, Hyperplane*> hyperplane_pair_;
     mutable T_gvec glued_vec_;
+    mutable T_vec x0;
 
 };
 

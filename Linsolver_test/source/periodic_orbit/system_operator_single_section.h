@@ -32,17 +32,17 @@ public:
         vec_ops_->stop_use_vector(b_); vec_ops_->free_vector(b_);
     }
 
+    // why do i need it????
+    // template<class VecOfVecs>
+    // void set_hyperplanes_from_initial_guesses(NonlinearOperator* nonlin_op_p, const VecOfVecs& init_vecs, const std::vector<T>& lambdas_p)
+    // {
+    //     nonlin_op_p->set_hyperplanes_from_initial_guesses(init_vecs, lambdas_p);
+    // }
     
-    template<class VecOfVecs>
-    void set_hyperplanes_from_initial_guesses(NonlinearOperator* nonlin_op_p, const VecOfVecs& init_vecs, const std::vector<T>& lambdas_p)
-    {
-        nonlin_op_p->set_hyperplanes_from_initial_guesses(init_vecs, lambdas_p);
-    }
-    
-    void set_hyperplane_from_initial_guesses(NonlinearOperator* nonlin_op_p, const T_vec& init_vec, const T lambda_p)
-    {
-        nonlin_op_p->set_hyperplane_from_initial_guesses(init_vec, lambda_p);
-    }
+    // void set_hyperplane_from_initial_guesses(NonlinearOperator* nonlin_op_p, const T_vec& init_vec, const T lambda_p)
+    // {
+    //     nonlin_op_p->set_hyperplane_from_initial_guesses(init_vec, lambda_p);
+    // }
 
     
     bool solve(NonlinearOperator* nonlin_op, const T_vec& x, const T lambda, T_vec& d_x)const

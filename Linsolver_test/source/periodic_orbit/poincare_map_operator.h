@@ -23,7 +23,7 @@ class poincare_map_operator
 
 public:
 
-    poincare_map_operator(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p, Log* log_p, T max_time, T param_p = 1.0, method_type method_p = method_type::RKDP45, T dt_initial_p = 1.0/500.0):
+    poincare_map_operator(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p, Log* log_p, T max_time, T param_p = 1.0, const std::string& method_p = "RKDP45", T dt_initial_p = 1.0/500.0):
     vec_ops_(vec_ops_p),
     nonlin_op_(nonlin_op_p),
     log_(log_p)
@@ -42,7 +42,7 @@ public:
     }
 
 
-    void set_method(method_type method_p)
+    void set_method(const std::string& method_p)
     {
         single_step_->scheme(method_p);
     }

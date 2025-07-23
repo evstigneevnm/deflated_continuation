@@ -14,7 +14,7 @@ namespace detail
 
 
 // assumed, that nonlinear operator contains the jacoboan s.t. it can perofrm operator-vector application
-template<class VectorOperations, class NonlinearOperator>
+template<class VectorOperations, class NonlinearOperator, bool ParamterJacobian = false>
 class glued_nonlinear_operator_and_jacobian
 {
 private:
@@ -23,6 +23,7 @@ private:
         template<class PT>
         void operator()(PT* p) const {}
     }; 
+
 public:
     using glued_vector_operations_type = scfd::linspace::glued_vector_space<VectorOperations, 2>;
     using vector_type = typename glued_vector_operations_type::vector_type;
@@ -40,6 +41,7 @@ public:
 
         std::shared_ptr<VectorOperations> aaa(vec_ops_, fake_deleter() );
         glued_vector_operations_ = new glued_vector_operations_type(aaa, aaa);
+
     }
     ~glued_nonlinear_operator_and_jacobian()
     {
@@ -55,7 +57,14 @@ public:
     {
         nonlin_op_->F(time_p, in_p.comp(0), param_p, out_p.comp(0) );
         nonlin_op_->set_linearization_point(in_p.comp(0), param_p);
-        nonlin_op_->jacobian_u( in_p.comp(1), out_p.comp(1) );
+        if constexpr (ParamterJacobian)
+        {
+            nonlin_op_->jacobian_alpha( out_p.comp(1) );
+        }
+        else
+        {
+            nonlin_op_->jacobian_u( in_p.comp(1), out_p.comp(1) );
+        }
     }
 
     void norm_bifurcation_diagram(const T_vec& v_in, std::vector<T>& bif_norms_at_t_)const 
@@ -66,11 +75,11 @@ public:
     {
         return nonlin_op_->check_solution_quality(v_out.comp(0));
     }
-
     glued_vector_operations_type* get_glued_vec_ops()const
     {
         return glued_vector_operations_;
     }
+
 
 protected:
     glued_vector_operations_type* glued_vector_operations_;

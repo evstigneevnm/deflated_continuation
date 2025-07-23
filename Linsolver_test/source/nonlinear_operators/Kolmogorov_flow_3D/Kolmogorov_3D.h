@@ -117,6 +117,11 @@ unsigned int BLOCK_SIZE_x = BLOCK_SIZE_X, unsigned int BLOCK_SIZE_y = BLOCK_SIZE
 bool PureImag = true>
 class Kolmogorov_3D
 {
+public:
+    struct is_periodic_orbit_reprojected
+    {
+        static const bool value = false;
+    };
 private:
     typedef VecOpsR vec_R_t;
     typedef VecOpsC vec_C_t;

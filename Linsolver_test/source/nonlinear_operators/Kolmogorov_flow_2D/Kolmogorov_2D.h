@@ -108,6 +108,11 @@ template<class FFT_type, class VecOpsR, class VecOpsC, class VecOps,
 unsigned int BLOCK_SIZE_x = 32, unsigned int BLOCK_SIZE_y = 16>
 class Kolmogorov_2D
 {
+public:
+    struct is_periodic_orbit_reprojected
+    {
+        static const bool value = false;
+    };
 private:
     typedef VecOpsR vec_R_t;
     typedef VecOpsC vec_C_t;

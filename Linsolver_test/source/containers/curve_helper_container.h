@@ -30,8 +30,8 @@ public:
         x1_ = x1;
     }
 private:
-    T_vec x0 = nullptr;
-    T_vec x1 = nullptr;
+    T_vec x0;
+    T_vec x1;
     VectorOperations* vec_ops;
 
 

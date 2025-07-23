@@ -23,7 +23,7 @@
 namespace continuation
 {
 
-template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperations, class LinearOperator,  class Knots, class LinearSolver, class Newton, class Curve>
+template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperator, class LinearOperator,  class Knots, class LinearSolver, class Newton, class Curve>
 class continuation
 {
 protected:
@@ -36,7 +36,7 @@ private:
 
     typedef system_operator_continuation<
         VectorOperations, 
-        NonlinearOperations,
+        NonlinearOperator,
         LinearOperator,
         LinearSolver,
         Log
@@ -44,12 +44,12 @@ private:
 
     typedef newton_method_extended::convergence_strategy<
         VectorOperations, 
-        NonlinearOperations, 
+        NonlinearOperator, 
         Log> convergence_newton_cont_t;
 
     typedef numerical_algos::newton_method_extended::newton_solver_extended<
         VectorOperations, 
-        NonlinearOperations,
+        NonlinearOperator,
         system_operator_cont_t, 
         convergence_newton_cont_t, 
         T /* point solution class here instead of real!*/ 
@@ -65,7 +65,7 @@ private:
         Log,
         newton_cont_t,
         Newton,
-        NonlinearOperations,
+        NonlinearOperator,
         system_operator_cont_t,
         predictor_cont_t,
         convergence_newton_cont_t
@@ -75,7 +75,7 @@ private:
         VectorOperations,
         Log,
         Newton,
-        NonlinearOperations, 
+        NonlinearOperator, 
         LinearOperator,
         LinearSolver
         > tangent_0_cont_t;
@@ -84,7 +84,7 @@ private:
 
 
 public:
-    continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, NonlinearOperations* nonlin_op_, LinearOperator* lin_op_, Knots* knots_, LinearSolver* SM_, Newton* newton_):
+    continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, NonlinearOperator* nonlin_op_, LinearOperator* lin_op_, Knots* knots_, LinearSolver* SM_, Newton* newton_):
     vec_ops(vec_ops_),
     file_ops(file_ops_),
     log(log_),
@@ -178,7 +178,7 @@ protected: //changed to protected for inheritance
     VectorOperations* vec_ops;
     VectorFileOperations* file_ops;
     Log* log;
-    NonlinearOperations* nonlin_op;
+    NonlinearOperator* nonlin_op;
     Knots* knots;
     LinearSolver* SM;
     Newton* newton;

@@ -25,6 +25,11 @@ template<class VectorOperations_R, unsigned int BLOCK_SIZE_x=64>
 class circle
 {
 public:
+    struct is_periodic_orbit_reprojected
+    {
+        static const bool value = false;
+    };
+public:
     
     typedef VectorOperations_R vector_operations_real;
     typedef typename VectorOperations_R::scalar_type  T;

@@ -36,6 +36,11 @@ unsigned int BLOCK_SIZE_x=32, unsigned int BLOCK_SIZE_y=16>
 class Kuramoto_Sivashinskiy_2D
 {
 public:
+    struct is_periodic_orbit_reprojected
+    {
+        static const bool value = false;
+    };
+public:
     
     typedef VectorOperations_R vector_operations_real;
     typedef VectorOperations_C vector_operations_complex;

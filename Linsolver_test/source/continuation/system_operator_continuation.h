@@ -1,6 +1,8 @@
 #ifndef __CONTINUATION__SYSTEM_OPERATOR_CONTINUATION_H__
 #define __CONTINUATION__SYSTEM_OPERATOR_CONTINUATION_H__
 
+// WARNING! THIS OPERATOR USES TRAITS (c++17) TO CHECK REPROJECT! CONVERT ALL YOUR NONLINEAR OPERATORS ACCORDINGLY. THIS IS A WALKARROUND FOR POICARE SECTION METHODS.
+
 #include <string>
 #include <stdexcept>
 
@@ -64,7 +66,15 @@ public:
         
             flag_lin_solver = false;
             nonlin_op->set_linearization_point(x, lambda);
-            nonlin_op->jacobian_alpha(Jlambda);
+            if constexpr(NonlinearOperator::is_periodic_orbit_reprojected::value)
+            {
+                nonlin_op->F_and_jacobian_alpha(f, Jlambda); // here f is a mute variable, set to 0 later
+            }
+            else
+            {
+                nonlin_op->jacobian_alpha(Jlambda);
+            }
+            
             vec_ops->assign_scalar(T(0.0), f);
             T beta = T(1.0);
             T alpha = lambda_0_s;
@@ -77,7 +87,12 @@ public:
             SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(tolerance_local);
             SM_solver->get_linsolver_handle()->monitor().set_temp_max_iterations(1000);
             flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, x_1_s, lambda_1_s);
-            
+            if constexpr(NonlinearOperator::is_periodic_orbit_reprojected::value)
+            {
+                nonlin_op->reproject(x_1_s);
+            }
+
+
             T minimum_resid = SM_solver->get_linsolver_handle()->monitor().resid_norm_out();
             int iters_performed = SM_solver->get_linsolver_handle()->monitor().iters_performed();
             log->info_f("desired residual = %le, minimum attained residual = %le with %i iterations.", tolerance_local, minimum_resid, iters_performed);
@@ -121,10 +136,21 @@ public:
 
             */
             nonlin_op->set_linearization_point(x, lambda);
-            nonlin_op->jacobian_alpha(Jlambda);
-            nonlin_op->F(x, lambda, f);            
+            if constexpr(NonlinearOperator::is_periodic_orbit_reprojected::value)
+            {
+                //merge these two calls (jacobina_alpha and F):
+                nonlin_op->F_and_jacobian_alpha(x, lambda, f, Jlambda);
+                //Must be called only afer the linearization point is zet
+                // nonlin_op->F(x, lambda, f);  
+            }
+            else
+            {
+                nonlin_op->jacobian_alpha(Jlambda);
+                nonlin_op->F(x, lambda, f);    
+                vec_ops->add_mul_scalar(T(0), T(-1.0), f); //f=-F(x,lambda)
+            }
             
-            vec_ops->add_mul_scalar(T(0), T(-1.0), f); //f=-F(x,lambda)
+            
             T beta =  - orthogonal_projection(x, lambda); //beta = -orth_proj
             T alpha = lambda_0_s;
 
@@ -132,7 +158,12 @@ public:
             // double N_ = 1.0*N;
             // vec_ops->scale(1.0/N_, x_0_s);
             flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, d_x, d_lambda);
-            
+            if constexpr(NonlinearOperator::is_periodic_orbit_reprojected::value)
+            {
+                nonlin_op->reproject(d_x);
+            }            
+
+
         }  
         else
         {

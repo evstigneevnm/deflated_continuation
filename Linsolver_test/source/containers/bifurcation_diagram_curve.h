@@ -439,8 +439,8 @@ private:
     uint64_t global_id = 0; 
     uint64_t global_index = 0;
 
-    T_vec x0 = nullptr;
-    T_vec x1 = nullptr;
+    T_vec x0;
+    T_vec x1;
     T lambda0, lambda1;
     bool curve_open;
 

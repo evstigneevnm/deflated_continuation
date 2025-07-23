@@ -5,9 +5,10 @@
 /**
 *   System operator class used to solve the linear system for implicit methods
 *   Executed in the Newton's method
-*
-*
-*/
+*   The form is:
+*   u_t = F(u,t)
+*   F(u,t) is on the RHS!
+*/ 
 
 namespace time_steppers
 {

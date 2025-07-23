@@ -5,6 +5,7 @@
 #include <vector>
 #include <iterator>
 #include <algorithm>
+#include <cmath>
 #include <common/dot_product.h>
 #include <common/threaded_reduction.h>
 
@@ -21,6 +22,8 @@ struct cpu_vector_operations
     using vector_type = std::vector<T>;//T*;
     using multivector_type = std::vector<vector_type>;
     using ordinal_type = std::ptrdiff_t;
+    using norm_type = scalar_type; //TODO!
+    using Tsc = norm_type;
 
     bool location;
     dot_product<T, vector_type>* dot = nullptr;
@@ -61,6 +64,10 @@ struct cpu_vector_operations
     {
         return get_default_size();
     }
+    size_t get_l2_size() const
+    {
+        return std::sqrt(Tsc(get_vector_size()));
+    }      
     size_t get_size(const vector_type& x)const
     {
         return x.size();
@@ -70,6 +77,11 @@ struct cpu_vector_operations
         return location;
     }
 
+    unsigned int get_fp_prec()const
+    {
+        //return std::round(std::log( 1.0/std::numeric_limits ) )
+        return std::numeric_limits<T>::digits10+1;
+    }
 
     void init_vector(vector_type& x, const size_t sz_p = 0)const 
     {
@@ -324,7 +336,7 @@ struct cpu_vector_operations
             y[i] += mul_x*x[i];
     }
     //calc: y := mul_x*x + mul_y*y
-    void add_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, vector_type& y)const
+    void add_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, vector_type& y)const
     {
         if(x.size() != y.size() )
         {
@@ -339,8 +351,8 @@ struct cpu_vector_operations
     }
 
     //calc: z := mul_x*x + mul_y*y + mul_z*z
-    void add_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, const vector_type& y, 
-                            scalar_type mul_z, vector_type& z)const
+    void add_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
+                           const  scalar_type mul_z, vector_type& z)const
     {
         if((x.size() != y.size() )&&(x.size() != z.size() ))
         {

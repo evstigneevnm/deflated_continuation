@@ -50,8 +50,14 @@ public:
         bool linear_system_converged = false;
     
         nonlin_op->set_linearization_point(x, lambda);
-        nonlin_op->jacobian_alpha(f);
-        
+        if constexpr(NonlinearOperator::is_periodic_orbit_reprojected::value)
+        {
+            nonlin_op->F_and_jacobian_alpha(x_s, f); //here x_s is a mute variable! It will be zeroed later.
+        }
+        else
+        {
+            nonlin_op->jacobian_alpha(f);
+        }
         
         //This is important!!!
         vec_ops->assign_scalar(T(0.0), x_s);
@@ -64,7 +70,11 @@ public:
         lin_solv->get_linsolver_handle_original()->monitor().set_temp_tolerance(tolerance_local);
         lin_solv->get_linsolver_handle_original()->monitor().set_temp_max_iterations(10000);
         linear_system_converged = lin_solv->solve((*lin_op), f, x_s);
-        
+        if constexpr(NonlinearOperator::is_periodic_orbit_reprojected::value)
+        {
+            nonlin_op->reproject(x_s);
+        }  
+
         T minimum_resid = lin_solv->get_linsolver_handle_original()->monitor().resid_norm_out();
         int iters_performed = lin_solv->get_linsolver_handle_original()->monitor().iters_performed();
         log->info_f("desired residual = %le, minimum attained residual = %le with %i iterations.", tolerance_local, minimum_resid, iters_performed);        

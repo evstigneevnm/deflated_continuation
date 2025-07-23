@@ -59,7 +59,6 @@ public:
     {
         param0[used_param_number_] = param_p;
         vec_ops_->assign(x_p, x0);
-
     }
 
     void set_initial(T_vec& x0)const

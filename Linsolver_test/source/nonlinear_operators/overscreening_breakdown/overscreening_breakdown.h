@@ -41,6 +41,11 @@ namespace nonlinear_operators
 template<class VecOps, class MatOps, class Kern = overscreening_breakdown_ker<VecOps, MatOps>, class FileOperations = gpu_file_operations<VecOps> >
 class overscreening_breakdown
 {
+public:
+    struct is_periodic_orbit_reprojected
+    {
+        static const bool value = false;
+    };
 private:
     using vec_ops_t = VecOps;
     using mat_ops_t = MatOps;

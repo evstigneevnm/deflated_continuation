@@ -21,7 +21,7 @@ public:
     ~cpu_file_operations()
     {}
 
-    void write_vector(const std::string &f_name, T_vec& vec_cpu) const
+    void write_vector(const std::string &f_name, const T_vec& vec_cpu) const
     {
         file_operations::write_vector<T, T_vec>(f_name, sz, vec_cpu, prec_);
     }

@@ -1,6 +1,7 @@
 #ifndef __NONLINEAR_OPERATORS_ROSSLER_OPERATOR_H__
 #define __NONLINEAR_OPERATORS_ROSSLER_OPERATOR_H__
 
+#include <stdexcept>
 
 namespace nonlinear_operators
 {
@@ -52,7 +53,6 @@ struct rossler //https://en.wikipedia.org/wiki/R%C3%B6ssler_attractor
     {
         param0[used_param_number_] = param_p;
         vec_ops_->assign(x_p, x0);
-
     }
 
     void set_initial(T_vec& x0)const
@@ -79,6 +79,38 @@ struct rossler //https://en.wikipedia.org/wiki/R%C3%B6ssler_attractor
         x_out_p[1] = x_in_p[0]+param0[0]*x_in_p[1];
         x_out_p[2] = x0[2]*x_in_p[0]+x0[0]*x_in_p[2]-param0[2]*x_in_p[2];
 
+    }
+
+    
+    void jacobian_alpha(const T_vec& x_in_p, const T param_p, T_vec& x_out_p) const
+    {
+        if (used_param_number_ == 0)
+        {
+            x_out_p[0] = 0; 
+            x_out_p[1] = x_in_p[1]; 
+            x_out_p[2] = 0;
+        }
+        else if (used_param_number_ == 1)
+        {
+            x_out_p[0] = 0; 
+            x_out_p[1] = 0; 
+            x_out_p[2] = 1.0;
+        }
+        else if (used_param_number_ == 2)
+        {
+            x_out_p[0] = 0; 
+            x_out_p[1] = 0; 
+            x_out_p[2] = x_in_p[2];
+        }
+        else
+        {
+            throw std::logic_error("Incorrect number of parameters provided in the constructor.");
+        }
+    }
+
+    void jacobian_alpha(T_vec& x_out_p) const
+    {
+        jacobian_alpha(x0, param0[used_param_number_], x_out_p);
     }
 
     void norm_bifurcation_diagram(const T_vec& x0, std::vector<T>& norm_vec)const
