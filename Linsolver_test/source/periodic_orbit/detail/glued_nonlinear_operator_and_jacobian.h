@@ -31,6 +31,7 @@ public:
 private:
     using T = scalar_type;
     using T_vec = vector_type;
+    using T_vec1 = typename VectorOperations::vector_type;
 
 public:
 
@@ -41,10 +42,12 @@ public:
 
         std::shared_ptr<VectorOperations> aaa(vec_ops_, fake_deleter() );
         glued_vector_operations_ = new glued_vector_operations_type(aaa, aaa);
+        vec_ops_->init_vector(x_l); vec_ops_->start_use_vector(x_l);
 
     }
     ~glued_nonlinear_operator_and_jacobian()
     {
+        vec_ops_->stop_use_vector(x_l); vec_ops_->free_vector(x_l);
         delete glued_vector_operations_;
     }
     
@@ -59,7 +62,11 @@ public:
         nonlin_op_->set_linearization_point(in_p.comp(0), param_p);
         if constexpr (ParamterJacobian)
         {
-            nonlin_op_->jacobian_alpha( out_p.comp(1) );
+            // variaitonal:
+            // dv/dt = df/du(u,lambda) v + df/dlambda
+            nonlin_op_->jacobian_u(in_p.comp(1), out_p.comp(1));
+            nonlin_op_->jacobian_alpha( x_l );
+            vec_ops_->add_mul(1.0, x_l, out_p.comp(1));
         }
         else
         {
@@ -86,7 +93,7 @@ protected:
 private:
     VectorOperations* vec_ops_;
     NonlinearOperator* nonlin_op_;
-
+    T_vec1 x_l;
 
 
 };

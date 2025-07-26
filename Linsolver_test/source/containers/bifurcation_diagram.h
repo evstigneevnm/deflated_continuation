@@ -86,7 +86,12 @@ public:
         curve_ref = &curve_container.back();
     }
 
-
+    Curve* get_current_ref()
+    {
+        //std::cout << "reference to the curve inside = " << &curve_container.back() << std::endl;
+        curve_container.back().set_main_refs( vec_ops, file_ops, log, nonlin_op, newton, cont_help );
+        return (&curve_container.back());
+    }
 
     int current_curve()
     {

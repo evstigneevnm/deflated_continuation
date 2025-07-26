@@ -50,7 +50,7 @@ private:
             bool finish_besection = false;
             if(simulated_time >= time_b4_section_check_)
             {
-                if(periodic_time_ == 0.0)
+                if(periodic_time_ == 0.0) //not too good, but ok for now, since in reset() we set it to 0.
                 {
                     if(time_b4_section_check_>0.0)
                     {
@@ -93,7 +93,7 @@ private:
         {
             time_b4_section_check_ = 0;
             solution_period_estmate_norms.resize(0);
-            periodic_time_ = 0;
+            periodic_time_ = 0.0;
 
         }
         void save_period_estmate_norms(const std::string& file_name_)const

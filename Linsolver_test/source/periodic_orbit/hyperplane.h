@@ -99,6 +99,9 @@ public:
         vec_ops_->add_mul(1.0, x_to, -1.0, x0_, 0.0, dx_);
         T dx_to = vec_ops_->scalar_prod(n_, dx_);
         bool flag_2 = dx_from*dx_to<0.0;
+
+    
+
         return flag_1&flag_2;
 
     }

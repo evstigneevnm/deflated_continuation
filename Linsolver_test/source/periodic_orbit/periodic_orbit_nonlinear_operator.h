@@ -69,7 +69,7 @@ public:
     };
     preconditioner_type* preconditioner;
 
-    periodic_orbit_nonlinear_operator(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p, Log* log_p, T max_time_p, T param_p = 1.0,  const std::string& method_p ="RKDP45", T dt_initial_p = 1.0/500.0):
+    periodic_orbit_nonlinear_operator(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p, Log* log_p, T max_time_p, T param_p = 1.0,  const std::string& method_p ="RKDP45", T dt_initial_p = 1.0/700.0):
     vec_ops_(vec_ops_p),
     nonlin_op_(nonlin_op_p),
     log_(log_p) 
@@ -197,9 +197,9 @@ public:
         }        
     }
 
-    void project(T_vec& x1_s) const //to be tested!!
+    void project(T_vec& x1_s) const //not needed!
     {
-        reproject(x1_s); 
+        // reproject(x1_s); 
     }
 
     T check_solution_quality(const T_vec& x)const

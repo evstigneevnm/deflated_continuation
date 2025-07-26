@@ -70,10 +70,10 @@ public:
         lin_solv->get_linsolver_handle_original()->monitor().set_temp_tolerance(tolerance_local);
         lin_solv->get_linsolver_handle_original()->monitor().set_temp_max_iterations(10000);
         linear_system_converged = lin_solv->solve((*lin_op), f, x_s);
-        if constexpr(NonlinearOperator::is_periodic_orbit_reprojected::value)
-        {
-            nonlin_op->reproject(x_s);
-        }  
+        // if constexpr(NonlinearOperator::is_periodic_orbit_reprojected::value)
+        // {
+        //     nonlin_op->reproject(x_s);
+        // }  
 
         T minimum_resid = lin_solv->get_linsolver_handle_original()->monitor().resid_norm_out();
         int iters_performed = lin_solv->get_linsolver_handle_original()->monitor().iters_performed();

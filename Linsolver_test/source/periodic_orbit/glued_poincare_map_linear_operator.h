@@ -277,11 +277,11 @@ public:
     //set hyperplanes must be done before this call
     void F_and_jacobian_alpha(T_vec& x_out, T_vec& x_lambda_out)const
     {
+        // throw std::runtime_error("F_and_jacobian_alpha: disabled.");
         Hyperplane* plane_0 = hyperplane_pair_.first;
         Hyperplane* plane_1 = hyperplane_pair_.second;
         plane_0->get_initial_point( glued_vec_.comp(0) );
-        // nonlin_op_->jacobian_alpha(glued_vec_.comp(0), plane_0->get_parameter(), x_lambda_out);
-        vec_ops_->assign(glued_vec_.comp(0), glued_vec_.comp(1));
+        vec_ops_->assign_scalar(0, glued_vec_.comp(1));
         plane_0->restore_from( glued_vec_.comp(1) );
         vec_ops_->assign(glued_vec_.comp(0), x0); //save initial point
         time_advance_alpha_->reset();
@@ -293,29 +293,27 @@ public:
         plane_1->project_to(period_time, glued_vec_.comp(0), glued_vec_.comp(1));
         
         vec_ops_->add_mul(1.0, x0, -1.0, glued_vec_.comp(0), 0.0, x_out);
-        
-        vec_ops_->assign(glued_vec_.comp(1), x_lambda_out);   
+        vec_ops_->assign(glued_vec_.comp(1), x_lambda_out);
     }
 
-    //set hyperplanes must be done before this call
     void F_and_jacobian_alpha(const T_vec& x_in_p, const T lambda, T_vec& x_out, T_vec& x_lambda_out)const
     {
         hyperplane_pair_.first->update(0.0, x_in_p, lambda);
-        hyperplane_pair_.first->get_initial_point( glued_vec_.comp(0) );
-        // nonlin_op_->jacobian_alpha(x_in_p, lambda, x_lambda_out);
-        vec_ops_->assign(glued_vec_.comp(0), glued_vec_.comp(1));
-        hyperplane_pair_.first->restore_from( glued_vec_.comp(1) );
-        vec_ops_->assign(glued_vec_.comp(0), x0); //save initial point for the F
-        time_advance_alpha_->reset();
-        external_alpha_->reset();
-        time_advance_alpha_->set_initial_conditions(glued_vec_);
-        time_advance_alpha_->execute();
-        time_advance_alpha_->get_results(glued_vec_);
-        auto period_time = time_advance_alpha_->get_simulated_time();
-        hyperplane_pair_.second->project_to(period_time, glued_vec_.comp(0), glued_vec_.comp(1));
-        
-        vec_ops_->add_mul(1.0, x_in_p, -1.0, glued_vec_.comp(0), 0.0, x_out);
-        vec_ops_->assign(glued_vec_.comp(1), x_lambda_out);
+        F_and_jacobian_alpha(x_out, x_lambda_out);
+        // hyperplane_pair_.first->get_initial_point( glued_vec_.comp(0) );
+        // vec_ops_->assign_scalar(0, glued_vec_.comp(1));
+        // hyperplane_pair_.first->restore_from( glued_vec_.comp(1) );
+        // vec_ops_->assign(glued_vec_.comp(0), x0); //save initial point for the F
+        // time_advance_alpha_->reset();
+        // external_alpha_->reset();
+        // time_advance_alpha_->set_initial_conditions(glued_vec_);
+        // time_advance_alpha_->execute();
+        // time_advance_alpha_->get_results(glued_vec_);
+        // auto period_time = time_advance_alpha_->get_simulated_time();
+        // hyperplane_pair_.second->project_to(period_time, glued_vec_.comp(0), glued_vec_.comp(1));
+
+        // vec_ops_->add_mul(1.0, x_in_p, -1.0, glued_vec_.comp(0), 0.0, x_out);
+        // vec_ops_->assign(glued_vec_.comp(1), x_lambda_out);
     }
 
 

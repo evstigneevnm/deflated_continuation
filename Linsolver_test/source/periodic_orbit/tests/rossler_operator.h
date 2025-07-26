@@ -100,7 +100,7 @@ struct rossler //https://en.wikipedia.org/wiki/R%C3%B6ssler_attractor
         {
             x_out_p[0] = 0; 
             x_out_p[1] = 0; 
-            x_out_p[2] = x_in_p[2];
+            x_out_p[2] = -x_in_p[2];
         }
         else
         {
