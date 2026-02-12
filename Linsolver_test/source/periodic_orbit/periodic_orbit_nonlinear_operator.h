@@ -209,6 +209,7 @@ public:
     void norm_bifurcation_diagram(const T_vec& v_in, std::vector<T>& bif_norms_at_t_)const 
     {
         nonlin_op_->norm_bifurcation_diagram(v_in, bif_norms_at_t_);
+        
         auto T_period = poincare_map_->get_period_estmate_time();
         bif_norms_at_t_.push_back(T_period);
     }

@@ -322,6 +322,8 @@ test_vdp_time_stepping:
 test_rossler_time_stepping:
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/time_stepper/tests/rossler_1.cpp $(OPENMP) -o test_rossler.bin 2>results.make
 
+test_lorentz_time_stepping:
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/time_stepper/tests/lorentz.cpp $(OPENMP) -o test_lorentz.bin 2>results.make
 # test periodic orbits:
 test_rossler_to_section:
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_to_section.cpp $(OPENMP) -o test_rossler_to_section.bin 2>results.make
@@ -335,6 +337,9 @@ test_glued_poincare_map_linear_operator:
 test_rossler_periodic_orbit_cpu:
 	$(G++)  $(G++FLAGS)  $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_periodic_cpu.cpp $(OPENMP) -o test_rossler_periodic_cpu.bin 2>results.make
 
+
+test_lorentz_periodic_orbit_cpu:
+	$(G++)  $(G++FLAGS)  $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/lorentz_periodic_cpu.cpp $(OPENMP) -o test_lorentz_periodic_cpu.bin 2>results.make
 
 test_rossler_periodic_continuate_cpu:
 	$(G++)  $(G++FLAGS)  $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) $(IBOOST) source/periodic_orbit/tests/rossler_periodic_continuate_cpu.cpp $(OPENMP) $(LBOOST) -o rossler_periodic_continuate_cpu.bin 2>results.make
