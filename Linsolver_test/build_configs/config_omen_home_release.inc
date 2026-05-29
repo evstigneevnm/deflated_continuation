@@ -1,0 +1,12 @@
+TARGET_GCC = -O3
+TARGET_NVCC = -O3
+HYPRE_BUILD_TYPE=release
+MPI_ROOT_PATH = /usr/local/mpi
+GCC_ROOT_PATH = /usr/bin
+CUDA_ROOT_PATH = /usr/local/cuda
+BOOST_ROOT_PATH = /usr/local/boost
+OPENBLAS_ROOT_PATH = /opt/openblas
+CUDA_ARCH_LIST = 75
+CPPSTD = c++17
+REAL_TYPE=float
+BUILD_DIR=./build

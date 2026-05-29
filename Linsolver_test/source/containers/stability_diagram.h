@@ -10,6 +10,11 @@
 #include <vector>
 #include <string>
 #include <stdexcept>
+#include <fstream>
+#include <iostream>
+#include <filesystem>
+#include <system_error>
+#include <cstdint>
 //using boost for serialization
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
@@ -87,6 +92,51 @@ private:
     VectorFileOperations* vec_file_ops;
     Log* log;
 
+    bool directory_exists(const std::string& name) const
+    {
+        std::error_code ec;
+        return std::filesystem::is_directory(name, ec);
+    }
+
+    bool path_exists(const std::string& name) const
+    {
+        std::error_code ec;
+        return std::filesystem::exists(name, ec);
+    }
+
+    void ensure_curve_directory_exists()
+    {
+        if(directory_exists(curve_path))
+        {
+            return;
+        }
+
+        if(path_exists(curve_path))
+        {
+            throw std::runtime_error(
+                std::string("stability_diagram: curve output path exists but is not a directory: ") +
+                curve_path);
+        }
+
+        std::error_code ec;
+        if(!std::filesystem::create_directory(curve_path, ec))
+        {
+            if(ec)
+            {
+                throw std::runtime_error(
+                    std::string("stability_diagram: failed to create curve output directory '") +
+                    curve_path + "': " + ec.message());
+            }
+            if(!directory_exists(curve_path))
+            {
+                throw std::runtime_error(
+                    std::string("stability_diagram: failed to create curve output directory: ") +
+                    curve_path);
+            }
+        }
+        log->info_f("stability_diagram: created curve output directory: %s", curve_path.c_str());
+    }
+
 public:
     stability_diagram()
     {   
@@ -104,7 +154,20 @@ public:
         {
             throw std::runtime_error(std::string("stability_diagram: container size and curve number don't match.") );
         }
-        curve_path = project_dir.c_str() + std::to_string(current_curve_number);
+        curve_path = (std::filesystem::path(project_dir) / std::to_string(current_curve_number)).string();
+        if(!directory_exists(project_dir))
+        {
+            if(path_exists(project_dir))
+            {
+                throw std::runtime_error(
+                    std::string("stability_diagram: project path exists but is not a directory: ") +
+                    project_dir);
+            }
+            throw std::runtime_error(
+                std::string("stability_diagram: project directory doesn't exist: ") +
+                project_dir);
+        }
+        ensure_curve_directory_exists();
         curve.clear();
         curve_opened = true;
 

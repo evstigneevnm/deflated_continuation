@@ -45,7 +45,7 @@ public:
         bool finished = false;
         bool linsolver_converged = false;
         conv_strat->reset_iterations(); //reset iteration count, newton wight and iteration history
-        finished = conv_strat->check_convergence(nonlin_op, x, lambda, delta_x, delta_lambda, result_status); //check that the supplied initial guess is not a solution
+        finished = check_convergence_with_optional_system_operator(nonlin_op, x, lambda, delta_x, delta_lambda, result_status, true); //check that the supplied initial guess is not a solution
         while(!finished)
         {
             //reset iterational vectors??!
@@ -54,7 +54,7 @@ public:
 
             linsolver_converged = system_op->solve(nonlin_op, x, lambda, delta_x, delta_lambda);
 
-            finished = conv_strat->check_convergence(nonlin_op, x, lambda, delta_x, delta_lambda, result_status);
+            finished = check_convergence_with_optional_system_operator(nonlin_op, x, lambda, delta_x, delta_lambda, result_status, linsolver_converged);
 
         }
         if(result_status==0)
@@ -89,6 +89,51 @@ public:
     }
 
 private:
+    template<class ConvergenceStrategy_, class SystemOperator_>
+    static auto check_convergence_impl(
+        int,
+        ConvergenceStrategy_* conv_strat_,
+        SystemOperator_* system_op_,
+        NonlinearOperator*& nonlin_op,
+        T_vec& x,
+        T& lambda,
+        T_vec& delta_x,
+        T& delta_lambda,
+        int& result_status,
+        bool lin_solver_converged)
+        -> decltype(conv_strat_->check_convergence(system_op_, nonlin_op, x, lambda, delta_x, delta_lambda, result_status, lin_solver_converged), bool())
+    {
+        return conv_strat_->check_convergence(system_op_, nonlin_op, x, lambda, delta_x, delta_lambda, result_status, lin_solver_converged);
+    }
+
+    template<class ConvergenceStrategy_, class SystemOperator_>
+    static bool check_convergence_impl(
+        long,
+        ConvergenceStrategy_* conv_strat_,
+        SystemOperator_*,
+        NonlinearOperator*& nonlin_op,
+        T_vec& x,
+        T& lambda,
+        T_vec& delta_x,
+        T& delta_lambda,
+        int& result_status,
+        bool lin_solver_converged)
+    {
+        return conv_strat_->check_convergence(nonlin_op, x, lambda, delta_x, delta_lambda, result_status, lin_solver_converged);
+    }
+
+    bool check_convergence_with_optional_system_operator(
+        NonlinearOperator*& nonlin_op,
+        T_vec& x,
+        T& lambda,
+        T_vec& delta_x,
+        T& delta_lambda,
+        int& result_status,
+        bool lin_solver_converged)
+    {
+        return check_convergence_impl(0, conv_strat, system_op, nonlin_op, x, lambda, delta_x, delta_lambda, result_status, lin_solver_converged);
+    }
+
     VectorOperations* vec_ops;
     SystemOperator* system_op;
     ConvergenceStrategy* conv_strat;

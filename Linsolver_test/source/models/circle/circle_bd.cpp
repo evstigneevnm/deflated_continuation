@@ -2,8 +2,9 @@
 #include <iostream>
 #include <cstdio>
 #include <memory>
+#include <string>
 #include <utils/cuda_support.h>
-#include <utils/log.h>
+#include <scfd/utils/log.h>
 #include <external_libraries/cublas_wrap.h>
 
 //problem dependant
@@ -31,12 +32,17 @@
 
 int main(int argc, char const *argv[])
 {
+    if(argc > 2)
+    {
+        printf("Usage: %s [path_to_config_file.json]\n", argv[0]);
+        return 1;
+    }
     
     typedef SCALAR_TYPE real;
 
     size_t Nx = 1; //size of the vector variable. 1 in this case
     
-    typedef utils::log_std log_t;
+    typedef scfd::utils::log_std log_t;
     typedef gpu_vector_operations<real> vec_ops_real;
     typedef gpu_file_operations<vec_ops_real> files_ops_t;
     typedef numerical_algos::lin_solvers::default_monitor<
@@ -55,7 +61,9 @@ int main(int argc, char const *argv[])
 
 
     typedef main_classes::parameters<real> parameters_t;
-    parameters_t parameters = main_classes::read_parameters_json<real>("json_project_files/circle_test.json");
+    const std::string path_to_config_file = (argc == 2) ? argv[1] : "json_project_files/circle_test.json";
+    std::cout << "Reading config file: " << path_to_config_file << std::endl;
+    parameters_t parameters = main_classes::read_parameters_json<real>(path_to_config_file);
     parameters.plot_all();
 
     Nx = parameters.nonlinear_operator.N_size.at(0)==1?Nx:(throw std::runtime_error("incorrect size for problem in config file provided. Expecting 1."));

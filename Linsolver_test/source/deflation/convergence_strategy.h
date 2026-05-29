@@ -5,7 +5,7 @@ converhence rules for Newton iterator for deflation process
 */
 #include <cmath>
 #include <vector>
-#include <utils/logged_obj_base.h>
+#include <scfd/utils/logged_obj_base.h>
 
 namespace deflation
 {
@@ -19,7 +19,7 @@ class convergence_strategy
 private:
     typedef typename vector_operations::scalar_type  T;
     typedef typename vector_operations::vector_type  T_vec;
-    typedef utils::logged_obj_base<logging> logged_obj_t;
+    typedef scfd::utils::logged_obj_base<logging> logged_obj_t;
 
 public:    
     using norms_storage_type = std::vector<T>;
@@ -66,8 +66,15 @@ public:
     }
 
 
-    bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status)
+    bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status, bool lin_solver_converged = true)
     {
+        if(!lin_solver_converged)
+        {
+            log->error("deflation::convergence: linear solver failed.");
+            result_status = 5;
+            return true;
+        }
+
         bool finish = false;
         nonlin_op->F(x, lambda, Fx);
         T normFx = vec_ops->norm(Fx);
@@ -125,7 +132,7 @@ public:
         }
         else if(iterations>=maximum_iterations)
         {
-            log->info("Newton max iterations (%i) reached.", iterations);
+            log->info_f("Newton max iterations (%i) reached.", iterations);
             result_status = 1;
             finish = true;
         }

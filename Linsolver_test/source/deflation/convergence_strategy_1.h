@@ -76,8 +76,14 @@ public:
     }
 
 
-    bool check_convergence(NonlinearOperator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status)
+    bool check_convergence(NonlinearOperator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status, bool lin_solver_converged = true)
     {
+        if(!lin_solver_converged)
+        {
+            log->error("deflation::convergence: linear solver failed.");
+            result_status = 5;
+            return true;
+        }
     
         bool finish = false;
         reset_wight();

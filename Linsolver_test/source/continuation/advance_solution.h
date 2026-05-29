@@ -61,7 +61,9 @@ public:
         {
             predictor->apply(x_p, lambda_p, x1, lambda1);
             T ds_l = predictor->get_ds();
-            log->info_f("continuation::predict: ||x_p|| = %le, lambda_p = %le, ||x1|| = %le, lambda1 = %le", (double)vec_ops->norm(x_p), (double)lambda_p, (double)vec_ops->norm(x1), (double)lambda1);
+            T ds_max = predictor->get_ds_max();
+            T tangent_norm = vec_ops->norm_rank1(x0_s, lambda0_s);
+            log->info_f("continuation::predict: dS = %le, max dS = %le, tangent norm = %le, ||x_p|| = %le, lambda_p = %le, ||x1|| = %le, lambda1 = %le", (double)ds_l, (double)ds_max, (double)tangent_norm, (double)vec_ops->norm(x_p), (double)lambda_p, (double)vec_ops->norm(x1), (double)lambda1);
             if(continuation_type == 'S')
             {
                 sys_op->set_tangent_space((T_vec&)x0, (T&)lambda0, (T_vec&)x0_s, (T&)lambda0_s, ds_l, continuation_type);
@@ -107,6 +109,9 @@ public:
 
 	    if(converged)
         {
+            T arclength_res = sys_op->arclength_residual(x1, lambda1);
+            T tangent_norm = vec_ops->norm_rank1(x0_s, lambda0_s);
+            log->info_f("continuation::advance_solution::corrected state: dS = %le, tangent norm = %le, arclength residual = %le", (double)predictor->get_ds(), (double)tangent_norm, (double)arclength_res);
             tangent_obtained = sys_op->update_tangent_space(nonlin_op, x1, lambda1, x1_s, lambda1_s);
         }
         if((converged)&&(!tangent_obtained))

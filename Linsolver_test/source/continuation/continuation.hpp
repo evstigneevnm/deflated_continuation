@@ -250,7 +250,7 @@ private:
     {
         T w = (lambda_star - lambda_0_)/(lambda_1_ - lambda_0_);
         T _w = T(1) - w;
-        vec_ops->add_mul(w, x0_, _w, x1_);
+        vec_ops->add_mul(_w, x0_, w, x1_);
         lambda_1_ = lambda_star;
         bool res = get_solution(lambda_star, x1_);
         if(!res)

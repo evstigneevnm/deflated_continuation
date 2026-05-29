@@ -10,6 +10,8 @@
 */
 
 #include <algorithm>
+#include <cmath>
+#include <stdexcept>
 
 namespace continuation
 {
@@ -21,14 +23,16 @@ public:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
 
-    predictor_adaptive(VectorOperations* vec_ops_, Logging* log_, T ds_0_ = 0.1, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4):
+    predictor_adaptive(VectorOperations* vec_ops_, Logging* log_, T ds_0_ = 0.1, T ds_max_ = 0.1, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01, unsigned int attempts_0_ = 4):
     vec_ops(vec_ops_),
     log(log_),
     ds_0(ds_0_),
+    ds_max(ds_max_),
     step_ds_p(step_ds_p_),
     step_ds_m(step_ds_m_),
     attempts_0(attempts_0_)
     {
+        validate_steps();
         attempts = 0;
         attempts_increase = 0;
         ds = ds_0;
@@ -48,6 +52,7 @@ public:
         step_ds_p = step_ds_p_;
         step_ds_m = step_ds_m_;
         attempts_0 = attempts_0_; 
+        validate_steps();
 
         attempts = 0;
         attempts_increase = 0;
@@ -63,7 +68,7 @@ public:
         // ds_m = ds;     
 
         attempts = 0;
-        log->info_f("predictor::arclength.reset: step dS = %le", (double)ds);
+        log->info_f("predictor::arclength.reset: step dS = %le, max dS = %le", (double)ds, (double)ds_max);
     }
     
     //resets all, including ds and advance counters
@@ -74,7 +79,7 @@ public:
         ds_m = ds_0;  
         attempts = 0;
         attempts_increase = 0; 
-        log->info_f("predictor::arclength.reset_all: step dS = %le", (double)ds);
+        log->info_f("predictor::arclength.reset_all: step dS = %le, max dS = %le", (double)ds, (double)ds_max);
     }
 
     void set_tangent_space(const T_vec& x_0_, const T& lambda_0_, const T_vec& x_s_, const T& lambda_s_)
@@ -108,6 +113,7 @@ public:
         vec_ops->assign(x_0, x_0_p);
         vec_ops->add_mul(ds, x_s, x_0_p);
         lambda_0_p=lambda_0 + ds*lambda_s;
+        log->info_f("predictor::apply: dS = %le, max dS = %le", (double)ds, (double)ds_max);
 /*
     //calc: y := mul_x*x
     void assign_mul(const scalar_type mul_x, const vector_type& x, vector_type& y)const;
@@ -129,6 +135,7 @@ public:
         vec_ops->add_mul(ds, x_s, x_0_p);
         
         lambda_0_p=lambda_0 + ds*lambda_s;
+        log->info_f("predictor::apply: dS = %le, max dS = %le", (double)ds, (double)ds_max);
     }
 
     bool modify_ds()
@@ -138,9 +145,8 @@ public:
 
             if(attempts%2==0)
             {
-                ds_p = ds_p*T(1+step_ds_p);
+                ds_p = std::min(ds_p*T(1+step_ds_p), ds_max);
                 ds = ds_p;
-                //ds = std::max(ds_p, ds_max);
             }
             else
             {
@@ -227,8 +233,40 @@ public:
     {
         return ds;    
     }
+    T get_ds_max()
+    {
+        return ds_max;
+    }
 
 private:
+    void validate_steps()
+    {
+        if((!std::isfinite(ds_0)) || (ds_0 <= T(0)))
+        {
+            throw std::runtime_error("predictor_adaptive: initial arclength step ds_0 must be positive and finite.");
+        }
+        if((!std::isfinite(ds_max)) || (ds_max <= T(0)))
+        {
+            throw std::runtime_error("predictor_adaptive: maximum arclength step ds_max must be positive and finite.");
+        }
+        if(ds_max < ds_0)
+        {
+            throw std::runtime_error("predictor_adaptive: maximum arclength step ds_max must be greater than or equal to ds_0.");
+        }
+        if((!std::isfinite(step_ds_m)) || (step_ds_m < T(0)) || (step_ds_m >= T(1)))
+        {
+            throw std::runtime_error("predictor_adaptive: step_ds_m must be finite and in [0,1).");
+        }
+        if((!std::isfinite(step_ds_p)) || (step_ds_p < T(0)))
+        {
+            throw std::runtime_error("predictor_adaptive: step_ds_p must be finite and non-negative.");
+        }
+        if(attempts_0 == 0)
+        {
+            throw std::runtime_error("predictor_adaptive: attempts_0 must be positive.");
+        }
+    }
+
     T ds_max, ds_0, ds, step_ds_p, step_ds_m, ds_p, ds_m;
     unsigned int attempts_0, attempts, attempts_increase;
     VectorOperations* vec_ops;

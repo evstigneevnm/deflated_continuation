@@ -54,6 +54,17 @@ public:
         {
             throw std::runtime_error(std::string("continuation::system_operator_continuation (corrector) " __FILE__ " " __STR(__LINE__) " incorrect continuation_type parameter. Only 'S'pherical or 'O'rthogonal can be used") );
         }
+        const T tangent_norm = vec_ops->norm_rank1(x_0_s, lambda_0_s);
+        log->info_f("continuation::system_operator: tangent space set: dS = %le, tangent norm = %le", (double)ds_l, (double)tangent_norm);
+    }
+
+    T arclength_residual(const T_vec& x_1, const T& lambda_1)
+    {
+        if(!tangent_set)
+        {
+            throw std::runtime_error(std::string("continuation::system_operator " __FILE__ " " __STR(__LINE__) " tangent space is not set. Set it with the method set_tangent_space(...).") );
+        }
+        return orthogonal_projection(x_1, lambda_1);
     }
     
     bool update_tangent_space(NonlinearOperator* nonlin_op, const T_vec& x, const T lambda, T_vec& x_1_s, T& lambda_1_s)
@@ -151,7 +162,9 @@ public:
             }
             
             
-            T beta =  - orthogonal_projection(x, lambda); //beta = -orth_proj
+            T arclength_res = orthogonal_projection(x, lambda);
+            log->info_f("continuation::system_operator: arclength residual = %le", (double)arclength_res);
+            T beta =  - arclength_res; //beta = -orth_proj
             T alpha = lambda_0_s;
 
             // auto N = vec_ops->get_vector_size();

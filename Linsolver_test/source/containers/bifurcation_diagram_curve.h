@@ -5,7 +5,11 @@
 #include <vector>
 #include <stdexcept>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <filesystem>
+#include <system_error>
+#include <cstdint>
 
 
 //using boost for serialization
@@ -185,10 +189,49 @@ private:
     bool refs_set = false;
 
 
-    inline bool fs_object_exsts(const std::string& name) 
+    bool directory_exists(const std::string& name) const
     {
-        std::ifstream f(name.c_str());
-        return f.good();
+        std::error_code ec;
+        return std::filesystem::is_directory(name, ec);
+    }
+
+    bool path_exists(const std::string& name) const
+    {
+        std::error_code ec;
+        return std::filesystem::exists(name, ec);
+    }
+
+    void ensure_curve_directory_exists()
+    {
+        if(directory_exists(full_path))
+        {
+            return;
+        }
+
+        if(path_exists(full_path))
+        {
+            throw std::runtime_error(
+                std::string("container::bifurcation_diagram_curve: curve output path exists but is not a directory: ") +
+                full_path);
+        }
+
+        std::error_code ec;
+        if(!std::filesystem::create_directory(full_path, ec))
+        {
+            if(ec)
+            {
+                throw std::runtime_error(
+                    std::string("container::bifurcation_diagram_curve: failed to create curve output directory '") +
+                    full_path + "': " + ec.message());
+            }
+            if(!directory_exists(full_path))
+            {
+                throw std::runtime_error(
+                    std::string("container::bifurcation_diagram_curve: failed to create curve output directory: ") +
+                    full_path);
+            }
+        }
+        log->info_f("container::bifurcation_diagram_curve: created curve output directory: %s", full_path.c_str());
     }
 
 public:
@@ -198,22 +241,28 @@ public:
     void set_directory(const std::string& data_directory_)
     {
         data_directory.assign(data_directory_);
-        if(!fs_object_exsts(data_directory))
-            throw std::runtime_error(std::string("container::bifurcation_diagram_curve: provided directory doesn't exist") );
+        if(!directory_exists(data_directory))
+        {
+            if(path_exists(data_directory))
+            {
+                throw std::runtime_error(
+                    std::string("container::bifurcation_diagram_curve: project path exists but is not a directory: ") +
+                    data_directory);
+            }
+            throw std::runtime_error(
+                std::string("container::bifurcation_diagram_curve: project directory doesn't exist: ") +
+                data_directory);
+        }
     }
 
 
     void set_curve_number(int curve_number_)
     {
         curve_number = curve_number_;
-        full_path.assign( data_directory.c_str()+std::to_string(curve_number) );
+        full_path.assign((std::filesystem::path(data_directory) / std::to_string(curve_number)).string());
         debug_f_name.assign(full_path.c_str() + std::string("/") + std::string("debug_curve.dat"));
         log->info_f("container::bifurcation_diagram_curve: FULL PATH: %s", full_path.c_str());
-        if(!fs_object_exsts(full_path) )
-        {
-//TODO For now. Later this is to be replaced by create directory
-            throw std::runtime_error(std::string("container::bifurcation_diagram_curve: provided directory and curve_number doesn't exist") );
-        }
+        ensure_curve_directory_exists();
 
     }
 
@@ -562,7 +611,7 @@ private:
     {
         T w = (lambda_star - lambda0)/(lambda1 - lambda0);
         T _w = T(1) - w;
-        vec_ops->add_mul(w, x0, _w, x1);
+        vec_ops->add_mul(_w, x0, w, x1);
         lambda1 = lambda_star;
         bool res = get_solution(lambda_star, x1);
         return(res);

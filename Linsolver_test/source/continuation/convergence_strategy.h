@@ -5,7 +5,7 @@ convergence rules for Newton iterator for continuation process
 */
 #include <cmath>
 #include <vector>
-#include <utils/logged_obj_base.h>
+#include <scfd/utils/logged_obj_base.h>
 #include <algorithm> // std::min_element
 #include <iterator>  // std::begin, std::end
 
@@ -21,7 +21,8 @@ class convergence_strategy
 private:
     typedef typename vector_operations::scalar_type  T;
     typedef typename vector_operations::vector_type  T_vec;
-    typedef utils::logged_obj_base<logging> logged_obj_t;
+    typedef scfd::utils::logged_obj_base<logging> logged_obj_t;
+    struct no_constraint_operator {};
 
 public:    
     convergence_strategy(vector_operations*& vec_ops_, logging*& log_, T tolerance_ = T(1.0e-6), unsigned int maximum_iterations_ = 100, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true, T maximum_norm_increase = 0.0):
@@ -48,6 +49,11 @@ public:
         stagnation_max = 10;
         maximum_norm_increase_ = maximum_norm_increase;
         newton_wight_threshold_ = 1.0e-12;
+        tolerance_0 = tolerance;
+        relax_tolerance_factor = T(1);
+        relax_tolerance_steps = 0;
+        d_step = T(0);
+        current_relax_step = 0;
     }
     ~convergence_strategy()
     {
@@ -87,15 +93,34 @@ public:
 
     }   
 
-    //updates a solution with a newton wight value provided
-    T inline update_solution(nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, T_vec& x1, T& lambda1)
+    T constraint_residual(no_constraint_operator*, const T_vec&, const T&)
+    {
+        return T(0);
+    }
+
+    template<class system_operator>
+    T constraint_residual(system_operator* sys_op, const T_vec& x, const T& lambda)
+    {
+        return sys_op->arclength_residual(x, lambda);
+    }
+
+    template<class system_operator>
+    T residual_norm(system_operator* sys_op, nonlinear_operator* nonlin_op, const T_vec& x, const T& lambda, T& normF, T& arclength_res)
+    {
+        nonlin_op->F(x, lambda, Fx);
+        normF = vec_ops->norm_l2(Fx);
+        arclength_res = constraint_residual(sys_op, x, lambda);
+        return std::sqrt(normF*normF + arclength_res*arclength_res);
+    }
+
+    //updates a solution with a newton weight value provided
+    template<class system_operator>
+    T inline update_solution(system_operator* sys_op, nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, T_vec& x1, T& lambda1, T& normF1, T& arclength_res1)
     {
         vec_ops->assign_mul(static_cast<T>(1.0), x, newton_wight, delta_x, x1);
         nonlin_op->project(x1); // project to invariant solution subspace. Should be blank if nothing is needed to be projected.
         lambda1 = lambda + newton_wight*delta_lambda;
-        nonlin_op->F(x1, lambda1, Fx);
-        T normFx1 = vec_ops->norm_l2(Fx);
-        return normFx1;
+        return residual_norm(sys_op, nonlin_op, x1, lambda1, normF1, arclength_res1);
     }
 
 
@@ -146,22 +171,42 @@ public:
 
     // }
 
-    bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status)
+    template<class system_operator>
+    bool check_convergence(system_operator* sys_op, nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status, bool lin_solver_converged = true)
     {
+        return check_convergence_impl(sys_op, nonlin_op, x, lambda, delta_x, delta_lambda, result_status, lin_solver_converged);
+    }
+
+    bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status, bool lin_solver_converged = true)
+    {
+        no_constraint_operator no_constraint;
+        return check_convergence_impl(&no_constraint, nonlin_op, x, lambda, delta_x, delta_lambda, result_status, lin_solver_converged);
+    }
+
+    template<class system_operator>
+    bool check_convergence_impl(system_operator* sys_op, nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status, bool lin_solver_converged = true)
+    {
+        if(!lin_solver_converged)
+        {
+            result_status = 5;
+            log->error("continuation::convergence: linear solver failed.");
+            return true;
+        }
+
         bool finish = false; //states that the newton process should stop.
         // result_status defines on how this process is stoped.
-        reset_wight();
-        nonlin_op->F(x, lambda, Fx);
-        T normFx = vec_ops->norm_l2(Fx);
+        T normF = T(0);
+        T arclength_res = T(0);
+        T normFx = residual_norm(sys_op, nonlin_op, x, lambda, normF, arclength_res);
         if(!std::isfinite(normFx)) //set result_status = 2 if the provided vector is inconsistent
         {
             result_status = 2;
-            finish = true; 
+            return true;
         }
         if(normFx < tolerance) //do nothing is my kind of problem =)
         {
             result_status = 0;
-            log->info_f("continuation::convergence: iteration %i, residuals n: %le < tolerance: %le => finished.",iterations, (double)normFx, (double)tolerance );            
+            log->info_f("continuation::convergence: iteration %i, extended residual n: %le, F residual: %le, arclength residual: %le < tolerance: %le => finished.",iterations, (double)normFx, (double)normF, (double)arclength_res, (double)tolerance );
             return true;
         }
         if(norms_storage.size() == 0)
@@ -171,11 +216,13 @@ public:
         }
         //update solution
         T lambda1 = lambda;
-        T normFx1 = update_solution(nonlin_op, x, lambda, delta_x, delta_lambda, x1, lambda1);
+        T normF1 = T(0);
+        T arclength_res1 = T(0);
+        T normFx1 = update_solution(sys_op, nonlin_op, x, lambda, delta_x, delta_lambda, x1, lambda1, normF1, arclength_res1);
         if(!std::isfinite(normFx1)) //quit if the obtained vector is inconsistent
         {
             result_status = 3;
-            finish = true; 
+            return true;
         }     
         if(normFx1 < tolerance) //converged
         {
@@ -193,8 +240,14 @@ public:
                 while( (normFx1 - normFx) > maximum_norm_increase_*normFx )
                 {
                     newton_wight *= 0.7;
-                    normFx1 = update_solution(nonlin_op, x, lambda, delta_x, delta_lambda, x1, lambda1);
+                    normFx1 = update_solution(sys_op, nonlin_op, x, lambda, delta_x, delta_lambda, x1, lambda1, normF1, arclength_res1);
                     log->info_f("continuation::convergence: increase threshold: %.01f, weight update from %le to %le with weight: %le and weight threshold: %le ", maximum_norm_increase_, normFx, normFx1, newton_wight,  newton_wight_threshold_);
+                    if(!std::isfinite(normFx1))
+                    {
+                        result_status = 3;
+                        finish = true;
+                        break;
+                    }
                     if(newton_wight < newton_wight_threshold_)
                     {
                         result_status = 4;
@@ -208,7 +261,7 @@ public:
                 lambda = lambda1;
                 vec_ops->assign(x1, x);
             }
-            if( std::abs(normFx1 - normFx) < 1.0e-6*normFx )
+            if( (result_status == 1)&&(std::abs(normFx1 - normFx) < 1.0e-6*normFx) )
             {
                 stagnation++;
             }
@@ -232,7 +285,7 @@ public:
         iterations++;
         auto result_status_string = parse_result_status(result_status);
         auto finish_string = parse_bool(finish);
-        log->info_f("continuation::convergence: iteration: %i, max_iterations: %i, residuals n: %le, n+1: %le, min_value: %le, result_status: %i => %s, is_finished = %s, newton_wight = %le, stagnation = %u ",iterations, maximum_iterations, (double)normFx, (double)normFx1, double(min_value), result_status,  result_status_string.c_str(), finish_string.c_str(), newton_wight, stagnation );
+        log->info_f("continuation::convergence: iteration: %i, max_iterations: %i, extended residuals n: %le, n+1: %le, F residuals n: %le, n+1: %le, arclength residuals n: %le, n+1: %le, min_value: %le, result_status: %i => %s, is_finished = %s, newton_wight = %le, stagnation = %u ",iterations, maximum_iterations, (double)normFx, (double)normFx1, (double)normF, (double)normF1, (double)arclength_res, (double)arclength_res1, double(min_value), result_status,  result_status_string.c_str(), finish_string.c_str(), newton_wight, stagnation );
 
         // store this solution point if the norm is the smalles of all
         if( (min_value >= normFx1)&&((result_status == 1)||(result_status == 4)) )
@@ -252,8 +305,12 @@ public:
 
 
         //this sets minimum norm solution that is bellow relaxed tolerance if finish condition is met
-        bool relaxed_tolerance_reached_max = *std::max_element(relaxed_tolerance_reached.begin(),relaxed_tolerance_reached.end());
-        if( finish&&relaxed_tolerance_reached_max&&(result_status>0)&&(relaxed_tolerance_reached.size()>0) )
+        bool relaxed_tolerance_reached_max = false;
+        if(relaxed_tolerance_reached.size()>0)
+        {
+            relaxed_tolerance_reached_max = *std::max_element(relaxed_tolerance_reached.begin(),relaxed_tolerance_reached.end());
+        }
+        if( finish&&relaxed_tolerance_reached_max&&((result_status == 1)||(result_status == 4)) )
         {
             auto min_value = *std::min_element(norms_storage.begin(),norms_storage.end());
             size_t soluton_num = 0;
@@ -301,7 +358,6 @@ public:
     void reset_wight()
     {
         newton_wight = newton_wight_initial;
-        stagnation = 0;
     }
     std::vector<T>* get_norms_history_handle()
     {
@@ -351,6 +407,9 @@ private:
                 break;   
             case 4:
                 return{"too small update wight"};
+                break;
+            case 5:
+                return{"linear solver failed"};
                 break;
             default:
                 return{"unknown state!"};

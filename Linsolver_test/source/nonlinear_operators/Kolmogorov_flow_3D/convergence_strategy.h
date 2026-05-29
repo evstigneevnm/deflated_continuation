@@ -87,7 +87,7 @@ public:
         if(!lin_solver_converged)
         {
             result_status = 5;
-            // return true;
+            return true;
         }
         bool finish = false;
         nonlin_op->F(x, lambda, Fx);

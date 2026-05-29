@@ -20,80 +20,59 @@
 #ifndef __CUDA_SUPPORT_H__
 #define __CUDA_SUPPORT_H__
 
+#include <algorithm>
+#include <cctype>
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
 #include <cstdlib>
 #include <stdarg.h>
+#include <string>
 #include <utils/cuda_safe_call.h>
 #include <cuda_runtime.h>
+#include <scfd/backend/copy/cuda.h>
+#include <scfd/utils/init_cuda.h>
 
 
 inline int init_cuda(int PCI_ID)
 {
+    return scfd::utils::init_cuda(PCI_ID);
+}
 
-    
-    int count = 0;
-    int i = 0;
+inline int init_cuda_dev_num(int device_number = 0)
+{
+    return scfd::utils::init_cuda(-2, device_number);
+}
 
-    cudaGetDeviceCount(&count);
-    if(count == 0)
+inline int init_cuda_best_memory()
+{
+    return scfd::utils::init_cuda_persistent();
+}
+
+inline int init_cuda_auto()
+{
+    return init_cuda_dev_num(0);
+}
+
+inline int init_cuda_from_string(const std::string& device_selector)
+{
+    if((device_selector.empty())||(device_selector == "auto"))
     {
-        fprintf(stderr, "There is no compartable device found.\n");
-        return -1;
+        return init_cuda_auto();
     }
-    
-    int deviceNumber=0;
-    int deviceNumberTemp=0;
-    
-    if(count>1)
+    if(device_selector == "best_mem")
     {
-
-        if(PCI_ID==-1)
-        {
-            for(i = 0; i < count; i++) 
-            {
-                cudaDeviceProp deviceProp;
-                cudaGetDeviceProperties(&deviceProp, i);
-                printf( "#%i:   %s, pci-bus id:%i %i %i \n", i, (char*)&deviceProp,deviceProp.pciBusID,deviceProp.pciDeviceID,deviceProp.pciDomainID);
-            }            
-            printf("Device number for it to use>>>\n");
-            int num_scanded = scanf("%i", &deviceNumberTemp);
-            if(num_scanded == 0)
-            {
-                throw(std::runtime_error("incorrect Device number provided!"));
-            }
-            
-        }
-        else
-        {
-            cudaDeviceProp deviceProp;
-            for(int j=0;j<count;j++)
-            {
-                cudaGetDeviceProperties(&deviceProp, j);
-                if(deviceProp.pciBusID==PCI_ID)
-                {
-                    deviceNumberTemp = j;
-                    break;
-                }
-            }
-
-            printf("Using %s@[%i:%i:%i]\n",(char*)&deviceProp,deviceProp.pciBusID,deviceProp.pciDeviceID,deviceProp.pciDomainID);
-        }
-        deviceNumber=deviceNumberTemp;
-    
+        return init_cuda_best_memory();
     }
-    else
+    bool is_integer = std::all_of(device_selector.begin(), device_selector.end(), [](unsigned char c)
     {
-        cudaDeviceProp deviceProp;
-        cudaGetDeviceProperties(&deviceProp, deviceNumber);
-        printf( "#%i:   %s, pci-bus id:%i %i %i \n", deviceNumber, (char*)&deviceProp,deviceProp.pciBusID,deviceProp.pciDeviceID,deviceProp.pciDomainID);
-        printf( "       using it...\n");    
+        return std::isdigit(c) != 0;
+    });
+    if(is_integer)
+    {
+        return init_cuda_dev_num(std::stoi(device_selector));
     }
-
-    cudaSetDevice(deviceNumber);
-    
-    return deviceNumber;
+    return scfd::utils::init_cuda_str(device_selector);
 }
 
 //
@@ -103,37 +82,40 @@ inline int init_cuda(int PCI_ID)
 //
 
 template <class T>
+void host_2_device_cpy(T* device, T* host, size_t size);
+
+template <class T>
+void device_2_host_cpy(T* host, T* device, size_t size);
+
+template <class T>
 void host_2_device_cpy(T* device, T* host, int Nx, int Ny, int Nz)
 {
-    int mem_size=sizeof(T)*Nx*Ny*Nz;
-    CUDA_SAFE_CALL(cudaMemcpy(device, host, mem_size, cudaMemcpyHostToDevice));
-
+    host_2_device_cpy(device, host, static_cast<size_t>(Nx)*static_cast<size_t>(Ny)*static_cast<size_t>(Nz));
 }
 
 template <class T>
 void device_2_host_cpy(T* host, T* device, size_t size)
 {
-    CUDA_SAFE_CALL(cudaMemcpy(host, device, sizeof(T)*size, cudaMemcpyDeviceToHost));
+    scfd::cuda_copy<size_t>()(size, device, host);
 }
 
 template <class T>
 void host_2_device_cpy(T* device, T* host, size_t size)
 {
-    CUDA_SAFE_CALL(cudaMemcpy(device, host, sizeof(T)*size, cudaMemcpyHostToDevice));
+    scfd::cuda_copy<size_t>()(size, host, device);
 }
 
 template <class T>
 void device_2_device_cpy(const T* device_from, T* device_to, size_t size)
 {
-    CUDA_SAFE_CALL(cudaMemcpy(device_to, device_from, sizeof(T)*size, cudaMemcpyDeviceToDevice));
+    scfd::cuda_copy<size_t>()(size, device_from, device_to);
 }
 
 
 template <class T>
 void device_2_host_cpy(T* host, T* device, int Nx, int Ny, int Nz)
 {
-    int mem_size=sizeof(T)*Nx*Ny*Nz;
-    CUDA_SAFE_CALL(cudaMemcpy(host, device, mem_size, cudaMemcpyDeviceToHost));
+    device_2_host_cpy(host, device, static_cast<size_t>(Nx)*static_cast<size_t>(Ny)*static_cast<size_t>(Nz));
 }
 
 

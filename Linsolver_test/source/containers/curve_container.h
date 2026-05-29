@@ -43,7 +43,7 @@ struct compare_key_pare
 };
 
 
-template<class VectorOperations, class Loggin, class NonlinearOperator, class Knots>
+template<class VectorOperations, class Loggin, class NewtonMethod, class NonlinearOperator, class Knots>
 class curve_storage
 {
 public:

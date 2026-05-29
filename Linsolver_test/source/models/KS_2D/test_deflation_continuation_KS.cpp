@@ -126,7 +126,8 @@ int main(int argc, char const *argv[])
     newton_t *newton = new newton_t(vec_ops_R_im, system_operator, conv_newton);
 
     //setup continuation system:
-    predictor_cont_t* predict = new predictor_cont_t(vec_ops_R_im, log, dS, 0.0765, 0.1, 30);
+    predictor_cont_t* predict = new predictor_cont_t(vec_ops_R_im, log);
+    predict->set_steps(dS, dS, real(0.0765), real(0.1), 30);
     system_operator_cont_t* system_operator_cont = new system_operator_cont_t(vec_ops_R_im, Ax, SM);
     convergence_newton_cont_t *conv_newton_cont = new convergence_newton_cont_t(vec_ops_R_im, log, newton_cont_tol, newton_def_cont_it, real(1), true);
     newton_cont_t* newton_cont = new newton_cont_t(vec_ops_R_im, system_operator_cont, conv_newton_cont);

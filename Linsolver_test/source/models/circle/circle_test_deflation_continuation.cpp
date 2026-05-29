@@ -1,9 +1,13 @@
 #include <cmath>
+#include <algorithm>
 #include <iostream>
 #include <cstdio>
+#include <exception>
+#include <limits>
+#include <string>
 
 #include <utils/cuda_support.h>
-#include <utils/log.h>
+#include <scfd/utils/log.h>
 #include <external_libraries/cublas_wrap.h>
 
 //problem dependant
@@ -41,9 +45,9 @@
 int main(int argc, char const *argv[])
 {
     
-    if(argc!=4)
+    if((argc!=4)&&(argc!=5))
     {
-        printf("Usage: %s lambda_0 dS S\n   lambda_0 - starting parameter\n   dS - continuation step\n   S - number of continuation steps\n",argv[0]);
+        printf("Usage: %s lambda_0 dS S [cuda_device]\n   lambda_0 - starting parameter\n   dS - continuation step\n   S - number of continuation steps\n   cuda_device - optional SCFD selector: auto, best_mem, dev_num:N, pci_id:N, manual, or plain device number\n",argv[0]);
         return 0;
     }
     size_t Nx = 1; //size of the vector variable. 1 in this case
@@ -55,7 +59,18 @@ int main(int argc, char const *argv[])
 
 
 
-    init_cuda(6); // )(PCI) where PCI is the GPU PCI ID
+    std::string cuda_selector = (argc == 5) ? argv[4] : "auto";
+    int cuda_device = -1;
+    try
+    {
+        cuda_device = init_cuda_from_string(cuda_selector);
+    }
+    catch(const std::exception& e)
+    {
+        fprintf(stderr, "Failed to initialize CUDA device selector '%s': %s\n", cuda_selector.c_str(), e.what());
+        return 2;
+    }
+    printf("Using CUDA device %i\n", cuda_device);
     real norm_wight = std::sqrt(real(Nx));
     real Rad = 1.0;
 
@@ -71,8 +86,8 @@ int main(int argc, char const *argv[])
     //newton control
     unsigned int newton_def_max_it = 350;
     unsigned int newton_def_cont_it = 100;
-    real newton_def_tol = 1.0e-9;
-    real newton_cont_tol = 1.0e-9;
+    real newton_def_tol = std::max(real(1.0e-9), real(10)*std::numeric_limits<real>::epsilon());
+    real newton_cont_tol = std::max(real(1.0e-9), real(10)*std::numeric_limits<real>::epsilon());
 
 
     cublas_wrap *CUBLAS = new cublas_wrap();
@@ -121,12 +136,17 @@ int main(int argc, char const *argv[])
     newton_t *newton = new newton_t(vec_ops_R, system_operator, conv_newton);
 
     //setup continuation system:
-    predictor_cont_t* predict = new predictor_cont_t(vec_ops_R, log, dS, 0.25, 20);
-    system_operator_cont_t* system_operator_cont = new system_operator_cont_t(vec_ops_R, Ax, SM);
+    const real dS_max = std::max(dS, real(0.25));
+    const real step_ds_m = real(0.25);
+    const real step_ds_p = real(0.25);
+    const unsigned int predictor_attempts = 4;
+    predictor_cont_t* predict = new predictor_cont_t(vec_ops_R, log);
+    predict->set_steps(dS, dS_max, step_ds_m, step_ds_p, predictor_attempts);
+    system_operator_cont_t* system_operator_cont = new system_operator_cont_t(vec_ops_R, log, Ax, SM);
     convergence_newton_cont_t *conv_newton_cont = new convergence_newton_cont_t(vec_ops_R, log, newton_cont_tol, newton_def_cont_it, real(1), true);
     newton_cont_t* newton_cont = new newton_cont_t(vec_ops_R, system_operator_cont, conv_newton_cont);
-    advance_step_cont_t* continuation_step = new advance_step_cont_t(vec_ops_R, log, system_operator_cont, newton_cont, predict);
-    tangent_0_cont_t* init_tangent = new tangent_0_cont_t(vec_ops_R, Ax, SM);
+    advance_step_cont_t* continuation_step = new advance_step_cont_t(vec_ops_R, log, system_operator_cont, newton_cont, newton, predict, conv_newton_cont);
+    tangent_0_cont_t* init_tangent = new tangent_0_cont_t(vec_ops_R, log, newton, Ax, SM);
 
 
     
