@@ -150,6 +150,12 @@ gpu_vector_operations.bin:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/gpu_vector_operations_kernels.cu -c -o $(BUILD_DIR)/gpu_vector_operations_kernels.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/test_vector_operations.cpp $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/test_vector_operations.bin 2>$(RESULTS)
 
+test_gpu_reduction_ogita.bin: source/common/tests/test_gpu_reduction_ogita.cpp $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) $(ICUDA) $(IPROJECT) source/common/tests/test_gpu_reduction_ogita.cpp $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LCUDA) -o $(BUILD_DIR)/test_gpu_reduction_ogita.bin 2>$(RESULTS)
+
+test_vector_snapshot_queue.bin: source/common/tests/test_vector_snapshot_queue.cu $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) $(ICUDA) $(IPROJECT) source/common/tests/test_vector_snapshot_queue.cu $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/test_vector_snapshot_queue.bin 2>$(RESULTS)
+
 gpu_reduction_ogita_ker: $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 
 $(BUILD_DIR)/gpu_reduction_ogita_kernels.o: source/common/ogita/gpu_reduction_ogita_kernels.cu | $(BUILD_STAMP)

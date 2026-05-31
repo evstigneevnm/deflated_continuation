@@ -8,6 +8,7 @@
 #include <string>
 
 #include <utils/cuda_support.h>
+#include <common/cuda_init_scfd.h>
 #include <scfd/utils/log.h>
 #include <external_libraries/cublas_wrap.h>
 
@@ -68,7 +69,7 @@ int main(int argc, char const *argv[])
     int cuda_device = -1;
     try
     {
-        cuda_device = init_cuda_from_string(cuda_selector);
+        cuda_device = common::init_cuda_from_scfd_selector(cuda_selector);
     }
     catch(const std::exception& e)
     {

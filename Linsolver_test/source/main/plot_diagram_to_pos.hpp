@@ -8,9 +8,6 @@
 #include <string>
 #include <vector>
 
-#include <utils/pointer_queue.h>
-#include <utils/queue_fixed_size.h>
-
 //boost serializatoin
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
@@ -51,8 +48,6 @@ private:
     typedef typename MatrixOperations::matrix_type  T_mat;
     typedef Monitor monitor_t;
     
-    typedef typename utils::queue_fixed_size<std::pair<T,T_vec>, 2> queue_t;
-
     typedef typename boost::archive::text_oarchive data_output;
     typedef typename boost::archive::text_iarchive data_input;
 
@@ -111,12 +106,6 @@ private:
         > stability_diagram_t;
 
 
-
-    typedef utils::pointer_queue<T> queue_pointer_t;
-    typedef utils::queue_fixed_size<T, 2> queue_lambda_t;
-    typedef utils::queue_fixed_size<std::pair<int, int>, 2> queue_dims_t;    
-
-
     //types of points in different curves
     typedef typename bif_diag_t::curve_point_type solution_point_t;
     typedef typename stability_diagram_t::stability_point_type stability_point_t;
@@ -158,20 +147,12 @@ public:
 
         stability_diagram = new stability_diagram_t(vec_ops, file_ops, log, project_dir);
 
-        queue_pointer = new queue_pointer_t(vec_ops->get_vector_size(), 2);
-        queue_lambda = new queue_lambda_t();
-        queue_dims = new queue_dims_t();
-
-
         vec_ops->init_vector(x_p); vec_ops->start_use_vector(x_p);
         vec_ops->init_vector(b_pos_plot); vec_ops->start_use_vector(b_pos_plot);
 
     }
     ~plot_diagram_to_pos()
     {
-        delete queue_dims;
-        delete queue_lambda;
-        delete queue_pointer;
         delete stability_diagram;
         delete bif_diag;        
         delete newton;
@@ -457,9 +438,6 @@ private:
     convergence_newton_t* convergence_newton = nullptr;
     system_operator_t* system_operator = nullptr;
     bif_diag_t* bif_diag = nullptr;
-    queue_pointer_t* queue_pointer = nullptr;
-    queue_lambda_t* queue_lambda = nullptr;
-    queue_dims_t* queue_dims = nullptr;
     stability_diagram_t* stability_diagram = nullptr;
 
 //  to detect curve break during analysis

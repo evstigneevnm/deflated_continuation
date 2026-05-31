@@ -6,4 +6,4 @@
 	url = git@github.com:oryabkov/NMFD-newton.git
 [submodule "Linsolver_test/source/contrib/nmfd-linsolvers"]
 	path = Linsolver_test/source/contrib/nmfd-linsolvers
-	url = git@github.com:oryabkov/NMFD-linsolvers.git
+	url = git@github.com:evstigneevnm/NMFD-linsolvers.git

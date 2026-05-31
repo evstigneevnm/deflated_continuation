@@ -1,4 +1,5 @@
-// Copyright © 2016-2018 Ryabkov Oleg Igorevich, Evstigneev Nikolay Mikhaylovitch
+// Copyright © 2016-2018 Ryabkov Oleg Igorevich, Evstigneev Nikolay
+// Mikhaylovitch
 
 // This file is part of SimpleCFD.
 
@@ -19,17 +20,23 @@
 
 #include <stdexcept>
 #include <string>
-
+#ifndef __STR_HELPER
 #define __STR_HELPER(x) #x
+#endif
+#ifndef __STR
 #define __STR(x) __STR_HELPER(x)
+#endif
 
-
-
-
-#define CUDA_SAFE_CALL(X)                                                                                                                                                                       \
-    do {                                                                                                                                                                                        \
-        cudaError_t cuda_res = (X);                                                                                                                                                             \
-        if (cuda_res != cudaSuccess) throw std::runtime_error(std::string("CUDA_SAFE_CALL " __FILE__ " " __STR(__LINE__) " : " #X " failed: ") + std::string(cudaGetErrorString(cuda_res)));    \
-    } while (0)
+#ifndef CUDA_SAFE_CALL
+#define CUDA_SAFE_CALL(X)                                                      \
+  do {                                                                         \
+    cudaError_t cuda_res = (X);                                                \
+    if (cuda_res != cudaSuccess)                                               \
+      throw std::runtime_error(std::string("CUDA_SAFE_CALL " __FILE__          \
+                                           " " __STR(__LINE__) " : " #X        \
+                                                               " failed: ") +  \
+                               std::string(cudaGetErrorString(cuda_res)));     \
+  } while (0)
+#endif
 
 #endif

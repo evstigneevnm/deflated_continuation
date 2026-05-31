@@ -7,9 +7,10 @@
 
 #include <string>
 #include <vector>
+#include <deque>
+#include <utility>
 
-#include <utils/pointer_queue.h>
-#include <utils/queue_fixed_size.h>
+#include <common/vector_snapshot_queue.h>
 
 //boost serializatoin
 #include <boost/archive/text_oarchive.hpp>
@@ -53,8 +54,6 @@ private:
     typedef typename MatrixOperations::matrix_type  T_mat;
     typedef Monitor monitor_t;
     
-    typedef typename utils::queue_fixed_size<std::pair<T,T_vec>, 2> queue_t;
-
     typedef typename boost::archive::text_oarchive data_output;
     typedef typename boost::archive::text_iarchive data_input;
     // typedef typename boost::archive::xml_oarchive data_output;
@@ -135,9 +134,9 @@ private:
 
 
 
-    typedef utils::pointer_queue<T> queue_pointer_t;
-    typedef utils::queue_fixed_size<T, 2> queue_lambda_t;
-    typedef utils::queue_fixed_size<std::pair<int, int>, 2> queue_dims_t;    
+    typedef common::vector_snapshot_queue<VectorOperations> queue_pointer_t;
+    typedef std::deque<T> queue_lambda_t;
+    typedef std::deque<std::pair<int, int>> queue_dims_t;
 
 public:
     stability_continuation(VectorOperations* vec_ops_, MatrixOperations* mat_ops_, VectorOperations* vec_ops_small_, MatrixOperations* mat_ops_small_, VectorFileOperations* file_ops_, Log* log_, Log* log_linsolver_, NonlinearOperations* nonlin_op_, Parameters* parameters_):
@@ -187,7 +186,7 @@ public:
 
         stability_diagram = new stability_diagram_t(vec_ops, file_ops, log, project_dir);
 
-        queue_pointer = new queue_pointer_t(vec_ops->get_vector_size(), 2);
+        queue_pointer = new queue_pointer_t(vec_ops, queue_size);
         queue_lambda = new queue_lambda_t();
         queue_dims = new queue_dims_t();
 
@@ -365,12 +364,12 @@ public:
 
 
             queue_pointer->push(x_p); 
-            queue_lambda->push(lambda_p);
+            push_queue(*queue_lambda, lambda_p);
             
             try
             {
                 std::pair<int, int> unstable_dim_p = stab->execute(x_p, lambda_p);
-                queue_dims->push(unstable_dim_p);
+                push_queue(*queue_dims, unstable_dim_p);
                 bool bifurcation_point = false;
                 if( queue_pointer->is_queue_filled() )
                 {
@@ -477,6 +476,18 @@ public:
 
 
 private:
+    template<class Queue, class Value>
+    void push_queue(Queue& queue, Value&& value) const
+    {
+        if(queue.size() == queue_size)
+        {
+            queue.pop_front();
+        }
+        queue.push_back(std::forward<Value>(value));
+    }
+
+    static constexpr std::size_t queue_size = 2;
+
     VectorOperations* vec_ops; 
     MatrixOperations* mat_ops;
     VectorFileOperations* file_ops;
