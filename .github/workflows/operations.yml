@@ -1,0 +1,40 @@
+name: Operations
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+env:
+  CONFIG_FILE: build_configs/config_omen_home_release.inc
+  BUILD_DIR: build/local_ci_operations
+
+defaults:
+  run:
+    shell: bash
+    working-directory: Linsolver_test
+
+jobs:
+  cpu-vector-operations:
+    runs-on: local
+    steps:
+      - name: Build
+        run: make test_cpu_vector_operations.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR"
+      - name: Test
+        run: ./"$BUILD_DIR"/test_cpu_vector_operations.bin
+
+  cpu-vector-operations-var-prec:
+    runs-on: local
+    steps:
+      - name: Build
+        run: make test_cpu_vector_operations_var_prec.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR"
+      - name: Test
+        run: ./"$BUILD_DIR"/test_cpu_vector_operations_var_prec.bin
+
+  scfd-vector-operations-cpu:
+    runs-on: local
+    steps:
+      - name: Build
+        run: make scfd_vector_operations_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR"
+      - name: Test
+        run: ./"$BUILD_DIR"/test_scfd_vector_operations_cpu.bin
