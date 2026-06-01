@@ -1,12 +1,9 @@
 #include <cmath>
 #include <cstdio>
-#include <external_libraries/cublas_wrap.h>
 #include <iostream>
-#include <memory>
 #include <scfd/utils/init_cuda.h>
 #include <scfd/utils/log.h>
 #include <string>
-#include <utils/cuda_support.h>
 
 // problem dependant
 #include <nonlinear_operators/circle/circle.h>
@@ -20,7 +17,8 @@
 
 // problem dependant
 #include <common/gpu_file_operations.h>
-#include <common/gpu_vector_operations.h>
+#include <common/scfd_vector_operations.h>
+#include <scfd/backend/cuda.h>
 // problem dependant ends
 
 #include <main/deflation_continuation.hpp>
@@ -41,7 +39,7 @@ int main(int argc, char const *argv[]) {
   size_t Nx = 1; // size of the vector variable. 1 in this case
 
   typedef scfd::utils::log_std log_t;
-  typedef gpu_vector_operations<real> vec_ops_real;
+  typedef scfd_vector_operations<scfd::backend::cuda, real> vec_ops_real;
   typedef gpu_file_operations<vec_ops_real> files_ops_t;
   typedef numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>
       monitor_t;
@@ -77,10 +75,10 @@ int main(int argc, char const *argv[]) {
   real norm_wight = std::sqrt(real(Nx));
   real Rad = 1.0;
 
-  auto CUBLAS = std::make_shared<cublas_wrap>();
-  vec_ops_real vec_ops_R(Nx, CUBLAS.get());
+  vec_ops_real vec_ops_R(Nx);
   if (use_high_precision_reduction) {
     vec_ops_R.use_high_precision();
+    std::cerr << "Warning: SCFD vector operations do not yet implement high-precision reductions; using regular reductions.\n";
   }
   files_ops_t file_ops((vec_ops_real *)&vec_ops_R);
 

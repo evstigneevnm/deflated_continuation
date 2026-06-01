@@ -2,12 +2,15 @@
 #define __CIRCLE_TEST_DEFLATION_CONTINUATION_TYPEDEFS_H__
 #define Blocks_x_ 64
 
+#include <scfd/backend/cuda.h>
+
+#include <common/scfd_vector_operations.h>
 
     typedef SCALAR_TYPE real;
 
 
     typedef scfd::utils::log_std log_t;
-    typedef gpu_vector_operations<real> vec_ops_real;
+    typedef scfd_vector_operations<scfd::backend::cuda, real> vec_ops_real;
 
     typedef numerical_algos::lin_solvers::default_monitor<
         vec_ops_real,log_t> monitor_t;

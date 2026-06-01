@@ -8,6 +8,7 @@
 #include <vector> 
 #include <algorithm>
 #include <chrono>
+#include <numeric>
 #include <omp.h>
 #include <common/macros.h>
 
@@ -21,20 +22,20 @@ struct cpu_matrix_vector_operations_var_prec
 private:
     #ifdef __cpu_matrix_vector_operations_var_prec_H_use_boost__
         template<class T>
-        auto sqrt(T val)const {return boost::multiprecision::sqrt(val);}
+        static auto sqrt(const T& val) {return boost::multiprecision::sqrt(val);}
         template<class T>
-        auto abs(T val)const {return boost::multiprecision::abs(val);}
+        static auto abs(const T& val) {return boost::multiprecision::abs(val);}
         template<class T>
-        auto fma(T a, T b, T c)const{return boost::multiprecision::fma(a,b,c);}
+        static auto fma(const T& a, const T& b, const T& c) {return boost::multiprecision::fma(a,b,c);}
 
 
     #else
         template<class T>
-        auto sqrt(T val)const {return std::sqrt(val);}
+        static auto sqrt(const T& val) {return std::sqrt(val);}
         template<class T>
-        auto abs(T val)const {return std::abs(val);}     
+        static auto abs(const T& val) {return std::abs(val);}
         template<class T>
-        auto fma(T a, T b, T c)const {return std::fma(a,b,c);}
+        static auto fma(const T& a, const T& b, const T& c) {return std::fma(a,b,c);}
 
     #endif
 
@@ -768,7 +769,7 @@ private:
 
                 for(size_t k = i; k < N; k++)
                 {
-                    auto abs_A = abs( A[I2_R(k,i,N)] );
+                    auto abs_A = cpu_matrix_vector_operations_var_prec::abs( A[I2_R(k,i,N)] );
                     if(abs_A > max_A)
                     { 
                         max_A = abs_A;

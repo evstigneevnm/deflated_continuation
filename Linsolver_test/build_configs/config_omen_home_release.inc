@@ -8,5 +8,5 @@ BOOST_ROOT_PATH = /usr/local/boost
 OPENBLAS_ROOT_PATH = /opt/openblas
 CUDA_ARCH_LIST = 75
 CPPSTD = c++17
-REAL_TYPE=float
+REAL_TYPE=double
 BUILD_DIR=./build

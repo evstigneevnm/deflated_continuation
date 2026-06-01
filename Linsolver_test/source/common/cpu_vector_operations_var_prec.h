@@ -5,15 +5,22 @@
 #include <vector>
 #include <iterator>
 #include <algorithm>
+#include <initializer_list>
+#include <limits>
+#include <stdexcept>
+#include <utility>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/random.hpp>
 #include <chrono>
 
+template <unsigned int SignificantBitsP = 100>
 struct cpu_vector_operations_var_prec
 {
-    static const unsigned int SignificantBits = 100;
+    static constexpr unsigned int SignificantBits = SignificantBitsP;
     using scalar_type = boost::multiprecision::number<boost::multiprecision::backends::cpp_bin_float<SignificantBits> >;
+    using norm_type = scalar_type;
+    using Tsc = scalar_type;
     using T = scalar_type;
     using vector_type = std::vector<T>;//T*;
     bool location;
@@ -30,29 +37,40 @@ private:
     using gen_t = boost::random::independent_bits_engine<boost::random::mt19937, std::numeric_limits<T>::digits, boost::multiprecision::cpp_int>;
     
     mutable vector_type helper_vector_;
-    size_t pow2_;
     gen_t* gen_;
 
 
-    T sum_pow2_helper() const
+    void ensure_helper_size(size_t count) const
     {
-        size_t sz_reduction = 2 << (pow2_-2); // 2^(pow2_-1)
-        while (sz_reduction>1)
+        if(helper_vector_.size() < count)
         {
-            
-            // #pragma omp parallel for
-            for(int j=0;j<sz_reduction;j++)
-            {
-                if(j+sz_reduction<sz_default_)
-                {
-                    helper_vector_[j] = helper_vector_[j] + helper_vector_[j+sz_reduction];
-                }
-                
-            }
-
-            sz_reduction /= 2;
+            helper_vector_.resize(count);
         }
-        return helper_vector_[0]+helper_vector_[1];
+    }
+
+    T sum_helper(size_t count) const
+    {
+        if(count == 0)
+        {
+            return static_cast<T>(0.0);
+        }
+
+        size_t active = count;
+        while(active > 1)
+        {
+            size_t out = 0;
+            size_t j = 0;
+            for(; j + 1 < active; j += 2)
+            {
+                helper_vector_[out++] = helper_vector_[j] + helper_vector_[j + 1];
+            }
+            if(j < active)
+            {
+                helper_vector_[out++] = helper_vector_[j];
+            }
+            active = out;
+        }
+        return helper_vector_[0];
     }    
 
 public:
@@ -61,7 +79,6 @@ public:
     sz_default_(sz_p)
     {
         location=false;
-        pow2_ = static_cast<size_t>(std::ceil( std::log2(sz_default_) ));
         init_vector(helper_vector_);
         start_use_vector(helper_vector_);
         gen_ = new gen_t();
@@ -145,7 +162,7 @@ public:
         size_t sz_l = x.size();
         for (size_t i = 0;i < sz_l;++i)
         {
-            if (boost::multiprecision::isinf(x[i]))
+            if (!boost::multiprecision::isfinite(x[i]))
             {
                 return false;
             }
@@ -179,12 +196,13 @@ public:
     scalar_type scalar_prod(const T* x, const T* y)const
     {
 
+        ensure_helper_size(get_default_size());
         // #pragma omp parallel for
         for(size_t j=0;j<get_default_size();j++)
         {
             helper_vector_[j] = x[j]*y[j];
         }
-        return sum_pow2_helper();
+        return sum_helper(get_default_size());
     }
 
     scalar_type norm(const vector_type &x)const
@@ -215,13 +233,25 @@ public:
     {
         return norm_sq(x);
     }
-    scalar_type sum(const vector_type &x)
+    scalar_type sum(const vector_type &x) const
     {
-        return 0;
+        size_t sz_l = x.size();
+        ensure_helper_size(sz_l);
+        for(size_t j=0;j<sz_l;j++)
+        {
+            helper_vector_[j] = x[j];
+        }
+        return sum_helper(sz_l);
     }
-    scalar_type asum(const vector_type &x)
+    scalar_type asum(const vector_type &x) const
     {
-        return 0;
+        size_t sz_l = x.size();
+        ensure_helper_size(sz_l);
+        for(size_t j=0;j<sz_l;j++)
+        {
+            helper_vector_[j] = boost::multiprecision::abs(x[j]);
+        }
+        return sum_helper(sz_l);
     }
 
     scalar_type normalize(vector_type& x)const
@@ -290,7 +320,7 @@ public:
     //calc: z := mul_x*x + mul_y*y
     void assign_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, const vector_type& y, vector_type& z)const
     {
-        if((x.size() != y.size() )&&(x.size() != z.size() ))
+        if((x.size() != y.size() )||(x.size() != z.size() ))
         {
             throw std::logic_error("cpu_vector_operations_var_prec::assign_mul: incorrect vector sizes provided");
         }  
@@ -321,7 +351,7 @@ public:
     void add_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, const vector_type& y, 
                             scalar_type mul_z, vector_type& z)const
     {
-        if((x.size() != y.size() )&&(x.size() != z.size() ))
+        if((x.size() != y.size() )||(x.size() != z.size() ))
         {
             throw std::logic_error("cpu_vector_operations_var_prec::add_mul: incorrect vector sizes provided");
         }         
@@ -401,7 +431,7 @@ public:
     void mul_pointwise(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                         vector_type& z)const
     {
-        if((x.size() != y.size() )&&(x.size() != z.size() ))
+        if((x.size() != y.size() )||(x.size() != z.size() ))
         {
             throw std::logic_error("cpu_vector_operations_var_prec::mul_pointwise: incorrect vector sizes provided");
         }          
@@ -414,7 +444,7 @@ public:
     void div_pointwise(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, 
                         vector_type& z)const
     {
-        if((x.size() != y.size() )&&(x.size() != z.size() ))
+        if((x.size() != y.size() )||(x.size() != z.size() ))
         {
             throw std::logic_error("cpu_vector_operations_var_prec::div_pointwise: incorrect vector sizes provided");
         }     
@@ -432,7 +462,7 @@ public:
         }         
         for(size_t j=0;j<x.size();j++)
         {
-            x[j] /= static_cast<scalar_type>(1.0)/(mul_y*y[j]);
+            x[j] /= mul_y*y[j];
         }
     }  
 

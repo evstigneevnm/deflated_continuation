@@ -1,27 +1,26 @@
 #ifndef __CIRCLE_TEST_ND__
 #define __CIRCLE_TEST_ND__
 
-
 /**
 *    Problem class for:
-*    (1)    f(x,lambda) := x*x+lambda*lambda-R^2 = 0
-*   
-*    1-dim sphere for x \in R and lambda \in R
-*    testing problem for the debugging of the continuation algorythm
-*    The vector operation class with size = 1 must be used in templates for this to work
+*    f(x, lambda) := x*x + lambda*lambda - R^2 = 0
 *
-*
-*
+*    This is a scalar continuation test problem.  The implementation is written
+*    against SCFD-style vector operations and uses the backend for_each instead
+*    of a hand-launched CUDA kernel.
 */
 
-#include <nonlinear_operators/circle/circle_ker.h>
+#include <cmath>
+#include <cstddef>
+#include <stdexcept>
 #include <vector>
+
+#include <scfd/utils/device_tag.h>
 
 namespace nonlinear_operators
 {
 
-
-template<class VectorOperations_R, unsigned int BLOCK_SIZE_x=64>
+template<class VectorOperations_R, unsigned int BLOCK_SIZE_x = 64>
 class circle
 {
 public:
@@ -29,114 +28,97 @@ public:
     {
         static const bool value = false;
     };
-public:
-    
-    typedef VectorOperations_R vector_operations_real;
-    typedef typename VectorOperations_R::scalar_type  T;
-    typedef typename VectorOperations_R::vector_type  T_vec;
 
-    circle(T R_, size_t Nx_, vector_operations_real *vec_ops_R_): 
-    R(R_), 
-    vec_ops_R(vec_ops_R_),
-    Nx(Nx_)
+    using vector_operations_real = VectorOperations_R;
+    using T = typename VectorOperations_R::scalar_type;
+    using T_vec = typename VectorOperations_R::vector_type;
+    using ordinal_type = typename VectorOperations_R::ordinal_type;
+    using for_each_type = typename VectorOperations_R::for_each_type;
+
+    circle(T R_, std::size_t Nx_, vector_operations_real* vec_ops_R_):
+        R(R_),
+        vec_ops_R(vec_ops_R_),
+        Nx(Nx_)
     {
         common_constructor_operation();
-        calculate_cuda_grid();
-    }
-
-    circle(T R_, size_t Nx_, dim3 dimGrid_, dim3 dimBlock_, vector_operations_real *vec_ops_R_): 
-    R(R_), 
-    dimGrid(dimGrid_), dimBlock(dimBlock_), 
-    vec_ops_R(vec_ops_R_),
-    Nx(Nx_)
-    {
-        common_constructor_operation();
-
     }
 
     ~circle()
     {
-
-        vec_ops_R->stop_use_vector(u_0); vec_ops_R->free_vector(u_0);
-        free(xp_host);
+        vec_ops_R->stop_use_vector(u_0);
+        vec_ops_R->free_vector(u_0);
     }
 
-    //nonlinear operator:
-    //   F(u,alpha)=v
     void F(const T_vec& u, const T alpha, T_vec& v)
     {
-        function<T>(dimGrid, dimBlock, Nx, R, (const T*&)u, alpha, v);
+        const auto up = u.raw_ptr();
+        auto vp = v.raw_ptr();
+        const T R_l = R;
+        for_each_([=] __DEVICE_TAG__ (ordinal_type)
+        {
+            vp[0] = up[0]*up[0] + alpha*alpha - R_l*R_l;
+        }, ordinal_type(1));
+        for_each_.wait();
     }
 
-    //sets (u_0, alpha_0) for jacobian linearization
-    //stores alpha_0, u_0, u_ext_0, u_x_ext_0, u_y_ext_0
-    //NOTE: u_ext_0, u_x_ext_0 and u_y_ext_0 MUST NOT BE CHANGED!!!
     void set_linearization_point(const T_vec& u_0_, const T alpha_0_)
     {
-        vec_ops_R->assign(u_0_,u_0);
+        vec_ops_R->assign(u_0_, u_0);
         alpha_0 = alpha_0_;
-
     }
 
-    //variational jacobian for 2D KS equations J=dF/du
-    //returns vector dv as Jdu->dv, where J(u_0,alpha_0) linearized at (u_0, alpha_0) by set_linearization_point
     void jacobian_u(const T_vec& du, T_vec& dv)
     {
-        jacobian_x<T>(dimGrid, dimBlock, Nx, R, (const T*&) u_0, alpha_0, (const T*&) du, dv);
+        const auto u0p = u_0.raw_ptr();
+        const auto dup = du.raw_ptr();
+        auto dvp = dv.raw_ptr();
+        for_each_([=] __DEVICE_TAG__ (ordinal_type)
+        {
+            dvp[0] = T(2)*u0p[0]*dup[0];
+        }, ordinal_type(1));
+        for_each_.wait();
     }
 
-
-    //variational jacobian for 2D KS equations J=dF/dalpha
     void jacobian_alpha(T_vec& dv)
     {
-        jacobian_lambda<T>(dimGrid, dimBlock, Nx, R, (const T*&) u_0, alpha_0, dv);
-    }   
-    void jacobian_alpha(const T_vec& x0, const T& alpha, T_vec& dv)
-    {
-        jacobian_lambda<T>(dimGrid, dimBlock, Nx, R, (const T*&) x0, alpha, dv);
+        jacobian_alpha(u_0, alpha_0, dv);
     }
 
-
-    void preconditioner_jacobian_u(T_vec& dr)
+    void jacobian_alpha(const T_vec&, const T& alpha, T_vec& dv)
     {
-        //void function cos there's no need for a preconditioner.
+        auto dvp = dv.raw_ptr();
+        for_each_([=] __DEVICE_TAG__ (ordinal_type)
+        {
+            dvp[0] = T(2)*alpha;
+        }, ordinal_type(1));
+        for_each_.wait();
     }
 
-    void set_cuda_grid(dim3 dimGrid_, dim3 dimBlock_)
+    void preconditioner_jacobian_u(T_vec&)
     {
-        dimGrid=dimGrid_;
-        dimBlock=dimBlock_;
     }
 
-    void get_cuda_grid(dim3 &dimGrid_, dim3 &dimBlock_)
-    {  
-        dimGrid_=dimGrid;
-        dimBlock_=dimBlock;
+    void physical_solution(T_vec&, T_vec&)
+    {
+    }
 
-    }
-        
-    void physical_solution(T_vec& u_in, T_vec& u_out)
+    void project(T_vec&)
     {
-        //void funciton that should return a physical solution
     }
-    void project(T_vec& u_)
+
+    void exact_solution(const T&, T_vec&)
     {
-        //void fuction to project to invariant subspace
     }
-    void exact_solution(const T& param, T_vec& u_out)
+
+    T check_solution_quality(const T_vec&)
     {
-        //void function for exact solution.
-    }
-    T check_solution_quality(const T_vec& u_in)
-    {
-        //void function that returns some norm of solution diverge from invariant subspace
-        return 0;
+        return T(0);
     }
 
     void norm_bifurcation_diagram(const T_vec& u_in, std::vector<T>& res) const
     {
-        device_2_host_cpy(xp_host, u_in, Nx);
-        T val = xp_host[0];   
+        T val = T(0);
+        vec_ops_R->get(u_in, &val);
         res.clear();
         res.reserve(2);
         res.push_back(val);
@@ -147,40 +129,24 @@ public:
     {
         vec_ops_R->assign_random(u_out);
     }
-    
 
 private:
     T R;
-    dim3 dimGrid;
-    dim3 dimBlock;
-    vector_operations_real *vec_ops_R;
-    size_t Nx;
-    T* xp_host; //for bifurcation diagram plotting
-
-    T_vec u_0=nullptr; // linearization point solution
-    T alpha_0=0.0;   // linearization point parameter
-
-
+    vector_operations_real* vec_ops_R;
+    std::size_t Nx;
+    T_vec u_0;
+    T alpha_0 = T(0);
+    mutable for_each_type for_each_;
 
     void common_constructor_operation()
-    {  
-        vec_ops_R->init_vector(u_0); vec_ops_R->start_use_vector(u_0); 
-        xp_host = (T*)malloc(Nx*sizeof(T));
-    }
-
-
-    void calculate_cuda_grid()
     {
-        dim3 s_dimBlock( BLOCK_SIZE_x );
-        dimBlock=s_dimBlock;
-        unsigned int blocks_x=floor(Nx/( BLOCK_SIZE_x ))+1;
-        dim3 s_dimGrid(blocks_x);
-        dimGrid=s_dimGrid;
+        if(Nx != 1)
+        {
+            throw std::runtime_error("nonlinear_operators::circle expects vector size 1.");
+        }
+        vec_ops_R->init_vector(u_0);
+        vec_ops_R->start_use_vector(u_0);
     }
-
-    
-
-
 };
 
 }

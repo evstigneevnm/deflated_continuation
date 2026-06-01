@@ -35,7 +35,7 @@
 int main(int argc, char const *argv[])
 {
     
-    using vec_ops_t = cpu_vector_operations_var_prec;
+    using vec_ops_t = cpu_vector_operations_var_prec<>;
     using T = typename vec_ops_t::scalar_type;
     using T_vec = typename vec_ops_t::vector_type;
     using mat_ops_t = cpu_matrix_vector_operations_var_prec<vec_ops_t>;

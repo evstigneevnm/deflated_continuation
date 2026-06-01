@@ -5,11 +5,10 @@
 #include <exception>
 #include <limits>
 #include <string>
+#include <vector>
 
-#include <utils/cuda_support.h>
 #include <common/cuda_init_scfd.h>
 #include <scfd/utils/log.h>
-#include <external_libraries/cublas_wrap.h>
 
 //problem dependant
 #include <nonlinear_operators/circle/circle.h>
@@ -38,8 +37,6 @@
 #include <continuation/convergence_strategy.h>
 
 //problem dependant
-#include <common/gpu_file_operations_functions.h>
-#include <common/gpu_vector_operations.h>
 #include "circle_test_deflation_continuation_typedefs.h"
 //problem dependant ends
 
@@ -91,16 +88,9 @@ int main(int argc, char const *argv[])
     real newton_cont_tol = std::max(real(1.0e-9), real(10)*std::numeric_limits<real>::epsilon());
 
 
-    cublas_wrap *CUBLAS = new cublas_wrap();
-    CUBLAS->set_pointer_location_device(false);
-    vec_ops_real *vec_ops_R = new vec_ops_real(Nx, CUBLAS);
+    vec_ops_real *vec_ops_R = new vec_ops_real(Nx);
 
-   //CUDA GRIDS
-    dim3 Blocks; dim3 Grids;
     circle_t *CIRCLE = new circle_t(Rad, Nx, vec_ops_R);
-    CIRCLE->get_cuda_grid(Grids, Blocks);
-    printf("Blocks = (%i,%i,%i)\n", Blocks.x, Blocks.y, Blocks.z);
-    printf("Grids = (%i,%i,%i)\n", Grids.x, Grids.y, Grids.z);
     log_t *log = new log_t();
     lin_op_t *Ax = new lin_op_t(CIRCLE);
     prec_t *prec = new prec_t(CIRCLE);
@@ -199,8 +189,8 @@ int main(int argc, char const *argv[])
     init_tangent->execute(CIRCLE, -1, x0, lambda0, x0_s, lambda0_s);
     real norm = 1;
 
-    real* x_host = (real*)malloc(Nx*sizeof(real));
-    real* xp_host = (real*)malloc(Nx*sizeof(real));
+    std::vector<real> x_host(Nx);
+    std::vector<real> xp_host(Nx);
 
     std::ofstream file_diag("diagram.dat", std::ofstream::out);
     
@@ -211,23 +201,20 @@ int main(int argc, char const *argv[])
         continuation_step->solve(CIRCLE, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
         //to check predicted values:
         predict->apply(x0p, lambda_0p, x_1_g, lambda_1_g);
-        device_2_host_cpy(xp_host, x0p, Nx);
+        vec_ops_R->get(x0p, xp_host.data());
 
         vec_ops_R->assign(x1, x0);
         vec_ops_R->assign(x1_s, x0_s);
         lambda0 = lambda1;
         lambda0_s = lambda1_s;
 
-        device_2_host_cpy(x_host, x1, Nx);
+        vec_ops_R->get(x1, x_host.data());
 
 
         file_diag << lambda_0p << " " << xp_host[0] << " " << lambda1 << " " << x_host[0] << std::endl; //vec_ops_R->norm_l2(x1)
         std::flush(file_diag);
     }
     file_diag.close();
-
-    free(x_host);
-    free(xp_host);
 
     CIRCLE->F(x1, lambda1, f);
     norm = vec_ops_R->norm_l2(f);

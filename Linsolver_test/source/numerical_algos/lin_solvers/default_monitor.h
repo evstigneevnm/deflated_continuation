@@ -43,7 +43,7 @@ public:
 
 private:
     using T = scalar_type;
-    using buf_arr_t = detail::vectors_arr_wrap_static<VectorOperations,1>;
+    using buf_arr_t = numerical_algos::detail::vectors_arr_wrap_static<VectorOperations,1>;
     const vector_operations_type &vec_ops_;
 
 public:

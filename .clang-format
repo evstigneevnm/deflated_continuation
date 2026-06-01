@@ -1,0 +1,79 @@
+# .clang-format (clang-format 15 compatible)
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Columns / indentation
+IndentWidth: 4
+ContinuationIndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+MaxEmptyLinesToKeep: 2
+
+# Braces / blocks (Allman via Custom so BraceWrapping is honored)
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterClass: true
+  AfterControlStatement: Always   # clang-format 15 expects Never|MultiLine|Always
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: true
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+
+AllowShortBlocksOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Namespaces / access specifiers
+NamespaceIndentation: None
+AccessModifierOffset: -4
+FixNamespaceComments: false
+
+# Line breaking / wrapping behavior
+AlignAfterOpenBracket: BlockIndent
+BinPackArguments: true
+BinPackParameters: true
+AlwaysBreakTemplateDeclarations: Yes
+
+# Encourage breaks like: `s  =` then newline for long RHS
+BreakBeforeBinaryOperators: None
+
+# Spacing (match: `f( A a, B b )`, `for ( int i = 0; ... )`)
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: true
+SpaceInEmptyParentheses: false
+
+# Alignment like:
+#   int         xx = 100;
+#   std::string s  = "..."
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: Consecutive
+
+# Includes: quoted first, then system; regroup with a blank line
+# SortIncludes: true
+# IncludeBlocks: Regroup
+SortIncludes:  false
+IncludeBlocks: Preserve
+IncludeCategories:
+  - Regex: '^"'
+    Priority: 1
+  - Regex: '^<'
+    Priority: 2
+
+# Preprocessor: indent directives and show nesting with 4 spaces
+IndentPPDirectives: AfterHash
+PPIndentWidth: 4
+
+# Keep comments stable
+ReflowComments: false
+...
+

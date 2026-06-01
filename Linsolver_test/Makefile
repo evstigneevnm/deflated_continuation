@@ -87,8 +87,11 @@ clean:
 	rm -f $(BUILD_DIR)/*.bin $(BUILD_DIR)/*.o $(RESULTS)
 
 #component tests
-test_cpu_vector_operations.bin: test_cpu_vector_operations.cpp
+test_cpu_vector_operations.bin: source/common/tests/test_cpu_vector_operations.cpp source/common/tests/vector_operations_template_tests.h
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_cpu_vector_operations.cpp $(OPENMP) -o $(BUILD_DIR)/test_cpu_vector_operations.bin 2>$(RESULTS)
+
+test_cpu_vector_operations_var_prec.bin: source/common/tests/test_cpu_vector_operations_var_prec.cpp source/common/cpu_vector_operations_var_prec.h
+	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) source/common/tests/test_cpu_vector_operations_var_prec.cpp -o $(BUILD_DIR)/test_cpu_vector_operations_var_prec.bin 2>$(RESULTS)
 
 test_multivector.bin: source/common/tests/test_multivector.cpp
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_multivector.cpp $(OPENMP) -o $(BUILD_DIR)/test_multivector.bin 2>$(RESULTS)
@@ -146,9 +149,14 @@ cufft_test_2D.bin: source/models/tests/cufft_test_2D.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/cufft_test_2D.cpp $(BUILD_DIR)/cufft_test_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o $(LIBS3) -o $(BUILD_DIR)/cufft_test_2D.bin 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/cufft_test_2D_1.cpp $(BUILD_DIR)/cufft_test_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o $(LIBS3) -o $(BUILD_DIR)/cufft_test_2D_1.bin 2>$(RESULTS)
 
-gpu_vector_operations.bin:
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/gpu_vector_operations_kernels.cu -c -o $(BUILD_DIR)/gpu_vector_operations_kernels.o 2>$(RESULTS)
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/test_vector_operations.cpp $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/test_vector_operations.bin 2>$(RESULTS)
+gpu_vector_operations.bin: source/common/tests/test_gpu_vector_operations.cu source/common/tests/vector_operations_template_tests.h $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/tests/test_gpu_vector_operations.cu $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/test_vector_operations.bin 2>$(RESULTS)
+
+scfd_vector_operations.bin: source/common/tests/test_scfd_vector_operations.cu source/common/tests/vector_operations_template_tests.h source/common/scfd_vector_operations.h
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/tests/test_scfd_vector_operations.cu $(LIBS1) -o $(BUILD_DIR)/test_scfd_vector_operations.bin 2>$(RESULTS)
+
+scfd_vector_operations_cpu.bin: source/common/tests/test_scfd_vector_operations_cpu.cpp source/common/tests/vector_operations_template_tests.h source/common/scfd_vector_operations.h
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/common/tests/test_scfd_vector_operations_cpu.cpp $(OPENMP) -o $(BUILD_DIR)/test_scfd_vector_operations_cpu.bin 2>$(RESULTS)
 
 test_gpu_reduction_ogita.bin: source/common/tests/test_gpu_reduction_ogita.cpp $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) $(ICUDA) $(IPROJECT) source/common/tests/test_gpu_reduction_ogita.cpp $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LCUDA) -o $(BUILD_DIR)/test_gpu_reduction_ogita.bin 2>$(RESULTS)
@@ -200,14 +208,14 @@ circle_ker: $(BUILD_DIR)/circle_ker.o
 $(BUILD_DIR)/circle_ker.o: source/nonlinear_operators/circle/circle_ker.cu | $(BUILD_STAMP)
 	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)  source/nonlinear_operators/circle/circle_ker.cu -c -o $(BUILD_DIR)/circle_ker.o 2>$(RESULTS)
 
-cont_def_circle: source/models/circle/circle_test_deflation_continuation.cpp $(BUILD_DIR)/circle_ker.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/circle/circle_test_deflation_continuation.cpp $(BUILD_DIR)/circle_ker.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/circle_test_deflation_continuation.bin 2>$(RESULTS)
+cont_def_circle: source/models/circle/circle_test_deflation_continuation.cpp source/models/circle/circle_test_deflation_continuation_typedefs.h source/nonlinear_operators/circle/circle.h source/common/scfd_vector_operations.h
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/circle/circle_test_deflation_continuation.cpp $(LIBS1) -o $(BUILD_DIR)/circle_test_deflation_continuation.bin 2>$(RESULTS)
 
-circle_curve_container: source/models/circle/circle_test_curve_container.cpp source/models/circle/circle_test_curve_container.h $(BUILD_DIR)/circle_ker.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/circle/circle_test_curve_container.cpp $(BUILD_DIR)/circle_ker.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/circle_test_curve_container.bin 2>$(RESULTS)
+circle_curve_container: source/models/circle/circle_test_curve_container.cpp source/models/circle/circle_test_curve_container.h source/models/circle/circle_test_deflation_continuation_typedefs.h source/nonlinear_operators/circle/circle.h source/common/scfd_vector_operations.h
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/circle/circle_test_curve_container.cpp $(LIBS1) -o $(BUILD_DIR)/circle_test_curve_container.bin 2>$(RESULTS)
 
-circle_bd: source/models/circle/circle_bd.cpp $(BUILD_DIR)/circle_ker.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/circle/circle_bd.cpp $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/circle_ker.o $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd.bin 2>$(RESULTS)
+circle_bd: source/models/circle/circle_bd.cpp source/nonlinear_operators/circle/circle.h source/common/scfd_vector_operations.h
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/circle/circle_bd.cpp $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd.bin 2>$(RESULTS)
 
 KS_bd: source/models/KS_2D/KS_bd_json_new.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KS_2D/KS_bd_json_new.cpp $(BUILD_DIR)/Kuramoto_Sivashinskiy_2D_ker.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBSAll) $(LLAPACK) -o $(BUILD_DIR)/KS_bd_json.bin 2>$(RESULTS)
@@ -349,7 +357,7 @@ test_ob_kernels:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/overscreening_breakdown/test_kernels.cpp $(BUILD_DIR)/overscreening_breakdown_ker.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o $(BUILD_DIR)/test_ob_kernels.bin 2>$(RESULTS)
 
 test_ob_kernels_var_prec:
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/overscreening_breakdown/test_kernels_var_prec.cpp $(BUILD_DIR)/overscreening_breakdown_ker_var_prec.o -o $(BUILD_DIR)/test_ob_kernels_var_prec.bin 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/overscreening_breakdown/test_kernels_var_prec.cpp $(BUILD_DIR)/overscreening_breakdown_ker_var_prec.o $(NVOPENMP) -o $(BUILD_DIR)/test_ob_kernels_var_prec.bin 2>$(RESULTS)
 
 
 test_ob_problem:
