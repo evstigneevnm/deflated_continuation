@@ -2,7 +2,7 @@
 #define __TEST_DEFLATION_TYPEDEFS_H__
 
 #include <utils/cuda_support.h>
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
 
@@ -35,7 +35,7 @@
 
 
     typedef SCALAR_TYPE real;
-    typedef utils::log_std log_t;
+    typedef scfd::utils::log_std log_t;
     typedef thrust::complex<real> complex;
     typedef gpu_vector_operations<real> vec_ops_real;
     typedef gpu_vector_operations<complex> vec_ops_complex;

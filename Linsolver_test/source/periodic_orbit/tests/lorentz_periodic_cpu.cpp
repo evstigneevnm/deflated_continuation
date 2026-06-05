@@ -7,9 +7,9 @@
 #include <array>
 #include <cmath>
 
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <common/file_operations.h>
-#include <common/cpu_vector_operations.h>
+#include <common/scfd_serial_cpu_vector_operations.h>
 #include <time_stepper/time_step_adaptation_constant.h>
 #include <time_stepper/time_step_adaptation_error_control.h>
 #include <time_stepper/explicit_time_step.h>
@@ -26,9 +26,9 @@ int main( int argc, char const *argv[] )
 {
 
     using real  = SCALAR_TYPE;
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
 
-    using vec_ops_t = cpu_vector_operations<real>;
+    using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
     using vec_t     = typename vec_ops_t::vector_type;
 
     using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t, log_t>;
@@ -200,7 +200,7 @@ int main( int argc, char const *argv[] )
 
     for ( int j = 0; j < 3; j++ )
     {
-        std::cout << x0[j] << std::endl;
+        std::cout << x0(j) << std::endl;
     }
 
     std::stringstream ss_periodic_estimate;

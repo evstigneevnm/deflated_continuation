@@ -11,7 +11,7 @@
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
 
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 
@@ -57,7 +57,7 @@ int main(int argc, char const *argv[])
     using vec_file_ops_t = gpu_file_operations<gpu_vector_operations_t>;
 
 
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
     using monitor_t = numerical_algos::lin_solvers::default_monitor<gpu_vector_operations_t,log_t>;
     using time_step_err_ctrl_t = time_steppers::time_step_adaptation_error_control<gpu_vector_operations_t, log_t>;
     using time_step_t = time_steppers::explicit_time_step<gpu_vector_operations_t, abc_flow_t, log_t, time_step_err_ctrl_t>;

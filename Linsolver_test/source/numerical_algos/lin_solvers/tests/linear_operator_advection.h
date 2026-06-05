@@ -69,7 +69,7 @@ public:
         {
             Ord jm = ((j==0)?N-1:j-1);
 
-            f[j] = (1.0+cfl_)*x[j]-(cfl_)*x[jm];
+            f(j) = (1.0+cfl_)*x(j)-(cfl_)*x(jm);
         }
     }
 

@@ -57,12 +57,12 @@ public:
             for(std::size_t j=0; j<N; j++)
             {
                 std::size_t jm = ((j==0)?N-1:j-1);
-                x[j] = ( y_[j]-side_coeff_*x[jm] )/diag_coeff_;
+                x(j) = ( y_(j)-side_coeff_*x(jm) )/diag_coeff_;
             }
             for(std::size_t j=N-1; j-->0;)
             {
                 std::size_t jm = ((j==0)?N-1:j-1);
-                x[j] = ( y_[j]-side_coeff_*x[jm] )/diag_coeff_;
+                x(j) = ( y_(j)-side_coeff_*x(jm) )/diag_coeff_;
             }
         }
     }

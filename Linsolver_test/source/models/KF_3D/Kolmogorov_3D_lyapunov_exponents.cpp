@@ -13,7 +13,7 @@
 #include <external_libraries/cublas_wrap.h>
 #include <external_libraries/lapack_wrap.h>
 
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 
@@ -54,7 +54,7 @@ int main(int argc, char const *argv[])
             vec_ops_t,
             Blocks_x_, Blocks_y_>; 
 
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
     using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t,log_t>;
 
     using lyapunov_exp_t = time_steppers::lyapunov_exponents<vec_ops_t, KF_3D_t, time_steppers::time_step_adaptation_error_control, time_steppers::explicit_time_step, log_t, number_of_exponents>;

@@ -8,7 +8,7 @@
 #include <cmath>
 // #include <utils/init_cuda.h>
 
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 // #include <numerical_algos/lin_solvers/default_monitor.h>
 // #include <numerical_algos/lin_solvers/bicgstabl.h>
 
@@ -16,7 +16,7 @@
 // #include <common/gpu_file_operations.h>
 // #include <common/gpu_vector_operations.h>
 #include <common/file_operations.h>
-#include <common/cpu_vector_operations.h>
+#include <common/scfd_serial_cpu_vector_operations.h>
 
 #include <time_stepper/time_step_adaptation_constant.h>
 #include <time_stepper/time_step_adaptation_error_control.h>
@@ -30,9 +30,9 @@ int main(int argc, char const *argv[])
 {
 
     using real = SCALAR_TYPE;
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
 
-    using vec_ops_t = cpu_vector_operations<real>;
+    using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
     using vec_t = typename vec_ops_t::vector_type;
 
     using nlin_op_t = nonlinear_operators::rossler<vec_ops_t>;
@@ -99,4 +99,3 @@ int main(int argc, char const *argv[])
     vec_ops.stop_use_vector(x0); vec_ops.free_vector(x0);
     return 0;
 }
-

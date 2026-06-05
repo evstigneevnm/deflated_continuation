@@ -13,7 +13,7 @@
 #include <external_libraries/cublas_wrap.h>
 #include <external_libraries/lapack_wrap.h>
 
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 
@@ -57,7 +57,7 @@ int main(int argc, char const *argv[])
             Blocks_x_, Blocks_y_>;    
 
 
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
     using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t,log_t>;
 
     using periodic_orbit_nonlinear_operator_t = periodic_orbit::periodic_orbit_nonlinear_operator<vec_ops_t, abc_flow_t, log_t, time_steppers::time_step_adaptation_error_control, time_steppers::explicit_time_step>; //time_step_adaptation_constant //time_step_adaptation_error_control

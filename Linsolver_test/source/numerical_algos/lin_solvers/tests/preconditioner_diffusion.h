@@ -8,12 +8,12 @@
 *
 *   u_t+a u_x = 0, a>0, x\in[0;1), u - periodic
 *
-*   u_j^{n+1} - u_j^{n} + a tau/dx( u_j^{n+1} - u_{j-1}^{n+1} ) = 0 
-*    
+*   u_j^{n+1} - u_j^{n} + a tau/dx( u_j^{n+1} - u_{j-1}^{n+1} ) = 0
+*
 *   u_j^{n+1} + a tau/dx (u_j^{n+1} - u_{j-1}^{n+1} ) = u_j^{n}
-* 
+*
 *   A U^{n+1} = U^{n}
-* 
+*
 */
 
 #include <memory>
@@ -21,7 +21,7 @@
 namespace tests
 {
 
-template<class VectorOperations, class LinearOperator, class Log> 
+template<class VectorOperations, class LinearOperator, class Log>
 class preconditioner_diffusion
 {
 public:
@@ -40,8 +40,8 @@ public:
         vec_ops_->stop_use_vector(y_);
         vec_ops_->free_vector(y_);
     }
-    
-    void set_operator(const LinearOperator* op_) 
+
+    void set_operator(const LinearOperator* op_)
     {
         N = op_->get_size();
         h_ = op_->get_h();
@@ -59,20 +59,20 @@ public:
             for(std::size_t j=0; j<N;j++)
             {
                 if(j>0&&j<N-1)
-                    x[j] = (y_[j]+side_coeff_*x[j-1]+side_coeff_*x[j+1])/diag_coeff_;
+                    x(j) = (y_(j)+side_coeff_*x(j-1)+side_coeff_*x(j+1))/diag_coeff_;
                 if(j==0)
-                    x[j] = (y_[j]+side_coeff_*x[j+1])/diag_coeff_;
+                    x(j) = (y_(j)+side_coeff_*x(j+1))/diag_coeff_;
                 if(j==N-1)
-                    x[j] = (y_[j]+side_coeff_*x[j-1])/diag_coeff_;            
+                    x(j) = (y_(j)+side_coeff_*x(j-1))/diag_coeff_;
             }
             for(std::size_t j=N-1; j-->0;)
             {
                 if(j>0&&j<N-1)
-                    x[j] = (y_[j]+side_coeff_*x[j-1]+side_coeff_*x[j+1])/diag_coeff_;
+                    x(j) = (y_(j)+side_coeff_*x(j-1)+side_coeff_*x(j+1))/diag_coeff_;
                 if(j==0)
-                    x[j] = (y_[j]+side_coeff_*x[j+1])/diag_coeff_;
+                    x(j) = (y_(j)+side_coeff_*x(j+1))/diag_coeff_;
                 if(j==N-1)
-                    x[j] = (y_[j]+side_coeff_*x[j-1])/diag_coeff_;            
+                    x(j) = (y_(j)+side_coeff_*x(j-1))/diag_coeff_;
             }
 
         }

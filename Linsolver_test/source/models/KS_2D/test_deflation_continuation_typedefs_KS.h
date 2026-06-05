@@ -5,7 +5,7 @@
 
 
     typedef SCALAR_TYPE real;
-    typedef utils::log_std log_t;
+    typedef scfd::utils::log_std log_t;
     typedef thrust::complex<real> complex;
     typedef gpu_vector_operations<real> vec_ops_real;
     typedef gpu_vector_operations<complex> vec_ops_complex;

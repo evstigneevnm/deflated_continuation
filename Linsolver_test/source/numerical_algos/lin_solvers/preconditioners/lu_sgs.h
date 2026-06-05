@@ -1,7 +1,7 @@
 #ifndef __SCFD_LU_SGS_H__
 #define __SCFD_LU_SGS_H__
 
-#include <utils/logged_obj_base.h>
+#include <scfd/utils/logged_obj_base.h>
 
 namespace numerical_algos
 {
@@ -32,7 +32,7 @@ namespace lin_solvers
 };*/
 
 template<class LinearOperator,class VectorOperations,class Log>
-class lu_sgs : public utils::logged_obj_base<Log>
+class lu_sgs : public scfd::utils::logged_obj_base<Log>
 {
 public:
     typedef LinearOperator                          operator_type;
@@ -52,7 +52,7 @@ private:
 public:
     lu_sgs(const vector_operations_type *vec_ops, 
              Log *log = NULL, int obj_log_lev = 0) : 
-        utils::logged_obj_base<Log>(log, obj_log_lev, "lu_sgs::"),
+        scfd::utils::logged_obj_base<Log>(log, obj_log_lev, "lu_sgs::"),
         vec_ops_(vec_ops), op_(NULL), bufs(vec_ops), tmp(bufs[0])
     {
         bufs.init();

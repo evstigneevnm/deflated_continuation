@@ -8,7 +8,7 @@
 #include <utils/init_cuda.h>
 #include <external_libraries/cublas_wrap.h>
 
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/exact_wrapper.h>
 

@@ -52,9 +52,9 @@ struct lorentz
         // dzdt = -self.beta * z + x * y - self.delta
         // sigma, rho, beta, epsilon, delta
         // 0      1    2     3        4
-        out_p[0] = -param[0] * in_p[0] + param[0] * in_p[1] - param[3] * in_p[0] * in_p[0] * in_p[0];
-        out_p[1] = param[1] * in_p[0] - in_p[1] - in_p[0] * in_p[2] + param[4];
-        out_p[2] = -param[2] * in_p[2] + in_p[0] * in_p[1] - param[4];
+        out_p(0) = -param[0] * in_p(0) + param[0] * in_p(1) - param[3] * in_p(0) * in_p(0) * in_p(0);
+        out_p(1) = param[1] * in_p(0) - in_p(1) - in_p(0) * in_p(2) + param[4];
+        out_p(2) = -param[2] * in_p(2) + in_p(0) * in_p(1) - param[4];
     }
 
     void set_linearization_point( const T_vec &x_p, const T param_p )
@@ -65,16 +65,16 @@ struct lorentz
 
     void set_initial( T_vec &x0 ) const
     {
-        x0[0] = 2.2;
-        x0[1] = 30.5;
-        x0[2] = 2.5;
+        x0(0) = 2.2;
+        x0(1) = 30.5;
+        x0(2) = 2.5;
     }
 
     void set_period_point( T_vec &x0 ) const
     {
-        x0[0] = -8.308455;
-        x0[1] = 21.347423;
-        x0[2] = 26.958582;
+        x0(0) = -8.308455;
+        x0(1) = 21.347423;
+        x0(2) = 26.958582;
     }
 
     void jacobian_u( const T_vec &x_in_p, T_vec &x_out_p ) const
@@ -84,30 +84,30 @@ struct lorentz
         // [-self.sigma - 3*self.epsilon*x**2, self.sigma, 0],
         // [self.rho - z, -1, -x],
         // [y, x, -self.beta]
-        x_out_p[0] = ( -param[0] - 3 * param[3] * x0[0] * x0[0] ) * x_in_p[0] + param[0] * x_in_p[1];
-        x_out_p[1] = ( param[1] - x0[2] ) * x_in_p[0] - x_in_p[1] - x0[0] * x_in_p[2];
-        x_out_p[2] = x0[1] * x_in_p[0] + x0[0] * x_in_p[1] - param[2] * x_in_p[2];
+        x_out_p(0) = ( -param[0] - 3 * param[3] * x0(0) * x0(0) ) * x_in_p(0) + param[0] * x_in_p(1);
+        x_out_p(1) = ( param[1] - x0(2) ) * x_in_p(0) - x_in_p(1) - x0(0) * x_in_p(2);
+        x_out_p(2) = x0(1) * x_in_p(0) + x0(0) * x_in_p(1) - param[2] * x_in_p(2);
     }
 
     void jacobian_alpha( const T_vec &x_in_p, const T param_p, T_vec &x_out_p ) const
     {
         if ( used_param_number_ == 0 )
         {
-            x_out_p[0] = 0;
-            x_out_p[1] = x_in_p[1];
-            x_out_p[2] = 0;
+            x_out_p(0) = 0;
+            x_out_p(1) = x_in_p(1);
+            x_out_p(2) = 0;
         }
         else if ( used_param_number_ == 1 )
         {
-            x_out_p[0] = 0;
-            x_out_p[1] = 0;
-            x_out_p[2] = 1.0;
+            x_out_p(0) = 0;
+            x_out_p(1) = 0;
+            x_out_p(2) = 1.0;
         }
         else if ( used_param_number_ == 2 )
         {
-            x_out_p[0] = 0;
-            x_out_p[1] = 0;
-            x_out_p[2] = -x_in_p[2];
+            x_out_p(0) = 0;
+            x_out_p(1) = 0;
+            x_out_p(2) = -x_in_p(2);
         }
         else
         {
@@ -122,16 +122,16 @@ struct lorentz
 
     void norm_bifurcation_diagram( const T_vec &x0, std::vector<T> &norm_vec ) const
     {
-        norm_vec.push_back( x0[0] );
-        norm_vec.push_back( x0[1] );
-        norm_vec.push_back( x0[2] );
+        norm_vec.push_back( x0(0) );
+        norm_vec.push_back( x0(1) );
+        norm_vec.push_back( x0(2) );
     }
     T check_solution_quality( const T_vec &x ) const
     {
         bool finite = true;
         for ( int j = 0; j < 3; j++ )
         {
-            finite &= std::isfinite( x[j] );
+            finite &= std::isfinite( x(j) );
         }
         return finite;
     }

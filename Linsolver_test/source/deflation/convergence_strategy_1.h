@@ -5,7 +5,7 @@ converhence rules for Newton iterator for deflation process
 */
 #include <cmath>
 #include <vector>
-//#include <utils/logged_obj_base.h>
+//#include <scfd/utils/logged_obj_base.h>
 
 namespace deflation
 {
@@ -19,7 +19,7 @@ class convergence_strategy
 private:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
-//    typedef utils::logged_obj_base<Logging> logged_obj_t;
+//    typedef scfd::utils::logged_obj_base<Logging> logged_obj_t;
 
     const T max_norm_Fx_ = 1.0e40;
 public:    

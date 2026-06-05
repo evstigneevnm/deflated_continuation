@@ -15,7 +15,7 @@
 
 #include <cmath>
 #include <vector>
-#include <utils/logged_obj_base.h>
+#include <scfd/utils/logged_obj_base.h>
 
 namespace nonlinear_operators
 {
@@ -29,7 +29,7 @@ class convergence_strategy
 private:
     typedef typename vector_operations::scalar_type  T;
     typedef typename vector_operations::vector_type  T_vec;
-    typedef utils::logged_obj_base<logging> logged_obj_t;
+    typedef scfd::utils::logged_obj_base<logging> logged_obj_t;
 
 public:    
     convergence_strategy(vector_operations*& vec_ops_, logging*& log_, T tolerance_ = T(1.0e-6), unsigned int maximum_iterations_ = 100, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true):
@@ -141,7 +141,7 @@ public:
         }
         else if(iterations>=maximum_iterations)
         {
-            log->info("nonlinear_operators::convergence_strategy::Newton max iterations (%i) reached.", iterations);
+            log->info_f("nonlinear_operators::convergence_strategy::Newton max iterations (%i) reached.", iterations);
             result_status = 1;
             finish = true;
         }

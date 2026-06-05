@@ -1,7 +1,7 @@
 #include <memory>
 #include <cmath>
 #include <scfd/utils/log.h>
-#include <common/cpu_vector_operations.h>
+#include <common/scfd_serial_cpu_vector_operations.h>
 #include "linear_operator_advection.h"
 #include "linear_operator_diffusion.h"
 #include "linear_operator_elliptic.h"
@@ -21,7 +21,7 @@ int main(int argc, char const *args[])
 {
     using log_t = scfd::utils::log_std;
     using T = SCALAR_TYPE;
-    using vec_ops_t = cpu_vector_operations<T>;
+    using vec_ops_t = scfd_serial_cpu_vector_operations<T>;
     using T_vec = typename vec_ops_t::vector_type;
     using lin_op_adv_t = tests::linear_operator_advection<vec_ops_t, log_t>;
     using lin_op_diff_t = tests::linear_operator_diffusion<vec_ops_t, log_t>;
@@ -79,10 +79,10 @@ int main(int argc, char const *args[])
 
         for(int j=0;j<N;j++)
         {
-            y[j] = std::sin(1.0*j/(N-1)*M_PIl);
-            // x[j] = 0.1*std::sin(1.0*j/(N-1)*M_PIl);
+            y(j) = std::sin(1.0*j/(N-1)*M_PIl);
+            // x(j) = 0.1*std::sin(1.0*j/(N-1)*M_PIl);
         }
-        y[0] = y[N-1] = 0;
+        y(0) = y(N-1) = 0;
 
         gmres_diff_t::params params_diff;
         T rel_tol = 1.0e-10;

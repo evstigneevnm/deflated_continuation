@@ -3,103 +3,19 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/jacobi.h>
 #include <numerical_algos/lin_solvers/cgs.h>
 #include <numerical_algos/lin_solvers/bicgstab.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
+#include <common/scfd_serial_cpu_vector_operations.h>
 
 using namespace numerical_algos::lin_solvers;
 
 typedef SCALAR_TYPE   real;
-typedef real*         vector_t;
-
-struct cpu_vector_operations
-{
-    typedef real     scalar_type;
-    typedef vector_t vector_type;
-
-    cpu_vector_operations(int sz) : sz_(sz)
-    {
-    }
-
-    int     sz_;
-
-    void            init_vector(vector_type& x)const 
-    {
-        x = NULL;
-    }
-    void            free_vector(vector_type& x)const 
-    {
-        if (x != NULL) free(x);
-    }
-    void            start_use_vector(vector_type& x)const
-    {
-        if (x == NULL) x = (real*)malloc(sz_*sizeof(real));
-    }
-    void            stop_use_vector(vector_type& x)const
-    {
-    }
-
-    bool            check_is_valid_number(const vector_type &x)const
-    {
-        //TODO check isinf
-        for (int i = 0;i < sz_;++i) if (x[i] != x[i]) return false;
-        return true;
-    }
-
-    scalar_type     norm(const vector_type &x)const
-    {
-        real    res(0.f);
-        for (int i = 0;i < sz_;++i) res += x[i]*x[i];
-        return std::sqrt(res);
-    }
-    scalar_type     scalar_prod(const vector_type &x, const vector_type &y)const
-    {
-        real    res(0.f);
-        for (int i = 0;i < sz_;++i) res += x[i]*y[i];
-        return res;
-    }
-    
-    //calc: x := <vector_type with all elements equal to given scalar value> 
-    void            assign_scalar(scalar_type scalar, vector_type& x)const
-    {
-        for (int i = 0;i < sz_;++i) x[i] = scalar;
-    }
-    //calc: x := mul_x*x + <vector_type of all scalar value> 
-    void            add_mul_scalar(scalar_type scalar, scalar_type mul_x, vector_type& x)const
-    {
-        for (int i = 0;i < sz_;++i) x[i] = mul_x*x[i] + scalar;
-    }
-    //copy: y := x
-    void            assign(const vector_type& x, vector_type& y)const
-    {
-        for (int i = 0;i < sz_;++i) y[i] = x[i];
-    }
-    //calc: y := mul_x*x
-    void            assign_mul(scalar_type mul_x, const vector_type& x, vector_type& y)const
-    {
-        for (int i = 0;i < sz_;++i) y[i] = mul_x*x[i];
-    }
-    //calc: z := mul_x*x + mul_y*y
-    void            assign_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, const vector_type& y, 
-                               vector_type& z)const
-    {
-        for (int i = 0;i < sz_;++i) z[i] = mul_x*x[i] + mul_y*y[i];
-    }
-    //calc: y := mul_x*x + mul_y*y
-    void            add_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, vector_type& y)const
-    {
-        for (int i = 0;i < sz_;++i) y[i] = mul_x*x[i] + mul_y*y[i];
-    }
-    //calc: z := mul_x*x + mul_y*y + mul_z*z
-    void            add_mul(scalar_type mul_x, const vector_type& x, scalar_type mul_y, const vector_type& y, 
-                            scalar_type mul_z, vector_type& z)const
-    {
-        for (int i = 0;i < sz_;++i) z[i] = mul_x*x[i] + mul_y*y[i] + mul_z*z[i];
-    }
-};
+using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
+using vector_t = typename vec_ops_t::vector_type;
 
 //TODO now works only for a > 0
 struct system_operator
@@ -111,12 +27,11 @@ struct system_operator
 
     void apply(const vector_t& x, vector_t& f)const
     {
-        //TODO
         for (int i = 0;i < sz_;++i) {
-            real    xm = (i > 0     ? x[i-1] : real(0.f)),
-                    xp = (i+1 < sz_ ? x[i+1] : real(0.f));
-            f[i] = a_*(x[i]-x[i-1])/h_ - (real(1.f)/re_)*(x[i+1] - real(2.f)*x[i] + x[i-1])/(h_*h_);
-            //f[i] = (real(1.f)/re_)*(x[i+1] - real(2.f)*x[i] + x[i-1])/(h_*h_);
+            real    xm = (i > 0     ? x(i-1) : real(0.f)),
+                    xp = (i+1 < sz_ ? x(i+1) : real(0.f));
+            f(i) = a_*(x(i)-xm)/h_ - (real(1.f)/re_)*(xp - real(2.f)*x(i) + xm)/(h_*h_);
+            //f(i) = (real(1.f)/re_)*(xp - real(2.f)*x(i) + xm)/(h_*h_);
         }
     }
 };
@@ -136,19 +51,19 @@ struct prec_operator
     void apply(vector_t& x)const
     {
         for (int i = 0;i < op_->sz_;++i) {
-            x[i] /= (op_->a_/op_->h_ - (real(1.f)/op_->re_)*(-real(2.f))/(op_->h_*op_->h_));
+            x(i) /= (op_->a_/op_->h_ - (real(1.f)/op_->re_)*(-real(2.f))/(op_->h_*op_->h_));
 
-            //x[i] /= ((real(1.f)/re_)*(-real(2.f))/(h_*h_));
+            //x(i) /= ((real(1.f)/re_)*(-real(2.f))/(h_*h_));
         }
     }
 };
 
-typedef utils::log_std                                                                  log_t;
-typedef default_monitor<cpu_vector_operations,log_t>                                    monitor_t;
-typedef jacobi<system_operator,prec_operator,cpu_vector_operations,monitor_t,log_t>     lin_solver_jacobi_t;
-typedef cgs<system_operator,prec_operator,cpu_vector_operations,monitor_t,log_t>        lin_solver_cgs_t;
-typedef bicgstab<system_operator,prec_operator,cpu_vector_operations,monitor_t,log_t>   lin_solver_bicgstab_t;
-typedef bicgstabl<system_operator,prec_operator,cpu_vector_operations,monitor_t,log_t>   lin_solver_bicgstabl_t;
+typedef scfd::utils::log_std                                                            log_t;
+typedef default_monitor<vec_ops_t,log_t>                                                monitor_t;
+typedef jacobi<system_operator,prec_operator,vec_ops_t,monitor_t,log_t>                 lin_solver_jacobi_t;
+typedef cgs<system_operator,prec_operator,vec_ops_t,monitor_t,log_t>                    lin_solver_cgs_t;
+typedef bicgstab<system_operator,prec_operator,vec_ops_t,monitor_t,log_t>               lin_solver_bicgstab_t;
+typedef bicgstabl<system_operator,prec_operator,vec_ops_t,monitor_t,log_t>              lin_solver_bicgstabl_t;
 
 void write_convergency(const std::string &fn, const std::vector<std::pair<int,real> > &conv, real tol)
 {
@@ -181,7 +96,7 @@ int main(int argc, char **args)
     int                     lin_solver_type = atoi(args[9]);
 
     log_t                   log;
-    cpu_vector_operations   vec_ops(sz);
+    vec_ops_t               vec_ops(sz);
     system_operator         A(sz, a, re);
     vector_t                rhs, x;
 
@@ -200,8 +115,10 @@ int main(int argc, char **args)
         default: throw std::runtime_error("unknown solvert type");
     }
 
-    x = (real*)malloc(sz*sizeof(real));
-    rhs = (real*)malloc(sz*sizeof(real));
+    vec_ops.init_vector(x);
+    vec_ops.init_vector(rhs);
+    vec_ops.start_use_vector(x);
+    vec_ops.start_use_vector(rhs);
 
     vec_ops.assign_scalar(real(1.f), rhs);
     vec_ops.assign_scalar(real(0.f), x);
@@ -239,13 +156,16 @@ int main(int argc, char **args)
     if (res_fn != "none") {
         std::ofstream    out_f(res_fn.c_str());
         for (int i = 0;i < sz;++i) {
-            out_f << (i + real(0.5f))/sz << " " << x[i] << std::endl;
+            out_f << (i + real(0.5f))/sz << " " << x(i) << std::endl;
         }
         out_f.close();
     }
     if (conv_fn != "none") write_convergency(conv_fn, mon->convergence_history(), mon->tol_out());
 
-    free(x); free(rhs);
+    vec_ops.stop_use_vector(x);
+    vec_ops.stop_use_vector(rhs);
+    vec_ops.free_vector(x);
+    vec_ops.free_vector(rhs);
 
     return 0;
 }

@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include <scfd/backend/copy/cuda.h>
+#include <scfd/copy/cuda.h>
 
 #include <common/cuda_init_scfd.h>
 #include <common/gpu_vector_operations.h>

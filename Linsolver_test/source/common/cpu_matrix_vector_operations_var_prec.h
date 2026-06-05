@@ -5,7 +5,7 @@
 #include <cmath>
 #include <random>
 #include <stdexcept>
-#include <vector> 
+#include <vector>
 #include <algorithm>
 #include <chrono>
 #include <numeric>
@@ -20,6 +20,30 @@ template <class VectorOperations>
 struct cpu_matrix_vector_operations_var_prec
 {
 private:
+    template<class Vec>
+    static auto vector_at(Vec& vec, size_t i) -> decltype(vec(i))
+    {
+        return vec(i);
+    }
+
+    template<class Vec>
+    static auto vector_at(Vec& vec, size_t i) -> decltype(vec[i])
+    {
+        return vec[i];
+    }
+
+    template<class Vec>
+    static auto vector_at(const Vec& vec, size_t i) -> decltype(vec(i))
+    {
+        return vec(i);
+    }
+
+    template<class Vec>
+    static auto vector_at(const Vec& vec, size_t i) -> decltype(vec[i])
+    {
+        return vec[i];
+    }
+
     #ifdef __cpu_matrix_vector_operations_var_prec_H_use_boost__
         template<class T>
         static auto sqrt(const T& val) {return boost::multiprecision::sqrt(val);}
@@ -45,7 +69,7 @@ public:
     using scalar_type = typename VectorOperations::scalar_type;
     using vector_type = typename VectorOperations::vector_type;
     using matrix_type = std::vector<scalar_type>;
-    
+
     using T = scalar_type;
     using T_vec = vector_type;
     using T_mat = matrix_type;
@@ -61,7 +85,7 @@ public:
         vec_ops_->init_vector(vec_helper_row_);
         vec_ops_->start_use_vector(vec_helper_row_);
         vec_ops_->init_vector(vec_helper_col_);
-        vec_ops_->start_use_vector(vec_helper_col_);  
+        vec_ops_->start_use_vector(vec_helper_col_);
         machesp_ = macheps();
         std::cout << "cpu_matrix_vector_operations_var_prec: macheps = " << machesp_ << std::endl;
         init_matrix(helper_matrix_);
@@ -76,12 +100,12 @@ public:
         vec_ops_->stop_use_vector(vec_helper_col_);
         vec_ops_->free_vector(vec_helper_col_);
         vec_ops_->stop_use_vector(vec_helper_row_);
-        vec_ops_->free_vector(vec_helper_row_);        
+        vec_ops_->free_vector(vec_helper_row_);
     }
 
-    void init_matrix(matrix_type& x)const 
+    void init_matrix(matrix_type& x)const
     {
-    } 
+    }
     template<class ...Args>
     void init_matrices(Args&&...args) const
     {
@@ -89,31 +113,31 @@ public:
     }
     void start_use_matrix(matrix_type& x)const
     {
-        if (x.size() == 0) 
+        if (x.size() == 0)
            x = std::move( matrix_type(sz_rows*sz_cols, 0) );
-    }  
+    }
     template<class ...Args>
     void start_use_matrices(Args&&...args) const
     {
         std::initializer_list<int>{((void)start_use_matrix(std::forward<Args>(args)), 0 )...};
-    }      
-    void free_matrix(matrix_type& x)const 
+    }
+    void free_matrix(matrix_type& x)const
     {
-        if (x.size() > 0) 
+        if (x.size() > 0)
             x.resize(0);
-    }   
+    }
     template<class ...Args>
     void free_matrices(Args&&...args) const
     {
         std::initializer_list<int>{((void)free_matrix(std::forward<Args>(args)), 0 )...};
-    }       
+    }
     void stop_use_matrix(matrix_type& x)const
     {}
     template<class ...Args>
     void stop_use_matrices(Args&&...args) const
     {
         std::initializer_list<int>{((void)stop_use_matrix(std::forward<Args>(args)), 0 )...};
-    }      
+    }
     size_t get_rows() const
     {
         return sz_rows;
@@ -138,7 +162,7 @@ public:
         }
         for(size_t j=0;j<sz_rows;++j)
         {
-            mat[I2_R(j,col_number,sz_rows)] = vec[j];
+            mat[I2_R(j,col_number,sz_rows)] = vector_at(vec, j);
         }
     }
     void get_matrix_column(vector_type& vec, const matrix_type& mat,  const size_t col_number)const
@@ -149,8 +173,8 @@ public:
         }
         for(size_t j=0;j<sz_rows;++j)
         {
-            vec[j] = mat[I2_R(j,col_number,sz_rows)];
-        }        
+            vector_at(vec, j) = mat[I2_R(j,col_number,sz_rows)];
+        }
     }
     void set_matrix_row(matrix_type& mat, const vector_type& vec, const size_t row_number)const
     {
@@ -160,7 +184,7 @@ public:
         }
         for(size_t k=0;k<sz_cols;k++)
         {
-            mat[I2_R(row_number,k,sz_rows)] = vec[k];
+            mat[I2_R(row_number,k,sz_rows)] = vector_at(vec, k);
         }
     }
     void get_matrix_row(vector_type& vec, const matrix_type& mat,  const size_t row_number)const
@@ -171,8 +195,8 @@ public:
         }
         for(size_t k=0;k<sz_cols;k++)
         {
-            vec[k] = mat[I2_R(row_number,k,sz_rows)];
-        }        
+            vector_at(vec, k) = mat[I2_R(row_number,k,sz_rows)];
+        }
     }
 
     void set_matrix_value(matrix_type& mat, const scalar_type& val, const size_t row_number, const size_t col_number) const
@@ -209,7 +233,7 @@ public:
         #pragma omp parallel for
         for(size_t j=0;j<sz_rows;j++)
         {
-            
+
             std::independent_bits_engine<std::mt19937_64, std::numeric_limits<T>::digits, uint64_t> gen;
             auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
             gen.seed( j ); //fix for debug
@@ -230,7 +254,7 @@ public:
             if((k >= col_from)&&(k < col_to))
             {
                 for(size_t j=0;j<sz_rows;++j)
-                {                
+                {
                    retA[I2_R(j,k,sz_rows)] = static_cast<scalar_type>(0.0);
                }
             }
@@ -239,7 +263,7 @@ public:
                 for(size_t j=0;j<sz_rows;++j)
                 {
                     retA[I2_R(j,k,sz_rows)] = matA[I2_R(j,k,sz_rows)];
-                }            
+                }
             }
         }
     }
@@ -250,7 +274,7 @@ public:
     void gemv(const char op, const matrix_type& mat, const scalar_type alpha, const vector_type& x, const scalar_type beta, vector_type& y) const
     {
         // cuBLAS->gemv<scalar_type>(op, sz_rows, mat, sz_cols, sz_rows, alpha, x, beta, y);
-        
+
         if(op == 'T')
         {
             #pragma omp parallel for
@@ -262,12 +286,12 @@ public:
                 T accum = 0;
                 for(size_t j = 0;j<sz_rows;j++)
                 {
-                    T prod = two_prod(accum_prod, x[j], mat[I2_R(j,k,sz_rows)]);
+                    T prod = two_prod(accum_prod, vector_at(x, j), mat[I2_R(j,k,sz_rows)]);
                     val = two_sum(accum_sum, val, prod );
                     accum = accum + accum_prod + accum_sum;
                     // val = val + x[k]*mat[I2_R(j,k,sz_rows)];
                 }
-                y[k] = alpha*(val+accum) + beta*y[k];                
+                vector_at(y, k) = alpha*(val+accum) + beta*vector_at(y, k);
 
             }
         }
@@ -284,12 +308,12 @@ public:
                 T accum = 0;
                 for(size_t k = 0;k<sz_cols;k++)
                 {
-                    T prod = two_prod(accum_prod, x[k], mat[I2_R(j,k,sz_rows)]);
+                    T prod = two_prod(accum_prod, vector_at(x, k), mat[I2_R(j,k,sz_rows)]);
                     val = two_sum(accum_sum, val, prod );
                     accum = accum + accum_prod + accum_sum;
                     // val = val + x[k]*mat[I2_R(j,k,sz_rows)];
                 }
-                y[j] = alpha*(val+accum) + beta*y[j];
+                vector_at(y, j) = alpha*(val+accum) + beta*vector_at(y, j);
             }
         }
 
@@ -312,12 +336,12 @@ public:
                 T accum = 0;
                 for(size_t j = 0;j<sz_rows;j++)
                 {
-                    T prod = two_prod(accum_prod, x[j], mat[I2_R(j,k,sz_rows)]);
+                    T prod = two_prod(accum_prod, vector_at(x, j), mat[I2_R(j,k,sz_rows)]);
                     val = two_sum(accum_sum, val, prod );
                     accum = accum + accum_prod + accum_sum;
                     // val = val + x[k]*mat[I2_R(j,k,sz_rows)];
                 }
-                y[k] = val+accum;                
+                vector_at(y, k) = val+accum;
 
             }
         }
@@ -344,15 +368,15 @@ public:
                 T accum = 0;
                 for(size_t j = 0;j<sz_rows;j++)
                 {
-                    T prod = two_prod(accum_prod, x[k], mat[I2_R(j,k,sz_rows)]);
+                    T prod = two_prod(accum_prod, vector_at(x, k), mat[I2_R(j,k,sz_rows)]);
                     val = two_sum(accum_sum, val, prod );
                     accum = accum + accum_prod + accum_sum;
                     // val = val + x[k]*mat[I2_R(j,k,sz_rows)];
                 }
-                y[k] = val+accum;                
+                vector_at(y, k) = val+accum;
 
-            }           
-            
+            }
+
         }
         else
         {
@@ -395,7 +419,7 @@ public:
 
 
     [[nodiscard]] T norm_fro(const matrix_type& A) const
-    { 
+    {
         int omp_num_threads = 0;
         #pragma omp parallel
         {
@@ -412,17 +436,17 @@ public:
             {
                 for (size_t k = 0; k < sz_rows; ++k)
                 {
-                    auto a_jk = A[I2_R(j,k,sz_rows)];   
+                    auto a_jk = A[I2_R(j,k,sz_rows)];
                     res_th[thread_id] = res_th[thread_id] + a_jk*a_jk;
                 }
-            }            
+            }
         }
         for(int l = 0; l<omp_num_threads;++l)
         {
             res = res + res_th[l];
         }
-        
-    
+
+
 
         // for(size_t k = 0;k<sz_cols;k++)
         // {
@@ -462,11 +486,11 @@ public:
 
                 for(size_t k = 0;k<max_size_B;k++)
                 {
-                    
+
                     matC[I2_R(j,k, sz_row_A)] *= beta;
                     for(size_t l = 0;l<sz_col_A;l++)
                     {
-                        
+
                         matC[I2_R(j,k, sz_row_A)] += alpha*matA[I2_R(j,l, sz_row_A)]*matB[I2_R(l,k, sz_row_B)];
                     }
 
@@ -478,41 +502,41 @@ public:
             if(sz_row_A!=sz_row_B)
             {
                 throw std::logic_error("gemm: matrix sizes are invalid: A(" + std::to_string(sz_row_A)+"X"+std::to_string(sz_col_A)+")^T * B("+ std::to_string(sz_row_B)+"X"+std::to_string(sz_col_B)+")");
-            }            
+            }
             #pragma omp parallel for
             for(size_t j = 0;j<sz_col_A;j++)
             {
 
                 for(size_t k = 0;k<max_size_B;k++)
                 {
-                    
+
                     matC[I2_R(j,k, sz_row_A)] *= beta;
                     for(size_t l = 0;l<sz_row_A;l++)
                     {
-                        
+
                         matC[I2_R(j,k, sz_row_A)] += alpha*matA[I2_R(l,j, sz_row_A)]*matB[I2_R(l,k, sz_row_B)];
                     }
 
                 }
             }
-        }    
+        }
         else if((opA == 'N')&&(opB == 'T'))
         {
             if(sz_col_A!=sz_col_B)
             {
                 throw std::logic_error("gemm: matrix sizes are invalid: A(" + std::to_string(sz_row_A)+"X"+std::to_string(sz_col_A)+") * B("+ std::to_string(sz_row_B)+"X"+std::to_string(sz_col_B)+")^T");
-            }            
+            }
             #pragma omp parallel for
             for(size_t j = 0;j<sz_row_A;j++)
             {
 
                 for(size_t k = 0;k<max_size_B;k++)
                 {
-                    
+
                     matC[I2_R(j,k, sz_row_A)] *= beta;
                     for(size_t l = 0;l<sz_col_A;l++)
                     {
-                        
+
                         matC[I2_R(j,k, sz_row_A)] += alpha*matA[I2_R(j,l, sz_row_A)]*matB[I2_R(k,l, sz_row_B)];
                     }
 
@@ -533,12 +557,12 @@ public:
     void mat_T_gemm_mat_N(const matrix_type& matA, const matrix_type& matB, size_t n_cols_B_C, const scalar_type alpha, const scalar_type beta, matrix_type& matC) const
     {
         if(n_cols_B_C<=sz_cols)
-        { 
-            gemm('T', 'N', alpha, sz_rows, sz_cols, matA, sz_rows, sz_cols, n_cols_B_C, matB, beta, matC);        
+        {
+            gemm('T', 'N', alpha, sz_rows, sz_cols, matA, sz_rows, sz_cols, n_cols_B_C, matB, beta, matC);
         }
         else
         {
-            throw std::runtime_error("mat_T_gemm_mat_N: n_cols_B_C > sz_cols"); 
+            throw std::runtime_error("mat_T_gemm_mat_N: n_cols_B_C > sz_cols");
         }
     }
 
@@ -552,12 +576,12 @@ public:
     void mat2column_mult_mat(const matrix_type& matA, const matrix_type& matB, size_t max_col, const scalar_type alpha, const scalar_type beta, matrix_type& matC) const
     {
         if(max_col<=sz_cols)
-        {        
-            gemm('N', 'N', alpha, sz_rows, sz_cols, matA, sz_rows, sz_cols, max_col, matB, beta, matC);  
+        {
+            gemm('N', 'N', alpha, sz_rows, sz_cols, matA, sz_rows, sz_cols, max_col, matB, beta, matC);
         }
         else
         {
-            throw std::runtime_error("mat2column_mult_mat: max_col > sz_cols");            
+            throw std::runtime_error("mat2column_mult_mat: max_col > sz_cols");
         }
 
     }
@@ -568,18 +592,18 @@ public:
         lup_decomp_s lup(A, sz_rows, sz_cols, machesp_);
         lup.permutation_matrix(P);
     }
-    void gesv(matrix_type& A, const vector_type&b, vector_type&x)const 
+    void gesv(matrix_type& A, const vector_type&b, vector_type&x)const
     {
         lup_decomp_s lup(A, sz_rows, sz_cols, machesp_);
         lup.solve(A, b, x);
     }
- 
-    void gesv(matrix_type& A, vector_type&x)const 
+
+    void gesv(matrix_type& A, vector_type&x)const
     {
         lup_decomp_s lup(A, sz_rows, sz_cols, machesp_);
         vec_ops_->assign(x, vec_helper_row_);
         lup.solve(A, vec_helper_row_, x);
-    }    
+    }
 
     void gesv(const matrix_type& A, const vector_type&b, vector_type&x)const
     {
@@ -608,7 +632,7 @@ public:
         else
         {
             throw std::runtime_error("gesv: incorrect matrix dims");
-        }        
+        }
     }
 
     void inv(matrix_type& A, matrix_type& iA)const
@@ -665,31 +689,31 @@ private:
             auto N = sz_rows_;
             for(size_t i = 0; i < N; i++)
             {
-                x[i] = b[P_[i]];
+                cpu_matrix_vector_operations_var_prec::vector_at(x, i) = cpu_matrix_vector_operations_var_prec::vector_at(b, P_[i]);
                 for (size_t k = 0; k < i; k++)
                 {
-                    x[i] -= A[I2_R(i,k,N)] * x[k];
+                    cpu_matrix_vector_operations_var_prec::vector_at(x, i) -= A[I2_R(i,k,N)] * cpu_matrix_vector_operations_var_prec::vector_at(x, k);
                 }
             }
 
-            
+
             for (size_t i = N;  i--;)
             {
                 for (size_t k = i + 1; k < N; k++)
                 {
-                    x[i] -= A[I2_R(i,k,N)] * x[k];
+                    cpu_matrix_vector_operations_var_prec::vector_at(x, i) -= A[I2_R(i,k,N)] * cpu_matrix_vector_operations_var_prec::vector_at(x, k);
                 }
-                x[i] /= A[I2_R(i,i,N)];
+                cpu_matrix_vector_operations_var_prec::vector_at(x, i) /= A[I2_R(i,i,N)];
             }
-        }        
-        
+        }
+
         void inv(const matrix_type& A, matrix_type& inv_A)
         {
-          
+
             if(wrong_size_) throw(std::runtime_error("lup_solve: incorrect matrix size provided: rows = " + std::to_string(sz_rows_) + " cols = " +  std::to_string(sz_cols_) ) );
-            auto N = sz_rows_;            
+            auto N = sz_rows_;
             #pragma omp parallel for
-            for(size_t j = 0; j < N; j++) 
+            for(size_t j = 0; j < N; j++)
             {
                 for(size_t i = 0; i < N; i++)
                 {
@@ -712,7 +736,7 @@ private:
             }
         }
 
-        T det(const matrix_type& A) 
+        T det(const matrix_type& A)
         {
             if(wrong_size_) throw(std::runtime_error("lup_solve: incorrect matrix size provided: rows = " + std::to_string(sz_rows_) + " cols = " +  std::to_string(sz_cols_) ) );
             auto N = sz_rows_;
@@ -753,14 +777,14 @@ private:
         std::vector<size_t> P_;
         T machesp_;
 
-        void lup_decompose(matrix_type& A) 
+        void lup_decompose(matrix_type& A)
         {
             if(wrong_size_) throw(std::runtime_error("lup_decompose: incorrect matrix size provided: rows = " + std::to_string(sz_rows_) + " cols = " +  std::to_string(sz_cols_) ) );
             size_t N = sz_rows_;
 
 
             std::iota(P_.begin(), P_.end(), 0);
-            
+
 
             for(size_t i = 0; i < N; i++)
             {
@@ -771,7 +795,7 @@ private:
                 {
                     auto abs_A = cpu_matrix_vector_operations_var_prec::abs( A[I2_R(k,i,N)] );
                     if(abs_A > max_A)
-                    { 
+                    {
                         max_A = abs_A;
                         imax = k;
                     }
@@ -788,14 +812,14 @@ private:
                     auto j = P_[i];
                     P_[i] = P_[imax];
                     P_[imax] = j;
-                    //pivoting rows of A                    
+                    //pivoting rows of A
                     for(size_t l=0;l<N;l++)
                     {
                         auto val = A[I2_R(i,l,N)];
                         A[I2_R(i,l,N)] = A[I2_R(imax,l,N)];
                         A[I2_R(imax,l,N)] = val;
                     }
-                    
+
                     //counting pivots starting from N (for determinant)
                     P_[N]++;
                 }
@@ -822,7 +846,7 @@ private:
 
 
 
-    T two_prod(T &t, T a, T b) const // [1], pdf: 71, 169, 198, 
+    T two_prod(T &t, T a, T b) const // [1], pdf: 71, 169, 198,
     {
         T p = a*b;
         t = fma(a, b, -p);

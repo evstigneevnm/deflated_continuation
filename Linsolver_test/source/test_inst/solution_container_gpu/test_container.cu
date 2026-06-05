@@ -3,7 +3,7 @@
 #include <cstdio>
 
 #include <utils/cuda_support.h>
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
 

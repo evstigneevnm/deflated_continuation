@@ -1,5 +1,6 @@
-#include <utils/log.h>
-#include <common/cpu_vector_operations.h>
+#include <scfd/utils/log_std.h>
+#include <limits>
+#include <common/scfd_serial_cpu_vector_operations.h>
 #include "../glued_poincare_map_linear_operator.h"
 #include "rossler_operator.h"
 #include <time_stepper/explicit_time_step.h>
@@ -12,10 +13,10 @@
 
 int main(int argc, char const *argv[])
 {
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
     using real = SCALAR_TYPE;
     using T = real;
-    using vec_ops_t = cpu_vector_operations<real>;
+    using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
     using vec_t = typename vec_ops_t::vector_type;
     using nlin_op_t = nonlinear_operators::rossler<vec_ops_t>;
     using hyperplane_t = periodic_orbit::hyperplane<vec_ops_t, nlin_op_t>;
@@ -52,16 +53,17 @@ int main(int argc, char const *argv[])
     vec_ops.init_vectors(xb,x0,v0,v1); vec_ops.start_use_vectors(xb,x0,v0,v1);
     rossler.set_period_point(xb);
     rossler.set_period_point(x0);
-    v0[0] = 1.0;
-    v0[1] = 2.0;
-    v0[2] = 3.0;
+    v0(0) = 1.0;
+    v0(1) = 2.0;
+    v0(2) = 3.0;
     
     
     hyperplane_t hyperplane(&vec_ops, &rossler, x0, 5.7);
     
     log.info("running poincare map");
     poincare_map.set_parameter(5.7);
-    poincare_map.set_hyperplanes({&hyperplane,&hyperplane});
+    auto hyperplanes = std::make_pair(&hyperplane, &hyperplane);
+    poincare_map.set_hyperplanes(hyperplanes);
     poincare_map.F(xb, 5.7, xb);
 
     log.info("running poincare map_x");
@@ -76,21 +78,21 @@ int main(int argc, char const *argv[])
 
     for(int j=0;j<3;j++)
     {
-        log.info_f("%le -> %le", x0[j], xb[j]);
+        log.info_f("%le -> %le", x0(j), xb(j));
     }
 
 
     real err = 0.0;
-    err += (v1[0]-(-17.1938638231880*0))*(v1[0]-(-17.1938638231880*0));
-    err += (v1[1]-(35.3045017642549))*(v1[1]-(35.3045017642549));
-    err += (v1[2]-(-0.199172394970001))*(v1[2]-(-0.199172394970001));
+    err += (v1(0)-(-17.1938638231880*0))*(v1(0)-(-17.1938638231880*0));
+    err += (v1(1)-(35.3045017642549))*(v1(1)-(35.3045017642549));
+    err += (v1(2)-(-0.199172394970001))*(v1(2)-(-0.199172394970001));
     
     err = std::sqrt(err);
 
 
     for(int j=0;j<3;j++)
     {
-        log.info_f("%le -> %le", v0[j], v1[j]);
+        log.info_f("%le -> %le", v0(j), v1(j));
     }
     
 
@@ -98,6 +100,7 @@ int main(int argc, char const *argv[])
 
     int N_tests = 1;
     const uint8_t N = 3;
+    const T ref_error = std::numeric_limits<T>::epsilon();
     auto ref_error_val = ref_error*N_tests*std::sqrt(N);
     if(err > ref_error*N_tests*std::sqrt(N) )
     {

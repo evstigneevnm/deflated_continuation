@@ -71,11 +71,11 @@ public:
         for(Ord j=0; j<N; j++)
         {
             if((j>0)&&(j<N-1))
-                f[j] = (1+2*tau_/h_/h_)*x[j] - (tau_/h_/h_)*x[j-1] - (tau_/h_/h_)*x[j+1];
+                f(j) = (1+2*tau_/h_/h_)*x(j) - (tau_/h_/h_)*x(j-1) - (tau_/h_/h_)*x(j+1);
             else if(j==0)
-                f[j] = (1+2*tau_/h_/h_)*x[j] - (tau_/h_/h_)*x[j+1];
+                f(j) = (1+2*tau_/h_/h_)*x(j) - (tau_/h_/h_)*x(j+1);
             else if(j==N-1)
-                f[j] = (1+2*tau_/h_/h_)*x[j] - (tau_/h_/h_)*x[j-1];
+                f(j) = (1+2*tau_/h_/h_)*x(j) - (tau_/h_/h_)*x(j-1);
         }
 
     }

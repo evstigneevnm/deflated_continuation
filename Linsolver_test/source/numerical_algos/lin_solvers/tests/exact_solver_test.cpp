@@ -2,7 +2,7 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <utils/init_cuda.h>
 #include <external_libraries/cublas_wrap.h>
 #include <external_libraries/cusolver_wrap.h>
@@ -129,7 +129,7 @@ int main(int argc, char **args)
     using lin_op_t = linear_operator<vec_ops_t, mat_ops_t>;
     using prec_t = prec_operator<vec_ops_t, lin_op_t>;
 
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
     using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t, log_t>;
     
     using linsolver_t = numerical_algos::lin_solvers::exact_wrapper<lin_op_t, prec_t, vec_ops_t, monitor_t, log_t>;

@@ -1,7 +1,7 @@
 // Example program
 #include <iostream>
 #include <vector>
-#include <common/cpu_vector_operations.h>
+#include <common/scfd_serial_cpu_vector_operations.h>
 #include "curve_container.h"
 
 
@@ -11,7 +11,7 @@ int main()
 {
     typedef SFLOATTYPE real;
     typedef knots<real> knots_t;
-    typedef cpu_vector_operations<real> cpu_vec_ops_t;
+    typedef scfd_serial_cpu_vector_operations<real> cpu_vec_ops_t;
     typedef typename cpu_vec_ops_t::vector_type real_vec;
     //typedef curve_storage<cpu_vec_ops_t, knots_t> curve_storage_t;
 

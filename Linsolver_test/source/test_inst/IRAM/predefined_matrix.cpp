@@ -2,7 +2,7 @@
 #include <common/gpu_matrix_vector_operations.h>
 #include <common/gpu_matrix_file_operations.h>
 #include <utils/cuda_support.h>
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <external_libraries/cublas_wrap.h>
 #include <external_libraries/lapack_wrap.h>
 #include <stability/IRAM/iram_container.h>
@@ -66,7 +66,7 @@ int main(int argc, char const *argv[])
     using T_mat = typename mat_ops_t::matrix_type;
     using mat_files_t = gpu_matrix_file_operations<mat_ops_t>;
     using lapack_wrap_t = lapack_wrap<real>;
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
     using container_t = stability::IRAM::iram_container<vec_ops_t,mat_ops_t,log_t>;
     using bulge_t = stability::IRAM::shift_bulge_chase<vec_ops_t, mat_ops_t, lapack_wrap_t, log_t>;
 

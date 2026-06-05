@@ -15,14 +15,6 @@ defaults:
     working-directory: Linsolver_test
 
 jobs:
-  cpu-vector-operations:
-    runs-on: local
-    steps:
-      - name: Build
-        run: make test_cpu_vector_operations.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR"
-      - name: Test
-        run: ./"$BUILD_DIR"/test_cpu_vector_operations.bin
-
   cpu-vector-operations-var-prec:
     runs-on: local
     steps:

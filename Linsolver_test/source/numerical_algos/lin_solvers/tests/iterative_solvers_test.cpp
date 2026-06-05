@@ -2,20 +2,20 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 #include <numerical_algos/lin_solvers/bicgstab.h>
 #include <numerical_algos/lin_solvers/gmres.h>
 #include <common/file_operations.h>
-#include <common/cpu_vector_operations.h>
+#include <common/scfd_serial_cpu_vector_operations.h>
 #include <common/cpu_matrix_vector_operations_var_prec.h>
 #include "test_matrix_liner_operator.h"
 
 using namespace numerical_algos::lin_solvers;
 
 using real = SCALAR_TYPE;
-using vec_ops_t = cpu_vector_operations<real>;
+using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
 using vector_t = typename vec_ops_t::vector_type;
 using mat_ops_t = cpu_matrix_vector_operations_var_prec<vec_ops_t>;
 using matrix_t = typename mat_ops_t::matrix_type;
@@ -23,7 +23,7 @@ using system_operator_t = system_operator<mat_ops_t>;
 using prec_operator_t = prec_operator<vec_ops_t, mat_ops_t>;
 
 
-typedef utils::log_std log_t;
+typedef scfd::utils::log_std log_t;
 typedef default_monitor<vec_ops_t,log_t> monitor_t;
 typedef bicgstabl<system_operator_t,prec_operator_t,vec_ops_t,monitor_t,log_t> bicgstabl_t;
 typedef bicgstab<system_operator_t,prec_operator_t,vec_ops_t,monitor_t,log_t> bicgstab_t;
@@ -105,7 +105,7 @@ int main(int argc, char **args)
         auto res_norm = vec_ops.norm(x)/vec_ops.norm(b);
         std::cout << "||x-x0||/||b|| = " << res_norm << std::endl;
         int iters_performed = mon->iters_performed();
-        log.info("gmres total iterations = %i", iters_performed);
+        log.info_f("gmres total iterations = %i", iters_performed);
 
         if (res_flag_l)
             log.info("gmres returned success result");
@@ -142,7 +142,7 @@ int main(int argc, char **args)
         auto res_norm = vec_ops.norm(x)/vec_ops.norm(b);
         std::cout << "||x-x0||/||b|| = " << res_norm << std::endl;
         int iters_performed = mon->iters_performed();
-        log.info("bicgstabl total iterations = %i", iters_performed);
+        log.info_f("bicgstabl total iterations = %i", iters_performed);
 
         if (res_flag_l)
             log.info("bicgstabl returned success result");
@@ -178,7 +178,7 @@ int main(int argc, char **args)
         auto res_norm = vec_ops.norm(x)/vec_ops.norm(b);
         std::cout << "||x-x0||/||b|| = " << res_norm << std::endl;
         int iters_performed = mon->iters_performed();
-        log.info("bicgstabl total iterations = %i", iters_performed);
+        log.info_f("bicgstabl total iterations = %i", iters_performed);
 
         if (res_flag_l)
             log.info("bicgstabl returned success result");

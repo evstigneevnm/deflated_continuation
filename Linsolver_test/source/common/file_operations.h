@@ -18,6 +18,35 @@
 namespace file_operations
 {
 
+namespace detail
+{
+
+template<class Vector>
+auto vector_at(Vector& vec, size_t i) -> decltype(vec(i))
+{
+    return vec(i);
+}
+
+template<class Vector>
+auto vector_at(Vector& vec, size_t i) -> decltype(vec[i])
+{
+    return vec[i];
+}
+
+template<class Vector>
+auto vector_at(const Vector& vec, size_t i) -> decltype(vec(i))
+{
+    return vec(i);
+}
+
+template<class Vector>
+auto vector_at(const Vector& vec, size_t i) -> decltype(vec[i])
+{
+    return vec[i];
+}
+
+} // namespace detail
+
 
 
 std::vector<std::string> match_file_names(const std::string& path, const std::string& regex_mask)
@@ -40,7 +69,7 @@ std::vector<std::string> match_file_names(const std::string& path, const std::st
 
     }
     std::sort( matched_file_names.begin(), matched_file_names.end() );
-    
+
     return matched_file_names;
 }
 
@@ -55,12 +84,12 @@ void write_2_vectors_by_side(const std::string &f_name, size_t N, const T_vec& v
 
     for (size_t i = 0; i < N-1; ++i)
     {
-        if (!(f << std::scientific << std::setprecision(prec) << vec1[i] << sep << vec2[i] <<  std::endl))
+        if (!(f << std::scientific << std::setprecision(prec) << detail::vector_at(vec1, i) << sep << detail::vector_at(vec2, i) <<  std::endl))
             throw std::runtime_error("print_vector: error while writing to file " + f_name);
     }
-    if (!(f << std::scientific << std::setprecision(prec) << vec1[N-1] << sep << vec2[N-1] ))
+    if (!(f << std::scientific << std::setprecision(prec) << detail::vector_at(vec1, N-1) << sep << detail::vector_at(vec2, N-1) ))
         throw std::runtime_error("print_vector: error while writing to file " + f_name);
-    
+
     f.close();
 }
 
@@ -73,12 +102,12 @@ void write_vector(const std::string &f_name, size_t N, const T *vec, unsigned in
 
         for (size_t i = 0; i < N-1; ++i)
         {
-            if (!(f << std::scientific << std::setprecision(prec) << vec[i] <<  std::endl))
+            if (!(f << std::scientific << std::setprecision(prec) << detail::vector_at(vec, i) <<  std::endl))
                 throw std::runtime_error("print_vector: error while writing to file " + f_name);
         }
-        if (!(f << std::scientific << std::setprecision(prec) << vec[N-1]))
+        if (!(f << std::scientific << std::setprecision(prec) << detail::vector_at(vec, N-1)))
             throw std::runtime_error("print_vector: error while writing to file " + f_name);
-        
+
         f.close();
 }
 template <class T, class Vector>
@@ -89,12 +118,12 @@ void write_vector(const std::string &f_name, size_t N, const Vector& vec, unsign
 
         for (size_t i = 0; i < N-1; ++i)
         {
-            if (!(f << std::scientific << std::setprecision(prec) << vec[i] <<  std::endl))
+            if (!(f << std::scientific << std::setprecision(prec) << detail::vector_at(vec, i) <<  std::endl))
                 throw std::runtime_error("print_vector: error while writing to file " + f_name);
         }
-        if (!(f << std::scientific << std::setprecision(prec) << vec[N-1]))
+        if (!(f << std::scientific << std::setprecision(prec) << detail::vector_at(vec, N-1)))
             throw std::runtime_error("print_vector: error while writing to file " + f_name);
-        
+
         f.close();
 }
 
@@ -115,8 +144,8 @@ void write_matrix(const std::string &f_name, size_t Row, size_t Col, T_mat& matr
 
         }
         f << std::endl;
-    } 
-    
+    }
+
     f.close();
 }
 
@@ -139,7 +168,7 @@ inline std::pair<size_t, size_t> read_matrix_size(const std::string &f_name)
                 if(s == ' ')
                 {
                     ++matrix_size_cols;
-                }                
+                }
             }
             check_cols = false;
         }
@@ -171,15 +200,15 @@ void read_matrix(const std::string &f_name,  size_t Row, size_t Col, T_mat& matr
     {
         for(size_t j=0;j<Col;j++)
         {
-            // double val=0;  
-            // fscanf(stream, "%le",&val);                
+            // double val=0;
+            // fscanf(stream, "%le",&val);
             // matrix[I2(i,j,Row)]=(real)val;
             T val;
             f >> val;
             matrix[I2_R(i,j,Row)]= static_cast<T>(val);
         }
-        
-    } 
+
+    }
 
     f.close();
 }
@@ -191,10 +220,10 @@ int read_vector(const std::string &f_name,  size_t N,  T *vec){
     if (!f) throw std::runtime_error("read_vector: error while opening file " + f_name);
     for (size_t i = 0; i<N; i++)
     {
-        T val;   
-        f >> val;             
-        vec[i]= static_cast<T>(val);           
-    } 
+        T val;
+        f >> val;
+        detail::vector_at(vec, i)= static_cast<T>(val);
+    }
     f.close();
     return 0;
 }
@@ -206,10 +235,10 @@ int read_vector(const std::string &f_name,  size_t N,  Vector& vec){
     if (!f) throw std::runtime_error("read_vector: error while opening file " + f_name);
     for (size_t i = 0; i<N; i++)
     {
-        T val;   
-        f >> val;             
-        vec[i]= static_cast<T>(val);           
-    } 
+        T val;
+        f >> val;
+        detail::vector_at(vec, i)= static_cast<T>(val);
+    }
     f.close();
     return 0;
 }

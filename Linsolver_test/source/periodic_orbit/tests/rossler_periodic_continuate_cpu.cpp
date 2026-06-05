@@ -9,7 +9,7 @@
 #include <memory>
 // #include <utils/init_cuda.h>
 
-// #include <utils/log.h>
+// #include <scfd/utils/log_std.h>
 #include <scfd/utils/log.h>
 // #include <numerical_algos/lin_solvers/default_monitor.h>
 // #include <numerical_algos/lin_solvers/bicgstabl.h>
@@ -18,7 +18,7 @@
 // #include <common/gpu_file_operations.h>
 // #include <common/gpu_vector_operations.h>
 #include <common/file_operations.h>
-#include <common/cpu_vector_operations.h>
+#include <common/scfd_serial_cpu_vector_operations.h>
 #include <common/cpu_file_operations.h>
 #include <time_stepper/time_step_adaptation_constant.h>
 #include <time_stepper/time_step_adaptation_error_control.h>
@@ -55,7 +55,7 @@ int main(int argc, char const *argv[])
     using real = SCALAR_TYPE;
     using log_t = scfd::utils::log_std;
 
-    using vec_ops_t = cpu_vector_operations<real>;
+    using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
     using vec_file_ops_t = cpu_file_operations<vec_ops_t>;
     using vec_t = typename vec_ops_t::vector_type;
     using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t,log_t>;
@@ -213,7 +213,7 @@ int main(int argc, char const *argv[])
     ss_periodic_estimate << "rossler_period_" << scheme_name << ".dat";
     periodic_orbit_nonlin_op.save_period_estmate_norms(ss_periodic_estimate.str() );
     real T = periodic_orbit_nonlin_op.get_period_estmate_time();
-    log_newton.info_f("solution point: [%le,%le,%le], stimated period: %le", x0[0], x0[1], x0[2], T);
+    log_newton.info_f("solution point: [%le,%le,%le], stimated period: %le", x0(0), x0(1), x0(2), T);
 
 
     // continuate
@@ -367,4 +367,3 @@ int main(int argc, char const *argv[])
 
 	return 0;
 }
-

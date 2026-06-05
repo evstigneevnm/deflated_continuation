@@ -124,11 +124,11 @@ private:
             // if located on GPU, then this can be accessed only in a kernel!
             T operator [](size_t i) const
             {
-                return array_[i];
+                return array_(i);
             }
             T& operator [](size_t i) 
             {
-                return array_[i];
+                return array_(i);
             }
             //reference to the internal storage
             T_vec& get_ref()

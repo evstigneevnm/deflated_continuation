@@ -8,7 +8,7 @@
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
 
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 #include <numerical_algos/lin_solvers/gmres.h>
@@ -59,7 +59,7 @@ int main(int argc, char const *argv[])
     using complex_vec = typename gpu_vector_operations_complex_t::vector_type;
     using vec = typename gpu_vector_operations_t::vector_type;
     // linear solver config
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
     using monitor_t = numerical_algos::lin_solvers::default_monitor<gpu_vector_operations_t,log_t>;
     using lin_op_t = nonlinear_operators::linear_operator_K_3D<gpu_vector_operations_t, KF_3D_t>;
     using prec_t = nonlinear_operators::preconditioner_K_3D<gpu_vector_operations_t, KF_3D_t, lin_op_t>;    

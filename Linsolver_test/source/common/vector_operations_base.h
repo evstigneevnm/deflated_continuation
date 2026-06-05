@@ -61,7 +61,7 @@ private:
 
 protected:
     //Ord sz_;
-    bool use_high_precision_;
+    mutable bool use_high_precision_;
 
 public:
     vector_operations_base(/*Ord sz,*/  bool use_high_precision = false):

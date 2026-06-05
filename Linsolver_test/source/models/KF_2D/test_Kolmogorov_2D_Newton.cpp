@@ -7,7 +7,7 @@
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
 
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 //#include <numerical_algos/lin_solvers/bicgstabl.h>
 #include <numerical_algos/lin_solvers/gmres.h>
@@ -89,7 +89,7 @@ int main(int argc, char const *argv[])
     
     KF_2D_t *KF_2D = new KF_2D_t(alpha, Nx, Ny, vec_ops_R, vec_ops_C, vec_ops, CUFFT_C2R);
     // linear solver config
-    typedef utils::log_std log_t;
+    typedef scfd::utils::log_std log_t;
     typedef numerical_algos::lin_solvers::default_monitor<
         gpu_vector_operations_t,log_t> monitor_t;
     typedef nonlinear_operators::linear_operator_K_2D<

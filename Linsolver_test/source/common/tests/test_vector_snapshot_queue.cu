@@ -7,11 +7,11 @@
 #include <utility>
 #include <vector>
 
-#include <scfd/backend/copy/cuda.h>
+#include <scfd/copy/cuda.h>
 
-#include <common/cpu_vector_operations.h>
 #include <common/cuda_init_scfd.h>
 #include <common/gpu_vector_operations.h>
+#include <common/scfd_serial_cpu_vector_operations.h>
 #include <common/vector_snapshot_queue.h>
 #include <external_libraries/cublas_wrap.h>
 
@@ -91,27 +91,32 @@ void test_metadata_queue()
 template<class T>
 void test_cpu_snapshots(std::size_t n)
 {
-    cpu_vector_operations<T> vec_ops(n);
-    typename cpu_vector_operations<T>::vector_type x;
+    scfd_serial_cpu_vector_operations<T> vec_ops(n);
+    typename scfd_serial_cpu_vector_operations<T>::vector_type x;
     vec_ops.init_vector(x);
     vec_ops.start_use_vector(x);
 
-    common::vector_snapshot_queue<cpu_vector_operations<T>> snapshots(&vec_ops, 2);
+    common::vector_snapshot_queue<scfd_serial_cpu_vector_operations<T>> snapshots(&vec_ops, 2);
 
-    std::fill(x.begin(), x.end(), T(1));
+    vec_ops.assign_scalar(T(1), x);
     snapshots.push(x);
-    std::fill(x.begin(), x.end(), T(2));
+    vec_ops.assign_scalar(T(2), x);
     snapshots.push(x);
 
     require(snapshots.is_queue_filled(), "CPU snapshot queue should be filled after two pushes");
-    std::fill(x.begin(), x.end(), T(3));
-    require_host_vector_value(snapshots.at(0), T(1), "CPU first stored vector after source mutation");
-    require_host_vector_value(snapshots.at(1), T(2), "CPU second stored vector after source mutation");
+    vec_ops.assign_scalar(T(3), x);
+    std::vector<T> host(n);
+    vec_ops.get(snapshots.at(0), host.data(), n);
+    require_host_vector_value(host, T(1), "CPU first stored vector after source mutation");
+    vec_ops.get(snapshots.at(1), host.data(), n);
+    require_host_vector_value(host, T(2), "CPU second stored vector after source mutation");
 
     snapshots.push(x);
-    std::fill(x.begin(), x.end(), T(4));
-    require_host_vector_value(snapshots.at(0), T(2), "CPU oldest vector after third push");
-    require_host_vector_value(snapshots.at(1), T(3), "CPU newest vector after third push");
+    vec_ops.assign_scalar(T(4), x);
+    vec_ops.get(snapshots.at(0), host.data(), n);
+    require_host_vector_value(host, T(2), "CPU oldest vector after third push");
+    vec_ops.get(snapshots.at(1), host.data(), n);
+    require_host_vector_value(host, T(3), "CPU newest vector after third push");
 
     snapshots.clear();
     require(snapshots.size() == 0, "CPU snapshot queue should be empty after clear");

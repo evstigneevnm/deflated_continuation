@@ -7,7 +7,7 @@
 
 // #include <external_libraries/lapack_wrap.h>
 
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/exact_wrapper.h>
 
@@ -84,7 +84,7 @@ int main(int argc, char const *argv[])
     using prec_t = nonlinear_operators::preconditioner_overscreening_breakdown<vec_ops_t, mat_ops_t, ob_prob_t, lin_op_t>;
     using prec_shifted_t = nonlinear_operators::preconditioner_overscreening_breakdown_shifted<vec_ops_t, mat_ops_t, ob_prob_t, lin_op_shifted_t>;
 
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
     using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t, log_t>;
     using lin_solver_t = numerical_algos::lin_solvers::exact_wrapper<lin_op_t, prec_t, vec_ops_t, monitor_t, log_t>;
     using lin_solver_shifted_t = numerical_algos::lin_solvers::exact_wrapper<lin_op_shifted_t, prec_shifted_t, vec_ops_t, monitor_t, log_t>;    

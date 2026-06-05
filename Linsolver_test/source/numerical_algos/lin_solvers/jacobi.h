@@ -52,9 +52,9 @@ public:
 
 private:
     typedef scalar_type                                         T;
-    typedef utils::logged_obj_base<Log>                         logged_obj_t;
     typedef iter_solver_base<LinearOperator,Preconditioner,
                              VectorOperations,Monitor,Log>      parent_t;
+    using logged_obj_t = typename parent_t::logged_obj_t;
     typedef vectors_arr_wrap_static<VectorOperations,1>         bufs_arr_t;
     typedef typename bufs_arr_t::vectors_arr_use_wrap_type      bufs_arr_use_wrap_t;
     typedef detail::monitor_call_wrap<VectorOperations,

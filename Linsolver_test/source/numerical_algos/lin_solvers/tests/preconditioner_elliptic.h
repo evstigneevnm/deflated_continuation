@@ -8,13 +8,13 @@
 *
 *   -u_{xx} = f(x), x\in[0;1), u - periodic, f(x) is in the perator domain
 *
-*   -u_{j-1}/h^2 +2 u_{j}/h^2 - u_{j+1}/h^2 = f(x_j) 
-*    
-* 
+*   -u_{j-1}/h^2 +2 u_{j}/h^2 - u_{j+1}/h^2 = f(x_j)
+*
+*
 *   A U = U^{n}
-* 
+*
 *   preconditioner for the residual vecotr R={r_j}:
-* 
+*
 *   u_{j}^{n+1} = (r_{j} + u_{j+1}/h^2^{n} + u_{j-1}/h^2 ^{n+1})/(2/h^2)
 *
 */
@@ -24,7 +24,7 @@
 namespace tests
 {
 
-template<class VectorOperations, class LinearOperator, class Log> 
+template<class VectorOperations, class LinearOperator, class Log>
 class preconditioner_elliptic
 {
 public:
@@ -43,8 +43,8 @@ public:
         vec_ops_->stop_use_vector(y_);
         vec_ops_->free_vector(y_);
     }
-    
-    void set_operator(const LinearOperator* op_) 
+
+    void set_operator(const LinearOperator* op_)
     {
         N = op_->get_size();
         h_ = op_->get_h();
@@ -61,20 +61,20 @@ public:
             for(std::size_t j=0; j<N;j++)
             {
                 if(j>0&&j<N-1)
-                    x[j] = (y_[j]+side_coeff_*x[j-1]+side_coeff_*x[j+1])/diag_coeff_;
+                    x(j) = (y_(j)+side_coeff_*x(j-1)+side_coeff_*x(j+1))/diag_coeff_;
                 if(j==0)
-                    x[0] = (y_[0]+side_coeff_*x[1]+side_coeff_*x[N-1])/diag_coeff_;
+                    x(0) = (y_(0)+side_coeff_*x(1)+side_coeff_*x(N-1))/diag_coeff_;
                 if(j==N-1)
-                    x[N-1] = (y_[N-1]+side_coeff_*x[N-2]+side_coeff_*x[0])/diag_coeff_;            
+                    x(N-1) = (y_(N-1)+side_coeff_*x(N-2)+side_coeff_*x(0))/diag_coeff_;
             }
             for(std::size_t j=N-1; j-->0;)
             {
                 if(j>0&&j<N-1)
-                    x[j] = (y_[j]+side_coeff_*x[j-1]+side_coeff_*x[j+1])/diag_coeff_;
+                    x(j) = (y_(j)+side_coeff_*x(j-1)+side_coeff_*x(j+1))/diag_coeff_;
                 if(j==0)
-                    x[0] = (y_[0]+side_coeff_*x[1]+side_coeff_*x[N-1])/diag_coeff_;
+                    x(0) = (y_(0)+side_coeff_*x(1)+side_coeff_*x(N-1))/diag_coeff_;
                 if(j==N-1)
-                    x[N-1] = (y_[N-1]+side_coeff_*x[N-2]+side_coeff_*x[0])/diag_coeff_;              
+                    x(N-1) = (y_(N-1)+side_coeff_*x(N-2)+side_coeff_*x(0))/diag_coeff_;
             }
 
         }

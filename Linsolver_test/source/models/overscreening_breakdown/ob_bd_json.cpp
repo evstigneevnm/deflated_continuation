@@ -8,7 +8,7 @@
 #include <utils/init_cuda.h>
 #include <external_libraries/cublas_wrap.h>
 #include <external_libraries/lapack_wrap.h>
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 
 
 //vector dependant
@@ -70,7 +70,7 @@ int main(int argc, char const *argv[])
     int bifurcation_parameter_number_in_vector = parameters.nonlinear_operator.problem_int_parameters_vector.at(0);
     params_st problem_params(N, bifurcation_parameter_number_in_vector, parameters.nonlinear_operator.problem_real_parameters_vector);
     
-    using log_t = utils::log_std ;
+    using log_t = scfd::utils::log_std ;
 
     using vec_ops_t = gpu_vector_operations<real>;
 

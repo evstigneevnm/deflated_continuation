@@ -1,15 +1,15 @@
-#include <utils/log.h>
-#include <common/cpu_vector_operations.h>
+#include <scfd/utils/log_std.h>
+#include <common/scfd_serial_cpu_vector_operations.h>
 #include "../detail/glued_nonlinear_operator_and_jacobian.h"
 #include "rossler_operator.h"
 
 
 int main(int argc, char const *argv[])
 {
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
     using real = SCALAR_TYPE;
     using T = real;
-    using vec_ops_t = cpu_vector_operations<real>;
+    using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
     using vec_t = typename vec_ops_t::vector_type;
     using nlin_op_t = nonlinear_operators::rossler<vec_ops_t>;
     using glued_nonlin_op_t = periodic_orbit::detail::glued_nonlinear_operator_and_jacobian<vec_ops_t, nlin_op_t>;

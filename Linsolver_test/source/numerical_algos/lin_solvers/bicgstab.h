@@ -23,7 +23,7 @@
 
 namespace numerical_algos
 {
-namespace lin_solvers 
+namespace lin_solvers
 {
 
 using numerical_algos::detail::vectors_arr_wrap_static;
@@ -54,10 +54,9 @@ public:
 
 private:
     typedef scalar_type                                         T;
-    // typedef utils::logged_obj_base<Log>                         logged_obj_t;
     typedef iter_solver_base<LinearOperator,Preconditioner,
                              VectorOperations,Monitor,Log>      parent_t;
-    using logged_obj_t = typename parent_t::logged_obj_t;                             
+    using logged_obj_t = typename parent_t::logged_obj_t;
     typedef vectors_arr_wrap_static<VectorOperations,7>         bufs_arr_t;
     typedef typename bufs_arr_t::vectors_arr_use_wrap_type      bufs_arr_use_wrap_t;
     typedef detail::monitor_call_wrap<VectorOperations,
@@ -78,8 +77,8 @@ protected:
     using parent_t::prec_;
 
 public:
-    bicgstab(const vector_operations_type *vec_ops, 
-             Log *log = NULL, int obj_log_lev = 0) : 
+    bicgstab(const vector_operations_type *vec_ops,
+             Log *log = NULL, int obj_log_lev = 0) :
         parent_t(vec_ops, log, obj_log_lev, "bicgstab::"),
         bufs(vec_ops),
         ri(bufs[0]),r_(bufs[1]),pi(bufs[2]),
@@ -104,10 +103,10 @@ public:
     }
     void set_resid_recalc_freq(int resid_recalc_freq)
     {
-        resid_recalc_freq_ = resid_recalc_freq; 
+        resid_recalc_freq_ = resid_recalc_freq;
     }
 
-    virtual bool    solve(const linear_operator_type &A, const vector_type &b, 
+    virtual bool    solve(const linear_operator_type &A, const vector_type &b,
                           vector_type &x)const
     {
         if (prec_ != NULL){
@@ -121,7 +120,7 @@ public:
         if (use_precond_resid_) {
             vec_ops_->assign(b, ri);
             if (prec_ != NULL) prec_->apply(ri);
-            monitor_wrap.start(ri);            
+            monitor_wrap.start(ri);
         } else {
             monitor_wrap.start(b);
         }
@@ -205,7 +204,7 @@ public:
 
                 //ri := s - omega_i*t
                 vec_ops_->assign_mul(T(1), s, -omega_i, t, ri);
-                //ri now is ri                
+                //ri now is ri
             } else {
                 logged_obj_t::info_f("solve: iter = %d recalc real residual", monitor_.iters_performed());
 
@@ -219,7 +218,7 @@ public:
             omega_i_1 = omega_i; rho_i_1 = rho_i;
             ++monitor_;
         }
-                
+
         if (monitor_.out_min_resid_norm()) vec_ops_->assign(monitor_.min_resid_norm_x(), x);
 
         if (not_valid_coeff_faced)

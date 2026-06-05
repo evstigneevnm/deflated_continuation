@@ -17,6 +17,8 @@
 #ifndef __SCFD_BICGSTABL_H__
 #define __SCFD_BICGSTABL_H__
 
+#include <cmath>
+#include <vector>
 #include <numerical_algos/detail/vectors_arr_wrap_static.h>
 #include "detail/monitor_call_wrap.h"
 #include "iter_solver_base.h"
@@ -27,7 +29,7 @@
 
 namespace numerical_algos
 {
-namespace lin_solvers 
+namespace lin_solvers
 {
 
 using numerical_algos::detail::vectors_arr_wrap_static;
@@ -56,12 +58,11 @@ public:
 private:
     static const int                                            max_basis_sz_ = SCFD_BICGSTABL_MAX_BASIS_SIZE;
     typedef scalar_type                                         T;
-    // typedef utils::logged_obj_base<Log>                         logged_obj_t;
 
     typedef iter_solver_base<LinearOperator,Preconditioner,
                              VectorOperations,Monitor,Log>      parent_t;
     using logged_obj_t = typename parent_t::logged_obj_t;
-    using logged_obj_params_t = typename parent_t::logged_obj_params_t;    
+    using logged_obj_params_t = typename parent_t::logged_obj_params_t;
     typedef vectors_arr_wrap_static<VectorOperations, 1>        buf_t;
     typedef typename buf_t::vectors_arr_use_wrap_type           buf_use_wrap_t;
     typedef vectors_arr_wrap_static<VectorOperations,
@@ -80,7 +81,7 @@ private:
 
     int                  basis_sz_;
 
-    mutable int          flag; 
+    mutable int          flag;
 
     void    calc_residual_(const linear_operator_type &A, const vector_type &x, const vector_type &b, vector_type &r)const
     {
@@ -103,37 +104,37 @@ protected:
     using parent_t::prec_;
 
 public:
-    bicgstabl(const vector_operations_type *vec_ops, 
-              Log *log = NULL, int obj_log_lev = 3) : 
+    bicgstabl(const vector_operations_type *vec_ops,
+              Log *log = NULL, int obj_log_lev = 3) :
         parent_t(vec_ops, log, obj_log_lev, "bicgstabl::"),
-        buf(vec_ops), r(vec_ops), u(vec_ops), rtilde(buf[0]), 
-        use_precond_resid_(true), resid_recalc_freq_(0), 
-        basis_sz_(2) 
+        buf(vec_ops), r(vec_ops), u(vec_ops), rtilde(buf[0]),
+        use_precond_resid_(true), resid_recalc_freq_(0),
+        basis_sz_(2)
     {
-        buf.init(); 
-        r.init(basis_sz_+1); 
+        buf.init();
+        r.init(basis_sz_+1);
         u.init(basis_sz_+1);
     }
 
-    void    set_basis_size(int basis_sz) 
-    { 
-        basis_sz_ = basis_sz; 
-        r.init(basis_sz_+1); 
+    void    set_basis_size(int basis_sz)
+    {
+        basis_sz_ = basis_sz;
+        r.init(basis_sz_+1);
         u.init(basis_sz_+1);
     }
     void    set_use_precond_resid(bool use_precond_resid) { use_precond_resid_ = use_precond_resid; }
     void    set_resid_recalc_freq(int resid_recalc_freq) { resid_recalc_freq_ = resid_recalc_freq; }
 
-    virtual bool    solve(const linear_operator_type &A, const vector_type &b, 
+    virtual bool    solve(const linear_operator_type &A, const vector_type &b,
                           vector_type &x)const
-    {                
-        if ((!use_precond_resid_)&&(prec_ != NULL)) 
+    {
+        if ((!use_precond_resid_)&&(prec_ != NULL))
             throw std::logic_error("bicgstabl::solve: use_precond_resid_ == false with non-empty preconditioner is not supported");
         if (prec_ != NULL) prec_->set_operator(&A);
 
         bufs_arr_use_wrap_t use_wrap_r(r);
         bufs_arr_use_wrap_t use_wrap_u(u);
-        use_wrap_r.start_use_range(basis_sz_+1); 
+        use_wrap_r.start_use_range(basis_sz_+1);
         use_wrap_u.start_use_range(basis_sz_+1);
 
         buf_use_wrap_t use_wrap_buf(buf);
@@ -150,11 +151,16 @@ public:
 
         vec_ops_->assign_scalar(T(0.f), u[0]);  //u[0] := 0.;
 
-        T       tau[basis_sz_][basis_sz_];      //Hessenberg matrix
-        T       sigma[basis_sz_ + 1];
-        T       gamma[basis_sz_ + 1];
-        T       gamma_p[basis_sz_ + 1];
-        T       gamma_pp[basis_sz_ + 1];
+        const int work_sz = basis_sz_ + 1;
+        std::vector<T> tau(static_cast<std::size_t>(work_sz * work_sz)); // Hessenberg matrix
+        std::vector<T> sigma(static_cast<std::size_t>(work_sz));
+        std::vector<T> gamma(static_cast<std::size_t>(work_sz));
+        std::vector<T> gamma_p(static_cast<std::size_t>(work_sz));
+        std::vector<T> gamma_pp(static_cast<std::size_t>(work_sz));
+        auto tau_at = [&tau, work_sz](int i, int j) -> T&
+        {
+            return tau[static_cast<std::size_t>(i * work_sz + j)];
+        };
 
         calc_residual_(A, x, b, r[0]);
         vec_ops_->assign_mul(T(1.f), r[0], rtilde);
@@ -165,19 +171,19 @@ public:
         bool    res = true;
 
         flag = 1;                               //default termiantion flag
-        
+
         while (!monitor_.check_finished(x, r[0]))
-        {       
+        {
             rho = -omega * rho;
             for (int j = 0; j < basis_sz_; ++j) {                                       //j=0,...basis_sz_-1
                 if ( rho == T(0.f) ) {                                                  //check rho break
                     flag=-1;
-                    break; 
+                    break;
                 }
-            
+
                 T rho1 = vec_ops_->scalar_prod(r[j], rtilde);                           //rho1=(r[j],rtilde)
-                T beta = alpha * rho1 / rho; 
-                rho = rho1;     
+                T beta = alpha * rho1 / rho;
+                rho = rho1;
                 for (int i = 0; i <= j; ++i){
                     vec_ops_->add_mul(T(1.f), r[i], -beta, u[i]);                       //u[i] := r[i] - beta * u[i]
                 }
@@ -193,8 +199,8 @@ public:
             }
             for (int j = 1; j <= basis_sz_; ++j) {
                 for (int i = 1; i < j; ++i) {
-                    tau[i][j] = vec_ops_->scalar_prod(r[j], r[i]) / sigma[i];
-                    vec_ops_->add_mul(-tau[i][j], r[i], T(1.f), r[j]);                  //r[j] := r[j] - tau[i,j] * r[i]
+                    tau_at(i, j) = vec_ops_->scalar_prod(r[j], r[i]) / sigma[i];
+                    vec_ops_->add_mul(-tau_at(i, j), r[i], T(1.f), r[j]);               //r[j] := r[j] - tau[i,j] * r[i]
                 }
                 sigma[j] = vec_ops_->scalar_prod(r[j],r[j]);                            //sigma[j]=(r[j],r[j]);
                 gamma_p[j] = vec_ops_->scalar_prod(r[0], r[j]) / sigma[j];              //gamma_p[j]=(r[0],r[j])/sigma[j];
@@ -204,13 +210,13 @@ public:
             for (int j = basis_sz_-1; j >= 1; --j) {
                 gamma[j] = gamma_p[j];                                                  //gamma[j]=gamma_p[j]
                 for (int i = j+1; i <= basis_sz_; ++i) {
-                    gamma[j] -= tau[j][i] * gamma[i];                                   //gamma[j]=gamma[j]-tau[j,i].*gamma[i];
+                    gamma[j] -= tau_at(j, i) * gamma[i];                                //gamma[j]=gamma[j]-tau[j,i].*gamma[i];
                 }
             }
             for (int j = 1; j < basis_sz_; ++j) {
                 gamma_pp[j] = gamma[j+1];                                               //gamma_pp[j]=gamma[j+1]
                 for (int i = j+1; i < basis_sz_; ++i){
-                    gamma_pp[j] += tau[j][i] * gamma[i+1];                              //gamma_pp[j]=gamma_pp[j]+tau[j,i]*gamma[i+1]
+                    gamma_pp[j] += tau_at(j, i) * gamma[i+1];                           //gamma_pp[j]=gamma_pp[j]+tau[j,i]*gamma[i+1]
                 }
             }
 
@@ -220,7 +226,7 @@ public:
             vec_ops_->add_mul(gamma[1], r[0], T(1.f), x);                               //x := x + gamma[1] * r[0];
             vec_ops_->add_mul(-gamma_p[basis_sz_], r[basis_sz_], T(1.f), r[0]);         //r[0] := r[0] - gamma_p[basis_sz_] * r[basis_sz_]
             vec_ops_->add_mul(-gamma[basis_sz_], u[basis_sz_], T(1.f), u[0]);           //u[0] := u[0] - gamma[basis_sz_] * u[basis_sz_];
-            
+
             for (int j = 1; j < basis_sz_; ++j) {                                       //j=1,..basis_sz_-1
                 vec_ops_->add_mul(gamma_pp[j], r[j], T(1.f), x);                        //x := x + gamma_pp[j] * r[j]
                 vec_ops_->add_mul(-gamma_p[j], r[j], T(1.f), r[0]);                     //r[0] := r[0] - gamma_p[j] * r[j]
@@ -238,7 +244,7 @@ public:
         res = monitor_.converged();
         if(!res)
             logged_obj_t::error_f("solve: linear solver failed to converge");
-        
+
         return res;
 
     }

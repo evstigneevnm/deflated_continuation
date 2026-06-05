@@ -30,7 +30,7 @@
 #include <string>
 #include <utils/cuda_safe_call.h>
 #include <cuda_runtime.h>
-#include <scfd/backend/copy/cuda.h>
+#include <scfd/copy/cuda.h>
 #include <scfd/utils/init_cuda.h>
 
 

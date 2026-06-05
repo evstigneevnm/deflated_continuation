@@ -17,6 +17,8 @@
 #ifndef __SCFD_BICGSTABL_H__
 #define __SCFD_BICGSTABL_H__
 
+#include <cmath>
+#include <vector>
 #include <numerical_algos/detail/vectors_arr_wrap_static.h>
 #include "detail/monitor_call_wrap.h"
 #include "iter_solver_base.h"
@@ -57,9 +59,9 @@ public:
 private:
     static const int                                            max_basis_sz_ = SCFD_BICGSTABL_MAX_BASIS_SIZE;
     typedef scalar_type                                         T;
-    typedef utils::logged_obj_base<Log>                         logged_obj_t;
     typedef iter_solver_base<LinearOperator,Preconditioner,
                              VectorOperations,Monitor,Log>      parent_t;
+    using logged_obj_t = typename parent_t::logged_obj_t;
     typedef vectors_arr_wrap_static<VectorOperations, 2>        buf_t;
     typedef typename buf_t::vectors_arr_use_wrap_type           buf_use_wrap_t;
     typedef vectors_arr_wrap_static<VectorOperations,
@@ -84,7 +86,7 @@ private:
         vec_ops_->add_mul(T(1.f), b, -T(1.f), r);
         if (prec_ != NULL) prec_->apply(r);
     }
-    int     normalize_(vector_type &v)const
+    void    normalize_(vector_type &v)const
     {
         T norm2 = std::sqrt( vec_ops_->scalar_prod(v, v) );
         vec_ops_->assign_mul(T(1.f)/norm2, v, v);
@@ -140,11 +142,16 @@ public:
 
         vec_ops_->assign_scalar(T(0.f), u[0]);  //u[0] := 0.;
 
-        T       tau[basis_sz_][basis_sz_];      //Hessenberg matrix
-        T       sigma[basis_sz_ + 1];
-        T       gamma[basis_sz_ + 1];
-        T       gamma_p[basis_sz_ + 1];
-        T       gamma_pp[basis_sz_ + 1];
+        const int work_sz = basis_sz_ + 1;
+        std::vector<T> tau(static_cast<std::size_t>(work_sz * work_sz)); // Hessenberg matrix
+        std::vector<T> sigma(static_cast<std::size_t>(work_sz));
+        std::vector<T> gamma(static_cast<std::size_t>(work_sz));
+        std::vector<T> gamma_p(static_cast<std::size_t>(work_sz));
+        std::vector<T> gamma_pp(static_cast<std::size_t>(work_sz));
+        auto tau_at = [&tau, work_sz](int i, int j) -> T&
+        {
+            return tau[static_cast<std::size_t>(i * work_sz + j)];
+        };
 
         calc_residual_(A, x, b, r[0]);
         vec_ops_->assign_mul(T(1.f), r[0], rtilde);
@@ -184,8 +191,8 @@ public:
             }
             for (int j = 1; j <= basis_sz_; ++j) {
                 for (int i = 1; i < j; ++i) {
-                    tau[i][j] = vec_ops_->scalar_prod(r[j], r[i]) / sigma[i];
-                    vec_ops_->add_mul(-tau[i][j], r[i], T(1.f), r[j]);                  //r[j] := r[j] - tau[i,j] * r[i]
+                    tau_at(i, j) = vec_ops_->scalar_prod(r[j], r[i]) / sigma[i];
+                    vec_ops_->add_mul(-tau_at(i, j), r[i], T(1.f), r[j]);               //r[j] := r[j] - tau[i,j] * r[i]
                 }
                 sigma[j] = vec_ops_->scalar_prod(r[j],r[j]);                            //sigma[j]=(r[j],r[j]);
                 gamma_p[j] = vec_ops_->scalar_prod(r[0], r[j]) / sigma[j];              //gamma_p[j]=(r[0],r[j])/sigma[j];
@@ -195,13 +202,13 @@ public:
             for (int j = basis_sz_-1; j >= 1; --j) {
                 gamma[j] = gamma_p[j];                                                  //gamma[j]=gamma_p[j]
                 for (int i = j+1; i <= basis_sz_; ++i) {
-                    gamma[j] -= tau[j][i] * gamma[i];                                   //gamma[j]=gamma[j]-tau[j,i].*gamma[i];
+                    gamma[j] -= tau_at(j, i) * gamma[i];                                //gamma[j]=gamma[j]-tau[j,i].*gamma[i];
                 }
             }
             for (int j = 1; j < basis_sz_; ++j) {
                 gamma_pp[j] = gamma[j+1];                                               //gamma_pp[j]=gamma[j+1]
                 for (int i = j+1; i < basis_sz_; ++i){
-                    gamma_pp[j] += tau[j][i] * gamma[i+1];                              //gamma_pp[j]=gamma_pp[j]+tau[j,i]*gamma[i+1]
+                    gamma_pp[j] += tau_at(j, i) * gamma[i+1];                           //gamma_pp[j]=gamma_pp[j]+tau[j,i]*gamma[i+1]
                 }
             }
             vec_ops_->add_mul(gamma[1], r[0], T(1.f), x);                               //x := x + gamma[1] * r[0];

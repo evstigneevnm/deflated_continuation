@@ -2,6 +2,7 @@
 #define __SCFD_GLUED_VECTOR_OPERATIONS_H__
 
 #include <array>
+#include <cmath>
 #include <memory>
 #include "detail/ctx_all_of.h"
 #include "vector_operations_base.h"

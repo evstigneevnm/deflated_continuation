@@ -7,7 +7,7 @@
 
 // #include <utils/init_cuda.h>
 
-#include <scfd/utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstab.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
@@ -16,7 +16,7 @@
 // #include <common/gpu_file_operations.h>
 // #include <common/gpu_vector_operations.h>
 #include <common/file_operations.h>
-#include <common/cpu_vector_operations.h>
+#include <common/scfd_serial_cpu_vector_operations.h>
 
 #include <time_stepper/detail/butcher_tables.h>
 
@@ -45,8 +45,8 @@ struct vdp
     void F(const T time_p, const T_vec& in_p, const T param_p, T_vec& out_p )const
     {
         // dy/dt = [y(2); mu*(1-y(1)^2)*y(2)-y(1)];
-        out_p[0] = in_p[1];
-        out_p[1] = param_p*(1-in_p[0]*in_p[0])*in_p[1]-in_p[0];
+        out_p(0) = in_p(1);
+        out_p(1) = param_p*(1-in_p(0)*in_p(0))*in_p(1)-in_p(0);
     }
 
     void jacobian(const T_vec& du, T_vec& dv)const
@@ -54,8 +54,8 @@ struct vdp
         // 0             1
         // 2mu*xy-1   mu*(1-x^2)
         // std::cout << "du = " << du[0] << " " << du[1] << std::endl;
-        dv[0] = du[1];
-        dv[1] = (-2.0*param_0*u_0[0]*u_0[1]-1.0)*du[0] + param_0*(1-u_0[0]*u_0[0])*du[1];
+        dv(0) = du(1);
+        dv(1) = (-2.0*param_0*u_0(0)*u_0(1)-1.0)*du(0) + param_0*(1-u_0(0)*u_0(0))*du(1);
         // std::cout << "dv = " << dv[0] << " " << dv[1] << std::endl;
     }    
 
@@ -67,14 +67,14 @@ struct vdp
 
     void set_initial(T_vec& x0)const
     {
-        x0[0] = 2.0;
-        x0[1] = 0.0;
+        x0(0) = 2.0;
+        x0(1) = 0.0;
     }
 
     void norm_bifurcation_diagram(const T_vec& x0, std::vector<T>& norm_vec)const
     {
-        norm_vec.push_back(x0[0]);
-        norm_vec.push_back(x0[1]);
+        norm_vec.push_back(x0(0));
+        norm_vec.push_back(x0(1));
     }
     T check_solution_quality(const T_vec& x)const
     {
@@ -95,8 +95,8 @@ struct vdp
             encl->jacobian(x, f);
             //calc: y := mul_x*x + mul_y*y
             // vec_ops->add_mul(ab.first, x, ab.second, f);
-            f[0] = ab.first*x[0] + ab.second*f[0];
-            f[1] = ab.first*x[1] + ab.second*f[1];
+            f(0) = ab.first*x(0) + ab.second*f(0);
+            f(1) = ab.first*x(1) + ab.second*f(1);
         }        
 
         std::pair<T, T> ab;
@@ -133,7 +133,7 @@ int main(int argc, char const *argv[])
     using real = SCALAR_TYPE;
     using log_t = scfd::utils::log_std;
 
-    using vec_ops_t = cpu_vector_operations<real>;
+    using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
     using vec_t = typename vec_ops_t::vector_type;
     using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t, log_t>;
 
@@ -249,4 +249,3 @@ int main(int argc, char const *argv[])
     vec_ops.stop_use_vector(x0); vec_ops.free_vector(x0);
     return 0;
 }
-

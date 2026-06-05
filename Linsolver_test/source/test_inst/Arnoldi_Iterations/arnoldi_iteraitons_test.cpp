@@ -4,7 +4,7 @@
 #include <common/file_operations.h>
 #include <numerical_algos/arnolid_process/arnoldi_process.h>
 #include <utils/cuda_support.h>
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <external_libraries/cublas_wrap.h>
 #include <external_libraries/lapack_wrap.h>
 #include <common/gpu_file_operations_functions.h>
@@ -20,7 +20,7 @@ int main(int argc, char const *argv[])
     using mat_ops_t = gpu_matrix_vector_operations<real, T_vec>;
     using T_mat = typename mat_ops_t::matrix_type;
     using mat_files_t = gpu_matrix_file_operations<mat_ops_t>;
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
     using sys_op_t = stability::system_operator_stability<vec_ops_t, mat_ops_t, log_t>;
     using lin_op_t = stability::linear_operator<vec_ops_t, mat_ops_t>;
     using arnoldi_t = numerical_algos::eigen_solvers::arnoldi_process<vec_ops_t, mat_ops_t, sys_op_t, log_t>;

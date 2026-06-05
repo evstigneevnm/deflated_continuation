@@ -8,7 +8,7 @@
 #include <cmath>
 #include <utils/init_cuda.h>
 #include <external_libraries/cublas_wrap.h>
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <common/gpu_file_operations.h>
 #include <common/gpu_vector_operations.h>
 #include <common/file_operations.h>
@@ -32,7 +32,7 @@ int main(int argc, char const *argv[])
 {
 
     using real = SCALAR_TYPE;
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
 
     
     using vec_ops_t = gpu_vector_operations<real>;

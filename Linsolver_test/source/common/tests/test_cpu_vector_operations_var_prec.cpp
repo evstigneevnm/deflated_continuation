@@ -91,12 +91,52 @@ void run_var_prec_tests(test_report& report)
     using default_vec_ops_t = cpu_vector_operations_var_prec<>;
     using T = typename vec_ops_t::scalar_type;
     using vector_type = typename vec_ops_t::vector_type;
+    using multivector_type = typename vec_ops_t::multivector_type;
+    using nmfd_base_type = typename vec_ops_t::nmfd_parent_type;
 
     static_assert(vec_ops_t::SignificantBits == 80, "explicit precision must be preserved");
     static_assert(default_vec_ops_t::SignificantBits == 100, "default precision must stay 100 bits");
 
     vec_ops_t vec_ops(5);
     report.require(vec_ops.get_fp_prec() == 80, "get_fp_prec reports template precision");
+
+    const nmfd_base_type& nmfd_base = vec_ops;
+    vector_type bx;
+    vector_type by;
+    vector_type bz;
+    nmfd_base.init_vector(bx);
+    nmfd_base.init_vector(by);
+    nmfd_base.init_vector(bz);
+    nmfd_base.start_use_vector(bx);
+    nmfd_base.start_use_vector(by);
+    nmfd_base.start_use_vector(bz);
+    nmfd_base.assign_scalar(T(2), bx);
+    nmfd_base.assign_lin_comb(T(3), bx, by);
+    check_vector_equal(report, "NMFD assign_lin_comb one-vector", by, vector_type{T(6), T(6), T(6), T(6), T(6)});
+    nmfd_base.assign_lin_comb(T(2), bx, T(-1), by, bz);
+    check_vector_equal(report, "NMFD assign_lin_comb two-vector", bz, vector_type{T(-2), T(-2), T(-2), T(-2), T(-2)});
+    nmfd_base.add_lin_comb(T(1), bx, T(1), bz);
+    check_vector_equal(report, "NMFD add_lin_comb", bz, vector_type{T(0), T(0), T(0), T(0), T(0)});
+    check_equal(report, "NMFD scalar_prod_l2", nmfd_base.scalar_prod_l2(bx, by), T(60));
+
+    multivector_type mv;
+    nmfd_base.init_multivector(mv, 2);
+    nmfd_base.start_use_multivector(mv, 2);
+    nmfd_base.assign(bx, mv, 2, 0);
+    nmfd_base.assign(by, mv, 2, 1);
+    nmfd_base.assign(mv, 2, 0, bz);
+    check_vector_equal(report, "NMFD multivector assign", bz, vector_type{T(2), T(2), T(2), T(2), T(2)});
+    check_equal(report, "NMFD multivector scalar_prod", nmfd_base.scalar_prod(mv, 2, 1, bx), T(60));
+    nmfd_base.add_lin_comb(T(2), mv, 2, 0, T(-1), bz);
+    check_vector_equal(report, "NMFD multivector add_lin_comb", bz, vector_type{T(2), T(2), T(2), T(2), T(2)});
+    nmfd_base.stop_use_multivector(mv, 2);
+    nmfd_base.free_multivector(mv, 2);
+    nmfd_base.stop_use_vector(bx);
+    nmfd_base.stop_use_vector(by);
+    nmfd_base.stop_use_vector(bz);
+    nmfd_base.free_vector(bx);
+    nmfd_base.free_vector(by);
+    nmfd_base.free_vector(bz);
 
     vec_ops_t one_ops(1);
     vector_type one_x;

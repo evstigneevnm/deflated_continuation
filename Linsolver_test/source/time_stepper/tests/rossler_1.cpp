@@ -8,7 +8,7 @@
 #include <cmath>
 // #include <utils/init_cuda.h>
 
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 // #include <numerical_algos/lin_solvers/default_monitor.h>
 // #include <numerical_algos/lin_solvers/bicgstabl.h>
 
@@ -16,7 +16,7 @@
 // #include <common/gpu_file_operations.h>
 // #include <common/gpu_vector_operations.h>
 #include <common/file_operations.h>
-#include <common/cpu_vector_operations.h>
+#include <common/scfd_serial_cpu_vector_operations.h>
 
 #include <time_stepper/time_step_adaptation_constant.h>
 #include <time_stepper/time_step_adaptation_error_control.h>
@@ -51,30 +51,30 @@ struct rossler //https://en.wikipedia.org/wiki/R%C3%B6ssler_attractor
     {
         param[used_param_number_] = param_p;
 
-        out_p[0] = -in_p[1] - in_p[2];
-        out_p[1] = in_p[0] + param[0] * in_p[1];
-        out_p[2] = param[1] + in_p[2] * ( in_p[0] - param[2] );
+        out_p(0) = -in_p(1) - in_p(2);
+        out_p(1) = in_p(0) + param[0] * in_p(1);
+        out_p(2) = param[1] + in_p(2) * ( in_p(0) - param[2] );
     }
 
     void set_initial( T_vec &x0 ) const
     {
-        x0[0] = 2.0;
-        x0[1] = 0.0;
-        x0[2] = 0.0;
+        x0(0) = 2.0;
+        x0(1) = 0.0;
+        x0(2) = 0.0;
     }
 
     void norm_bifurcation_diagram( const T_vec &x0, std::vector<T> &norm_vec ) const
     {
-        norm_vec.push_back( x0[0] );
-        norm_vec.push_back( x0[1] );
-        norm_vec.push_back( x0[2] );
+        norm_vec.push_back( x0(0) );
+        norm_vec.push_back( x0(1) );
+        norm_vec.push_back( x0(2) );
     }
     T check_solution_quality( const T_vec &x ) const
     {
         bool finite = true;
         for ( int j = 0; j < 3; j++ )
         {
-            finite &= std::isfinite( x[j] );
+            finite &= std::isfinite( x(j) );
         }
         return finite;
     }
@@ -109,9 +109,9 @@ int main( int argc, char const *argv[] )
 {
 
     using real  = SCALAR_TYPE;
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
 
-    using vec_ops_t = cpu_vector_operations<real>;
+    using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
     using vec_t     = typename vec_ops_t::vector_type;
 
     using nlin_op_t = nonlinear_operators::rossler<vec_ops_t>;

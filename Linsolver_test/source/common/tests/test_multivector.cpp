@@ -1,6 +1,9 @@
-#include <common/cpu_vector_operations.h>
+#include <cmath>
+#include <iostream>
 
-using vec_ops_t = cpu_vector_operations<double>;
+#include <common/scfd_serial_cpu_vector_operations.h>
+
+using vec_ops_t = scfd_serial_cpu_vector_operations<double>;
 using T =  typename vec_ops_t::scalar_type;
 using vec_t = typename vec_ops_t::vector_type;
 using mvec_t = typename vec_ops_t::multivector_type;
@@ -19,7 +22,7 @@ int main(int argc, char const *argv[])
         for(int k=0;k<100;k++)
         {
             
-            x[k] = (j+1)*k;
+            x(k) = (j+1)*k;
         }
     }
 
@@ -30,9 +33,9 @@ int main(int argc, char const *argv[])
         for(int k=0;k<100;k++)
         {
             
-            if( std::abs(x[k]-(j+1)*k) > 1.0e-10)
+            if( std::abs(x(k)-(j+1)*k) > 1.0e-10)
             {
-                std::cout << "failed at: " << j << ", " << k << ". Expexted: " << (j+1)*k << ", got: " << x[k] << std::endl;
+                std::cout << "failed at: " << j << ", " << k << ". Expexted: " << (j+1)*k << ", got: " << x(k) << std::endl;
                 ok_flag = false;
             }
         }

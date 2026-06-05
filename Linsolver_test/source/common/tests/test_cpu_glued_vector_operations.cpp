@@ -1,20 +1,20 @@
 #include <iostream>
 #include <string>
-#include <utils/log.h>
-#include <common/cpu_vector_operations.h>
+#include <scfd/utils/log_std.h>
 #include <common/glued_vector_operations.h>
 #include <common/glued_vector_space.h>
+#include <common/scfd_serial_cpu_vector_operations.h>
 
 
 
 
 int main(int argc, char const *argv[]) 
 {
-    using log_t = utils::log_std;
+    using log_t = scfd::utils::log_std;
 
     using real = SCALAR_TYPE;
     using T = real;
-    using vec_ops_t = cpu_vector_operations<real>;
+    using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
     using vec_t = typename vec_ops_t::vector_type;
     using glued_vec_space_t = scfd::linspace::glued_vector_space<vec_ops_t, 2>;
     using glued_vec_t = typename glued_vec_space_t::vector_type;

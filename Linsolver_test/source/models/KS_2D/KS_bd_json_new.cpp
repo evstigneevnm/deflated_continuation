@@ -4,7 +4,7 @@
 #include <string>
 
 #include <utils/cuda_support.h>
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <external_libraries/cublas_wrap.h>
 #include <external_libraries/cufft_wrap.h>
 
@@ -76,7 +76,7 @@ int main(int argc, char const *argv[])
     size_t Ny = parameters.nonlinear_operator.N_size.at(1);
 
     
-    typedef utils::log_std log_t;
+    typedef scfd::utils::log_std log_t;
     typedef thrust::complex<real> complex;
     typedef gpu_vector_operations<real> vec_ops_real;    
     typedef gpu_vector_operations<complex> vec_ops_complex;

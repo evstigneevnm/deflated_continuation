@@ -5,7 +5,7 @@
 #include <string>
 #include <sstream>
 
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/exact_wrapper.h>
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>

@@ -4,7 +4,7 @@
 #include <string>
 
 #include <utils/cuda_support.h>
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <external_libraries/cublas_wrap.h>
 #include <external_libraries/cufft_wrap.h>
 
@@ -90,7 +90,7 @@ int main(int argc, char const *argv[])
     typedef gpu_file_operations<vec_ops_real> files_real_t;
     typedef gpu_file_operations<vec_ops_real_im> files_real_im_t;
 
-    typedef utils::log_std log_t;
+    typedef scfd::utils::log_std log_t;
     typedef numerical_algos::lin_solvers::default_monitor<
         vec_ops_real, log_t> monitor_t;
     typedef nonlinear_operators::Kuramoto_Sivashinskiy_2D<

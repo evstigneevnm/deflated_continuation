@@ -6,7 +6,7 @@
 
 #include <utils/cuda_support.h>
 #include <scfd/utils/trash_cuda_memory.h>
-#include <utils/log.h>
+#include <scfd/utils/log_std.h>
 #include <external_libraries/cufft_wrap.h>
 #include <external_libraries/cublas_wrap.h>
 
@@ -32,7 +32,7 @@ int main(int argc, char const *argv[])
 
     typedef SCALAR_TYPE real;
     typedef thrust::complex<real> complex;
-    typedef utils::log_std log_t;
+    typedef scfd::utils::log_std log_t;
     typedef gpu_vector_operations<real> gpu_vector_operations_real_t;
     typedef gpu_vector_operations<complex> gpu_vector_operations_complex_t;
     typedef gpu_vector_operations<real> gpu_vector_operations_t;
