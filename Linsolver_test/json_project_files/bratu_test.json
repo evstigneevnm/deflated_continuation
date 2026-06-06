@@ -1,0 +1,110 @@
+{
+    "gpu_pci_id": -1,
+    "path_to_prject": "./bratu_test/",
+    "use_high_precision_reduction": false,
+    "bifurcaiton_diagram_file_name": "bifurcation_diagram.dat",
+    "stability_diagram_file_name": "stability_diagram.dat",
+    "deflation_continuation": {
+        "maximum_continuation_steps": 600,
+        "step_size": 0.02,
+        "max_step_size": 0.05,
+        "deflation_attempts": 10,
+        "continuation_fail_attempts": 8,
+        "initial_direciton": 1,
+        "minimum_step_multiplier": 0.8,
+        "maximum_step_multiplier": 0.0777,
+        "skip_file_output": 1,
+        "deflation_knots": [
+            0.1,
+            1.0,
+            1.5,
+            3.0,
+            4.0
+        ],
+        "linear_solver_extended": {
+            "maximum_iterations": 50,
+            "use_preconditioned_residual": 1,
+            "residual_recalculate_frequency": 1,
+            "basis_size": 1,
+            "tolerance": 1.0e-8,
+            "use_small_alpha_approximation": false,
+            "save_convergence_history": false,
+            "divide_norms_by_relative_base": true
+        },
+        "newton_continuation": {
+            "maximum_iterations": 18,
+            "update_wight_maximum": 1.0,
+            "save_norms_history": false,
+            "verbose": false,
+            "tolerance": 5.0e-8,
+            "relax_tolerance_factor": 1000.0,
+            "relax_tolerance_steps": 2,
+            "stagnation_max": 10,
+            "maximum_norm_increase": 2.0,
+            "newton_wight_threshold": 1.0e-8
+        },
+        "newton_deflation": {
+            "maximum_iterations": 50,
+            "update_wight_maximum": 0.5,
+            "save_norms_history": false,
+            "verbose": true,
+            "tolerance": 1.0e-8
+        }
+    },
+    "stability_continuation": {
+        "left_halfplane_stable_eigenvalues": true,
+        "Krylov_subspace_dimension": 40,
+        "desired_spectrum": 8,
+        "Cayley_transform_sigma_mu": [
+            12.0,
+            -12.0
+        ],
+        "linear_solver": {
+            "maximum_iterations": 100,
+            "use_preconditioned_residual": 1,
+            "residual_recalculate_frequency": 1,
+            "basis_size": 1,
+            "tolerance": 1.0e-8,
+            "save_convergence_history": false,
+            "divide_norms_by_relative_base": true
+        },
+        "newton": {
+            "maximum_iterations": 50,
+            "update_wight_maximum": 1.0,
+            "save_norms_history": false,
+            "verbose": false,
+            "tolerance": 1.0e-8
+        }
+    },
+    "nonlinear_operator": {
+        "discrete_problem_dimensions": [
+            64
+        ],
+        "spatial_discretization": "chebyshev", //"fd3", //"chebyshev",
+        "problem_real_parameters_vector": [
+            0
+        ],
+        "problem_int_parameters_vector": [
+            0
+        ],
+        "linear_solver": {
+            "maximum_iterations": 3,
+            "use_preconditioned_residual": 1,
+            "residual_recalculate_frequency": 1,
+            "basis_size": 1,
+            "tolerance": 1.0e-8,
+            "save_convergence_history": false,
+            "divide_norms_by_relative_base": true
+        },
+        "newton": {
+            "maximum_iterations": 20,
+            "update_wight_maximum": 1.0,
+            "save_norms_history": false,
+            "verbose": false,
+            "tolerance": 1.0e-8
+        }
+    },
+    "plot_solutions": {
+        "plot_solution_frequency": 3
+    }
+}
