@@ -77,6 +77,7 @@ SCFD_VECTOR_OPS_HEADERS = source/common/scfd_vector_operations.h source/common/N
 SCFD_SERIAL_VECTOR_OPS_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/scfd_serial_cpu_vector_operations.h
 SCFD_VECTOR_OPS_TEST_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/tests/scfd_vector_operations_nmfd_interface_tests.h
 CPU_VECTOR_OPS_VAR_PREC_HEADERS = source/common/cpu_vector_operations_var_prec.h source/common/NMFD-operations/nmfd/operations/cpu_vector_operations_var_prec.h source/common/NMFD-operations/nmfd/operations/vector_operations_base.h source/common/NMFD-operations/nmfd/operations/vector_space_base.h
+COMMON_FILE_OPS_HEADERS = source/common/file_operations.h source/common/cpu_file_operations.h source/common/cpu_matrix_file_operations.h source/common/gpu_file_operations.h source/common/gpu_matrix_file_operations.h source/common/NMFD-operations/nmfd/operations/io/file_operations.h source/common/NMFD-operations/nmfd/operations/io/vector_file_operations.h source/common/NMFD-operations/nmfd/operations/io/matrix_file_operations.h
 
 LCUDA = -L$(CUDA_ROOT_PATH)/lib64
 LBOOST = -L$(BOOST_ROOT_PATH)/lib
@@ -100,6 +101,12 @@ test_cpu_vector_operations_var_prec.bin: source/common/tests/test_cpu_vector_ope
 
 test_multivector.bin: source/common/tests/test_multivector.cpp $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_multivector.cpp $(OPENMP) -o $(BUILD_DIR)/test_multivector.bin 2>$(RESULTS)
+
+test_file_operations.bin: source/common/tests/test_file_operations.cpp $(COMMON_FILE_OPS_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/common/tests/test_file_operations.cpp $(OPENMP) -o $(BUILD_DIR)/test_file_operations.bin 2>$(RESULTS)
+
+test_file_operations_cuda.bin: source/common/tests/test_file_operations_cuda.cu $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) source/common/cuda_init_scfd.h
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/tests/test_file_operations_cuda.cu $(LIBS1) -o $(BUILD_DIR)/test_file_operations_cuda.bin 2>$(RESULTS)
 
 
 test_cpu_glued_vector_operations.bin: source/common/tests/test_cpu_glued_vector_operations.cpp $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
@@ -215,6 +222,12 @@ $(BUILD_DIR)/circle_ker.o: source/nonlinear_operators/circle/circle_ker.cu | $(B
 
 cont_def_circle: source/models/circle/circle_test_deflation_continuation.cpp source/models/circle/circle_test_deflation_continuation_typedefs.h source/nonlinear_operators/circle/circle.h $(SCFD_VECTOR_OPS_HEADERS)
 	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/circle/circle_test_deflation_continuation.cpp $(LIBS1) -o $(BUILD_DIR)/circle_test_deflation_continuation.bin 2>$(RESULTS)
+
+cont_def_circle_cpu_omp: source/models/circle/circle_test_deflation_continuation.cpp source/models/circle/circle_test_deflation_continuation_typedefs.h source/nonlinear_operators/circle/circle.h $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) source/models/circle/circle_test_deflation_continuation.cpp $(OPENMP) -o $(BUILD_DIR)/circle_test_deflation_continuation_cpu_omp.bin 2>$(RESULTS)
+
+cont_def_circle_var_prec: source/models/circle/circle_test_deflation_continuation.cpp source/models/circle/circle_test_deflation_continuation_typedefs.h source/nonlinear_operators/circle/circle.h $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
+	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(IBOOST) source/models/circle/circle_test_deflation_continuation.cpp $(OPENMP) -o $(BUILD_DIR)/circle_test_deflation_continuation_var_prec.bin 2>$(RESULTS)
 
 circle_curve_container: source/models/circle/circle_test_curve_container.cpp source/models/circle/circle_test_curve_container.h source/models/circle/circle_test_deflation_continuation_typedefs.h source/nonlinear_operators/circle/circle.h $(SCFD_VECTOR_OPS_HEADERS)
 	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/circle/circle_test_curve_container.cpp $(LIBS1) -o $(BUILD_DIR)/circle_test_curve_container.bin 2>$(RESULTS)

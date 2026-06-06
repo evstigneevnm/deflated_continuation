@@ -15,6 +15,7 @@
 
 #include <cmath>
 #include <vector>
+#include <common/scalar_math.h>
 #include <scfd/utils/logged_obj_base.h>
 
 namespace nonlinear_operators
@@ -92,42 +93,42 @@ public:
         if(normFx1/normFx>T(2))
         {
             newton_wight *= 0.75;
-            log->info_f("adjusting Newton wight to %le and updating...", newton_wight);            
+            log->info_f("adjusting Newton wight to %le and updating...", (double)newton_wight);
             vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
         }
-        if((std::abs(normFx1-normFx)/normFx<T(0.05))&&(iterations>maximum_iterations/3))
+        if((common::scalar_math::abs(normFx1-normFx)/normFx<T(0.05))&&(iterations>maximum_iterations/3))
         {
             newton_wight *= 0.75;
-            log->info_f("adjusting Newton wight to %le and updating...", newton_wight);   
+            log->info_f("adjusting Newton wight to %le and updating...", (double)newton_wight);
             vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);            
         }
         iterations++;
 
         if(newton_wight<T(1.0e-6))
         {
-            log->info_f("Newton wight is too small (%le).", newton_wight);   
+            log->info_f("Newton wight is too small (%le).", (double)newton_wight);
             finish = true;
             result_status = 4;
         }
-        if(std::isnan(normFx))
+        if(common::scalar_math::isnan(normFx))
         {
             log->info("Newton initial vector caused nan.");
             finish = true;
             result_status = 3;
         }
-        else if(std::isnan(normFx1))
+        else if(common::scalar_math::isnan(normFx1))
         {
             log->info("Newton updated vector caused nan.");
             finish = true;
             result_status = 3;
         }
-        else if(std::isinf(normFx))
+        else if(common::scalar_math::isinf(normFx))
         {
             log->info("Newton initial vector caused inf.");
             finish = true;
             result_status = 2;            
         }
-        else if(std::isinf(normFx1))
+        else if(common::scalar_math::isinf(normFx1))
         {
             log->info("Newton update caused inf.");
             finish = true;

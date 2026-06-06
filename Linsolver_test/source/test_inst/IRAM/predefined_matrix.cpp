@@ -7,7 +7,6 @@
 #include <external_libraries/lapack_wrap.h>
 #include <stability/IRAM/iram_container.h>
 #include <stability/IRAM/shift_bulge_chase.h>
-#include <common/gpu_file_operations_functions.h>
 
 template<class T>
 void print_matrix(int Nrows, int Ncols, T* A)
@@ -125,7 +124,6 @@ int main(int argc, char const *argv[])
     // container.to_gpu();
     // mat_f_m.read_matrix("dat_files/iram/Q_test.dat", Q_deb );
     // mat_f_m.read_matrix("dat_files/iram/H1_test.dat", H_deb );
-    // gpu_file_operations_functions::read_vector<real>("dat_files/iram/f_test.dat", N, container.ref_f() );
     // bulge._debug_set_Q(Q_deb);
     // bulge._debug_set_H(H_deb);
 

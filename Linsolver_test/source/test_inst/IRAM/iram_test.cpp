@@ -8,7 +8,6 @@
 #include <scfd/utils/log_std.h>
 #include <external_libraries/cublas_wrap.h>
 #include <external_libraries/lapack_wrap.h>
-#include <common/gpu_file_operations_functions.h>
 #include <test_inst/IRAM/system_operator_test.h>
 #include <test_inst/IRAM/linear_operator.h>
 #include <stability/IRAM/iram_process.hpp>

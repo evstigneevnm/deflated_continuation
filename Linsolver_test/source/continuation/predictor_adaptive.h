@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <common/scalar_math.h>
 
 namespace continuation
 {
@@ -241,11 +242,11 @@ public:
 private:
     void validate_steps()
     {
-        if((!std::isfinite(ds_0)) || (ds_0 <= T(0)))
+        if((!common::scalar_math::isfinite(ds_0)) || (ds_0 <= T(0)))
         {
             throw std::runtime_error("predictor_adaptive: initial arclength step ds_0 must be positive and finite.");
         }
-        if((!std::isfinite(ds_max)) || (ds_max <= T(0)))
+        if((!common::scalar_math::isfinite(ds_max)) || (ds_max <= T(0)))
         {
             throw std::runtime_error("predictor_adaptive: maximum arclength step ds_max must be positive and finite.");
         }
@@ -253,11 +254,11 @@ private:
         {
             throw std::runtime_error("predictor_adaptive: maximum arclength step ds_max must be greater than or equal to ds_0.");
         }
-        if((!std::isfinite(step_ds_m)) || (step_ds_m < T(0)) || (step_ds_m >= T(1)))
+        if((!common::scalar_math::isfinite(step_ds_m)) || (step_ds_m < T(0)) || (step_ds_m >= T(1)))
         {
             throw std::runtime_error("predictor_adaptive: step_ds_m must be finite and in [0,1).");
         }
-        if((!std::isfinite(step_ds_p)) || (step_ds_p < T(0)))
+        if((!common::scalar_math::isfinite(step_ds_p)) || (step_ds_p < T(0)))
         {
             throw std::runtime_error("predictor_adaptive: step_ds_p must be finite and non-negative.");
         }

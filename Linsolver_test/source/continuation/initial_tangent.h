@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <cmath>
 
+#include <common/scalar_math.h>
 #include <iostream>
 
 namespace continuation
@@ -77,14 +78,14 @@ public:
 
         T minimum_resid = lin_solv->get_linsolver_handle_original()->monitor().resid_norm_out();
         int iters_performed = lin_solv->get_linsolver_handle_original()->monitor().iters_performed();
-        log->info_f("desired residual = %le, minimum attained residual = %le with %i iterations.", tolerance_local, minimum_resid, iters_performed);        
+        log->info_f("desired residual = %le, minimum attained residual = %le with %i iterations.", (double)tolerance_local, (double)minimum_resid, iters_performed);
         lin_solv->get_linsolver_handle_original()->monitor().restore_max_iterations();
         lin_solv->get_linsolver_handle_original()->monitor().restore_tolerance();
 
         if(linear_system_converged)
         {
             T z_sq = vec_ops->scalar_prod(x_s, x_s); //(dx,x_0_s)
-            lambda_s = sign/std::sqrt(z_sq+T(1.0));
+            lambda_s = sign/common::scalar_math::sqrt(z_sq+T(1.0));
             vec_ops->add_mul_scalar(T(0.0), lambda_s, x_s); 
 	    
         //TODO: do smth with the norm

@@ -13,12 +13,73 @@
 #include <cmath>
 #include <cstddef>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
+#include <common/scalar_math.h>
 #include <scfd/utils/device_tag.h>
 
 namespace nonlinear_operators
 {
+
+namespace circle_detail
+{
+
+template<class VectorOperations, class = void>
+struct vector_access
+{
+    using vector_type = typename VectorOperations::vector_type;
+    using scalar_type = typename VectorOperations::scalar_type;
+    using ordinal_type = typename VectorOperations::ordinal_type;
+
+    static scalar_type* data(vector_type& x)
+    {
+        return x.data();
+    }
+
+    static const scalar_type* data(const vector_type& x)
+    {
+        return x.data();
+    }
+
+    template<class Function>
+    static void for_each(Function&& function, ordinal_type n)
+    {
+        for(ordinal_type i = 0; i < n; ++i)
+        {
+            function(i);
+        }
+    }
+};
+
+template<class VectorOperations>
+struct vector_access<VectorOperations, std::void_t<typename VectorOperations::for_each_type>>
+{
+    using vector_type = typename VectorOperations::vector_type;
+    using scalar_type = typename VectorOperations::scalar_type;
+    using ordinal_type = typename VectorOperations::ordinal_type;
+    using for_each_type = typename VectorOperations::for_each_type;
+
+    static auto data(vector_type& x) -> decltype(x.raw_ptr())
+    {
+        return x.raw_ptr();
+    }
+
+    static auto data(const vector_type& x) -> decltype(x.raw_ptr())
+    {
+        return x.raw_ptr();
+    }
+
+    template<class Function>
+    static void for_each(Function&& function, ordinal_type n)
+    {
+        for_each_type for_each;
+        for_each(std::forward<Function>(function), n);
+        for_each.wait();
+    }
+};
+
+} // namespace circle_detail
 
 template<class VectorOperations_R, unsigned int BLOCK_SIZE_x = 64>
 class circle
@@ -33,7 +94,7 @@ public:
     using T = typename VectorOperations_R::scalar_type;
     using T_vec = typename VectorOperations_R::vector_type;
     using ordinal_type = typename VectorOperations_R::ordinal_type;
-    using for_each_type = typename VectorOperations_R::for_each_type;
+    using access_type = circle_detail::vector_access<VectorOperations_R>;
 
     circle(T R_, std::size_t Nx_, vector_operations_real* vec_ops_R_):
         R(R_),
@@ -51,14 +112,13 @@ public:
 
     void F(const T_vec& u, const T alpha, T_vec& v)
     {
-        const auto up = u.raw_ptr();
-        auto vp = v.raw_ptr();
+        const auto up = access_type::data(u);
+        auto vp = access_type::data(v);
         const T R_l = R;
-        for_each_([=] __DEVICE_TAG__ (ordinal_type)
+        access_type::for_each([=] __DEVICE_TAG__ (ordinal_type)
         {
             vp[0] = up[0]*up[0] + alpha*alpha - R_l*R_l;
         }, ordinal_type(1));
-        for_each_.wait();
     }
 
     void set_linearization_point(const T_vec& u_0_, const T alpha_0_)
@@ -69,14 +129,13 @@ public:
 
     void jacobian_u(const T_vec& du, T_vec& dv)
     {
-        const auto u0p = u_0.raw_ptr();
-        const auto dup = du.raw_ptr();
-        auto dvp = dv.raw_ptr();
-        for_each_([=] __DEVICE_TAG__ (ordinal_type)
+        const auto u0p = access_type::data(u_0);
+        const auto dup = access_type::data(du);
+        auto dvp = access_type::data(dv);
+        access_type::for_each([=] __DEVICE_TAG__ (ordinal_type)
         {
             dvp[0] = T(2)*u0p[0]*dup[0];
         }, ordinal_type(1));
-        for_each_.wait();
     }
 
     void jacobian_alpha(T_vec& dv)
@@ -86,12 +145,11 @@ public:
 
     void jacobian_alpha(const T_vec&, const T& alpha, T_vec& dv)
     {
-        auto dvp = dv.raw_ptr();
-        for_each_([=] __DEVICE_TAG__ (ordinal_type)
+        auto dvp = access_type::data(dv);
+        access_type::for_each([=] __DEVICE_TAG__ (ordinal_type)
         {
             dvp[0] = T(2)*alpha;
         }, ordinal_type(1));
-        for_each_.wait();
     }
 
     void preconditioner_jacobian_u(T_vec&)
@@ -122,7 +180,7 @@ public:
         res.clear();
         res.reserve(2);
         res.push_back(val);
-        res.push_back(std::abs(val));
+        res.push_back(common::scalar_math::abs(val));
     }
 
     void randomize_vector(T_vec& u_out)
@@ -136,7 +194,6 @@ private:
     std::size_t Nx;
     T_vec u_0;
     T alpha_0 = T(0);
-    mutable for_each_type for_each_;
 
     void common_constructor_operation()
     {

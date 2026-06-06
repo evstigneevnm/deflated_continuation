@@ -11,7 +11,6 @@
 #include <external_libraries/lapack_wrap.h>
 #include <stability/IRAM/iram_container.h>
 #include <stability/IRAM/shift_bulge_chase.h>
-#include <common/gpu_file_operations_functions.h>
 #include <test_inst/IRAM/system_operator_test.h>
 #include <stability/IRAM/schur_select.h>
 

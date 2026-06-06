@@ -23,6 +23,7 @@
 #ifdef SCFD_ENABLE_NLOHMANN
 #include <nlohmann/json.hpp>
 #endif
+#include <common/scalar_math.h>
 #include <scfd/utils/logged_obj_base.h>
 #include <scfd/utils/log.h>
 #include "detail/vectors_arr_wrap_static.h"
@@ -213,7 +214,7 @@ public:
     bool is_valid_number()const { return is_valid_number_; }
     void check_valid_norm()const
     {
-        is_valid_number_ = std::isfinite(resid_norm_);
+        is_valid_number_ = common::scalar_math::isfinite(resid_norm_);
     }
     T rhs_norm()const { return rhs_norm_; }
     T resid_norm()const { return resid_norm_; }
@@ -262,7 +263,7 @@ public:
 
         resid_norm_ = vec_ops_.norm(r);
 
-        logged_obj_type::info_f("resid norm = %0.6e tol = %0.6e", resid_norm_out(), tol_out());
+        logged_obj_type::info_f("resid norm = %0.6e tol = %0.6e", (double)resid_norm_out(), (double)tol_out());
         if (prms_.save_convergence_history) 
             convergence_history_.emplace_back( iters_performed(), resid_norm_out() );
 

@@ -16,6 +16,7 @@
 #include <chrono>
 
 #include <nmfd/operations/vector_space_base.h>
+#include <common/scalar_math.h>
 
 namespace nmfd_operations_detail
 {
@@ -156,6 +157,11 @@ public:
     unsigned int get_fp_prec()const
     {
         return SignificantBits;
+    }
+
+    norm_type get_l2_size() const
+    {
+        return common::scalar_math::sqrt(static_cast<norm_type>(sz_default_));
     }
 
 
@@ -374,6 +380,16 @@ public:
         return norm2_sq(x);
     }
 
+    scalar_type norm_rank1(const vector_type& x, const scalar_type val_x) const
+    {
+        return common::scalar_math::sqrt(norm_sq(x) + val_x*val_x);
+    }
+
+    scalar_type norm_rank1_l2(const vector_type& x, const scalar_type val_x) const
+    {
+        return norm_rank1(x, val_x)/get_l2_size();
+    }
+
     scalar_type norm2(const vector_type& x) const override
     {
         return norm_l2(x);
@@ -427,7 +443,50 @@ public:
     T get_value_at_point(size_t at, const vector_type& x) const
     {
         return x[at];
-    }    
+    }
+
+    T* view(vector_type& x) const
+    {
+        return x.data();
+    }
+
+    const T* view(const vector_type& x) const
+    {
+        return x.data();
+    }
+
+    void set(vector_type&) const
+    {
+    }
+
+    void set(const T* host, vector_type& x) const
+    {
+        set(host, x, x.size());
+    }
+
+    void set(const T* host, vector_type& x, size_t n) const
+    {
+        if(n > x.size())
+        {
+            throw std::logic_error("cpu_vector_operations_var_prec::set: input size is larger than destination vector");
+        }
+        std::copy(host, host + n, x.begin());
+    }
+
+    void get(const vector_type& x, T* host) const
+    {
+        get(x, host, x.size());
+    }
+
+    void get(const vector_type& x, T* host, size_t n) const
+    {
+        if(n > x.size())
+        {
+            throw std::logic_error("cpu_vector_operations_var_prec::get: input size is larger than source vector");
+        }
+        std::copy(x.begin(), x.begin() + static_cast<std::ptrdiff_t>(n), host);
+    }
+
     //calc: x := <vector_type with all elements equal to given scalar value> 
     void assign_scalar(const scalar_type scalar, vector_type& x)const override
     {

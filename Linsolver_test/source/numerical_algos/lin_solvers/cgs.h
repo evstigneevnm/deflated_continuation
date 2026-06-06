@@ -18,6 +18,7 @@
 #define __SCFD_CGS_H__
 
 #include <numerical_algos/detail/vectors_arr_wrap_static.h>
+#include <common/scalar_math.h>
 #include "detail/monitor_call_wrap.h"
 #include "iter_solver_base.h"
 
@@ -114,8 +115,7 @@ public:
                 vec_ops_->assign(ui, pi);
             } else {
                 T   beta_i_1 = rho_i_1/rho_i_2;
-                if (std::isnan(beta_i_1)) { not_valid_coeff_faced = true; break; }
-                if (std::isinf(beta_i_1)) { not_valid_coeff_faced = true; break; }
+                if (!common::scalar_math::isfinite(beta_i_1)) { not_valid_coeff_faced = true; break; }
                 //ui := ri + beta_i_1 * qi
                 vec_ops_->assign_mul(T(1.f), ri, beta_i_1, qi, ui);
                 //pi := beta_i_1*beta_i_1 * p{i-1} + ui + beta_i_1 * qi
@@ -125,8 +125,7 @@ public:
             A.apply(pi, theta); 
             if (prec_ != NULL) prec_->apply(theta);
             T   alpha_i = rho_i_1/vec_ops_->scalar_prod(theta, r0);
-            if (std::isnan(alpha_i)) { not_valid_coeff_faced = true; break; }
-            if (std::isinf(alpha_i)) { not_valid_coeff_faced = true; break; }
+            if (!common::scalar_math::isfinite(alpha_i)) { not_valid_coeff_faced = true; break; }
             //qi := ui - alpha_i*theta
             vec_ops_->assign_mul(T(1.f), ui, -alpha_i, theta, qi);
             //theta := ui + qi;

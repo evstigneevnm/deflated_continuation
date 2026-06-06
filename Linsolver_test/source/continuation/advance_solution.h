@@ -4,6 +4,7 @@
 #include <string>
 #include <stdexcept>
 #include <cmath>
+#include <common/scalar_math.h>
 /**
   continuation of a single solution forward or backward on a single step
   execute SOLVE method to continue solution in one step
@@ -151,7 +152,7 @@ public:
                 T norm = vec_ops->norm_rank1(x1_s, lambda1_s);
                 lambda1_s/=norm;
                 vec_ops->scale(T(1)/norm, x1_s);
-                log->info_f("continuation::advance_solution::||(x_s, l_s)|| = %le", lambda1_s*lambda1_s + vec_ops->scalar_prod(x1_s, x1_s) );
+                log->info_f("continuation::advance_solution::||(x_s, l_s)|| = %le", (double)(lambda1_s*lambda1_s + vec_ops->scalar_prod(x1_s, x1_s)) );
 
                 tangent_obtained = true;
             }
@@ -161,7 +162,7 @@ public:
                 log->warning("continuation::advance_solution::newton_extended solver failed for additional point in tangent");
                 log->info("continuation::advance_solution using Newton-Raphson estimation.");
                 T x_norm = vec_ops->norm(x1);
-                T sign = (lambda1 - lambda0)/std::abs(lambda1 - lambda0);
+                T sign = (lambda1 - lambda0)/common::scalar_math::abs(lambda1 - lambda0);
                 T d_lambda = sign*T(1.0)/x_norm;
                 lambda1_l = lambda1 + d_lambda;
                 vec_ops->assign(x1, x1_l); //guess for x1 

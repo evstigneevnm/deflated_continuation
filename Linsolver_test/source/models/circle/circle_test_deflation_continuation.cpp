@@ -3,11 +3,16 @@
 #include <iostream>
 #include <cstdio>
 #include <exception>
+#include <fstream>
 #include <limits>
+#include <sstream>
 #include <string>
 #include <vector>
 
+#if !defined(CIRCLE_VECTOR_BACKEND_OMP) && !defined(CIRCLE_VECTOR_BACKEND_VAR_PREC)
 #include <common/cuda_init_scfd.h>
+#endif
+#include <common/scalar_math.h>
 #include <scfd/utils/log.h>
 
 //problem dependant
@@ -40,23 +45,68 @@
 #include "circle_test_deflation_continuation_typedefs.h"
 //problem dependant ends
 
+namespace
+{
+
+template<class T>
+T parse_scalar(const char* value, const char* label)
+{
+    std::istringstream stream(value);
+    T result = T(0);
+    stream >> result;
+    if(!stream)
+    {
+        throw std::runtime_error(std::string("failed to parse ") + label + " from '" + value + "'");
+    }
+    return result;
+}
+
+bool needs_cuda_device_argument()
+{
+#if defined(CIRCLE_VECTOR_BACKEND_OMP) || defined(CIRCLE_VECTOR_BACKEND_VAR_PREC)
+    return false;
+#else
+    return true;
+#endif
+}
+
+} // namespace
+
 int main(int argc, char const *argv[])
 {
     
-    if((argc!=4)&&(argc!=5))
+    const bool cuda_backend = needs_cuda_device_argument();
+    if((argc != 4) && !(cuda_backend && argc == 5))
     {
-        printf("Usage: %s lambda_0 dS S [cuda_device]\n   lambda_0 - starting parameter\n   dS - continuation step\n   S - number of continuation steps\n   cuda_device - optional SCFD selector: auto, best_mem, dev_num:N, pci_id:N, manual, or plain device number\n",argv[0]);
+        if(cuda_backend)
+        {
+            printf("Usage: %s lambda_0 dS S [cuda_device]\n   lambda_0 - starting parameter\n   dS - continuation step\n   S - number of continuation steps\n   cuda_device - optional SCFD selector: auto, best_mem, dev_num:N, pci_id:N, manual, or plain device number\n",argv[0]);
+        }
+        else
+        {
+            printf("Usage: %s lambda_0 dS S\n   lambda_0 - starting parameter\n   dS - continuation step\n   S - number of continuation steps\n", argv[0]);
+        }
         return 0;
     }
     size_t Nx = 1; //size of the vector variable. 1 in this case
-    real lambda0 = atof(argv[1]);
-    real dS = atof(argv[2]);
-    unsigned int S = atoi(argv[3]);
+    real lambda0;
+    real dS;
+    unsigned int S;
+    try
+    {
+        lambda0 = parse_scalar<real>(argv[1], "lambda_0");
+        dS = parse_scalar<real>(argv[2], "dS");
+        S = static_cast<unsigned int>(std::stoul(argv[3]));
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 2;
+    }
 
+    std::cout << "Using circle backend: " << CIRCLE_BACKEND_NAME << std::endl;
 
-
-
-
+#if !defined(CIRCLE_VECTOR_BACKEND_OMP) && !defined(CIRCLE_VECTOR_BACKEND_VAR_PREC)
     std::string cuda_selector = (argc == 5) ? argv[4] : "auto";
     int cuda_device = -1;
     try
@@ -69,7 +119,8 @@ int main(int argc, char const *argv[])
         return 2;
     }
     printf("Using CUDA device %i\n", cuda_device);
-    real norm_wight = std::sqrt(real(Nx));
+#endif
+    real norm_wight = common::scalar_math::sqrt(real(Nx));
     real Rad = 1.0;
 
 
@@ -218,7 +269,7 @@ int main(int argc, char const *argv[])
 
     CIRCLE->F(x1, lambda1, f);
     norm = vec_ops_R->norm_l2(f);
-    printf("\n===(%le, %le)===\n", lambda1, norm);
+    std::cout << "\n===(" << lambda1 << ", " << norm << ")===" << std::endl;
 
 
     vec_ops_R->stop_use_vector(x0); vec_ops_R->free_vector(x0);

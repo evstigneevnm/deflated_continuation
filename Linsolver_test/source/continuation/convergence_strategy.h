@@ -5,6 +5,7 @@ convergence rules for Newton iterator for continuation process
 */
 #include <cmath>
 #include <vector>
+#include <common/scalar_math.h>
 #include <scfd/utils/logged_obj_base.h>
 #include <algorithm> // std::min_element
 #include <iterator>  // std::begin, std::end
@@ -110,7 +111,7 @@ public:
         nonlin_op->F(x, lambda, Fx);
         normF = vec_ops->norm_l2(Fx);
         arclength_res = constraint_residual(sys_op, x, lambda);
-        return std::sqrt(normF*normF + arclength_res*arclength_res);
+        return common::scalar_math::sqrt(normF*normF + arclength_res*arclength_res);
     }
 
     //updates a solution with a newton weight value provided
@@ -198,7 +199,7 @@ public:
         T normF = T(0);
         T arclength_res = T(0);
         T normFx = residual_norm(sys_op, nonlin_op, x, lambda, normF, arclength_res);
-        if(!std::isfinite(normFx)) //set result_status = 2 if the provided vector is inconsistent
+        if(!common::scalar_math::isfinite(normFx)) //set result_status = 2 if the provided vector is inconsistent
         {
             result_status = 2;
             return true;
@@ -219,7 +220,7 @@ public:
         T normF1 = T(0);
         T arclength_res1 = T(0);
         T normFx1 = update_solution(sys_op, nonlin_op, x, lambda, delta_x, delta_lambda, x1, lambda1, normF1, arclength_res1);
-        if(!std::isfinite(normFx1)) //quit if the obtained vector is inconsistent
+        if(!common::scalar_math::isfinite(normFx1)) //quit if the obtained vector is inconsistent
         {
             result_status = 3;
             return true;
@@ -241,8 +242,8 @@ public:
                 {
                     newton_wight *= 0.7;
                     normFx1 = update_solution(sys_op, nonlin_op, x, lambda, delta_x, delta_lambda, x1, lambda1, normF1, arclength_res1);
-                    log->info_f("continuation::convergence: increase threshold: %.01f, weight update from %le to %le with weight: %le and weight threshold: %le ", maximum_norm_increase_, normFx, normFx1, newton_wight,  newton_wight_threshold_);
-                    if(!std::isfinite(normFx1))
+                    log->info_f("continuation::convergence: increase threshold: %.01f, weight update from %le to %le with weight: %le and weight threshold: %le ", (double)maximum_norm_increase_, (double)normFx, (double)normFx1, (double)newton_wight, (double)newton_wight_threshold_);
+                    if(!common::scalar_math::isfinite(normFx1))
                     {
                         result_status = 3;
                         finish = true;
@@ -261,7 +262,7 @@ public:
                 lambda = lambda1;
                 vec_ops->assign(x1, x);
             }
-            if( (result_status == 1)&&(std::abs(normFx1 - normFx) < 1.0e-6*normFx) )
+            if( (result_status == 1)&&(common::scalar_math::abs(normFx1 - normFx) < T(1.0e-6)*normFx) )
             {
                 stagnation++;
             }
@@ -285,7 +286,7 @@ public:
         iterations++;
         auto result_status_string = parse_result_status(result_status);
         auto finish_string = parse_bool(finish);
-        log->info_f("continuation::convergence: iteration: %i, max_iterations: %i, extended residuals n: %le, n+1: %le, F residuals n: %le, n+1: %le, arclength residuals n: %le, n+1: %le, min_value: %le, result_status: %i => %s, is_finished = %s, newton_wight = %le, stagnation = %u ",iterations, maximum_iterations, (double)normFx, (double)normFx1, (double)normF, (double)normF1, (double)arclength_res, (double)arclength_res1, double(min_value), result_status,  result_status_string.c_str(), finish_string.c_str(), newton_wight, stagnation );
+        log->info_f("continuation::convergence: iteration: %i, max_iterations: %i, extended residuals n: %le, n+1: %le, F residuals n: %le, n+1: %le, arclength residuals n: %le, n+1: %le, min_value: %le, result_status: %i => %s, is_finished = %s, newton_wight = %le, stagnation = %u ",iterations, maximum_iterations, (double)normFx, (double)normFx1, (double)normF, (double)normF1, (double)arclength_res, (double)arclength_res1, double(min_value), result_status,  result_status_string.c_str(), finish_string.c_str(), (double)newton_wight, stagnation );
 
         // store this solution point if the norm is the smalles of all
         if( (min_value >= normFx1)&&((result_status == 1)||(result_status == 4)) )
@@ -316,7 +317,7 @@ public:
             size_t soluton_num = 0;
             for(int jjj = 0;jjj<relaxed_tolerance_reached.size();jjj++)
             {
-                log->warning_f("continuation::convergence: solution %i: norm = %le, flag = %s, relaxed_tol = %le", soluton_num++, norms_storage[jjj], (relaxed_tolerance_reached[jjj]?"true":"false"), tolerance*relax_tolerance_factor  );
+                log->warning_f("continuation::convergence: solution %i: norm = %le, flag = %s, relaxed_tol = %le", soluton_num++, (double)norms_storage[jjj], (relaxed_tolerance_reached[jjj]?"true":"false"), (double)(tolerance*relax_tolerance_factor)  );
             }
 
             vec_ops->assign(x1_storage, x);
@@ -328,14 +329,14 @@ public:
         //this signals that we couldn't set up the solution with the relaxed tolerance
         else if(finish&&(result_status>0))
         {
-            log->error_f("continuation::convergence: newton step failed to finish: relaxed_tolerance_reached.size() = %i, result_status = %i, ||x| = %le, relaxed_tol = %le", relaxed_tolerance_reached.size(), result_status, vec_ops->norm_l2(x), tolerance*relax_tolerance_factor );
+            log->error_f("continuation::convergence: newton step failed to finish: relaxed_tolerance_reached.size() = %i, result_status = %i, ||x| = %le, relaxed_tol = %le", relaxed_tolerance_reached.size(), result_status, (double)vec_ops->norm_l2(x), (double)(tolerance*relax_tolerance_factor) );
                 finish = true;
         }
 
         if(finish)
         {   //checks whaterver is needed for nans, errors or whaterver is considered a quality solution in the nonlinear operator.
             T solution_quality = nonlin_op->check_solution_quality(x);
-            log->info_f("continuation::convergence: Newton obtained solution quality = %le.", solution_quality);
+            log->info_f("continuation::convergence: Newton obtained solution quality = %le.", (double)solution_quality);
 
         }
 

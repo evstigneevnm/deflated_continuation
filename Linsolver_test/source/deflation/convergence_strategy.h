@@ -5,6 +5,7 @@ converhence rules for Newton iterator for deflation process
 */
 #include <cmath>
 #include <vector>
+#include <common/scalar_math.h>
 #include <scfd/utils/logged_obj_base.h>
 
 namespace deflation
@@ -91,7 +92,7 @@ public:
         iterations++;
         log->info_f("iteration %i, previous residual %le, current residual %le",iterations, (double)normFx, (double)normFx1);
 
-        if(std::isnan(normFx))
+        if(common::scalar_math::isnan(normFx))
         {
             log->info("Newton initial vector caused nan.");
             finish = true;
@@ -103,17 +104,17 @@ public:
             finish = true;
             result_status = 2;            
         }        
-        else if(std::isnan(normFx1))
+        else if(common::scalar_math::isnan(normFx1))
         {
             log->info("Newton updated vector caused nan.");
             finish = true;
             result_status = 3;
-        }else if(std::isinf(normFx))
+        }else if(common::scalar_math::isinf(normFx))
         {
             log->info("Newton initial vector caused inf.");
             finish = true;
             result_status = 2;            
-        }else if(std::isinf(normFx1))
+        }else if(common::scalar_math::isinf(normFx1))
         {
             log->info("Newton update caused inf.");
             finish = true;

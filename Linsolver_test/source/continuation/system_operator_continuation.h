@@ -106,7 +106,7 @@ public:
 
             T minimum_resid = SM_solver->get_linsolver_handle()->monitor().resid_norm_out();
             int iters_performed = SM_solver->get_linsolver_handle()->monitor().iters_performed();
-            log->info_f("desired residual = %le, minimum attained residual = %le with %i iterations.", tolerance_local, minimum_resid, iters_performed);
+            log->info_f("desired residual = %le, minimum attained residual = %le with %i iterations.", (double)tolerance_local, (double)minimum_resid, iters_performed);
 
             SM_solver->get_linsolver_handle()->monitor().restore_max_iterations();
             SM_solver->get_linsolver_handle()->monitor().restore_tolerance();
