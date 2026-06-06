@@ -9,7 +9,26 @@
 namespace deflation
 {
 
-template<class vector_operations>
+namespace detail
+{
+
+template<class T>
+void log_solution_storage_message_0(void*, const T&)
+{
+}
+
+template<class Log, class T>
+auto log_solution_storage_message_0(Log* log, const T& message) -> decltype(log->info_f("%s", message), void())
+{
+    if(log)
+    {
+        log->info_f("%s", message);
+    }
+}
+
+} // namespace detail
+
+template<class vector_operations, class Log = void>
 class solution_storage
 {
 public:    
@@ -17,8 +36,9 @@ public:
     typedef typename vector_operations::vector_type  T_vec;
 
     
-    solution_storage(vector_operations*& vec_ops_, int number_of_solutions_, T norm_weight_):
+    solution_storage(vector_operations*& vec_ops_, int number_of_solutions_, T norm_weight_, Log* log_ = nullptr):
     vec_ops(vec_ops_),
+    log(log_),
     norm_weight(norm_weight_)
     {
         //reserve elements in container
@@ -39,14 +59,14 @@ public:
     void push(const T_vec& vect)
     {
     
-        container.emplace_back( internal_container(vec_ops, vect) );
+        container.emplace_back( internal_container(vec_ops, vect, log) );
         elements_number++;
     
     }
     void push_back(const T_vec& vect)
     {
     
-        container.emplace_back(vec_ops, vect);
+        container.emplace_back(vec_ops, vect, log);
         elements_number++;
     
     }
@@ -76,6 +96,7 @@ private:
 
     unsigned int elements_number = 0;
     vector_operations* vec_ops;
+    Log* log;
     
     void calc_distance_norms(const T_vec& x, T_vec& c, int p)
     {
@@ -108,8 +129,9 @@ private:
         class internal_container
         {
         public:
-            internal_container(vector_operations* vec_ops_, const T_vec& vec_):
-            vec_ops(vec_ops_)
+            internal_container(vector_operations* vec_ops_, const T_vec& vec_, Log* log_ = nullptr):
+            vec_ops(vec_ops_),
+            log(log_)
             {
                 vec_size = vec_ops->get_vector_size();
                 init_array(vec_);         
@@ -120,12 +142,14 @@ private:
             {
                 vec_ops = ic_.vec_ops;
                 vec_size = ic_.vec_size;
+                log = ic_.log;
                 init_array(ic_.array_);
             }
 
             //move constructor
             internal_container(internal_container&& ic_):
             vec_ops(ic_.vec_ops),
+            log(ic_.log),
             vec_size(ic_.vec_size),
             array_(ic_.array_),
             allocated(true),
@@ -161,9 +185,7 @@ private:
             {
                 if((owned)&&(allocated))
                 {
-                    std::cout << "extern:" << vec_ops->check_is_valid_number(vec_x) << std::endl;
-                    std::cout << "intern:" << vec_ops->check_is_valid_number(array_) << std::endl;
-                    std::fflush(stdout);
+                    detail::log_solution_storage_message_0(log, "deflation::solution_storage_0: copying solution from internal container");
                     vec_ops->assign(array_, vec_x);
                 }
             }
@@ -171,6 +193,7 @@ private:
         private:
             T_vec array_;
             vector_operations* vec_ops;
+            Log* log;
             size_t vec_size;
             bool allocated = false;
             bool owned = false;

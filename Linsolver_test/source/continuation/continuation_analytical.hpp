@@ -1,12 +1,27 @@
 #ifndef __CONTINUATION_ANALYTICAL_HPP__
 #define __CONTINUATION_ANALYTICAL_HPP__
 
+#include <sstream>
+#include <string>
 
+#include <common/scalar_math.h>
 #include <continuation/continuation.hpp>
 
 namespace continuation
 {
 
+namespace detail
+{
+
+template<class T>
+std::string scalar_to_string(const T& value)
+{
+    std::ostringstream stream;
+    stream << value;
+    return stream.str();
+}
+
+} // namespace detail
 
 template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperations, class LinearOperator,  class Knots, class LinearSolver, class Newton, class Curve>
 class continuation_analytical: public continuation<VectorOperations, VectorFileOperations, Log, NonlinearOperations, LinearOperator,  Knots, LinearSolver, Newton, Curve>
@@ -98,13 +113,13 @@ private:
         bool intersect_min = false;
         bool intersect_max = false;
 
-        if(!std::isfinite(parent_t::lambda0))
+        if(!common::scalar_math::isfinite(parent_t::lambda0))
         {
-            throw std::runtime_error("continuation_analytical::check_interval: fatal nonfinite value of lambda0 = " + std::to_string(parent_t::lambda0) );
+            throw std::runtime_error("continuation_analytical::check_interval: fatal nonfinite value of lambda0 = " + detail::scalar_to_string(parent_t::lambda0) );
         }
-        if(!std::isfinite(parent_t::lambda1))
+        if(!common::scalar_math::isfinite(parent_t::lambda1))
         {
-            throw std::runtime_error("continuation_analytical::check_interval: fatal nonfinite value of lambda1 = " + std::to_string(parent_t::lambda1) );
+            throw std::runtime_error("continuation_analytical::check_interval: fatal nonfinite value of lambda1 = " + detail::scalar_to_string(parent_t::lambda1) );
         }
 
 
@@ -144,7 +159,7 @@ private:
             // continuation_step->solve(nonlin_op, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
             // (x0, lambda0)->(x1, lambda1)
             bool did_knot_interpolation = false;
-            if((s>1)&&(!parent_t::just_interpolated))
+            if(!parent_t::just_interpolated)
             {
                 check_interval();
                 //check_returning();

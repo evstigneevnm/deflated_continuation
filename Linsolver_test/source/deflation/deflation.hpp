@@ -37,7 +37,8 @@ private:
         NonlinearOperations,
         LinearOperator,
         LinearSolver,
-        sol_storage_def_t> system_operator_def_t;
+        sol_storage_def_t,
+        Log> system_operator_def_t;
 
     typedef numerical_algos::newton_method_extended::newton_solver_extended<
         VectorOperations, 
@@ -65,7 +66,7 @@ public:
     solution_storage(solution_storage_)
 	{
         conv_newton_def = new convergence_newton_def_t(vec_ops, log);
-        system_operator_def = new system_operator_def_t(vec_ops, lin_op_, SM_, solution_storage);
+        system_operator_def = new system_operator_def_t(vec_ops, lin_op_, SM_, solution_storage, log);
         newton_def = new newton_def_t(vec_ops, system_operator_def, conv_newton_def);
         deflation_op = new deflation_operator_t(vec_ops, log, newton_def);
 	}

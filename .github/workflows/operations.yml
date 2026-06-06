@@ -91,3 +91,97 @@ jobs:
           ./"$BUILD_DIR"/scfd_hip_double/test_scfd_vector_operations_hip.bin auto
           make scfd_vector_operations_hip.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_hip_float" REAL_TYPE=float HIPCC="$HIPCC_BIN"
           ./"$BUILD_DIR"/scfd_hip_float/test_scfd_vector_operations_hip.bin auto
+
+  circle-bd-cpu-omp:
+    runs-on: local
+    steps:
+      - name: Build and validate
+        run: |
+          export OMP_NUM_THREADS=8
+          CIRCLE_BUILD="$BUILD_DIR/circle_bd_cpu_omp"
+          make circle_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double
+          python3 scripts/write_circle_ci_config.py "$CIRCLE_BUILD/circle_ci.json" "$CIRCLE_BUILD/project" --clean-project
+          timeout 120s ./"$CIRCLE_BUILD"/circle_bd_cpu_omp.bin "$CIRCLE_BUILD/circle_ci.json" --analytical-solution --quiet
+          python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
+
+  circle-bd-full-cpu-omp:
+    runs-on: local
+    steps:
+      - name: Build and validate full closed circle
+        run: |
+          export OMP_NUM_THREADS=8
+          CIRCLE_BUILD="$BUILD_DIR/circle_bd_full_cpu_omp"
+          make circle_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double
+          python3 scripts/write_circle_ci_config.py "$CIRCLE_BUILD/circle_full_ci.json" "$CIRCLE_BUILD/project" --clean-project --steps 340 --step-size 0.02 --max-step-size 0.04 --deflation-attempts 1 --continuation-fail-attempts 8 --knots -1.05 0.5 1.05
+          timeout 120s ./"$CIRCLE_BUILD"/circle_bd_cpu_omp.bin "$CIRCLE_BUILD/circle_full_ci.json" --seed-exact-curve 0.5 -1 --quiet
+          python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-circle --min-angle-coverage 6.0 --max-closure-distance 1e-10
+
+  circle-bd-var-prec:
+    runs-on: local
+    steps:
+      - name: Build and validate
+        run: |
+          CIRCLE_BUILD="$BUILD_DIR/circle_bd_var_prec"
+          make circle_bd_var_prec CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD"
+          python3 scripts/write_circle_ci_config.py "$CIRCLE_BUILD/circle_ci.json" "$CIRCLE_BUILD/project" --clean-project
+          timeout 120s ./"$CIRCLE_BUILD"/circle_bd_var_prec.bin "$CIRCLE_BUILD/circle_ci.json" --analytical-solution --quiet
+          python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
+
+  circle-bd-cuda:
+    runs-on: local
+    steps:
+      - name: Build and validate when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA circle_bd: nvidia-smi not found"
+            exit 0
+          fi
+          if ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA circle_bd: nvidia-smi is present but no usable NVIDIA device was reported"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA circle_bd: nvcc not found"
+            exit 0
+          fi
+          CIRCLE_BUILD="$BUILD_DIR/circle_bd_cuda"
+          make circle_bd CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double
+          python3 scripts/write_circle_ci_config.py "$CIRCLE_BUILD/circle_ci.json" "$CIRCLE_BUILD/project" --clean-project
+          timeout 120s ./"$CIRCLE_BUILD"/circle_bd.bin "$CIRCLE_BUILD/circle_ci.json" --analytical-solution --quiet
+          python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
+
+  circle-bd-hip:
+    runs-on: local
+    steps:
+      - name: Build and validate when HIP is available
+        run: |
+          HIPCC_BIN="${HIPCC:-hipcc}"
+          if ! command -v "$HIPCC_BIN" >/dev/null 2>&1 && [ ! -x "$HIPCC_BIN" ]; then
+            echo "Skipping HIP circle_bd: hipcc not found"
+            exit 0
+          fi
+          HIP_COMPILER_VERSION="$("$HIPCC_BIN" --version 2>/dev/null || true)"
+          if echo "$HIP_COMPILER_VERSION" | grep -qi nvcc; then
+            if ! command -v nvidia-smi >/dev/null 2>&1; then
+              echo "Skipping HIP circle_bd: HIP is configured for NVIDIA, but nvidia-smi was not found"
+              exit 0
+            fi
+            if ! nvidia-smi >/dev/null 2>&1; then
+              echo "Skipping HIP circle_bd: HIP is configured for NVIDIA, but no usable NVIDIA device was reported"
+              exit 0
+            fi
+          else
+            if ! command -v rocm-smi >/dev/null 2>&1; then
+              echo "Skipping HIP circle_bd: rocm-smi not found"
+              exit 0
+            fi
+            if ! rocm-smi >/dev/null 2>&1; then
+              echo "Skipping HIP circle_bd: rocm-smi is present but no usable ROCm device was reported"
+              exit 0
+            fi
+          fi
+          CIRCLE_BUILD="$BUILD_DIR/circle_bd_hip"
+          make circle_bd_hip CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double HIPCC="$HIPCC_BIN"
+          python3 scripts/write_circle_ci_config.py "$CIRCLE_BUILD/circle_ci.json" "$CIRCLE_BUILD/project" --clean-project
+          timeout 120s ./"$CIRCLE_BUILD"/circle_bd_hip.bin "$CIRCLE_BUILD/circle_ci.json" --analytical-solution --quiet
+          python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8

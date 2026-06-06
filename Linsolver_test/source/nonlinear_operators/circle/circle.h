@@ -164,8 +164,19 @@ public:
     {
     }
 
-    void exact_solution(const T&, T_vec&)
+    void exact_solution(const T& alpha, T_vec& u_out)
     {
+        T radicand = R*R - alpha*alpha;
+        if(radicand < T(0))
+        {
+            radicand = T(0);
+        }
+        const T value = common::scalar_math::sqrt(radicand);
+        auto up = access_type::data(u_out);
+        access_type::for_each([=] __DEVICE_TAG__ (ordinal_type)
+        {
+            up[0] = value;
+        }, ordinal_type(1));
     }
 
     T check_solution_quality(const T_vec&)

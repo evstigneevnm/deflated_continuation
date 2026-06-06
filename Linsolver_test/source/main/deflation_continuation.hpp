@@ -37,6 +37,41 @@
 
 namespace main_classes{
 
+namespace detail
+{
+
+template<class Solver>
+auto set_use_precond_resid_if_available(Solver* solver, int value) -> decltype(solver->set_use_precond_resid(value), void())
+{
+    solver->set_use_precond_resid(value);
+}
+
+inline void set_use_precond_resid_if_available(...)
+{
+}
+
+template<class Solver>
+auto set_resid_recalc_freq_if_available(Solver* solver, int value) -> decltype(solver->set_resid_recalc_freq(value), void())
+{
+    solver->set_resid_recalc_freq(value);
+}
+
+inline void set_resid_recalc_freq_if_available(...)
+{
+}
+
+template<class Solver>
+auto set_basis_size_if_available(Solver* solver, int value) -> decltype(solver->set_basis_size(value), void())
+{
+    solver->set_basis_size(value);
+}
+
+inline void set_basis_size_if_available(...)
+{
+}
+
+} // namespace detail
+
 
 template<class VectorOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, template<class , class , class , class , class > class LinearSolver, template<class , class , class , class > class SystemOperator, class Parameters>
 class deflation_continuation
@@ -85,7 +120,7 @@ private:
 
     typedef container::curve_helper_container<VectorOperations> container_helper_t;
 
-    typedef deflation::solution_storage<VectorOperations> sol_storage_def_t;   
+    typedef deflation::solution_storage<VectorOperations, Log> sol_storage_def_t;
 
 
     typedef container::bifurcation_diagram_curve<
@@ -173,7 +208,7 @@ public:
         continuate = new continuate_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
         continuate_analytical = new continuate_analytical_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
         bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files);
-        sol_storage_def = new sol_storage_def_t(vec_ops, 50, vec_ops->get_l2_size(), 2.0 );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
+        sol_storage_def = new sol_storage_def_t(vec_ops, 50, vec_ops->get_l2_size(), 2.0, log );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
         deflate = new deflate_t(vec_ops, file_ops, log, nonlin_op, lin_op, SM, sol_storage_def);
     }
     ~deflation_continuation()
@@ -226,11 +261,11 @@ public:
         mon_orig->out_min_resid_norm();
 //
         if(use_precond_resid >= 0)
-            SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
+            detail::set_use_precond_resid_if_available(SM->get_linsolver_handle_original(), use_precond_resid);
         if(resid_recalc_freq >= 0)
-            SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
+            detail::set_resid_recalc_freq_if_available(SM->get_linsolver_handle_original(), resid_recalc_freq);
         if(basis_sz > 0)
-            SM->get_linsolver_handle_original()->set_basis_size(basis_sz);  
+            detail::set_basis_size_if_available(SM->get_linsolver_handle_original(), basis_sz);
             // SM->get_linsolver_handle_original()->set_restarts(basis_sz);  
 //
     }
@@ -254,11 +289,11 @@ public:
         mon->out_min_resid_norm();
 //
         if(use_precond_resid >= 0)
-            SM->get_linsolver_handle()->set_use_precond_resid(use_precond_resid);
+            detail::set_use_precond_resid_if_available(SM->get_linsolver_handle(), use_precond_resid);
         if(resid_recalc_freq >= 0)
-            SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
+            detail::set_resid_recalc_freq_if_available(SM->get_linsolver_handle(), resid_recalc_freq);
         if(basis_sz > 0)
-           SM->get_linsolver_handle()->set_basis_size(basis_sz); 
+           detail::set_basis_size_if_available(SM->get_linsolver_handle(), basis_sz);
             // SM->get_linsolver_handle()->set_restarts(basis_sz); 
 //
         SM->is_small_alpha(is_small_alpha);        
@@ -339,6 +374,15 @@ public:
     void use_analytical_solution(bool analytical_solution_ = false)
     {
         analytical_solution = analytical_solution_;
+    }
+
+    void add_solution_curve(const T_vec& x0_, const T& lambda0_)
+    {
+        bif_diag_curve_t* bdf;
+        bif_diag->init_new_curve();
+        bif_diag->get_current_ref(bdf);
+        continuate->continuate_curve(bdf, x0_, lambda0_);
+        bif_diag->close_curve();
     }
 
 

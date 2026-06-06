@@ -163,8 +163,8 @@ private:
         std::size_t N = all_norms.size();
         std::size_t max_size = 0;
         for(auto& x: all_norms) max_size = x.size()>max_size?x.size():max_size; 
-        std::cout << "N = " << N << std::endl;
-        std::cout << "max_size = " << max_size << std::endl;
+        log->info_f("deflation_operator::write_norm_file: histories = %zu", N);
+        log->info_f("deflation_operator::write_norm_file: max history size = %zu", max_size);
         std::ofstream f(norms_file_name_, std::ofstream::out);
         if (!f) throw std::runtime_error("deflation_operator::write_norm_file: error while opening file " + norms_file_name_);
 

@@ -1,10 +1,12 @@
 #ifndef __SYSTEM_OPERATOR_DEFLATION__WITH_TRANSLATION_H__
 #define __SYSTEM_OPERATOR_DEFLATION__WITH_TRANSLATION_H__
 
+#include <deflation/system_operator_deflation.h>
+
 namespace deflation
 {
 
-template<class vector_operations, class nonlinear_operator, class linear_operator, class sherman_morrison_linear_system_solver, class solution_storage>
+template<class vector_operations, class nonlinear_operator, class linear_operator, class sherman_morrison_linear_system_solver, class solution_storage, class Log = void>
 class system_operator_deflation_with_translation
 {
 public:
@@ -12,11 +14,12 @@ public:
     typedef typename vector_operations::vector_type  T_vec;
     
 
-    system_operator_deflation_with_translation(vector_operations*& vec_ops_, linear_operator*& lin_op_, sherman_morrison_linear_system_solver*& SM_solver_, solution_storage*& sol_storage_):
+    system_operator_deflation_with_translation(vector_operations*& vec_ops_, linear_operator*& lin_op_, sherman_morrison_linear_system_solver*& SM_solver_, solution_storage*& sol_storage_, Log* log_ = nullptr):
     vec_ops(vec_ops_),
     lin_op(lin_op_),
     SM_solver(SM_solver_),
-    sol_storage(sol_storage_)
+    sol_storage(sol_storage_),
+    log(log_)
     {
         vec_ops->init_vector(f); vec_ops->start_use_vector(f);
         vec_ops->init_vector(b); vec_ops->start_use_vector(b);
@@ -41,7 +44,7 @@ public:
         nonlin_op->translation_fix(x, x_fixed);
         sol_storage->calc_distance(x, x_fixed, beta, c); //beta = 1/||x-x0_j||, c = (x-x0_j)
         vec_ops->add_mul_scalar(T(0), T(-beta), b); //b=-F(x,lambda)
-        std::cout << "tr distance = " << beta << " ";
+        detail::log_deflation_distance(log, "deflation::system_operator_with_translation", beta);
         flag_lin_solver = SM_solver->solve(beta, *lin_op, T(1.0), c, f, b, d_x);
         d_lambda = 0;
         return flag_lin_solver;
@@ -51,6 +54,7 @@ private:
     linear_operator* lin_op;
     sherman_morrison_linear_system_solver* SM_solver;
     solution_storage* sol_storage;
+    Log* log;
     T_vec b;
     T_vec f;
     T_vec c;

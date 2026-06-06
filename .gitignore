@@ -31,5 +31,8 @@
 *.out
 *.app
 
+# Project build directories
+Linsolver_test/build/
+
 # Sublime workspaces
 *.sublime-workspace

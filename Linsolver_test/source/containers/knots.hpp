@@ -57,6 +57,16 @@ public:
         container.insert(container.end(), std::make_move_iterator(vec_.begin()), std::make_move_iterator(vec_.end()) );
         unique_and_sort();
     }
+
+    template<class U>
+    void add_element(const std::vector<U>& vec_)
+    {
+        for(const auto& value : vec_)
+        {
+            container.push_back(static_cast<T>(value));
+        }
+        unique_and_sort();
+    }
     
     T get_max_value()
     {

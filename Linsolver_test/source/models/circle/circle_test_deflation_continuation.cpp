@@ -9,7 +9,9 @@
 #include <string>
 #include <vector>
 
-#if !defined(CIRCLE_VECTOR_BACKEND_OMP) && !defined(CIRCLE_VECTOR_BACKEND_VAR_PREC)
+#if defined(CIRCLE_VECTOR_BACKEND_HIP)
+#include <common/hip_init_scfd.h>
+#elif !defined(CIRCLE_VECTOR_BACKEND_OMP) && !defined(CIRCLE_VECTOR_BACKEND_VAR_PREC)
 #include <common/cuda_init_scfd.h>
 #endif
 #include <common/scalar_math.h>
@@ -80,7 +82,7 @@ int main(int argc, char const *argv[])
     {
         if(cuda_backend)
         {
-            printf("Usage: %s lambda_0 dS S [cuda_device]\n   lambda_0 - starting parameter\n   dS - continuation step\n   S - number of continuation steps\n   cuda_device - optional SCFD selector: auto, best_mem, dev_num:N, pci_id:N, manual, or plain device number\n",argv[0]);
+            printf("Usage: %s lambda_0 dS S [device]\n   lambda_0 - starting parameter\n   dS - continuation step\n   S - number of continuation steps\n   device - optional SCFD selector: auto, best_mem, dev_num:N, pci_id:N, manual, or plain device number\n",argv[0]);
         }
         else
         {
@@ -107,18 +109,22 @@ int main(int argc, char const *argv[])
     std::cout << "Using circle backend: " << CIRCLE_BACKEND_NAME << std::endl;
 
 #if !defined(CIRCLE_VECTOR_BACKEND_OMP) && !defined(CIRCLE_VECTOR_BACKEND_VAR_PREC)
-    std::string cuda_selector = (argc == 5) ? argv[4] : "auto";
-    int cuda_device = -1;
+    std::string device_selector = (argc == 5) ? argv[4] : "auto";
+    int device = -1;
     try
     {
-        cuda_device = common::init_cuda_from_scfd_selector(cuda_selector);
+#if defined(CIRCLE_VECTOR_BACKEND_HIP)
+        device = common::init_hip_from_scfd_selector(device_selector);
+#else
+        device = common::init_cuda_from_scfd_selector(device_selector);
+#endif
     }
     catch(const std::exception& e)
     {
-        fprintf(stderr, "Failed to initialize CUDA device selector '%s': %s\n", cuda_selector.c_str(), e.what());
+        fprintf(stderr, "Failed to initialize device selector '%s': %s\n", device_selector.c_str(), e.what());
         return 2;
     }
-    printf("Using CUDA device %i\n", cuda_device);
+    printf("Using device %i\n", device);
 #endif
     real norm_wight = common::scalar_math::sqrt(real(Nx));
     real Rad = 1.0;
