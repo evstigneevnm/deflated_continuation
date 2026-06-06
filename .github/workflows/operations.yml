@@ -18,7 +18,7 @@ jobs:
   cpu-vector-operations-var-prec:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Prepare hosted Ubuntu CPU dependencies
@@ -36,7 +36,7 @@ jobs:
   scfd-vector-operations-cpu:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Prepare hosted Ubuntu CPU dependencies
@@ -58,7 +58,7 @@ jobs:
   scfd-vector-operations-cuda:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Build and test when CUDA is available
@@ -83,7 +83,7 @@ jobs:
   scfd-vector-operations-hip:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Build and test when HIP is available
@@ -121,7 +121,7 @@ jobs:
   circle-bd-cpu-omp:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Prepare hosted Ubuntu CPU dependencies
@@ -143,7 +143,7 @@ jobs:
   circle-bd-full-cpu-omp:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Prepare hosted Ubuntu CPU dependencies
@@ -165,7 +165,7 @@ jobs:
   circle-bd-var-prec:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Prepare hosted Ubuntu CPU dependencies
@@ -186,7 +186,7 @@ jobs:
   bratu-bd-cpu-omp:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Prepare hosted Ubuntu CPU dependencies
@@ -208,7 +208,7 @@ jobs:
   bratu-bd-fd3-cpu-omp:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Prepare hosted Ubuntu CPU dependencies
@@ -230,7 +230,7 @@ jobs:
   bratu-bd-var-prec:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Prepare hosted Ubuntu CPU dependencies
@@ -251,7 +251,7 @@ jobs:
   circle-bd-cuda:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Build and validate when CUDA is available
@@ -277,7 +277,7 @@ jobs:
   circle-bd-hip:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Build and validate when HIP is available
