@@ -363,34 +363,47 @@ struct has_partial_set_get<
 };
 
 template<class VecOps, class = void>
-struct has_view_set : std::false_type
+struct has_view : std::false_type
 {
 };
 
 template<class VecOps>
-struct has_view_set<
+struct has_view<
     VecOps,
     std::void_t<
-        decltype(std::declval<VecOps&>().view(std::declval<typename VecOps::vector_type&>())),
-        decltype(std::declval<VecOps&>().set(std::declval<typename VecOps::vector_type&>()))>>
+        decltype(std::declval<VecOps&>().view(std::declval<typename VecOps::vector_type&>()))>>
     : std::true_type
 {
 };
 
-template<class VecOps, class = void>
-struct has_get_buffer_set : std::false_type
+template<class View>
+auto view_data(View& view) -> decltype(view.raw_ptr())
 {
-};
+    return view.raw_ptr();
+}
 
-template<class VecOps>
-struct has_get_buffer_set<
-    VecOps,
-    std::void_t<
-        decltype(std::declval<VecOps&>().get_buffer()),
-        decltype(std::declval<VecOps&>().set(std::declval<typename VecOps::vector_type&>()))>>
-    : std::true_type
+template<class T>
+T* view_data(T* view)
 {
-};
+    return view;
+}
+
+template<class View>
+auto release_view_impl(View& view, bool sync_to_array, int) -> decltype(view.release(sync_to_array), void())
+{
+    view.release(sync_to_array);
+}
+
+template<class View>
+void release_view_impl(View&, bool, long)
+{
+}
+
+template<class View>
+void release_view(View& view, bool sync_to_array)
+{
+    release_view_impl(view, sync_to_array, 0);
+}
 
 template<class VecOps, class = void>
 struct has_swap : std::false_type
@@ -902,32 +915,21 @@ void run_core_vector_operations_suite(VecOps& vec_ops, Access access, std::size_
         check_vector_close(report, label + " partial get", partial_read, partial_values);
     }
 
-    if constexpr(has_view_set<VecOps>::value)
+    if constexpr(has_view<VecOps>::value)
     {
         access.write(vec_ops, x, hx0);
         auto view_expected = hx0;
-        auto* view = vec_ops.view(x);
-        view[0] = make_scalar<scalar_type>(-8.0L, 0.5L);
-        view_expected[0] = view[0];
+        auto view = vec_ops.view(x);
+        auto* view_ptr = view_data(view);
+        view_ptr[0] = make_scalar<scalar_type>(-8.0L, 0.5L);
+        view_expected[0] = view_ptr[0];
         if(n > 1)
         {
-            view[n - 1] = make_scalar<scalar_type>(9.0L, -0.75L);
-            view_expected[n - 1] = view[n - 1];
+            view_ptr[n - 1] = make_scalar<scalar_type>(9.0L, -0.75L);
+            view_expected[n - 1] = view_ptr[n - 1];
         }
-        vec_ops.set(x);
+        release_view(view, true);
         check_vector_close(report, label + " view set", access.read(vec_ops, x, n), view_expected);
-    }
-
-    if constexpr(has_get_buffer_set<VecOps>::value)
-    {
-        auto buffer_expected = make_pattern<scalar_type>(n, 1.15L);
-        auto* buffer = vec_ops.get_buffer();
-        for(std::size_t i = 0; i < n; ++i)
-        {
-            buffer[i] = buffer_expected[i];
-        }
-        vec_ops.set(x);
-        check_vector_close(report, label + " get_buffer set", access.read(vec_ops, x, n), buffer_expected);
     }
 
     if constexpr(has_swap<VecOps>::value)

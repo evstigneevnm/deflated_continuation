@@ -80,7 +80,7 @@
         "discrete_problem_dimensions": [
             64
         ],
-        "spatial_discretization": "chebyshev", //"fd3", //"chebyshev",
+        "spatial_discretization": "chebyshev",
         "problem_real_parameters_vector": [
             0
         ],

@@ -44,10 +44,8 @@ public:
     using Tsc = norm_type;
     using vector_type_real = scfd::arrays::array<norm_type, memory_type>;
     using host_view_traits = common::scfd_backend_ext::host_view_traits<vector_type>;
-    using vector_host_view_type = typename host_view_traits::view_type;
-    using host_vector_type = typename host_view_traits::host_array_type;
+    using vector_host_view_type = typename host_view_traits::scoped_view_type;
     using host_view_traits_real = common::scfd_backend_ext::host_view_traits<vector_type_real>;
-    using host_vector_type_real = typename host_view_traits_real::host_array_type;
     using for_each_type = typename backend_type::template for_each_type<ordinal_type>;
     using reduce_type = typename backend_type::reduce_type;
     using copy_type = typename backend_type::copy_type;
@@ -70,16 +68,12 @@ public:
     {
         helper_scalar_.init(static_cast<ordinal_type>(sz_));
         helper_real_.init(static_cast<ordinal_type>(sz_));
-        ensure_host_buffer();
     }
 
     ~scfd_vector_operations()
     {
-        release_host_view(false);
         free_owned(helper_scalar_);
         free_owned(helper_real_);
-        free_owned(host_buffer_);
-        free_owned(real_host_buffer_);
     }
 
     std::size_t get_default_size() const
@@ -262,34 +256,14 @@ public:
         add_lin_comb(mul_x, mx[checked_multivector_index(m, k)], mul_y, y);
     }
 
-    scalar_type* view(vector_type& x) const
+    vector_host_view_type view(vector_type& x, bool sync_from_array = true, bool sync_to_array_on_destroy = false) const
     {
-        open_host_view(x, true);
-        return active_host_view_.raw_ptr();
+        return vector_host_view_type(x, sync_from_array, sync_to_array_on_destroy);
     }
 
-    const scalar_type* view(const vector_type& x) const
+    vector_host_view_type view(const vector_type& x, bool sync_from_array = true) const
     {
-        open_host_view(x, true);
-        return active_host_view_.raw_ptr();
-    }
-
-    scalar_type* get_buffer() const
-    {
-        ensure_host_buffer();
-        return host_buffer_.raw_ptr();
-    }
-
-    void set(vector_type& x) const
-    {
-        if(host_view_active_ && active_host_view_array_ptr_ == x.raw_ptr())
-        {
-            active_host_view_.sync_to_array();
-            release_host_view(false);
-            return;
-        }
-        ensure_host_buffer();
-        set(host_buffer_.raw_ptr(), x);
+        return vector_host_view_type(x, sync_from_array, false);
     }
 
     void set(const scalar_type* host, vector_type& x) const
@@ -724,9 +698,8 @@ public:
 
     scalar_type get_value_at_point(std::size_t at, const vector_type& x) const
     {
-        ensure_host_buffer();
-        get(x, host_buffer_.raw_ptr());
-        return host_buffer_.raw_ptr()[at];
+        auto host_view = view(x);
+        return host_view[at];
     }
 
     norm_type max_element(vector_type_real& x) const
@@ -867,39 +840,10 @@ private:
         }
     }
 
-    void ensure_host_buffer() const
-    {
-        common::scfd_backend_ext::ensure_host_array(host_buffer_, sz_);
-    }
-
-    void open_host_view(const vector_type& x, bool sync_from_array) const
-    {
-        release_host_view(false);
-        active_host_view_.init(x, sync_from_array);
-        host_view_active_ = true;
-        active_host_view_array_ptr_ = x.raw_ptr();
-    }
-
-    void release_host_view(bool sync_to_array) const
-    {
-        if(!host_view_active_)
-        {
-            return;
-        }
-        active_host_view_.release(sync_to_array);
-        host_view_active_ = false;
-        active_host_view_array_ptr_ = nullptr;
-    }
-
     std::size_t sz_;
     mutable for_each_type for_each_;
     mutable vector_type helper_scalar_;
     mutable vector_type_real helper_real_;
-    mutable host_vector_type host_buffer_;
-    mutable host_vector_type_real real_host_buffer_;
-    mutable vector_host_view_type active_host_view_;
-    mutable bool host_view_active_ = false;
-    mutable const scalar_type* active_host_view_array_ptr_ = nullptr;
     mutable std::size_t random_seed_ = 1;
     bool high_precision_requested_ = false;
 };
