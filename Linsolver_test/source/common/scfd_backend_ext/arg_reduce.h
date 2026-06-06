@@ -7,7 +7,8 @@
 
 #include <scfd/utils/device_tag.h>
 
-#if __has_include(<thrust/iterator/counting_iterator.h>) && __has_include(<thrust/iterator/transform_iterator.h>) && __has_include(<thrust/reduce.h>)
+#if __has_include(<thrust/execution_policy.h>) && __has_include(<thrust/iterator/counting_iterator.h>) && __has_include(<thrust/iterator/transform_iterator.h>) && __has_include(<thrust/reduce.h>)
+#include <thrust/execution_policy.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/reduce.h>
@@ -19,6 +20,7 @@ namespace scfd
 namespace backend
 {
 struct cuda;
+struct hip;
 }
 }
 
@@ -72,7 +74,7 @@ struct arg_reduce
 
 #ifdef COMMON_SCFD_BACKEND_EXT_HAS_THRUST_REDUCE
 template<class T, class Ordinal>
-struct cuda_indexed_value_functor
+struct thrust_indexed_value_functor
 {
     const T* input;
 
@@ -83,20 +85,36 @@ struct cuda_indexed_value_functor
 };
 
 template<class T, class Ordinal>
+std::pair<T, std::size_t> thrust_max_argmax(Ordinal size, const T* input)
+{
+    auto begin = thrust::make_transform_iterator(
+        thrust::counting_iterator<Ordinal>(Ordinal(0)),
+        thrust_indexed_value_functor<T, Ordinal>{input});
+    const indexed_value<T, Ordinal> init{std::numeric_limits<T>::lowest(), Ordinal(0)};
+    const auto result = thrust::reduce(
+        thrust::device,
+        begin,
+        begin + size,
+        init,
+        indexed_max_op<T, Ordinal>());
+    return {result.value, static_cast<std::size_t>(result.index)};
+}
+
+template<class T, class Ordinal>
 struct arg_reduce<scfd::backend::cuda, T, Ordinal>
 {
     static std::pair<T, std::size_t> max_argmax(Ordinal size, const T* input)
     {
-        auto begin = thrust::make_transform_iterator(
-            thrust::counting_iterator<Ordinal>(Ordinal(0)),
-            cuda_indexed_value_functor<T, Ordinal>{input});
-        const indexed_value<T, Ordinal> init{std::numeric_limits<T>::lowest(), Ordinal(0)};
-        const auto result = thrust::reduce(
-            begin,
-            begin + size,
-            init,
-            indexed_max_op<T, Ordinal>());
-        return {result.value, static_cast<std::size_t>(result.index)};
+        return thrust_max_argmax(size, input);
+    }
+};
+
+template<class T, class Ordinal>
+struct arg_reduce<scfd::backend::hip, T, Ordinal>
+{
+    static std::pair<T, std::size_t> max_argmax(Ordinal size, const T* input)
+    {
+        return thrust_max_argmax(size, input);
     }
 };
 #endif

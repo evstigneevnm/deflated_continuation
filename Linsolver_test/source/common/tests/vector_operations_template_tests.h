@@ -271,6 +271,311 @@ struct has_assign_random_range<
 {
 };
 
+template<class VecOps, class = void>
+struct has_size_method : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_size_method<VecOps, std::void_t<decltype(std::declval<VecOps&>().size())>> : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_get_default_size : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_get_default_size<VecOps, std::void_t<decltype(std::declval<VecOps&>().get_default_size())>> : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_get_size : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_get_size<
+    VecOps,
+    std::void_t<decltype(std::declval<VecOps&>().get_size(std::declval<const typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_device_location : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_device_location<VecOps, std::void_t<decltype(std::declval<VecOps&>().device_location())>> : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_get_fp_prec : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_get_fp_prec<VecOps, std::void_t<decltype(std::declval<VecOps&>().get_fp_prec())>> : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_high_precision_state : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_high_precision_state<
+    VecOps,
+    std::void_t<
+        decltype(std::declval<VecOps&>().use_high_precision()),
+        decltype(std::declval<VecOps&>().set_high_precision()),
+        decltype(std::declval<VecOps&>().set_regular_precision()),
+        decltype(std::declval<VecOps&>().high_precision_requested())>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_partial_set_get : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_partial_set_get<
+    VecOps,
+    std::void_t<
+        decltype(std::declval<VecOps&>().set(
+            std::declval<const typename VecOps::scalar_type*>(),
+            std::declval<typename VecOps::vector_type&>(),
+            std::declval<std::size_t>())),
+        decltype(std::declval<VecOps&>().get(
+            std::declval<const typename VecOps::vector_type&>(),
+            std::declval<typename VecOps::scalar_type*>(),
+            std::declval<std::size_t>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_view_set : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_view_set<
+    VecOps,
+    std::void_t<
+        decltype(std::declval<VecOps&>().view(std::declval<typename VecOps::vector_type&>())),
+        decltype(std::declval<VecOps&>().set(std::declval<typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_get_buffer_set : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_get_buffer_set<
+    VecOps,
+    std::void_t<
+        decltype(std::declval<VecOps&>().get_buffer()),
+        decltype(std::declval<VecOps&>().set(std::declval<typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_swap : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_swap<
+    VecOps,
+    std::void_t<decltype(std::declval<VecOps&>().swap(
+        std::declval<typename VecOps::vector_type&>(),
+        std::declval<typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_inplace_mul_pointwise : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_inplace_mul_pointwise<
+    VecOps,
+    std::void_t<decltype(std::declval<VecOps&>().mul_pointwise(
+        std::declval<typename VecOps::vector_type&>(),
+        std::declval<typename VecOps::scalar_type>(),
+        std::declval<const typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_norm2 : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_norm2<VecOps, std::void_t<decltype(std::declval<VecOps&>().norm2(std::declval<const typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_norm_l2_sq : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_norm_l2_sq<
+    VecOps,
+    std::void_t<decltype(std::declval<VecOps&>().norm_l2_sq(std::declval<const typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_norm1 : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_norm1<VecOps, std::void_t<decltype(std::declval<VecOps&>().norm1(std::declval<const typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_norm_l1 : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_norm_l1<
+    VecOps,
+    std::void_t<decltype(std::declval<VecOps&>().norm_l1(std::declval<const typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_norm_rank1_l2 : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_norm_rank1_l2<
+    VecOps,
+    std::void_t<decltype(std::declval<VecOps&>().norm_rank1_l2(
+        std::declval<const typename VecOps::vector_type&>(),
+        std::declval<typename VecOps::scalar_type>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_norm_l_inf : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_norm_l_inf<
+    VecOps,
+    std::void_t<decltype(std::declval<VecOps&>().norm_l_inf(std::declval<const typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_is_valid_number : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_is_valid_number<
+    VecOps,
+    std::void_t<decltype(std::declval<VecOps&>().is_valid_number(std::declval<const typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_set_value_at_point_sized : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_set_value_at_point_sized<
+    VecOps,
+    std::void_t<decltype(std::declval<VecOps&>().set_value_at_point(
+        std::declval<typename VecOps::scalar_type>(),
+        std::declval<std::size_t>(),
+        std::declval<typename VecOps::vector_type&>(),
+        std::declval<std::size_t>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_sized_vector_lifetime : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_sized_vector_lifetime<
+    VecOps,
+    std::void_t<
+        decltype(std::declval<VecOps&>().init_vector(std::declval<typename VecOps::vector_type&>(), std::declval<std::size_t>())),
+        decltype(std::declval<VecOps&>().start_use_vector(std::declval<typename VecOps::vector_type&>(), std::declval<std::size_t>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_assign_slices : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_assign_slices<
+    VecOps,
+    std::void_t<decltype(std::declval<VecOps&>().assign_slices(
+        std::declval<const typename VecOps::vector_type&>(),
+        std::declval<std::vector<std::pair<std::size_t, std::size_t>>>(),
+        std::declval<typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
+template<class VecOps, class = void>
+struct has_assign_skip_slices : std::false_type
+{
+};
+
+template<class VecOps>
+struct has_assign_skip_slices<
+    VecOps,
+    std::void_t<decltype(std::declval<VecOps&>().assign_skip_slices(
+        std::declval<const typename VecOps::vector_type&>(),
+        std::declval<std::vector<std::pair<std::size_t, std::size_t>>>(),
+        std::declval<typename VecOps::vector_type&>()))>>
+    : std::true_type
+{
+};
+
 template<class T>
 T make_scalar(long double real, long double imag = 0.0L)
 {
@@ -537,6 +842,39 @@ void run_core_vector_operations_suite(VecOps& vec_ops, Access access, std::size_
 
     report.require(vec_ops.get_vector_size() == n, label + " get_vector_size");
     check_close_real(report, label + " get_l2_size", static_cast<norm_type>(vec_ops.get_l2_size()), std::sqrt(static_cast<long double>(n)), 1024.0L);
+    if constexpr(has_size_method<VecOps>::value)
+    {
+        report.require(static_cast<std::size_t>(vec_ops.size()) == n, label + " size");
+    }
+    if constexpr(has_get_default_size<VecOps>::value)
+    {
+        report.require(static_cast<std::size_t>(vec_ops.get_default_size()) == n, label + " get_default_size");
+    }
+    if constexpr(has_get_size<VecOps>::value)
+    {
+        report.require(static_cast<std::size_t>(vec_ops.get_size(x)) == n, label + " get_size");
+    }
+    if constexpr(has_device_location<VecOps>::value)
+    {
+        const bool device_location = vec_ops.device_location();
+        report.require(device_location || !device_location, label + " device_location callable");
+    }
+    if constexpr(has_get_fp_prec<VecOps>::value)
+    {
+        report.require(vec_ops.get_fp_prec() > 0, label + " get_fp_prec positive");
+    }
+    if constexpr(has_high_precision_state<VecOps>::value)
+    {
+        vec_ops.set_regular_precision();
+        report.require(!vec_ops.high_precision_requested(), label + " regular precision state");
+        vec_ops.use_high_precision();
+        report.require(vec_ops.high_precision_requested(), label + " use_high_precision state");
+        vec_ops.set_regular_precision();
+        report.require(!vec_ops.high_precision_requested(), label + " reset regular precision state");
+        vec_ops.set_high_precision();
+        report.require(vec_ops.high_precision_requested(), label + " set_high_precision state");
+        vec_ops.set_regular_precision();
+    }
 
     const auto hx0 = make_pattern<scalar_type>(n, 0.15L);
     const auto hy0 = make_pattern<scalar_type>(n, -0.35L);
@@ -549,6 +887,59 @@ void run_core_vector_operations_suite(VecOps& vec_ops, Access access, std::size_
     vec_ops.assign(x, y);
     check_vector_close(report, label + " assign", access.read(vec_ops, y, n), hx0);
 
+    if constexpr(has_partial_set_get<VecOps>::value)
+    {
+        const std::size_t partial_n = n == 1 ? 1 : n/2;
+        const auto partial_values = make_pattern<scalar_type>(partial_n, 0.95L);
+        vec_ops.assign_scalar(make_scalar<scalar_type>(0.0L), x);
+        vec_ops.set(partial_values.data(), x, partial_n);
+        auto partial_expected = std::vector<scalar_type>(n, make_scalar<scalar_type>(0.0L));
+        std::copy(partial_values.begin(), partial_values.end(), partial_expected.begin());
+        check_vector_close(report, label + " partial set", access.read(vec_ops, x, n), partial_expected);
+
+        std::vector<scalar_type> partial_read(partial_n, make_scalar<scalar_type>(0.0L));
+        vec_ops.get(x, partial_read.data(), partial_n);
+        check_vector_close(report, label + " partial get", partial_read, partial_values);
+    }
+
+    if constexpr(has_view_set<VecOps>::value)
+    {
+        access.write(vec_ops, x, hx0);
+        auto view_expected = hx0;
+        auto* view = vec_ops.view(x);
+        view[0] = make_scalar<scalar_type>(-8.0L, 0.5L);
+        view_expected[0] = view[0];
+        if(n > 1)
+        {
+            view[n - 1] = make_scalar<scalar_type>(9.0L, -0.75L);
+            view_expected[n - 1] = view[n - 1];
+        }
+        vec_ops.set(x);
+        check_vector_close(report, label + " view set", access.read(vec_ops, x, n), view_expected);
+    }
+
+    if constexpr(has_get_buffer_set<VecOps>::value)
+    {
+        auto buffer_expected = make_pattern<scalar_type>(n, 1.15L);
+        auto* buffer = vec_ops.get_buffer();
+        for(std::size_t i = 0; i < n; ++i)
+        {
+            buffer[i] = buffer_expected[i];
+        }
+        vec_ops.set(x);
+        check_vector_close(report, label + " get_buffer set", access.read(vec_ops, x, n), buffer_expected);
+    }
+
+    if constexpr(has_swap<VecOps>::value)
+    {
+        access.write(vec_ops, x, hx0);
+        access.write(vec_ops, y, hy0);
+        vec_ops.swap(x, y);
+        check_vector_close(report, label + " swap x", access.read(vec_ops, x, n), hy0);
+        check_vector_close(report, label + " swap y", access.read(vec_ops, y, n), hx0);
+    }
+
+    access.write(vec_ops, x, hx0);
     auto expected = hx0;
     vec_ops.add_mul_scalar(make_scalar<scalar_type>(-1.25L, 0.375L), make_scalar<scalar_type>(0.5L, -0.25L), x);
     add_mul_scalar_ref(expected, make_scalar<scalar_type>(-1.25L, 0.375L), make_scalar<scalar_type>(0.5L, -0.25L));
@@ -601,17 +992,30 @@ void run_core_vector_operations_suite(VecOps& vec_ops, Access access, std::size_
         z_expected);
     check_vector_close(report, label + " add_lin_comb three-term", access.read(vec_ops, z, n), z_expected);
 
+    const auto hden = make_nonzero_pattern<scalar_type>(n, 0.8L);
     access.write(vec_ops, x, hx0);
-    access.write(vec_ops, y, make_nonzero_pattern<scalar_type>(n, 0.4L));
+    access.write(vec_ops, y, hden);
     vec_ops.mul_pointwise(make_scalar<scalar_type>(1.5L, 0.125L), x, make_scalar<scalar_type>(-0.75L, 0.25L), y, z);
     check_vector_close(
         report,
         label + " mul_pointwise out",
         access.read(vec_ops, z, n),
-        mul_pointwise_ref(make_scalar<scalar_type>(1.5L, 0.125L), hx0, make_scalar<scalar_type>(-0.75L, 0.25L), make_nonzero_pattern<scalar_type>(n, 0.4L)));
+        mul_pointwise_ref(make_scalar<scalar_type>(1.5L, 0.125L), hx0, make_scalar<scalar_type>(-0.75L, 0.25L), hden));
+
+    if constexpr(has_inplace_mul_pointwise<VecOps>::value)
+    {
+        access.write(vec_ops, x, hx0);
+        access.write(vec_ops, y, hden);
+        auto mul_inplace_expected = hx0;
+        for(std::size_t i = 0; i < n; ++i)
+        {
+            mul_inplace_expected[i] *= make_scalar<scalar_type>(-1.25L, 0.25L)*hden[i];
+        }
+        vec_ops.mul_pointwise(x, make_scalar<scalar_type>(-1.25L, 0.25L), y);
+        check_vector_close(report, label + " mul_pointwise in-place", access.read(vec_ops, x, n), mul_inplace_expected);
+    }
 
     auto x_expected = hx0;
-    const auto hden = make_nonzero_pattern<scalar_type>(n, 0.8L);
     access.write(vec_ops, x, hx0);
     access.write(vec_ops, y, hden);
     vec_ops.div_pointwise(x, make_scalar<scalar_type>(2.0L, 0.25L), y);
@@ -637,17 +1041,61 @@ void run_core_vector_operations_suite(VecOps& vec_ops, Access access, std::size_
     check_close_real(report, label + " asum", vec_ops.asum(x), reference_asum(hx0), 16384.0L);
 
     const long double norm_sq = reference_norm_sq(hx0);
+    const long double norm_l2 = std::sqrt(norm_sq/static_cast<long double>(n));
     check_close_real(report, label + " norm", vec_ops.norm(x), std::sqrt(norm_sq), 16384.0L);
     check_close_real(report, label + " norm_sq", vec_ops.norm_sq(x), norm_sq, 32768.0L);
-    check_close_real(report, label + " norm_l2", vec_ops.norm_l2(x), std::sqrt(norm_sq/static_cast<long double>(n)), 16384.0L);
+    check_close_real(report, label + " norm_l2", vec_ops.norm_l2(x), norm_l2, 16384.0L);
     check_close_real(report, label + " norm2_sq", vec_ops.norm2_sq(x), norm_sq/static_cast<long double>(n), 32768.0L);
+    if constexpr(has_norm2<VecOps>::value)
+    {
+        check_close_real(report, label + " norm2", vec_ops.norm2(x), norm_l2, 16384.0L);
+    }
+    if constexpr(has_norm_l2_sq<VecOps>::value)
+    {
+        check_close_real(report, label + " norm_l2_sq", vec_ops.norm_l2_sq(x), norm_sq/static_cast<long double>(n), 32768.0L);
+    }
+    if constexpr(has_norm1<VecOps>::value)
+    {
+        check_close_real(report, label + " norm1", vec_ops.norm1(x), reference_asum(hx0), 16384.0L);
+    }
+    if constexpr(has_norm_l1<VecOps>::value)
+    {
+        check_close_real(report, label + " norm_l1", vec_ops.norm_l1(x), reference_asum(hx0), 16384.0L);
+    }
+    if constexpr(has_norm_l_inf<VecOps>::value)
+    {
+        long double expected_l_inf = 0.0L;
+        for(const auto& value : hx0)
+        {
+            expected_l_inf = std::max(expected_l_inf, scalar_traits<scalar_type>::asum_term(value));
+        }
+        check_close_real(report, label + " norm_l_inf", vec_ops.norm_l_inf(x), expected_l_inf, 16384.0L);
+    }
     const auto rank1_value = make_scalar<scalar_type>(-0.75L, 0.5L);
     check_close_real(report, label + " norm_rank1", vec_ops.norm_rank1(x, rank1_value), std::sqrt(norm_sq + scalar_traits<scalar_type>::norm_sq_term(rank1_value)), 16384.0L);
+    if constexpr(has_norm_rank1_l2<VecOps>::value)
+    {
+        check_close_real(
+            report,
+            label + " norm_rank1_l2",
+            vec_ops.norm_rank1_l2(x, rank1_value),
+            std::sqrt(norm_sq + scalar_traits<scalar_type>::norm_sq_term(rank1_value))/std::sqrt(static_cast<long double>(n)),
+            16384.0L);
+    }
 
+    report.require(vec_ops.check_is_valid_number(x), label + " check_is_valid_number accepts finite");
+    if constexpr(has_is_valid_number<VecOps>::value)
+    {
+        report.require(vec_ops.is_valid_number(x), label + " is_valid_number accepts finite");
+    }
     auto invalid = hx0;
     invalid.back() = invalid_scalar<scalar_type>();
     access.write(vec_ops, x, invalid);
     report.require(!vec_ops.check_is_valid_number(x), label + " check_is_valid_number rejects NaN");
+    if constexpr(has_is_valid_number<VecOps>::value)
+    {
+        report.require(!vec_ops.is_valid_number(x), label + " is_valid_number rejects NaN");
+    }
 
     if constexpr(has_assign_random<VecOps>::value)
     {
@@ -767,6 +1215,56 @@ void run_core_vector_operations_suite(VecOps& vec_ops, Access access, std::size_
 
         vec_ops.set_value_at_point(make_scalar<scalar_type>(7.25L), n/2, x);
         check_close(report, label + " get_value_at_point", vec_ops.get_value_at_point(n/2, x), make_scalar<scalar_type>(7.25L), 1024.0L);
+        if constexpr(has_set_value_at_point_sized<VecOps>::value)
+        {
+            access.write(vec_ops, x, real_pattern);
+            const std::size_t at = n - 1;
+            vec_ops.set_value_at_point(make_scalar<scalar_type>(-6.5L), at, x, n);
+            check_close(report, label + " get_value_at_point sized", vec_ops.get_value_at_point(at, x), make_scalar<scalar_type>(-6.5L), 1024.0L);
+        }
+    }
+
+    if constexpr(has_sized_vector_lifetime<VecOps>::value && has_assign_slices<VecOps>::value && has_assign_skip_slices<VecOps>::value)
+    {
+        if(n >= 10)
+        {
+            vector_type slice_x;
+            vector_type slice_y;
+            vector_type slice_z;
+            vec_ops.init_vector(slice_x, 10);
+            vec_ops.init_vector(slice_y, 3);
+            vec_ops.init_vector(slice_z, 9);
+            vec_ops.start_use_vector(slice_x, 10);
+            vec_ops.start_use_vector(slice_y, 3);
+            vec_ops.start_use_vector(slice_z, 9);
+
+            std::vector<scalar_type> slice_input(10);
+            for(std::size_t i = 0; i < slice_input.size(); ++i)
+            {
+                slice_input[i] = make_scalar<scalar_type>(static_cast<long double>(i), -0.25L*static_cast<long double>(i));
+            }
+
+            access.write(vec_ops, slice_x, slice_input);
+            vec_ops.assign_slices(slice_x, {{3, 4}, {6, 8}}, slice_y);
+            vec_ops.assign_skip_slices(slice_x, {{5, 6}}, slice_z);
+
+            const std::vector<scalar_type> expected_slice_y = {slice_input[3], slice_input[6], slice_input[7]};
+            const std::vector<scalar_type> expected_slice_z = {
+                slice_input[0],
+                slice_input[1],
+                slice_input[2],
+                slice_input[3],
+                slice_input[4],
+                slice_input[6],
+                slice_input[7],
+                slice_input[8],
+                slice_input[9]};
+            check_vector_close(report, label + " assign_slices", access.read(vec_ops, slice_y, expected_slice_y.size()), expected_slice_y);
+            check_vector_close(report, label + " assign_skip_slices", access.read(vec_ops, slice_z, expected_slice_z.size()), expected_slice_z);
+
+            vec_ops.stop_use_vectors(slice_x, slice_y, slice_z);
+            vec_ops.free_vectors(slice_x, slice_y, slice_z);
+        }
     }
 
     vec_ops.stop_use_vectors(x, y, z, w);

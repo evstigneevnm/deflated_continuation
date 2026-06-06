@@ -14,6 +14,7 @@ namespace scfd
 namespace backend
 {
 struct cuda;
+struct hip;
 struct omp;
 struct serial_cpu;
 }
@@ -46,6 +47,20 @@ template<class Real>
 struct complex<scfd::backend::cuda, Real>
 {
     static_assert(dependent_false<Real>::value, "CUDA complex type requires thrust::complex.");
+};
+#endif
+
+#ifdef COMMON_SCFD_BACKEND_EXT_HAS_THRUST_COMPLEX
+template<class Real>
+struct complex<scfd::backend::hip, Real>
+{
+    using type = thrust::complex<Real>;
+};
+#else
+template<class Real>
+struct complex<scfd::backend::hip, Real>
+{
+    static_assert(dependent_false<Real>::value, "HIP complex type requires thrust::complex.");
 };
 #endif
 

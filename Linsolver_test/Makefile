@@ -62,6 +62,9 @@ endif
 NVCC = $(CUDA_ROOT_PATH)/bin/nvcc
 NVCC_CHECK_REGS = -Xptxas -v
 NVCCFLAGS = -Wno-deprecated-gpu-targets --expt-relaxed-constexpr $(CUDA_ARCH) -std=$(CPPSTD) $(TARGET_NVCC)
+HIPCC ?= hipcc
+HIP_EXTENDED_LAMBDA ?= $(shell $(HIPCC) --version 2>/dev/null | grep -iq nvcc && printf '%s' '--extended-lambda')
+HIPFLAGS ?= -std=$(CPPSTD) $(HIP_EXTENDED_LAMBDA) $(TARGET_HIPCC)
 OPENMP = -fopenmp -lpthread
 NVOPENMP = -Xcompiler $(OPENMP)
 CONTRIB_SCFD = source/contrib/scfd
@@ -166,6 +169,9 @@ gpu_vector_operations.bin: source/common/tests/test_gpu_vector_operations.cu sou
 
 scfd_vector_operations.bin: source/common/tests/test_scfd_vector_operations.cu source/common/tests/vector_operations_template_tests.h $(SCFD_VECTOR_OPS_TEST_HEADERS)
 	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/tests/test_scfd_vector_operations.cu $(LIBS1) -o $(BUILD_DIR)/test_scfd_vector_operations.bin 2>$(RESULTS)
+
+scfd_vector_operations_hip.bin: source/common/tests/test_scfd_vector_operations_hip.cpp source/common/tests/vector_operations_template_tests.h source/common/hip_init_scfd.h $(SCFD_VECTOR_OPS_TEST_HEADERS)
+	$(HIPCC) $(HIPFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/common/tests/test_scfd_vector_operations_hip.cpp -o $(BUILD_DIR)/test_scfd_vector_operations_hip.bin 2>$(RESULTS)
 
 scfd_vector_operations_cpu.bin: source/common/tests/test_scfd_vector_operations_cpu.cpp source/common/tests/vector_operations_template_tests.h $(SCFD_VECTOR_OPS_TEST_HEADERS)
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/common/tests/test_scfd_vector_operations_cpu.cpp $(OPENMP) -o $(BUILD_DIR)/test_scfd_vector_operations_cpu.bin 2>$(RESULTS)

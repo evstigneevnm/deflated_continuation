@@ -26,7 +26,68 @@ jobs:
   scfd-vector-operations-cpu:
     runs-on: local
     steps:
-      - name: Build
-        run: make scfd_vector_operations_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR"
-      - name: Test
-        run: ./"$BUILD_DIR"/test_scfd_vector_operations_cpu.bin
+      - name: Build and test double
+        run: |
+          make scfd_vector_operations_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cpu_double" REAL_TYPE=double
+          ./"$BUILD_DIR"/scfd_cpu_double/test_scfd_vector_operations_cpu.bin
+      - name: Build and test float
+        run: |
+          make scfd_vector_operations_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cpu_float" REAL_TYPE=float
+          ./"$BUILD_DIR"/scfd_cpu_float/test_scfd_vector_operations_cpu.bin
+
+  scfd-vector-operations-cuda:
+    runs-on: local
+    steps:
+      - name: Build and test when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA vector operations: nvidia-smi not found"
+            exit 0
+          fi
+          if ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA vector operations: nvidia-smi is present but no usable NVIDIA device was reported"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA vector operations: nvcc not found"
+            exit 0
+          fi
+          make scfd_vector_operations.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cuda_double" REAL_TYPE=double
+          ./"$BUILD_DIR"/scfd_cuda_double/test_scfd_vector_operations.bin auto
+          make scfd_vector_operations.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cuda_float" REAL_TYPE=float
+          ./"$BUILD_DIR"/scfd_cuda_float/test_scfd_vector_operations.bin auto
+
+  scfd-vector-operations-hip:
+    runs-on: local
+    steps:
+      - name: Build and test when HIP is available
+        run: |
+          HIPCC_BIN="${HIPCC:-hipcc}"
+          if ! command -v "$HIPCC_BIN" >/dev/null 2>&1 && [ ! -x "$HIPCC_BIN" ]; then
+            echo "Skipping HIP vector operations: hipcc not found"
+            exit 0
+          fi
+          HIP_COMPILER_VERSION="$("$HIPCC_BIN" --version 2>/dev/null || true)"
+          if echo "$HIP_COMPILER_VERSION" | grep -qi nvcc; then
+            if ! command -v nvidia-smi >/dev/null 2>&1; then
+              echo "Skipping HIP vector operations: HIP is configured for NVIDIA, but nvidia-smi was not found"
+              exit 0
+            fi
+            if ! nvidia-smi >/dev/null 2>&1; then
+              echo "Skipping HIP vector operations: HIP is configured for NVIDIA, but no usable NVIDIA device was reported"
+              exit 0
+            fi
+          else
+            if ! command -v rocm-smi >/dev/null 2>&1; then
+              echo "Skipping HIP vector operations: rocm-smi not found"
+              exit 0
+            fi
+            if ! rocm-smi >/dev/null 2>&1; then
+              echo "Skipping HIP vector operations: rocm-smi is present but no usable ROCm device was reported"
+              exit 0
+            fi
+          fi
+          make scfd_vector_operations_hip.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_hip_double" REAL_TYPE=double HIPCC="$HIPCC_BIN"
+          ./"$BUILD_DIR"/scfd_hip_double/test_scfd_vector_operations_hip.bin auto
+          make scfd_vector_operations_hip.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_hip_float" REAL_TYPE=float HIPCC="$HIPCC_BIN"
+          ./"$BUILD_DIR"/scfd_hip_float/test_scfd_vector_operations_hip.bin auto

@@ -23,7 +23,7 @@ struct scfd_vector_access
         typename VecOps::vector_type& dst,
         const std::vector<typename VecOps::scalar_type>& src) const
     {
-        vec_ops.set(src.data(), dst);
+        vec_ops.set(src.data(), dst, src.size());
     }
 
     template<class VecOps>
@@ -33,7 +33,7 @@ struct scfd_vector_access
         std::size_t n) const
     {
         std::vector<typename VecOps::scalar_type> host(n);
-        vec_ops.get(src, host.data());
+        vec_ops.get(src, host.data(), n);
         return host;
     }
 };
@@ -80,7 +80,7 @@ int main(int argc, char** argv)
         const int device = common::init_cuda_from_scfd_selector(device_selector);
         std::cout << "CUDA device: " << device << std::endl;
 
-        const std::vector<std::size_t> cuda_sizes = {1, 7, 64, 1025};
+        const std::vector<std::size_t> cuda_sizes = {1, 2, 7, 31, 32, 33, 64, 1025, 4097};
         run_scfd_type<scfd::backend::cuda, real>("SCFD CUDA real", cuda_sizes, report);
         run_scfd_type<scfd::backend::cuda, cuda_complex>("SCFD CUDA complex", cuda_sizes, report);
     }
