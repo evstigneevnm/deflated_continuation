@@ -55,6 +55,70 @@ jobs:
           make scfd_vector_operations_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cpu_float" REAL_TYPE=float
           ./"$BUILD_DIR"/scfd_cpu_float/test_scfd_vector_operations_cpu.bin
 
+  fftw-operations-cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libfftw3-dev
+          fi
+      - name: Build and test
+        run: |
+          make test_fftw_operations.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fftw_operations"
+          ./"$BUILD_DIR"/fftw_operations/test_fftw_operations.bin
+
+  lapack-wrap-cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libopenblas-dev
+          fi
+      - name: Build and test
+        run: |
+          make test_lapack_wrap.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/lapack_wrap"
+          ./"$BUILD_DIR"/lapack_wrap/test_lapack_wrap.bin
+
+  lapack-wrap-cuda:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Build and test when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA LAPACK wrapper: nvidia-smi not found"
+            exit 0
+          fi
+          if ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA LAPACK wrapper: nvidia-smi is present but no usable NVIDIA device was reported"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA LAPACK wrapper: nvcc not found"
+            exit 0
+          fi
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libopenblas-dev
+          fi
+          make test_lapack_wrap_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/lapack_wrap_cuda"
+          ./"$BUILD_DIR"/lapack_wrap_cuda/test_lapack_wrap_cuda.bin auto
+
   scfd-vector-operations-cuda:
     runs-on: ubuntu-latest
     steps:

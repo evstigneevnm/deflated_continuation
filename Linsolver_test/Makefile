@@ -92,6 +92,7 @@ LIBS3 = $(LCUDA) -lcusolver $(LIBS2)
 LIBSAll = $(LCUDA) -lcublas -lcurand -lcufft -lcusolver
 LIBBOOST = -lboost_serialization
 LLAPACK = -L$(OPENBLAS_ROOT_PATH)/lib -lopenblas
+LFFTW = -lfftw3 -lfftw3f
 
 #clean
 clean:
@@ -112,6 +113,15 @@ test_file_operations.bin: source/common/tests/test_file_operations.cpp $(COMMON_
 
 test_file_operations_cuda.bin: source/common/tests/test_file_operations_cuda.cu $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) source/common/cuda_init_scfd.h
 	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/tests/test_file_operations_cuda.cu $(LIBS1) -o $(BUILD_DIR)/test_file_operations_cuda.bin 2>$(RESULTS)
+
+test_fftw_operations.bin: source/external_libraries/tests/test_fftw_operations.cpp
+	$(G++) $(G++FLAGS) source/external_libraries/tests/test_fftw_operations.cpp $(LFFTW) -o $(BUILD_DIR)/test_fftw_operations.bin 2>$(RESULTS)
+
+test_lapack_wrap.bin: source/external_libraries/tests/test_lapack_wrap.cpp source/contrib/scfd/include/scfd/external_libraries/lapack_wrap.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/external_libraries/tests/test_lapack_wrap.cpp $(LLAPACK) -o $(BUILD_DIR)/test_lapack_wrap.bin 2>$(RESULTS)
+
+test_lapack_wrap_cuda.bin: source/external_libraries/tests/test_lapack_wrap_cuda.cu source/external_libraries/lapack_wrap.h source/contrib/scfd/include/scfd/external_libraries/lapack_wrap.h source/contrib/scfd/include/scfd/external_libraries/lapack_wrap_device.h source/common/cuda_init_scfd.h
+	$(NVCC) $(NVCCFLAGS) $(ICUDA) $(IPROJECT) source/external_libraries/tests/test_lapack_wrap_cuda.cu $(LLAPACK) -o $(BUILD_DIR)/test_lapack_wrap_cuda.bin 2>$(RESULTS)
 
 
 test_cpu_glued_vector_operations.bin: source/common/tests/test_cpu_glued_vector_operations.cpp $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
