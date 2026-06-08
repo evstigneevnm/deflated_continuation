@@ -102,12 +102,15 @@ CPU_VECTOR_OPS_VAR_PREC_HEADERS = source/common/cpu_vector_operations_var_prec.h
 COMMON_FILE_OPS_HEADERS = source/common/file_operations.h source/common/cpu_file_operations.h source/common/cpu_matrix_file_operations.h source/common/gpu_file_operations.h source/common/gpu_matrix_file_operations.h source/common/NMFD-operations/nmfd/operations/io/file_operations.h source/common/NMFD-operations/nmfd/operations/io/vector_file_operations.h source/common/NMFD-operations/nmfd/operations/io/matrix_file_operations.h
 SMALL_DENSE_LINALG_HEADERS = source/common/NMFD-operations/nmfd/operations/linalg/small_dense.h
 COMPLEX_TRAITS_HEADERS = source/common/scfd_backend_ext/complex.h
-SYMMETRY_FOURIER_HEADERS = source/symmetry/fourier/mode_traits.h $(COMPLEX_TRAITS_HEADERS) $(SMALL_DENSE_LINALG_HEADERS)
+SYMMETRY_CORE_HEADERS = source/symmetry/slice_data.h source/symmetry/slice_projector.h source/symmetry/quotient_classifier.h source/symmetry/stabilized_storage.h
+SYMMETRY_FOURIER_HEADERS = source/symmetry/fourier/mode_descriptor.h source/symmetry/fourier/mode_access.h source/symmetry/fourier/phase_conditions.h source/symmetry/fourier/translation_generators.h source/symmetry/fourier/fourier_slice_1d.h source/symmetry/fourier/fourier_slice_differential_1d.h source/symmetry/fourier/fourier_slice.h source/symmetry/fourier/real_packed_fourier_slice_1d_adapter.h $(SYMMETRY_CORE_HEADERS) $(COMPLEX_TRAITS_HEADERS) $(SMALL_DENSE_LINALG_HEADERS)
+DEFLATION_SYMMETRY_HEADERS = source/deflation/symmetry_solution_storage.h $(SYMMETRY_FOURIER_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 FFT_FACADE_HEADERS = source/external_libraries/fft_facade.h source/external_libraries/fft_facade_fftw.h source/external_libraries/fft_facade_cufft.h source/external_libraries/fftw_wrap.h source/external_libraries/cufft_wrap.h
 CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/nonlinear_operators/circle/circle.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/linear_operator_circle.h source/nonlinear_operators/circle/preconditioner_circle.h source/nonlinear_operators/circle/system_operator.h
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h
 STAR_SHAPED_MODEL_HEADERS = source/models/star_shaped/star_shaped_backend_typedefs.h source/nonlinear_operators/star_shaped/star_shaped.h source/nonlinear_operators/star_shaped/convergence_strategy.h source/nonlinear_operators/star_shaped/linear_operator_star_shaped.h source/nonlinear_operators/star_shaped/preconditioner_star_shaped.h source/nonlinear_operators/star_shaped/system_operator.h
 KS1D_MODEL_HEADERS = source/models/KS_1D/KS1D_backend_typedefs.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/linear_operator_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/preconditioner_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/system_operator.h
+KS1D_FULL_MODEL_HEADERS = $(KS1D_MODEL_HEADERS) source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/projected_linear_operator_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/projected_preconditioner_KS_1D.h source/nonlinear_operators/projected_system_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/projected_system_operator_continuation.h $(DEFLATION_SYMMETRY_HEADERS)
 
 LCUDA = -L$(CUDA_ROOT_PATH)/lib64
 LBOOST = -L$(BOOST_ROOT_PATH)/lib
@@ -160,8 +163,23 @@ test_small_dense_linalg.bin: source/common/tests/test_small_dense_linalg.cpp $(S
 test_complex_traits.bin: source/common/tests/test_complex_traits.cpp $(COMPLEX_TRAITS_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/common/tests/test_complex_traits.cpp -o $(BUILD_DIR)/test_complex_traits.bin 2>$(RESULTS)
 
-test_fourier_mode_traits.bin: source/symmetry/tests/test_fourier_mode_traits.cpp $(SYMMETRY_FOURIER_HEADERS)
-	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_mode_traits.cpp -o $(BUILD_DIR)/test_fourier_mode_traits.bin 2>$(RESULTS)
+test_fourier_mode_primitives.bin: source/symmetry/tests/test_fourier_mode_primitives.cpp $(SYMMETRY_FOURIER_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_mode_primitives.cpp -o $(BUILD_DIR)/test_fourier_mode_primitives.bin 2>$(RESULTS)
+
+test_quotient_classifier.bin: source/symmetry/tests/test_quotient_classifier.cpp $(SYMMETRY_CORE_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_quotient_classifier.cpp -o $(BUILD_DIR)/test_quotient_classifier.bin 2>$(RESULTS)
+
+test_fourier_slice_1d.bin: source/symmetry/tests/test_fourier_slice_1d.cpp $(SYMMETRY_FOURIER_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_slice_1d.cpp -o $(BUILD_DIR)/test_fourier_slice_1d.bin 2>$(RESULTS)
+
+test_fourier_slice_differential_1d.bin: source/symmetry/tests/test_fourier_slice_differential_1d.cpp $(SYMMETRY_FOURIER_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_slice_differential_1d.cpp -o $(BUILD_DIR)/test_fourier_slice_differential_1d.bin 2>$(RESULTS)
+
+test_stabilized_storage.bin: source/symmetry/tests/test_stabilized_storage.cpp $(SYMMETRY_CORE_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_stabilized_storage.cpp -o $(BUILD_DIR)/test_stabilized_storage.bin 2>$(RESULTS)
+
+test_symmetry_solution_storage.bin: source/deflation/tests/test_symmetry_solution_storage.cpp $(DEFLATION_SYMMETRY_HEADERS)
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/deflation/tests/test_symmetry_solution_storage.cpp $(OPENMP) -o $(BUILD_DIR)/test_symmetry_solution_storage.bin 2>$(RESULTS)
 
 
 test_cpu_glued_vector_operations.bin: source/common/tests/test_cpu_glued_vector_operations.cpp $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
@@ -350,14 +368,28 @@ KS1D_operator_cuda.bin: source/models/KS_1D/test_KS1D_operator.cpp $(KS1D_MODEL_
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/KS_1D/test_KS1D_operator.cpp -c -o $(BUILD_DIR)/test_KS1D_operator_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS1D_operator_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/test_KS1D_operator_cuda.bin 2>$(RESULTS)
 
+KS1D_full_operator_cpu_omp.bin: source/models/KS_1D/test_KS1D_full_operator.cpp $(KS1D_FULL_MODEL_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
+	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) source/models/KS_1D/test_KS1D_full_operator.cpp $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/test_KS1D_full_operator_cpu_omp.bin 2>$(RESULTS)
+
+KS1D_full_operator_cuda.bin: source/models/KS_1D/test_KS1D_full_operator.cpp $(KS1D_FULL_MODEL_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/KS_1D/test_KS1D_full_operator.cpp -c -o $(BUILD_DIR)/test_KS1D_full_operator_cuda_main.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS1D_full_operator_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/test_KS1D_full_operator_cuda.bin 2>$(RESULTS)
+
 KS1D_bd_cpu_omp: source/models/KS_1D/KS1D_bd.cpp $(KS1D_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
 	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) source/models/KS_1D/KS1D_bd.cpp $(OPENMP) $(LFFTW) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_bd_cpu_omp.bin 2>$(RESULTS)
+
+KS1D_full_bd_cpu_omp: source/models/KS_1D/KS1D_full_bd.cpp $(KS1D_FULL_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
+	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) source/models/KS_1D/KS1D_full_bd.cpp $(OPENMP) $(LFFTW) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_full_bd_cpu_omp.bin 2>$(RESULTS)
 
 KS1D_bd: KS1D_bd_cuda
 
 KS1D_bd_cuda: source/models/KS_1D/KS1D_bd.cpp $(KS1D_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/KS_1D/KS1D_bd.cpp -c -o $(BUILD_DIR)/KS1D_bd_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/KS1D_bd_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_bd_cuda.bin 2>$(RESULTS)
+
+KS1D_full_bd_cuda: source/models/KS_1D/KS1D_full_bd.cpp $(KS1D_FULL_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/KS_1D/KS1D_full_bd.cpp -c -o $(BUILD_DIR)/KS1D_full_bd_cuda_main.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/KS1D_full_bd_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_full_bd_cuda.bin 2>$(RESULTS)
 
 KS_bd: source/models/KS_2D/KS_bd_json_new.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KS_2D/KS_bd_json_new.cpp $(BUILD_DIR)/Kuramoto_Sivashinskiy_2D_ker.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBSAll) $(LLAPACK) -o $(BUILD_DIR)/KS_bd_json.bin 2>$(RESULTS)

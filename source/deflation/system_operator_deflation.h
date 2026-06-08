@@ -1,6 +1,8 @@
 #ifndef __SYSTEM_OPERATOR_DEFLATION_H__
 #define __SYSTEM_OPERATOR_DEFLATION_H__
 
+#include <nonlinear_operators/projected_operator_helpers.h>
+
 namespace deflation
 {
 
@@ -53,8 +55,8 @@ public:
     {
         bool flag_lin_solver;
         
-        nonlin_op->set_linearization_point(x, lambda);
-        nonlin_op->F(x, lambda, f); // f = F(x)
+        nonlinear_operators::detail::set_linearization_point(nonlin_op, x, lambda);
+        nonlinear_operators::detail::residual_at_linearization(nonlin_op, x, lambda, f); // f = F(x)
         vec_ops->assign(f, b);
         sol_storage->calc_distance(x, beta, c); //beta = 1/||x-x0_j||, c = (x-x0_j)
         vec_ops->add_mul_scalar(T(0), T(-beta), b); //b=-F(x,lambda)

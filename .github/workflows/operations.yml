@@ -74,8 +74,18 @@ jobs:
           ./"$BUILD_DIR"/small_dense_linalg/test_small_dense_linalg.bin
           make test_complex_traits.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/complex_traits"
           ./"$BUILD_DIR"/complex_traits/test_complex_traits.bin
-          make test_fourier_mode_traits.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fourier_mode_traits"
-          ./"$BUILD_DIR"/fourier_mode_traits/test_fourier_mode_traits.bin
+          make test_fourier_mode_primitives.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fourier_mode_primitives"
+          ./"$BUILD_DIR"/fourier_mode_primitives/test_fourier_mode_primitives.bin
+          make test_quotient_classifier.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/quotient_classifier"
+          ./"$BUILD_DIR"/quotient_classifier/test_quotient_classifier.bin
+          make test_fourier_slice_1d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fourier_slice_1d"
+          ./"$BUILD_DIR"/fourier_slice_1d/test_fourier_slice_1d.bin
+          make test_fourier_slice_differential_1d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fourier_slice_differential_1d"
+          ./"$BUILD_DIR"/fourier_slice_differential_1d/test_fourier_slice_differential_1d.bin
+          make test_stabilized_storage.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stabilized_storage"
+          ./"$BUILD_DIR"/stabilized_storage/test_stabilized_storage.bin
+          make test_symmetry_solution_storage.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/symmetry_solution_storage" REAL_TYPE=double
+          ./"$BUILD_DIR"/symmetry_solution_storage/test_symmetry_solution_storage.bin
 
   fftw-operations-cpu:
     needs: [symmetry-foundation-cpu]
@@ -253,10 +263,16 @@ jobs:
           KS1D_BUILD="$BUILD_DIR/ks1d_sym_cpu_omp"
           make KS1D_operator_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_operator_cpu_omp.bin
+          make KS1D_full_operator_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          ./"$KS1D_BUILD"/test_KS1D_full_operator_cpu_omp.bin
           make KS1D_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
           timeout 120s ./"$KS1D_BUILD"/KS1D_bd_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
+          make KS1D_full_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
+          timeout 120s ./"$KS1D_BUILD"/KS1D_full_bd_cpu_omp.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet
+          python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project_full" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
 
   circle-bd-cpu-omp:
     needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
@@ -517,10 +533,16 @@ jobs:
           KS1D_BUILD="$BUILD_DIR/ks1d_sym_cuda"
           make KS1D_operator_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_operator_cuda.bin auto
+          make KS1D_full_operator_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          ./"$KS1D_BUILD"/test_KS1D_full_operator_cuda.bin auto
           make KS1D_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
           timeout 120s ./"$KS1D_BUILD"/KS1D_bd_cuda.bin "$KS1D_BUILD/ks1d_ci.json" --quiet auto
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
+          make KS1D_full_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
+          timeout 120s ./"$KS1D_BUILD"/KS1D_full_bd_cuda.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet auto
+          python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project_full" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
 
   circle-bd-hip:
     needs: [scfd-vector-operations-hip]

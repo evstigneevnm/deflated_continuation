@@ -6,6 +6,7 @@ converhence rules for Newton iterator for deflation process
 #include <cmath>
 #include <vector>
 #include <common/scalar_math.h>
+#include <nonlinear_operators/projected_operator_helpers.h>
 #include <scfd/utils/logged_obj_base.h>
 
 namespace deflation
@@ -77,12 +78,13 @@ public:
         }
 
         bool finish = false;
-        nonlin_op->F(x, lambda, Fx);
+        nonlinear_operators::detail::residual(nonlin_op, x, lambda, Fx);
         T normFx = vec_ops->norm(Fx);
         //update solution
         vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
         T lambda1 = lambda + newton_wight*delta_lambda;
-        nonlin_op->F(x1, lambda1, Fx);
+        nonlinear_operators::detail::project_state(nonlin_op, x1);
+        nonlinear_operators::detail::residual(nonlin_op, x1, lambda1, Fx);
         T normFx1 = vec_ops->norm(Fx);
         if(store_norms_history)
         {

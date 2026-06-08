@@ -11,6 +11,7 @@
 #include <cmath>
 
 #include <common/scalar_math.h>
+#include <nonlinear_operators/projected_operator_helpers.h>
 #include <iostream>
 
 namespace continuation
@@ -50,14 +51,14 @@ public:
 
         bool linear_system_converged = false;
     
-        nonlin_op->set_linearization_point(x, lambda);
+        nonlinear_operators::detail::set_linearization_point(nonlin_op, x, lambda);
         if constexpr(NonlinearOperator::is_periodic_orbit_reprojected::value)
         {
             nonlin_op->F_and_jacobian_alpha(x_s, f); //here x_s is a mute variable! It will be zeroed later.
         }
         else
         {
-            nonlin_op->jacobian_alpha(f);
+            nonlinear_operators::detail::jacobian_alpha(nonlin_op, f);
         }
         
         //This is important!!!
@@ -71,6 +72,7 @@ public:
         lin_solv->get_linsolver_handle_original()->monitor().set_temp_tolerance(tolerance_local);
         lin_solv->get_linsolver_handle_original()->monitor().set_temp_max_iterations(10000);
         linear_system_converged = lin_solv->solve((*lin_op), f, x_s);
+        nonlinear_operators::detail::project_current_tangent(vec_ops, nonlin_op, x_s, x_s);
         // if constexpr(NonlinearOperator::is_periodic_orbit_reprojected::value)
         // {
         //     nonlin_op->reproject(x_s);

@@ -23,11 +23,11 @@ std::string scalar_to_string(const T& value)
 
 } // namespace detail
 
-template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperations, class LinearOperator,  class Knots, class LinearSolver, class Newton, class Curve>
-class continuation_analytical: public continuation<VectorOperations, VectorFileOperations, Log, NonlinearOperations, LinearOperator,  Knots, LinearSolver, Newton, Curve>
+template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperations, class LinearOperator,  class Knots, class LinearSolver, class Newton, class Curve, template<class, class, class, class, class> class SystemOperatorContinuation = system_operator_continuation>
+class continuation_analytical: public continuation<VectorOperations, VectorFileOperations, Log, NonlinearOperations, LinearOperator,  Knots, LinearSolver, Newton, Curve, SystemOperatorContinuation>
 {
 private:
-    typedef continuation<VectorOperations, VectorFileOperations, Log, NonlinearOperations, LinearOperator,  Knots, LinearSolver, Newton, Curve> parent_t;
+    typedef continuation<VectorOperations, VectorFileOperations, Log, NonlinearOperations, LinearOperator,  Knots, LinearSolver, Newton, Curve, SystemOperatorContinuation> parent_t;
 
     typedef typename parent_t::T T;
     typedef typename parent_t::T_vec T_vec;
@@ -147,7 +147,7 @@ private:
     void start_semicurve()
     {
 
-        parent_t::bif_diag->add(parent_t::lambda0, parent_t::x0, true); //add initial knot, force save data!           
+        parent_t::add_solution_to_curve(parent_t::lambda0, parent_t::x0, true); //add initial knot, force save data!
         unsigned int s;
         for(s=0;s<parent_t::max_S;s++)
         {
@@ -171,7 +171,7 @@ private:
                 parent_t::just_interpolated = false;
             }
             //if try blocks passes, THIS is executed:
-            parent_t::bif_diag->add(parent_t::lambda1, parent_t::x1, did_knot_interpolation);
+            parent_t::add_solution_to_curve(parent_t::lambda1, parent_t::x1, did_knot_interpolation);
                     
             parent_t::vec_ops->assign(parent_t::x1, parent_t::x0);
             //parent_t::vec_ops->assign(parent_t::x1_s, parent_t::x0_s);

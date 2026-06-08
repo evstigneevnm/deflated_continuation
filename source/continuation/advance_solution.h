@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <cmath>
 #include <common/scalar_math.h>
+#include <nonlinear_operators/projected_operator_helpers.h>
 /**
   continuation of a single solution forward or backward on a single step
   execute SOLVE method to continue solution in one step
@@ -193,7 +194,7 @@ public:
 
 
             }
-            nonlin_op->project(x1_s); //TEMP FIX!!!
+            nonlinear_operators::detail::project_current_tangent(vec_ops, nonlin_op, x1_s, x1_s);
             
         }
         if(any_failed_attempts)

@@ -10,6 +10,7 @@
 *   data serialization is done using boost archive
 */
 #include <string>
+#include <utility>
 #include <vector>
 // #include <type_traits> //to check linsolvers
 //boost serializatoin
@@ -70,10 +71,33 @@ inline void set_basis_size_if_available(...)
 {
 }
 
+template<class SolutionStorage, class Vector>
+auto stabilize_solution_if_available(SolutionStorage* storage, Vector& x) -> decltype(storage->stabilize_in_place(x), void())
+{
+    storage->stabilize_in_place(x);
+}
+
+inline void stabilize_solution_if_available(...)
+{
+}
+
+template<class Continuation, class SolutionStorage, class Vector>
+auto set_solution_postprocessor_if_available(Continuation* continuation, SolutionStorage* storage, Vector*) -> decltype(storage->stabilize_in_place(std::declval<Vector&>()), void())
+{
+    continuation->set_solution_postprocessor([storage](Vector& x)
+    {
+        storage->stabilize_in_place(x);
+    });
+}
+
+inline void set_solution_postprocessor_if_available(...)
+{
+}
+
 } // namespace detail
 
 
-template<class VectorOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, template<class , class , class , class , class > class LinearSolver, template<class , class , class , class > class SystemOperator, class Parameters>
+template<class VectorOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, template<class , class , class , class , class > class LinearSolver, template<class , class , class , class > class SystemOperator, class Parameters, class SolutionStorage = deflation::solution_storage<VectorOperations, Log>, template<class, class, class, class, class> class ContinuationSystemOperator = continuation::system_operator_continuation>
 class deflation_continuation
 {
 private:
@@ -120,7 +144,7 @@ private:
 
     typedef container::curve_helper_container<VectorOperations> container_helper_t;
 
-    typedef deflation::solution_storage<VectorOperations, Log> sol_storage_def_t;
+    typedef SolutionStorage sol_storage_def_t;
 
 
     typedef container::bifurcation_diagram_curve<
@@ -153,7 +177,8 @@ private:
         knots_t,
         sherman_morrison_linear_system_solve_t,  
         newton_t,
-        bif_diag_curve_t
+        bif_diag_curve_t,
+        ContinuationSystemOperator
         > continuate_t;
 
     typedef continuation::continuation_analytical<
@@ -165,7 +190,8 @@ private:
         knots_t,
         sherman_morrison_linear_system_solve_t,  
         newton_t,
-        bif_diag_curve_t
+        bif_diag_curve_t,
+        ContinuationSystemOperator
         > continuate_analytical_t;
 
     typedef deflation::deflation<
@@ -180,13 +206,15 @@ private:
 
 
 public:
-    deflation_continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, Log* log_linsolver_, NonlinearOperations* nonlin_op_, Parameters* parameters_):
+    deflation_continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, Log* log_linsolver_, NonlinearOperations* nonlin_op_, Parameters* parameters_, sol_storage_def_t* sol_storage_external_ = nullptr):
     vec_ops(vec_ops_),
     file_ops(file_ops_),
     log(log_),
     nonlin_op(nonlin_op_),
     log_linsolver(log_linsolver_),
-    parameters(parameters_)
+    parameters(parameters_),
+    sol_storage_def(sol_storage_external_),
+    owns_solution_storage(sol_storage_external_ == nullptr)
     {
         
         //add '/' to the end of the project dir, if needed
@@ -208,14 +236,22 @@ public:
         continuate = new continuate_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
         continuate_analytical = new continuate_analytical_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
         bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files);
-        sol_storage_def = new sol_storage_def_t(vec_ops, 50, vec_ops->get_l2_size(), 2.0, log );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
+        if(sol_storage_def == nullptr)
+        {
+            sol_storage_def = new sol_storage_def_t(vec_ops, 50, vec_ops->get_l2_size(), 2.0, log );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
+        }
+        detail::set_solution_postprocessor_if_available(continuate, sol_storage_def, static_cast<T_vec*>(nullptr));
+        detail::set_solution_postprocessor_if_available(continuate_analytical, sol_storage_def, static_cast<T_vec*>(nullptr));
         deflate = new deflate_t(vec_ops, file_ops, log, nonlin_op, lin_op, SM, sol_storage_def);
     }
     ~deflation_continuation()
     {
         
         delete deflate;
-        delete sol_storage_def;
+        if(owns_solution_storage)
+        {
+            delete sol_storage_def;
+        }
         delete bif_diag;
         delete continuate;
         delete continuate_analytical;
@@ -383,10 +419,17 @@ public:
     void add_solution_curve(const T_vec& x0_, const T& lambda0_)
     {
         bif_diag_curve_t* bdf;
+        T_vec x0_stabilized;
+        vec_ops->init_vector(x0_stabilized);
+        vec_ops->start_use_vector(x0_stabilized);
+        vec_ops->assign(x0_, x0_stabilized);
+        detail::stabilize_solution_if_available(sol_storage_def, x0_stabilized);
         bif_diag->init_new_curve();
         bif_diag->get_current_ref(bdf);
-        continuate->continuate_curve(bdf, x0_, lambda0_);
+        continuate->continuate_curve(bdf, x0_stabilized, lambda0_);
         bif_diag->close_curve();
+        vec_ops->stop_use_vector(x0_stabilized);
+        vec_ops->free_vector(x0_stabilized);
     }
 
 
@@ -514,6 +557,7 @@ public:
             T lambda = knots->get_value();
             vec_ops->init_vector(x_deflation); vec_ops->start_use_vector(x_deflation);
             nonlin_op->exact_solution(lambda, x_deflation);
+            detail::stabilize_solution_if_available(sol_storage_def, x_deflation);
             bif_diag->init_new_curve();
             bif_diag->get_current_ref(bdf);
             continuate_analytical->continuate_curve(bdf, x_deflation, lambda);
@@ -546,6 +590,7 @@ public:
                 log->info_f("MAIN:deflation_continuation: found %i solutions for lambda = %lf.", number_of_solutions, double(lambda) );
                 
                 deflate->get_solution_ref(x_deflation);
+                detail::stabilize_solution_if_available(sol_storage_def, x_deflation);
                 bif_diag_curve_t* bdf;
                 
                 bif_diag->init_new_curve();
@@ -590,7 +635,8 @@ private:
     continuate_t* continuate;
     continuate_analytical_t* continuate_analytical;
     deflate_t* deflate;
-    sol_storage_def_t* sol_storage_def;
+    sol_storage_def_t* sol_storage_def = nullptr;
+    bool owns_solution_storage = true;
     std::string project_dir;
     bool analytical_solution = false;
     unsigned int skip_files;

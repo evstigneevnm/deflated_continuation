@@ -16,6 +16,7 @@
 #include <cmath>
 #include <vector>
 #include <common/scalar_math.h>
+#include <nonlinear_operators/projected_operator_helpers.h>
 #include <scfd/utils/logged_obj_base.h>
 
 namespace nonlinear_operators
@@ -79,11 +80,12 @@ public:
         }
 
         bool finish = false;
-        nonlin_op->F(x, lambda, Fx);
+        nonlinear_operators::detail::residual(nonlin_op, x, lambda, Fx);
         T normFx = vec_ops->norm_l2(Fx);
         //update solution
         vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
-        nonlin_op->F(x1, lambda, Fx);
+        nonlinear_operators::detail::project_state(nonlin_op, x1);
+        nonlinear_operators::detail::residual(nonlin_op, x1, lambda, Fx);
         T normFx1 = vec_ops->norm_l2(Fx);
         if(store_norms_history)
         {
@@ -95,12 +97,14 @@ public:
             newton_wight *= 0.75;
             log->info_f("adjusting Newton wight to %le and updating...", (double)newton_wight);
             vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
+            nonlinear_operators::detail::project_state(nonlin_op, x1);
         }
         if((common::scalar_math::abs(normFx1-normFx)/normFx<T(0.05))&&(iterations>maximum_iterations/3))
         {
             newton_wight *= 0.75;
             log->info_f("adjusting Newton wight to %le and updating...", (double)newton_wight);
-            vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);            
+            vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
+            nonlinear_operators::detail::project_state(nonlin_op, x1);
         }
         iterations++;
 

@@ -9,6 +9,7 @@
 *
 */
 
+#include <functional>
 #include <string>
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
@@ -23,7 +24,7 @@
 namespace continuation
 {
 
-template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperator, class LinearOperator,  class Knots, class LinearSolver, class Newton, class Curve>
+template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperator, class LinearOperator,  class Knots, class LinearSolver, class Newton, class Curve, template<class, class, class, class, class> class SystemOperatorContinuation = system_operator_continuation>
 class continuation
 {
 protected:
@@ -34,7 +35,7 @@ private:
     typedef std::pair<bool, bool> bools2;
 
 
-    typedef system_operator_continuation<
+    typedef SystemOperatorContinuation<
         VectorOperations, 
         NonlinearOperator,
         LinearOperator,
@@ -131,6 +132,11 @@ public:
         epsilon = T(100.0)*tolerance_; //tolerance to check distance between vectors in curves.
     }
 
+    void set_solution_postprocessor(std::function<void(T_vec&)> solution_postprocessor_)
+    {
+        solution_postprocessor = std::move(solution_postprocessor_);
+    }
+
 
     void update_knots()
     {
@@ -209,16 +215,33 @@ protected: //changed to protected for inheritance
     T lambda_start; T_vec x_start;
     T lambda0, lambda0_s, lambda1, lambda1_s;
     T lambda_min, lambda_max;
-    T_vec x0, x0_s, x1, x1_back, x1_s, x_check;
+    T_vec x0, x0_s, x1, x1_back, x1_s, x_check, x_output;
     char break_semicurve = 0;
     bool fail_flag = false;
     bool continue_next_step = true;
     bool just_interpolated = false;
+    std::function<void(T_vec&)> solution_postprocessor;
+
+    void add_solution_to_curve(const T& lambda, const T_vec& x, const bool force_store)
+    {
+        if(solution_postprocessor)
+        {
+            vec_ops->assign(x, x_output);
+            solution_postprocessor(x_output);
+            bif_diag->add(lambda, x_output, force_store);
+        }
+        else
+        {
+            bif_diag->add(lambda, x, force_store);
+        }
+    }
+
 private:
     void set_all_vectors()
     {
         
         vec_ops->init_vector(x_check); vec_ops->start_use_vector(x_check);
+        vec_ops->init_vector(x_output); vec_ops->start_use_vector(x_output);
         vec_ops->init_vector(x_start); vec_ops->start_use_vector(x_start);
         vec_ops->init_vector(x0); vec_ops->start_use_vector(x0);
         vec_ops->init_vector(x0_s); vec_ops->start_use_vector(x0_s);
@@ -228,6 +251,7 @@ private:
     }
     void unset_all_vectors()
     {
+        vec_ops->stop_use_vector(x_output); vec_ops->free_vector(x_output);
         vec_ops->stop_use_vector(x_check); vec_ops->free_vector(x_check);
         vec_ops->stop_use_vector(x_start); vec_ops->free_vector(x_start);
         vec_ops->stop_use_vector(x0); vec_ops->free_vector(x0);
@@ -402,7 +426,7 @@ private:
         }
         if(!fail_flag)
         {        
-            bif_diag->add(lambda0, x0, true); //add initial knot, force save data!           
+            add_solution_to_curve(lambda0, x0, true); //add initial knot, force save data!
             continuation_step->reset(); //resets all data for initial continuation stepping
             unsigned int s;
             for(s=0;s<max_S;s++)
@@ -437,7 +461,7 @@ private:
                         just_interpolated = false;
                     }
                     //if try blocks passes, THIS is executed:
-                    bif_diag->add(lambda1, x1, did_knot_interpolation);
+                    add_solution_to_curve(lambda1, x1, did_knot_interpolation);
                     
                     vec_ops->assign(x1, x0);
                     vec_ops->assign(x1_s, x0_s);

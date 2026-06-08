@@ -5,7 +5,8 @@
 #include <string>
 
 #include <nmfd/operations/linalg/small_dense.h>
-#include <symmetry/fourier/mode_traits.h>
+#include <symmetry/fourier/mode_descriptor.h>
+#include <symmetry/fourier/phase_conditions.h>
 
 namespace
 {

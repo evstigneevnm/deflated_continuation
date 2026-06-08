@@ -6,6 +6,7 @@ convergence rules for Newton iterator for continuation process
 #include <cmath>
 #include <vector>
 #include <common/scalar_math.h>
+#include <nonlinear_operators/projected_operator_helpers.h>
 #include <scfd/utils/logged_obj_base.h>
 #include <algorithm> // std::min_element
 #include <iterator>  // std::begin, std::end
@@ -108,7 +109,7 @@ public:
     template<class system_operator>
     T residual_norm(system_operator* sys_op, nonlinear_operator* nonlin_op, const T_vec& x, const T& lambda, T& normF, T& arclength_res)
     {
-        nonlin_op->F(x, lambda, Fx);
+        nonlinear_operators::detail::residual(nonlin_op, x, lambda, Fx);
         normF = vec_ops->norm_l2(Fx);
         arclength_res = constraint_residual(sys_op, x, lambda);
         return common::scalar_math::sqrt(normF*normF + arclength_res*arclength_res);
