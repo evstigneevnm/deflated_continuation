@@ -100,6 +100,9 @@ SCFD_SERIAL_VECTOR_OPS_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/scfd_s
 SCFD_VECTOR_OPS_TEST_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/tests/scfd_vector_operations_high_precision_tests.h source/common/tests/scfd_vector_operations_nmfd_interface_tests.h
 CPU_VECTOR_OPS_VAR_PREC_HEADERS = source/common/cpu_vector_operations_var_prec.h source/common/NMFD-operations/nmfd/operations/cpu_vector_operations_var_prec.h source/common/NMFD-operations/nmfd/operations/vector_operations_base.h source/common/NMFD-operations/nmfd/operations/vector_space_base.h
 COMMON_FILE_OPS_HEADERS = source/common/file_operations.h source/common/cpu_file_operations.h source/common/cpu_matrix_file_operations.h source/common/gpu_file_operations.h source/common/gpu_matrix_file_operations.h source/common/NMFD-operations/nmfd/operations/io/file_operations.h source/common/NMFD-operations/nmfd/operations/io/vector_file_operations.h source/common/NMFD-operations/nmfd/operations/io/matrix_file_operations.h
+SMALL_DENSE_LINALG_HEADERS = source/common/NMFD-operations/nmfd/operations/linalg/small_dense.h
+COMPLEX_TRAITS_HEADERS = source/common/scfd_backend_ext/complex.h
+SYMMETRY_FOURIER_HEADERS = source/symmetry/fourier/mode_traits.h $(COMPLEX_TRAITS_HEADERS) $(SMALL_DENSE_LINALG_HEADERS)
 FFT_FACADE_HEADERS = source/external_libraries/fft_facade.h source/external_libraries/fft_facade_fftw.h source/external_libraries/fft_facade_cufft.h source/external_libraries/fftw_wrap.h source/external_libraries/cufft_wrap.h
 CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/nonlinear_operators/circle/circle.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/linear_operator_circle.h source/nonlinear_operators/circle/preconditioner_circle.h source/nonlinear_operators/circle/system_operator.h
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h
@@ -150,6 +153,15 @@ test_lapack_wrap.bin: source/external_libraries/tests/test_lapack_wrap.cpp sourc
 
 test_lapack_wrap_cuda.bin: source/external_libraries/tests/test_lapack_wrap_cuda.cu source/external_libraries/lapack_wrap.h source/contrib/scfd/include/scfd/external_libraries/lapack_wrap.h source/contrib/scfd/include/scfd/external_libraries/lapack_wrap_device.h source/common/cuda_init_scfd.h
 	$(NVCC) $(NVCCFLAGS) $(ICUDA) $(IPROJECT) source/external_libraries/tests/test_lapack_wrap_cuda.cu $(LLAPACK) -o $(BUILD_DIR)/test_lapack_wrap_cuda.bin 2>$(RESULTS)
+
+test_small_dense_linalg.bin: source/common/tests/test_small_dense_linalg.cpp $(SMALL_DENSE_LINALG_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/common/tests/test_small_dense_linalg.cpp -o $(BUILD_DIR)/test_small_dense_linalg.bin 2>$(RESULTS)
+
+test_complex_traits.bin: source/common/tests/test_complex_traits.cpp $(COMPLEX_TRAITS_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/common/tests/test_complex_traits.cpp -o $(BUILD_DIR)/test_complex_traits.bin 2>$(RESULTS)
+
+test_fourier_mode_traits.bin: source/symmetry/tests/test_fourier_mode_traits.cpp $(SYMMETRY_FOURIER_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_mode_traits.cpp -o $(BUILD_DIR)/test_fourier_mode_traits.bin 2>$(RESULTS)
 
 
 test_cpu_glued_vector_operations.bin: source/common/tests/test_cpu_glued_vector_operations.cpp $(SCFD_SERIAL_VECTOR_OPS_HEADERS)

@@ -54,8 +54,31 @@ jobs:
           make scfd_vector_operations_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cpu_float" REAL_TYPE=float
           ./"$BUILD_DIR"/scfd_cpu_float/test_scfd_vector_operations_cpu.bin
 
-  fftw-operations-cpu:
+  symmetry-foundation-cpu:
     needs: [scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3
+          fi
+      - name: Build and test
+        run: |
+          make test_small_dense_linalg.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/small_dense_linalg"
+          ./"$BUILD_DIR"/small_dense_linalg/test_small_dense_linalg.bin
+          make test_complex_traits.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/complex_traits"
+          ./"$BUILD_DIR"/complex_traits/test_complex_traits.bin
+          make test_fourier_mode_traits.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fourier_mode_traits"
+          ./"$BUILD_DIR"/fourier_mode_traits/test_fourier_mode_traits.bin
+
+  fftw-operations-cpu:
+    needs: [symmetry-foundation-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
