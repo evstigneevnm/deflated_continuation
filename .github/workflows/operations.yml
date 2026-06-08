@@ -247,6 +247,49 @@ jobs:
           timeout 120s ./"$CIRCLE_BUILD"/circle_bd_var_prec.bin "$CIRCLE_BUILD/circle_ci.json" --analytical-solution --quiet
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
 
+  star-shaped-bd-cpu-omp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev
+          fi
+      - name: Build and validate full closed star
+        run: |
+          export OMP_NUM_THREADS=8
+          STAR_BUILD="$BUILD_DIR/star_shaped_bd_cpu_omp"
+          make star_shaped_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$STAR_BUILD" REAL_TYPE=double
+          python3 scripts/write_star_shaped_ci_config.py "$STAR_BUILD/star_shaped_ci.json" "$STAR_BUILD/project" --clean-project --curvature 0.3
+          timeout 120s ./"$STAR_BUILD"/star_shaped_bd_cpu_omp.bin "$STAR_BUILD/star_shaped_ci.json" --seed-exact 0.25 --continue-seed-only --quiet
+          python3 scripts/validate_star_shaped_diagram.py "$STAR_BUILD/project" --config "$STAR_BUILD/star_shaped_ci.json" --residual-tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-star --min-angle-coverage 6.0 --max-closure-distance 5e-2
+
+  star-shaped-bd-var-prec:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev
+          fi
+      - name: Build and validate full closed star
+        run: |
+          STAR_BUILD="$BUILD_DIR/star_shaped_bd_var_prec"
+          make star_shaped_bd_var_prec CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$STAR_BUILD"
+          python3 scripts/write_star_shaped_ci_config.py "$STAR_BUILD/star_shaped_ci.json" "$STAR_BUILD/project" --clean-project --curvature 0.3
+          timeout 120s ./"$STAR_BUILD"/star_shaped_bd_var_prec.bin "$STAR_BUILD/star_shaped_ci.json" --seed-exact 0.25 --continue-seed-only --quiet
+          python3 scripts/validate_star_shaped_diagram.py "$STAR_BUILD/project" --config "$STAR_BUILD/star_shaped_ci.json" --residual-tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-star --min-angle-coverage 6.0 --max-closure-distance 5e-2
+
   bratu-bd-cpu-omp:
     runs-on: ubuntu-latest
     steps:
@@ -338,6 +381,32 @@ jobs:
           timeout 120s ./"$CIRCLE_BUILD"/circle_bd.bin "$CIRCLE_BUILD/circle_ci.json" --analytical-solution --quiet
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
 
+  star-shaped-bd-cuda:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Build and validate when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA star_shaped_bd: nvidia-smi not found"
+            exit 0
+          fi
+          if ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA star_shaped_bd: nvidia-smi is present but no usable NVIDIA device was reported"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA star_shaped_bd: nvcc not found"
+            exit 0
+          fi
+          STAR_BUILD="$BUILD_DIR/star_shaped_bd_cuda"
+          make star_shaped_bd CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$STAR_BUILD" REAL_TYPE=double
+          python3 scripts/write_star_shaped_ci_config.py "$STAR_BUILD/star_shaped_ci.json" "$STAR_BUILD/project" --clean-project --curvature 0.3
+          timeout 120s ./"$STAR_BUILD"/star_shaped_bd.bin "$STAR_BUILD/star_shaped_ci.json" --seed-exact 0.25 --continue-seed-only --quiet
+          python3 scripts/validate_star_shaped_diagram.py "$STAR_BUILD/project" --config "$STAR_BUILD/star_shaped_ci.json" --residual-tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-star --min-angle-coverage 6.0 --max-closure-distance 5e-2
+
   circle-bd-hip:
     runs-on: ubuntu-latest
     steps:
@@ -376,3 +445,42 @@ jobs:
           python3 scripts/write_circle_ci_config.py "$CIRCLE_BUILD/circle_ci.json" "$CIRCLE_BUILD/project" --clean-project
           timeout 120s ./"$CIRCLE_BUILD"/circle_bd_hip.bin "$CIRCLE_BUILD/circle_ci.json" --analytical-solution --quiet
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
+
+  star-shaped-bd-hip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Build and validate when HIP is available
+        run: |
+          HIPCC_BIN="${HIPCC:-hipcc}"
+          if ! command -v "$HIPCC_BIN" >/dev/null 2>&1 && [ ! -x "$HIPCC_BIN" ]; then
+            echo "Skipping HIP star_shaped_bd: hipcc not found"
+            exit 0
+          fi
+          HIP_COMPILER_VERSION="$("$HIPCC_BIN" --version 2>/dev/null || true)"
+          if echo "$HIP_COMPILER_VERSION" | grep -qi nvcc; then
+            if ! command -v nvidia-smi >/dev/null 2>&1; then
+              echo "Skipping HIP star_shaped_bd: HIP is configured for NVIDIA, but nvidia-smi was not found"
+              exit 0
+            fi
+            if ! nvidia-smi >/dev/null 2>&1; then
+              echo "Skipping HIP star_shaped_bd: HIP is configured for NVIDIA, but no usable NVIDIA device was reported"
+              exit 0
+            fi
+          else
+            if ! command -v rocm-smi >/dev/null 2>&1; then
+              echo "Skipping HIP star_shaped_bd: rocm-smi not found"
+              exit 0
+            fi
+            if ! rocm-smi >/dev/null 2>&1; then
+              echo "Skipping HIP star_shaped_bd: rocm-smi is present but no usable ROCm device was reported"
+              exit 0
+            fi
+          fi
+          STAR_BUILD="$BUILD_DIR/star_shaped_bd_hip"
+          make star_shaped_bd_hip CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$STAR_BUILD" REAL_TYPE=double HIPCC="$HIPCC_BIN"
+          python3 scripts/write_star_shaped_ci_config.py "$STAR_BUILD/star_shaped_ci.json" "$STAR_BUILD/project" --clean-project --curvature 0.3
+          timeout 120s ./"$STAR_BUILD"/star_shaped_bd_hip.bin "$STAR_BUILD/star_shaped_ci.json" --seed-exact 0.25 --continue-seed-only --quiet
+          python3 scripts/validate_star_shaped_diagram.py "$STAR_BUILD/project" --config "$STAR_BUILD/star_shaped_ci.json" --residual-tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-star --min-angle-coverage 6.0 --max-closure-distance 5e-2
