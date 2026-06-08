@@ -4,10 +4,11 @@
 #include <utility>
 #include <cstddef>
 #include <cmath>
-#include <utils/cuda_support.h>
 #include <common/macros.h>
+#include <cuda_runtime.h>
+#include <scfd/utils/cuda_safe_call.h>
 #include <thrust/complex.h>
-#include <nmfd/operations/blas1/high_precision/gpu_reduction_ogita_type.h>
+#include <nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_type.h>
 
 
 
@@ -22,29 +23,29 @@ public:
     gpu_reduction_ogita(size_t vec_size_):
     vec_size(vec_size_)
     {
-        vec_helper = device_allocate_host<T>(vec_size);
-        vec_helper_d = device_allocate<T>(vec_size);
-        err_helper = device_allocate_host<T>(vec_size);
-        err_helper_d = device_allocate<T>(vec_size);
+        vec_helper = allocate_host(vec_size);
+        vec_helper_d = allocate_device(vec_size);
+        err_helper = allocate_host(vec_size);
+        err_helper_d = allocate_device(vec_size);
 
     }
     ~gpu_reduction_ogita()
     {
         if(vec_helper != nullptr)
         {
-            device_deallocate_host(vec_helper);
+            free_host(vec_helper);
         }
         if(vec_helper_d != nullptr)
         {
-            device_deallocate(vec_helper_d);
+            free_device(vec_helper_d);
         }
         if(err_helper != nullptr)
         {
-            device_deallocate_host(err_helper);
+            free_host(err_helper);
         }
         if(err_helper_d != nullptr)
         {
-            device_deallocate(err_helper_d);
+            free_device(err_helper_d);
         }        
     }
 
@@ -82,6 +83,38 @@ private:
     T_vec vec_helper = nullptr;
     T_vec err_helper_d = nullptr;
     T_vec err_helper = nullptr;
+
+    static T_vec allocate_device(size_t size)
+    {
+        void* ptr = nullptr;
+        CUDA_SAFE_CALL(cudaMalloc(&ptr, sizeof(T)*size));
+        return static_cast<T_vec>(ptr);
+    }
+
+    static T_vec allocate_host(size_t size)
+    {
+        void* ptr = nullptr;
+        if(size != 0)
+        {
+            CUDA_SAFE_CALL(cudaMallocHost(&ptr, sizeof(T)*size, cudaHostAllocDefault));
+        }
+        return static_cast<T_vec>(ptr);
+    }
+
+    static void free_device(T_vec ptr)
+    {
+        CUDA_SAFE_CALL(cudaFree(static_cast<void*>(ptr)));
+    }
+
+    static void free_host(T_vec ptr)
+    {
+        CUDA_SAFE_CALL(cudaFreeHost(static_cast<void*>(ptr)));
+    }
+
+    static void copy_device_to_host(T_vec host, const T_vec device, size_t size)
+    {
+        CUDA_SAFE_CALL(cudaMemcpy(host, device, sizeof(T)*size, cudaMemcpyDeviceToHost));
+    }
 
 
     T reduction_sum(int N, const T_vec InputV, T_vec OutputV, T_vec Output, T_vec errV, T_vec err, bool use_abs_);

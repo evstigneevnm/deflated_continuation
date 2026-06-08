@@ -1,9 +1,9 @@
 #ifndef __GPU_REDUCTION_IMPL_OGITA_CUH__
 #define __GPU_REDUCTION_IMPL_OGITA_CUH__
 
-#include <nmfd/operations/blas1/high_precision/gpu_reduction_ogita_impl_shmem.cuh>
-#include <nmfd/operations/blas1/high_precision/gpu_reduction_ogita_impl_functions.cuh>
-#include <nmfd/operations/blas1/high_precision/gpu_reduction_ogita.h>
+#include <nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_shmem.cuh>
+#include <nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_functions.cuh>
+#include <nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita.h>
 
 namespace gpu_reduction_ogita_gpu_kernels
 {
@@ -24,9 +24,9 @@ __global__ void reduce_asum_ogita_kernel(const T_vec g_idata, T_vec g_odata, T_v
     unsigned int i = blockIdx.x*blockSize*2 + threadIdx.x;
     unsigned int gridSize = blockSize*2*gridDim.x;
 
-    T main_sum = T(0.0);
-    T error_sum = T(0.0);
-    T error_local = T(0.0);
+    T main_sum{};
+    T error_sum{};
+    T error_local{};
     // we reduce multiple elements per thread.  The number is determined by the
     // number of active thread blocks (via gridDim).  More blocks will result
     // in a larger gridSize and therefore fewer elements per thread
@@ -35,7 +35,7 @@ __global__ void reduce_asum_ogita_kernel(const T_vec g_idata, T_vec g_odata, T_v
 
         if(first_run)
         {
-            err_data[i] = T(0.0);
+            err_data[i] = T{};
         }
         //main_sum += g_idata[i];
         
@@ -48,7 +48,7 @@ __global__ void reduce_asum_ogita_kernel(const T_vec g_idata, T_vec g_odata, T_v
         {
             if(first_run)
             {
-                err_data[i + blockSize] = T(0.0);
+                err_data[i + blockSize] = T{};
             }
             main_sum = __GPU_REDUCTION_OGITA_H__two_asum_device(error_local, main_sum, g_idata[i+blockSize] );
             error_sum += error_local + err_data[i+blockSize];            
@@ -235,9 +235,9 @@ __global__ void reduce_sum_ogita_kernel(const T_vec g_idata, T_vec g_odata, T_ve
     unsigned int i = blockIdx.x*blockSize*2 + threadIdx.x;
     unsigned int gridSize = blockSize*2*gridDim.x;
 
-    T main_sum = T(0.0);
-    T error_sum = T(0.0);
-    T error_local = T(0.0);
+    T main_sum{};
+    T error_sum{};
+    T error_local{};
     // we reduce multiple elements per thread.  The number is determined by the
     // number of active thread blocks (via gridDim).  More blocks will result
     // in a larger gridSize and therefore fewer elements per thread
@@ -246,7 +246,7 @@ __global__ void reduce_sum_ogita_kernel(const T_vec g_idata, T_vec g_odata, T_ve
 
         if(first_run)
         {
-            err_data[i] = T(0.0);
+            err_data[i] = T{};
         }
         //main_sum += g_idata[i];
         main_sum = __GPU_REDUCTION_OGITA_H__two_sum_device(error_local, main_sum, g_idata[i]);
@@ -258,7 +258,7 @@ __global__ void reduce_sum_ogita_kernel(const T_vec g_idata, T_vec g_odata, T_ve
         {
             if(first_run)
             {
-                err_data[i + blockSize] = T(0.0);
+                err_data[i + blockSize] = T{};
             }
 
             main_sum = __GPU_REDUCTION_OGITA_H__two_sum_device(error_local, main_sum, g_idata[i+blockSize]);
@@ -457,10 +457,10 @@ __global__ void reduce_dot_ogita_kernel(const T_vec g_idata1, const T_vec g_idat
     unsigned int i = blockIdx.x*blockSize*2 + threadIdx.x;
     unsigned int gridSize = blockSize*2*gridDim.x;
 
-    T main_sum = T(0.0);
-    T error_sum = T(0.0);
-    T error_local = T(0.0);
-    T error_local_prod = T(0.0);
+    T main_sum{};
+    T error_sum{};
+    T error_local{};
+    T error_local_prod{};
     // we reduce multiple elements per thread.  The number is determined by the
     // number of active thread blocks (via gridDim).  More blocks will result
     // in a larger gridSize and therefore fewer elements per thread
@@ -468,7 +468,7 @@ __global__ void reduce_dot_ogita_kernel(const T_vec g_idata1, const T_vec g_idat
     {
         if(first_run)
         {
-            err_data[i] = T(0.0);
+            err_data[i] = T{};
         }
 
         // main_sum += g_idata1[i]*g_idata2[i];
@@ -483,7 +483,7 @@ __global__ void reduce_dot_ogita_kernel(const T_vec g_idata1, const T_vec g_idat
 
             if(first_run)
             {
-                err_data[i+blockSize] = T(0.0);
+                err_data[i+blockSize] = T{};
             }
             //main_sum += g_idata1[i+blockSize]*g_idata2[i+blockSize];
             T res_l = __GPU_REDUCTION_OGITA_H__two_prod_device(error_local_prod, g_idata1[i+blockSize], g_idata2[i+blockSize]);
@@ -1146,8 +1146,8 @@ void gpu_reduction_ogita<T, T_vec, BLOCK_SIZE, threads_r>::wrapper_reduce_dot(in
 template<class T, class T_vec, int BLOCK_SIZE, int threads_r>
 T gpu_reduction_ogita<T, T_vec, BLOCK_SIZE, threads_r>::reduction_sum(int N, const T_vec InputV, T_vec OutputV, T_vec Output, T_vec errV, T_vec err, bool use_abs_)
 {
-    T gpu_result = T(0.0);
-    T gpu_err = T(0.0);
+    T gpu_result{};
+    T gpu_err{};
     int threads = 0, blocks = 0, sdataSize=0;
 
     get_blocks_threads_shmem(N, maxBlocks, blocks, threads, sdataSize);
@@ -1176,10 +1176,10 @@ T gpu_reduction_ogita<T, T_vec, BLOCK_SIZE, threads_r>::reduction_sum(int N, con
     if (s > 1)
     {
         // printf("s= %i >1, threads=%i, blocks=%i, shmem size=%i\n",s, threads, blocks, sdataSize);
-        device_2_host_cpy<T>(Output, OutputV, s);
-        device_2_host_cpy<T>(err, errV, s);
+        copy_device_to_host(Output, OutputV, s);
+        copy_device_to_host(err, errV, s);
 
-        T tt = T(0.0);
+        T tt{};
         for (int i=0; i < s; i++)
         {
             gpu_result = two_sum_(tt, gpu_result, Output[i]);
@@ -1190,8 +1190,8 @@ T gpu_reduction_ogita<T, T_vec, BLOCK_SIZE, threads_r>::reduction_sum(int N, con
     if (needReadBack)
     {
         // printf("s = %i == 1, needReadBack.\n",s);
-        device_2_host_cpy<T>(&gpu_result, OutputV, 1);
-        device_2_host_cpy<T>(&gpu_err, errV, 1);
+        copy_device_to_host(&gpu_result, OutputV, 1);
+        copy_device_to_host(&gpu_err, errV, 1);
     }
 
     T gpu_res_long = gpu_result + gpu_err;
@@ -1204,8 +1204,8 @@ T gpu_reduction_ogita<T, T_vec, BLOCK_SIZE, threads_r>::reduction_sum(int N, con
 template<class T, class T_vec, int BLOCK_SIZE, int threads_r>
 T gpu_reduction_ogita<T, T_vec, BLOCK_SIZE, threads_r>::reduction_dot(int N, const T_vec InputV1, const T_vec InputV2, T_vec OutputV, T_vec Output, T_vec errV, T_vec err)
 {
-    T gpu_result = T(0.0);
-    T gpu_err = T(0.0);
+    T gpu_result{};
+    T gpu_err{};
     int threads = 0, blocks = 0, sdataSize=0;
 
     get_blocks_threads_shmem(N, maxBlocks, blocks, threads, sdataSize);
@@ -1213,12 +1213,6 @@ T gpu_reduction_ogita<T, T_vec, BLOCK_SIZE, threads_r>::reduction_dot(int N, con
     // printf(" s = %i, threads=%i, blocks=%i, shmem size=%i\n",N,threads, blocks, sdataSize);
     wrapper_reduce_dot(blocks, threads, sdataSize, InputV1, InputV2, OutputV, errV, N, true);
     
-    // device_2_host_cpy<T>(err, errV, N);
-    // for(int jj = 0;jj<N;jj++)
-    // {
-    //     std::cout << err[jj] << std::endl;
-    // }
-
     bool needReadBack=true;
     int s=blocks;
     while (s > 1)
@@ -1233,10 +1227,10 @@ T gpu_reduction_ogita<T, T_vec, BLOCK_SIZE, threads_r>::reduction_dot(int N, con
     {
         // printf(" s= %i >1, threads=%i, blocks=%i, shmem size=%i\n", s, threads, blocks, sdataSize);
         
-        device_2_host_cpy<T>(Output, OutputV, s);
-        device_2_host_cpy<T>(err, errV, s);
+        copy_device_to_host(Output, OutputV, s);
+        copy_device_to_host(err, errV, s);
 
-        T tt = T(0.0);
+        T tt{};
         for (int i=0; i < s; i++)
         {
             gpu_result = two_sum_(tt, gpu_result, Output[i]);
@@ -1247,11 +1241,10 @@ T gpu_reduction_ogita<T, T_vec, BLOCK_SIZE, threads_r>::reduction_dot(int N, con
     if (needReadBack)
     {
         // printf(" s = %i == 1, needReadBack.\n",s);
-        device_2_host_cpy<T>(&gpu_result, OutputV, 1);
-        device_2_host_cpy<T>(&gpu_err, errV, 1);
+        copy_device_to_host(&gpu_result, OutputV, 1);
+        copy_device_to_host(&gpu_err, errV, 1);
     }
 
-    // printf(" gpu_result = %.24le gpu_err = %.24le\n", (double)gpu_result, (double)gpu_err);
     // std::cout << "gpu_res = " << gpu_result << " gpu_err = " << gpu_err << std::endl;
     gpu_result = gpu_result + gpu_err;
     

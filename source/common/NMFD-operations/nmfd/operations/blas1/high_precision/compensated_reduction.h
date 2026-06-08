@@ -14,9 +14,16 @@
 
 #include <common/scfd_backend_ext/complex.h>
 
+#if defined(NMFD_HIGH_PRECISION_BLAS1_ENABLE_HIP_NVIDIA) || (defined(__HIPCC__) && (defined(__HIP_PLATFORM_NVIDIA__) || defined(__HIP_PLATFORM_NVCC__)))
+#define NMFD_HIGH_PRECISION_BLAS1_HIP_USES_CUDA_OGITA 1
+#endif
+
 #if defined(__CUDACC__) && !defined(__HIPCC__)
 #include <memory>
-#include <nmfd/operations/blas1/high_precision/gpu_reduction_ogita.h>
+#include <nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita.h>
+#elif defined(NMFD_HIGH_PRECISION_BLAS1_HIP_USES_CUDA_OGITA)
+#include <memory>
+#include <nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita.h>
 #endif
 
 namespace scfd
@@ -515,6 +522,67 @@ private:
         if(n != size_)
         {
             throw std::logic_error("CUDA high precision reduction currently requires the vector-operations default size");
+        }
+    }
+
+    gpu_reduction_ogita<T, T*>& reducer() const
+    {
+        if(!reducer_)
+        {
+            reducer_.reset(new gpu_reduction_ogita<T, T*>(static_cast<std::size_t>(size_)));
+        }
+        return *reducer_;
+    }
+
+    Ordinal size_;
+    mutable std::unique_ptr<gpu_reduction_ogita<T, T*>> reducer_;
+};
+#endif
+
+#if defined(NMFD_HIGH_PRECISION_BLAS1_HIP_USES_CUDA_OGITA)
+template<class T, class Ordinal>
+class compensated_reduction<scfd::backend::hip, T, Ordinal>
+{
+public:
+    using arithmetic_type = detail::arithmetic<T>;
+    using real_type = typename arithmetic_type::real_type;
+    static constexpr bool is_supported = true;
+
+    explicit compensated_reduction(Ordinal size):
+        size_(size)
+    {
+    }
+
+    T sum(Ordinal n, const T* x) const
+    {
+        check_size(n);
+        return reducer().sum(const_cast<T*>(x));
+    }
+
+    real_type asum(Ordinal n, const T* x) const
+    {
+        check_size(n);
+        return reducer().asum(const_cast<T*>(x));
+    }
+
+    T dot(Ordinal n, const T* x, const T* y) const
+    {
+        check_size(n);
+        return reducer().dot(const_cast<T*>(x), const_cast<T*>(y));
+    }
+
+    real_type norm_sq(Ordinal n, const T* x) const
+    {
+        check_size(n);
+        return arithmetic_type::real_part(reducer().dot(const_cast<T*>(x), const_cast<T*>(x)));
+    }
+
+private:
+    void check_size(Ordinal n) const
+    {
+        if(n != size_)
+        {
+            throw std::logic_error("HIP high precision reduction currently requires the vector-operations default size");
         }
     }
 

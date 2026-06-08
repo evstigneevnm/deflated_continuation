@@ -8,6 +8,7 @@
 #include <common/hip_init_scfd.h>
 #include <common/scfd_backend_ext/complex.h>
 #include <common/scfd_vector_operations.h>
+#include <common/tests/scfd_vector_operations_high_precision_tests.h>
 #include <common/tests/scfd_vector_operations_nmfd_interface_tests.h>
 #include <common/tests/vector_operations_template_tests.h>
 
@@ -54,6 +55,12 @@ void run_scfd_type(
             label + " n=" + std::to_string(n),
             report);
         vector_operations_tests::run_nmfd_vector_space_interface_tests(
+            vec_ops,
+            scfd_vector_access{},
+            n,
+            label + " n=" + std::to_string(n),
+            report);
+        vector_operations_tests::run_scfd_vector_operations_high_precision_tests(
             vec_ops,
             scfd_vector_access{},
             n,

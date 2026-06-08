@@ -6,7 +6,7 @@
 #include <external_libraries/cublas_wrap.h>
 #include <utils/curand_safe_call.h>
 #include <common/macros.h>
-#include <nmfd/operations/blas1/high_precision/gpu_reduction_ogita.h>
+#include <nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita.h>
 #include <random>
 #include <initializer_list>
 #include <utility>

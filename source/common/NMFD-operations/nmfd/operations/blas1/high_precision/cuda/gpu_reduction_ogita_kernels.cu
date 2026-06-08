@@ -1,4 +1,4 @@
-#include <nmfd/operations/blas1/high_precision/gpu_reduction_ogita_impl.cuh>
+#include <nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl.cuh>
 #include <thrust/complex.h>
 
 

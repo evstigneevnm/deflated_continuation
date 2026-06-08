@@ -1,7 +1,7 @@
 #ifndef __GPU_REDUCTION_IMPL_OGITA_FUNCTIONS_CUH__
 #define __GPU_REDUCTION_IMPL_OGITA_FUNCTIONS_CUH__
 
-#include <nmfd/operations/blas1/high_precision/gpu_reduction_ogita_type.h>
+#include <nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_type.h>
 #include <cuda_runtime_api.h>
 #include <thrust/complex.h>
 
@@ -24,7 +24,7 @@ template <class T> __device__ __forceinline__ T _shfl(T a, const int j) {
 
 // basic template (int, float)
 template <class T> __device__ __forceinline__ T shuffle(T a, const int j) {
-  return _shfl<T>(T(a), j);
+  return _shfl<T>(static_cast<T>(a), j);
 }
 // double specialization
 template <> __device__ __forceinline__ double shuffle(double a, const int j) {
@@ -110,17 +110,14 @@ __GPU_REDUCTION_OGITA_H__two_prod_device(thrust::complex<float> &t,
   T_real p_I2 = -a_I * b_R;
   T_real t_I2 = _fma<T_real>(-a_I, b_R, -p_I2);
 
-  T_real t1 = T_real(0.0);
-  T_real t2 = T_real(0.0);
+  T_real t1{};
+  T_real t2{};
   T_real p_R = __GPU_REDUCTION_OGITA_H__two_sum_device<T_real>(t1, p_R1, p_R2);
   T_real p_I = __GPU_REDUCTION_OGITA_H__two_sum_device<T_real>(t2, p_I1, p_I2);
 
   TC p = TC(p_R, p_I);
 
   t = TC(t_R1 + t_R2 + t1, t_I1 + t_I2 + t2);
-  // printf("p_R1=%e, p_R2=%e, p_R=%e p_I1=%e, p_I2=%e, p_I=%e\n", p_R1, p_R2,
-  // p_R, p_I1, p_I2, p_I ); printf("t = (%le,%le)\n", (double)t.real(),
-  // (double)t.imag());
   return p;
 }
 template <>
@@ -148,8 +145,8 @@ __GPU_REDUCTION_OGITA_H__two_prod_device(thrust::complex<double> &t,
   T_real p_I2 = -a_I * b_R;
   T_real t_I2 = _fma<T_real>(-a_I, b_R, -p_I2);
 
-  T_real t1 = T_real(0.0);
-  T_real t2 = T_real(0.0);
+  T_real t1{};
+  T_real t2{};
   T_real p_R = __GPU_REDUCTION_OGITA_H__two_sum_device<T_real>(t1, p_R1, p_R2);
   T_real p_I = __GPU_REDUCTION_OGITA_H__two_sum_device<T_real>(t2, p_I1, p_I2);
 
@@ -190,14 +187,14 @@ __device__ __forceinline__ thrust::complex<float>
 __GPU_REDUCTION_OGITA_H__two_asum_device(thrust::complex<float> &t,
                                          thrust::complex<float> a,
                                          thrust::complex<float> b) {
-  float t1 = float(0.0);
-  thrust::complex<float> t2 = thrust::complex<float>(0.0);
+  float t1{};
+  thrust::complex<float> t2{};
   float b_real = __GPU_REDUCTION_OGITA_H__two_sum_device<float>(
       t1, cuda_abs<float>(b.real()), cuda_abs<float>(b.imag()));
   thrust::complex<float> s =
       __GPU_REDUCTION_OGITA_H__two_sum_device<thrust::complex<float>>(
-          t2, a, thrust::complex<float>(b_real, float(0.0)));
-  t = thrust::complex<float>(t1, float(0.0)) + t2;
+          t2, a, thrust::complex<float>(b_real, 0.0f));
+  t = thrust::complex<float>(t1, 0.0f) + t2;
   return s;
 }
 template <>
@@ -205,26 +202,26 @@ __device__ __forceinline__ thrust::complex<double>
 __GPU_REDUCTION_OGITA_H__two_asum_device(thrust::complex<double> &t,
                                          thrust::complex<double> a,
                                          thrust::complex<double> b) {
-  double t1 = double(0.0);
-  thrust::complex<double> t2 = thrust::complex<double>(0.0);
+  double t1{};
+  thrust::complex<double> t2{};
   double b_real = __GPU_REDUCTION_OGITA_H__two_sum_device<double>(
       t1, cuda_abs<double>(b.real()), cuda_abs<double>(b.imag()));
   thrust::complex<double> s =
       __GPU_REDUCTION_OGITA_H__two_sum_device<thrust::complex<double>>(
-          t2, a, thrust::complex<double>(b_real, double(0.0)));
-  t = thrust::complex<double>(t1, double(0.0)) + t2;
+          t2, a, thrust::complex<double>(b_real, 0.0));
+  t = thrust::complex<double>(t1, 0.0) + t2;
   return s;
 }
 
 // funciton for debug =)
 template <class T> __device__ void print_var(T var) {
-  printf("var = %le\n", (double)var);
+  printf("var = %le\n", static_cast<double>(var));
 }
 template <> __device__ void print_var(thrust::complex<double> var) {
-  printf("var = (%le,%le)\n", (double)var.real(), (double)var.imag());
+  printf("var = (%le,%le)\n", static_cast<double>(var.real()), static_cast<double>(var.imag()));
 }
 template <> __device__ void print_var(thrust::complex<float> var) {
-  printf("var = (%le,%le)\n", (double)var.real(), (double)var.imag());
+  printf("var = (%le,%le)\n", static_cast<double>(var.real()), static_cast<double>(var.imag()));
 }
 // function ends
 

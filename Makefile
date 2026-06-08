@@ -62,9 +62,25 @@ endif
 NVCC = $(CUDA_ROOT_PATH)/bin/nvcc
 NVCC_CHECK_REGS = -Xptxas -v
 NVCCFLAGS = -Wno-deprecated-gpu-targets --expt-relaxed-constexpr $(CUDA_ARCH) -std=$(CPPSTD) $(TARGET_NVCC)
+ifdef HIP_ROOT_PATH
+HIPCC ?= $(HIP_ROOT_PATH)/bin/hipcc
+else
 HIPCC ?= hipcc
+endif
 HIP_EXTENDED_LAMBDA ?= $(shell $(HIPCC) --version 2>/dev/null | grep -iq nvcc && printf '%s' '--extended-lambda')
-HIPFLAGS ?= -std=$(CPPSTD) $(HIP_EXTENDED_LAMBDA) $(TARGET_HIPCC)
+ifdef HIP_ARCH_LIST
+HIP_ARCH = $(shell echo '$(HIP_ARCH_LIST)' | awk '{for (i=1;i<=NF;++i) {if ($$i ~ /^[0-9]+$$/) printf " -gencode arch=compute_%s,code=sm_%s", $$i, $$i; else printf " --offload-arch=%s", $$i}}')
+HIP_NVIDIA_BACKEND = $(shell echo '$(HIP_ARCH_LIST)' | awk '{for (i=1;i<=NF;++i) {if ($$i ~ /^[0-9]+$$/) {printf "1"; exit}}}')
+else
+HIP_ARCH =
+HIP_NVIDIA_BACKEND =
+endif
+ifeq ($(HIP_NVIDIA_BACKEND),1)
+HIP_PLATFORM_DEFINES = -DNMFD_HIGH_PRECISION_BLAS1_ENABLE_HIP_NVIDIA=1
+else
+HIP_PLATFORM_DEFINES =
+endif
+HIPFLAGS ?= $(HIP_ARCH) $(HIP_PLATFORM_DEFINES) -std=$(CPPSTD) $(HIP_EXTENDED_LAMBDA) $(TARGET_HIPCC)
 OPENMP = -fopenmp -lpthread
 NVOPENMP = -Xcompiler $(OPENMP)
 CONTRIB_SCFD = source/contrib/scfd
@@ -76,7 +92,9 @@ G++FLAGS = -std=$(CPPSTD) $(TARGET_GCC)
 ICUDA = -I$(CUDA_ROOT_PATH)/include
 IPROJECT = -I $(COMMON_NMFD_OPERATIONS) -I source/ -I $(CONTRIB_SCFD)/include
 IBOOST = -I$(BOOST_ROOT_PATH)/include
-HIGH_PRECISION_BLAS1_HEADERS = source/common/NMFD-operations/nmfd/operations/blas1/high_precision/compensated_reduction.h source/common/NMFD-operations/nmfd/operations/blas1/high_precision/gpu_reduction_ogita.h source/common/NMFD-operations/nmfd/operations/blas1/high_precision/gpu_reduction_ogita_type.h source/common/NMFD-operations/nmfd/operations/blas1/high_precision/gpu_reduction_ogita_impl.cuh source/common/NMFD-operations/nmfd/operations/blas1/high_precision/gpu_reduction_ogita_impl_functions.cuh source/common/NMFD-operations/nmfd/operations/blas1/high_precision/gpu_reduction_ogita_impl_shmem.cuh
+HIGH_PRECISION_BLAS1_CUDA_HEADERS = source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita.h source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_type.h source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl.cuh source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_functions.cuh source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_shmem.cuh
+HIGH_PRECISION_BLAS1_HIP_HEADERS = source/common/NMFD-operations/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita.h
+HIGH_PRECISION_BLAS1_HEADERS = source/common/NMFD-operations/nmfd/operations/blas1/high_precision/compensated_reduction.h $(HIGH_PRECISION_BLAS1_CUDA_HEADERS) $(HIGH_PRECISION_BLAS1_HIP_HEADERS)
 SCFD_VECTOR_OPS_HEADERS = source/common/scfd_vector_operations.h source/common/NMFD-operations/nmfd/operations/scfd_vector_operations.h $(HIGH_PRECISION_BLAS1_HEADERS) source/common/NMFD-operations/nmfd/operations/vector_operations_base.h source/common/NMFD-operations/nmfd/operations/vector_space_base.h
 SCFD_SERIAL_VECTOR_OPS_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/scfd_serial_cpu_vector_operations.h
 SCFD_VECTOR_OPS_TEST_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/tests/scfd_vector_operations_high_precision_tests.h source/common/tests/scfd_vector_operations_nmfd_interface_tests.h
@@ -194,8 +212,11 @@ scfd_vector_operations.bin: scfd_vector_operations_cuda.bin
 scfd_vector_operations_cuda.bin: source/common/tests/test_scfd_vector_operations.cu source/common/tests/vector_operations_template_tests.h $(SCFD_VECTOR_OPS_TEST_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/tests/test_scfd_vector_operations.cu $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/test_scfd_vector_operations_cuda.bin 2>$(RESULTS)
 
-scfd_vector_operations_hip.bin: source/common/tests/test_scfd_vector_operations_hip.cpp source/common/tests/vector_operations_template_tests.h source/common/hip_init_scfd.h $(SCFD_VECTOR_OPS_TEST_HEADERS)
-	$(HIPCC) $(HIPFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/common/tests/test_scfd_vector_operations_hip.cpp -o $(BUILD_DIR)/test_scfd_vector_operations_hip.bin 2>$(RESULTS)
+scfd_vector_operations_hip.bin: $(BUILD_DIR)/test_scfd_vector_operations_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_scfd_vector_operations_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o -o $(BUILD_DIR)/test_scfd_vector_operations_hip.bin 2>$(RESULTS)
+
+$(BUILD_DIR)/test_scfd_vector_operations_hip.o: source/common/tests/test_scfd_vector_operations_hip.cpp source/common/tests/vector_operations_template_tests.h source/common/hip_init_scfd.h $(SCFD_VECTOR_OPS_TEST_HEADERS) | $(BUILD_STAMP)
+	$(HIPCC) $(HIPFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/common/tests/test_scfd_vector_operations_hip.cpp -c -o $(BUILD_DIR)/test_scfd_vector_operations_hip.o 2>$(RESULTS)
 
 scfd_vector_operations_cpu.bin: source/common/tests/test_scfd_vector_operations_cpu.cpp source/common/tests/vector_operations_template_tests.h $(SCFD_VECTOR_OPS_TEST_HEADERS)
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/common/tests/test_scfd_vector_operations_cpu.cpp $(OPENMP) -o $(BUILD_DIR)/test_scfd_vector_operations_cpu.bin 2>$(RESULTS)
@@ -208,8 +229,11 @@ test_vector_snapshot_queue.bin: source/common/tests/test_vector_snapshot_queue.c
 
 gpu_reduction_ogita_ker: $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 
-$(BUILD_DIR)/gpu_reduction_ogita_kernels.o: source/common/NMFD-operations/nmfd/operations/blas1/high_precision/gpu_reduction_ogita_kernels.cu $(HIGH_PRECISION_BLAS1_HEADERS) | $(BUILD_STAMP)
-	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)  source/common/NMFD-operations/nmfd/operations/blas1/high_precision/gpu_reduction_ogita_kernels.cu -c -o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o 2>$(RESULTS)
+$(BUILD_DIR)/gpu_reduction_ogita_kernels.o: source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_kernels.cu $(HIGH_PRECISION_BLAS1_HEADERS) | $(BUILD_STAMP)
+	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)  source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_kernels.cu -c -o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o 2>$(RESULTS)
+
+$(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o: source/common/NMFD-operations/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita_kernels.cu $(HIGH_PRECISION_BLAS1_HEADERS) | $(BUILD_STAMP)
+	$(HIPCC) $(HIPFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/common/NMFD-operations/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita_kernels.cu -c -o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o 2>$(RESULTS)
 
 gpu_vector_operations_ker: $(BUILD_DIR)/gpu_vector_operations_kernels.o
 
