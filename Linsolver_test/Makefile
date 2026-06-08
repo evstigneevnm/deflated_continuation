@@ -81,6 +81,7 @@ SCFD_SERIAL_VECTOR_OPS_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/scfd_s
 SCFD_VECTOR_OPS_TEST_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/tests/scfd_vector_operations_nmfd_interface_tests.h
 CPU_VECTOR_OPS_VAR_PREC_HEADERS = source/common/cpu_vector_operations_var_prec.h source/common/NMFD-operations/nmfd/operations/cpu_vector_operations_var_prec.h source/common/NMFD-operations/nmfd/operations/vector_operations_base.h source/common/NMFD-operations/nmfd/operations/vector_space_base.h
 COMMON_FILE_OPS_HEADERS = source/common/file_operations.h source/common/cpu_file_operations.h source/common/cpu_matrix_file_operations.h source/common/gpu_file_operations.h source/common/gpu_matrix_file_operations.h source/common/NMFD-operations/nmfd/operations/io/file_operations.h source/common/NMFD-operations/nmfd/operations/io/vector_file_operations.h source/common/NMFD-operations/nmfd/operations/io/matrix_file_operations.h
+FFT_FACADE_HEADERS = source/external_libraries/fft_facade.h source/external_libraries/fft_facade_fftw.h source/external_libraries/fft_facade_cufft.h source/external_libraries/fftw_wrap.h source/external_libraries/cufft_wrap.h
 CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/nonlinear_operators/circle/circle.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/linear_operator_circle.h source/nonlinear_operators/circle/preconditioner_circle.h source/nonlinear_operators/circle/system_operator.h
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h
 STAR_SHAPED_MODEL_HEADERS = source/models/star_shaped/star_shaped_backend_typedefs.h source/nonlinear_operators/star_shaped/star_shaped.h source/nonlinear_operators/star_shaped/convergence_strategy.h source/nonlinear_operators/star_shaped/linear_operator_star_shaped.h source/nonlinear_operators/star_shaped/preconditioner_star_shaped.h source/nonlinear_operators/star_shaped/system_operator.h
@@ -117,6 +118,12 @@ test_file_operations_cuda.bin: source/common/tests/test_file_operations_cuda.cu 
 
 test_fftw_operations.bin: source/external_libraries/tests/test_fftw_operations.cpp source/external_libraries/fftw_wrap.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/external_libraries/tests/test_fftw_operations.cpp $(LFFTW) -o $(BUILD_DIR)/test_fftw_operations.bin 2>$(RESULTS)
+
+test_fft_facade_fftw.bin: source/external_libraries/tests/test_fft_facade_fftw.cpp $(FFT_FACADE_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/external_libraries/tests/test_fft_facade_fftw.cpp $(LFFTW) -o $(BUILD_DIR)/test_fft_facade_fftw.bin 2>$(RESULTS)
+
+test_fft_facade_cufft.bin: source/external_libraries/tests/test_fft_facade_cufft.cu $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/external_libraries/tests/test_fft_facade_cufft.cu $(LIBS2) -o $(BUILD_DIR)/test_fft_facade_cufft.bin 2>$(RESULTS)
 
 test_lapack_wrap.bin: source/external_libraries/tests/test_lapack_wrap.cpp source/contrib/scfd/include/scfd/external_libraries/lapack_wrap.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/external_libraries/tests/test_lapack_wrap.cpp $(LLAPACK) -o $(BUILD_DIR)/test_lapack_wrap.bin 2>$(RESULTS)

@@ -73,6 +73,8 @@ jobs:
         run: |
           make test_fftw_operations.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fftw_operations"
           ./"$BUILD_DIR"/fftw_operations/test_fftw_operations.bin
+          make test_fft_facade_fftw.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fft_facade_fftw"
+          ./"$BUILD_DIR"/fft_facade_fftw/test_fft_facade_fftw.bin
 
   lapack-wrap-cpu:
     needs: [scfd-vector-operations-cpu]
@@ -184,6 +186,30 @@ jobs:
           ./"$BUILD_DIR"/scfd_hip_double/test_scfd_vector_operations_hip.bin auto
           make scfd_vector_operations_hip.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_hip_float" REAL_TYPE=float HIPCC="$HIPCC_BIN"
           ./"$BUILD_DIR"/scfd_hip_float/test_scfd_vector_operations_hip.bin auto
+
+  fft-facade-cuda:
+    needs: [scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Build and test when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA FFT facade: nvidia-smi not found"
+            exit 0
+          fi
+          if ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA FFT facade: nvidia-smi is present but no usable NVIDIA device was reported"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA FFT facade: nvcc not found"
+            exit 0
+          fi
+          make test_fft_facade_cufft.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fft_facade_cufft" REAL_TYPE=double
+          ./"$BUILD_DIR"/fft_facade_cufft/test_fft_facade_cufft.bin auto
 
   circle-bd-cpu-omp:
     needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
@@ -367,7 +393,7 @@ jobs:
           python3 scripts/validate_bratu_diagram.py "$BRATU_BUILD/project" --config "$BRATU_BUILD/bratu_ci.json" --residual-tolerance 1e-5 --relation-tolerance 1e-2 --min-points 20 --min-saved-points 20 --expected-curves 1 --require-fold --min-max-u 2.0
 
   circle-bd-cuda:
-    needs: [scfd-vector-operations-cuda, lapack-wrap-cuda]
+    needs: [scfd-vector-operations-cuda, fft-facade-cuda, lapack-wrap-cuda]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -394,7 +420,7 @@ jobs:
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
 
   star-shaped-bd-cuda:
-    needs: [scfd-vector-operations-cuda, lapack-wrap-cuda]
+    needs: [scfd-vector-operations-cuda, fft-facade-cuda, lapack-wrap-cuda]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

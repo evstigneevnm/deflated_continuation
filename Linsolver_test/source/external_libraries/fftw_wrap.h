@@ -8,7 +8,7 @@
 #include <string>
 #include <type_traits>
 
-namespace linsolver_external_libraries
+namespace external_libraries
 {
 namespace detail
 {
@@ -608,12 +608,12 @@ private:
     complex_type* inverse_destination_ = nullptr;
 };
 
-} // namespace linsolver_external_libraries
+} // namespace external_libraries
 
 template<class T>
-using fftw_wrap_R2C = linsolver_external_libraries::fftw_wrap_R2C<T>;
+using fftw_wrap_R2C = external_libraries::fftw_wrap_R2C<T>;
 
 template<class T>
-using fftw_wrap_C2C = linsolver_external_libraries::fftw_wrap_C2C<T>;
+using fftw_wrap_C2C = external_libraries::fftw_wrap_C2C<T>;
 
 #endif

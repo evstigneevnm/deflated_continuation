@@ -13,7 +13,7 @@
 #error "hipfft_wrapper.h requires hipFFT headers. Install hipFFT or include this header only in HIP FFT builds."
 #endif
 
-namespace linsolver_external_libraries
+namespace external_libraries
 {
 namespace detail
 {
@@ -39,7 +39,7 @@ inline void hipfft_safe_call(hipfftResult status, const char* expression, const 
 }
 
 #define LINSOLVER_HIPFFT_SAFE_CALL(expr) \
-    ::linsolver_external_libraries::detail::hipfft_safe_call((expr), #expr, __FILE__, __LINE__)
+    ::external_libraries::detail::hipfft_safe_call((expr), #expr, __FILE__, __LINE__)
 
 template<class T>
 struct hipfft_traits;
@@ -387,12 +387,12 @@ private:
     hipfftHandle planC2C_ = 0;
 };
 
-} // namespace linsolver_external_libraries
+} // namespace external_libraries
 
 template<class T>
-using hipfft_wrap_R2C = linsolver_external_libraries::hipfft_wrap_R2C<T>;
+using hipfft_wrap_R2C = external_libraries::hipfft_wrap_R2C<T>;
 
 template<class T>
-using hipfft_wrap_C2C = linsolver_external_libraries::hipfft_wrap_C2C<T>;
+using hipfft_wrap_C2C = external_libraries::hipfft_wrap_C2C<T>;
 
 #endif

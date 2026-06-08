@@ -6,7 +6,7 @@
 #include <scfd/external_libraries/lapack_wrap_device.h>
 #include <scfd/utils/cuda_safe_call.h>
 
-namespace linsolver_external_libraries_compat
+namespace external_libraries_compat
 {
 struct cuda_memory
 {
@@ -28,6 +28,6 @@ struct cuda_backend
 }
 
 template <class T>
-using lapack_wrap = scfd::lapack_wrap_device<linsolver_external_libraries_compat::cuda_backend, T>;
+using lapack_wrap = scfd::lapack_wrap_device<external_libraries_compat::cuda_backend, T>;
 
 #endif
