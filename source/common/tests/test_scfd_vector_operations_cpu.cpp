@@ -3,10 +3,12 @@
 #include <string>
 #include <vector>
 
+#include <scfd/backend/omp.h>
 #include <scfd/backend/serial_cpu.h>
 
 #include <common/scfd_backend_ext/complex.h>
 #include <common/scfd_vector_operations.h>
+#include <common/tests/scfd_vector_operations_high_precision_tests.h>
 #include <common/tests/scfd_vector_operations_nmfd_interface_tests.h>
 #include <common/tests/vector_operations_template_tests.h>
 
@@ -57,6 +59,12 @@ void run_scfd_type(
             n,
             label + " n=" + std::to_string(n),
             report);
+        vector_operations_tests::run_scfd_vector_operations_high_precision_tests(
+            vec_ops,
+            scfd_vector_access{},
+            n,
+            label + " n=" + std::to_string(n),
+            report);
     }
 }
 
@@ -67,11 +75,14 @@ int main()
     vector_operations_tests::test_report report;
 
     using real = SCALAR_TYPE;
-    using complex = common::scfd_backend_ext::complex_t<scfd::backend::serial_cpu, real>;
+    using serial_complex = common::scfd_backend_ext::complex_t<scfd::backend::serial_cpu, real>;
+    using omp_complex = common::scfd_backend_ext::complex_t<scfd::backend::omp, real>;
 
     const std::vector<std::size_t> sizes = {1, 2, 7, 31, 32, 33, 64, 1025, 4097};
     run_scfd_type<scfd::backend::serial_cpu, real>("SCFD serial real", sizes, report);
-    run_scfd_type<scfd::backend::serial_cpu, complex>("SCFD serial complex", sizes, report);
+    run_scfd_type<scfd::backend::serial_cpu, serial_complex>("SCFD serial complex", sizes, report);
+    run_scfd_type<scfd::backend::omp, real>("SCFD OMP real", sizes, report);
+    run_scfd_type<scfd::backend::omp, omp_complex>("SCFD OMP complex", sizes, report);
 
     std::cout << "Checks: " << report.checks << ", failures: " << report.failures << std::endl;
     if(report.failures == 0)

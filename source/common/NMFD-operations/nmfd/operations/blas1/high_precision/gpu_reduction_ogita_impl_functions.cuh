@@ -1,7 +1,7 @@
 #ifndef __GPU_REDUCTION_IMPL_OGITA_FUNCTIONS_CUH__
 #define __GPU_REDUCTION_IMPL_OGITA_FUNCTIONS_CUH__
 
-#include <common/ogita/gpu_reduction_ogita_type.h>
+#include <nmfd/operations/blas1/high_precision/gpu_reduction_ogita_type.h>
 #include <cuda_runtime_api.h>
 #include <thrust/complex.h>
 

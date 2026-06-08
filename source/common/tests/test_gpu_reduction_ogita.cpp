@@ -14,7 +14,7 @@
 #include <thrust/complex.h>
 
 #include <common/cuda_init_scfd.h>
-#include <common/ogita/gpu_reduction_ogita.h>
+#include <nmfd/operations/blas1/high_precision/gpu_reduction_ogita.h>
 
 namespace
 {

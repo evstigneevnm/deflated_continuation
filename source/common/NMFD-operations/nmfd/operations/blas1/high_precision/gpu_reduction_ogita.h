@@ -7,7 +7,7 @@
 #include <utils/cuda_support.h>
 #include <common/macros.h>
 #include <thrust/complex.h>
-#include <common/ogita/gpu_reduction_ogita_type.h>
+#include <nmfd/operations/blas1/high_precision/gpu_reduction_ogita_type.h>
 
 
 

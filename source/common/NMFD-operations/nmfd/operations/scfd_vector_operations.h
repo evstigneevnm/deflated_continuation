@@ -18,6 +18,7 @@
 #include <common/scfd_backend_ext/math.h>
 #include <common/scfd_backend_ext/random.h>
 
+#include <nmfd/operations/blas1/high_precision/compensated_reduction.h>
 #include <nmfd/operations/vector_space_base.h>
 
 template<class Backend, class T, class Ordinal = std::ptrdiff_t>
@@ -49,6 +50,7 @@ public:
     using for_each_type = typename backend_type::template for_each_type<ordinal_type>;
     using reduce_type = typename backend_type::reduce_type;
     using copy_type = typename backend_type::copy_type;
+    using high_precision_reduction_type = nmfd::operations::blas1::high_precision::compensated_reduction<backend_type, scalar_type, ordinal_type>;
     using nmfd_parent_type = nmfd::operations::vector_space_base
     <
         scalar_type,
@@ -64,7 +66,8 @@ public:
     using nmfd_parent_type::scalar_prod_l2;
 
     explicit scfd_vector_operations(std::size_t sz):
-        sz_(sz)
+        sz_(sz),
+        high_precision_reduction_(static_cast<ordinal_type>(sz))
     {
         helper_scalar_.init(static_cast<ordinal_type>(sz_));
         helper_real_.init(static_cast<ordinal_type>(sz_));
@@ -131,6 +134,11 @@ public:
     bool high_precision_requested() const
     {
         return high_precision_requested_;
+    }
+
+    bool last_reduction_used_high_precision() const
+    {
+        return last_reduction_high_precision_;
     }
 
     void init_vector(vector_type& x) const override
@@ -305,6 +313,12 @@ public:
 
     scalar_type scalar_prod(const vector_type& x, const vector_type& y) const
     {
+        if(high_precision_requested_)
+        {
+            last_reduction_high_precision_ = true;
+            return high_precision_reduction_.dot(static_cast<ordinal_type>(sz_), x.raw_ptr(), y.raw_ptr());
+        }
+        last_reduction_high_precision_ = false;
         const auto xp = x.raw_ptr();
         const auto yp = y.raw_ptr();
         auto hp = helper_scalar_.raw_ptr();
@@ -323,11 +337,23 @@ public:
 
     scalar_type sum(const vector_type& x) const
     {
+        if(high_precision_requested_)
+        {
+            last_reduction_high_precision_ = true;
+            return high_precision_reduction_.sum(static_cast<ordinal_type>(sz_), x.raw_ptr());
+        }
+        last_reduction_high_precision_ = false;
         return reduce_type()(static_cast<ordinal_type>(sz_), x.raw_ptr(), scalar_traits::zero());
     }
 
     norm_type asum(const vector_type& x) const
     {
+        if(high_precision_requested_)
+        {
+            last_reduction_high_precision_ = true;
+            return high_precision_reduction_.asum(static_cast<ordinal_type>(sz_), x.raw_ptr());
+        }
+        last_reduction_high_precision_ = false;
         const auto xp = x.raw_ptr();
         auto hp = helper_real_.raw_ptr();
         for_each_([=] __DEVICE_TAG__ (ordinal_type i)
@@ -345,6 +371,12 @@ public:
 
     norm_type norm_sq(const vector_type& x) const
     {
+        if(high_precision_requested_)
+        {
+            last_reduction_high_precision_ = true;
+            return high_precision_reduction_.norm_sq(static_cast<ordinal_type>(sz_), x.raw_ptr());
+        }
+        last_reduction_high_precision_ = false;
         const auto xp = x.raw_ptr();
         auto hp = helper_real_.raw_ptr();
         for_each_([=] __DEVICE_TAG__ (ordinal_type i)
@@ -844,7 +876,9 @@ private:
     mutable for_each_type for_each_;
     mutable vector_type helper_scalar_;
     mutable vector_type_real helper_real_;
+    mutable high_precision_reduction_type high_precision_reduction_;
     mutable std::size_t random_seed_ = 1;
+    mutable bool last_reduction_high_precision_ = false;
     bool high_precision_requested_ = false;
 };
 
