@@ -83,6 +83,7 @@ CPU_VECTOR_OPS_VAR_PREC_HEADERS = source/common/cpu_vector_operations_var_prec.h
 COMMON_FILE_OPS_HEADERS = source/common/file_operations.h source/common/cpu_file_operations.h source/common/cpu_matrix_file_operations.h source/common/gpu_file_operations.h source/common/gpu_matrix_file_operations.h source/common/NMFD-operations/nmfd/operations/io/file_operations.h source/common/NMFD-operations/nmfd/operations/io/vector_file_operations.h source/common/NMFD-operations/nmfd/operations/io/matrix_file_operations.h
 CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/nonlinear_operators/circle/circle.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/linear_operator_circle.h source/nonlinear_operators/circle/preconditioner_circle.h source/nonlinear_operators/circle/system_operator.h
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h
+STAR_SHAPED_MODEL_HEADERS = source/models/star_shaped/star_shaped_backend_typedefs.h source/nonlinear_operators/star_shaped/star_shaped.h source/nonlinear_operators/star_shaped/convergence_strategy.h source/nonlinear_operators/star_shaped/linear_operator_star_shaped.h source/nonlinear_operators/star_shaped/preconditioner_star_shaped.h source/nonlinear_operators/star_shaped/system_operator.h
 
 LCUDA = -L$(CUDA_ROOT_PATH)/lib64
 LBOOST = -L$(BOOST_ROOT_PATH)/lib
@@ -270,6 +271,18 @@ bratu_bd_cpu_omp: source/models/bratu/bratu_bd.cpp $(BRATU_MODEL_HEADERS) $(COMM
 
 bratu_bd_var_prec: source/models/bratu/bratu_bd.cpp $(BRATU_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
 	$(G++) $(G++FLAGS) -DBRATU_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(IBOOST) source/models/bratu/bratu_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/bratu_bd_var_prec.bin 2>$(RESULTS)
+
+star_shaped_bd: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/star_shaped/star_shaped_bd.cpp $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd.bin 2>$(RESULTS)
+
+star_shaped_bd_cpu_omp: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) source/models/star_shaped/star_shaped_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd_cpu_omp.bin 2>$(RESULTS)
+
+star_shaped_bd_hip: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(HIPCC) $(HIPFLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) source/models/star_shaped/star_shaped_bd.cpp $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd_hip.bin 2>$(RESULTS)
+
+star_shaped_bd_var_prec: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
+	$(G++) $(G++FLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(IBOOST) source/models/star_shaped/star_shaped_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd_var_prec.bin 2>$(RESULTS)
 
 KS_bd: source/models/KS_2D/KS_bd_json_new.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KS_2D/KS_bd_json_new.cpp $(BUILD_DIR)/Kuramoto_Sivashinskiy_2D_ker.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBSAll) $(LLAPACK) -o $(BUILD_DIR)/KS_bd_json.bin 2>$(RESULTS)
