@@ -56,6 +56,7 @@ jobs:
           ./"$BUILD_DIR"/scfd_cpu_float/test_scfd_vector_operations_cpu.bin
 
   fftw-operations-cpu:
+    needs: [scfd-vector-operations-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -74,6 +75,7 @@ jobs:
           ./"$BUILD_DIR"/fftw_operations/test_fftw_operations.bin
 
   lapack-wrap-cpu:
+    needs: [scfd-vector-operations-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -92,6 +94,7 @@ jobs:
           ./"$BUILD_DIR"/lapack_wrap/test_lapack_wrap.bin
 
   lapack-wrap-cuda:
+    needs: [scfd-vector-operations-cuda, lapack-wrap-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -183,6 +186,7 @@ jobs:
           ./"$BUILD_DIR"/scfd_hip_float/test_scfd_vector_operations_hip.bin auto
 
   circle-bd-cpu-omp:
+    needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -205,6 +209,7 @@ jobs:
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
 
   circle-bd-full-cpu-omp:
+    needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -227,6 +232,7 @@ jobs:
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-circle --min-angle-coverage 6.0 --max-closure-distance 1e-10
 
   circle-bd-var-prec:
+    needs: [cpu-vector-operations-var-prec, fftw-operations-cpu, lapack-wrap-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -248,6 +254,7 @@ jobs:
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
 
   star-shaped-bd-cpu-omp:
+    needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -270,6 +277,7 @@ jobs:
           python3 scripts/validate_star_shaped_diagram.py "$STAR_BUILD/project" --config "$STAR_BUILD/star_shaped_ci.json" --residual-tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-star --min-angle-coverage 6.0 --max-closure-distance 5e-2
 
   star-shaped-bd-var-prec:
+    needs: [cpu-vector-operations-var-prec, fftw-operations-cpu, lapack-wrap-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -291,6 +299,7 @@ jobs:
           python3 scripts/validate_star_shaped_diagram.py "$STAR_BUILD/project" --config "$STAR_BUILD/star_shaped_ci.json" --residual-tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-star --min-angle-coverage 6.0 --max-closure-distance 5e-2
 
   bratu-bd-cpu-omp:
+    needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -313,6 +322,7 @@ jobs:
           python3 scripts/validate_bratu_diagram.py "$BRATU_BUILD/project" --config "$BRATU_BUILD/bratu_ci.json" --residual-tolerance 1e-5 --relation-tolerance 1e-2 --min-points 20 --min-saved-points 20 --expected-curves 1 --require-fold --min-max-u 2.0
 
   bratu-bd-fd3-cpu-omp:
+    needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -335,6 +345,7 @@ jobs:
           python3 scripts/validate_bratu_diagram.py "$BRATU_BUILD/project" --config "$BRATU_BUILD/bratu_ci.json" --residual-tolerance 1e-5 --relation-tolerance 5e-2 --min-points 20 --min-saved-points 20 --expected-curves 1 --require-fold --min-max-u 2.0
 
   bratu-bd-var-prec:
+    needs: [cpu-vector-operations-var-prec, fftw-operations-cpu, lapack-wrap-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -356,6 +367,7 @@ jobs:
           python3 scripts/validate_bratu_diagram.py "$BRATU_BUILD/project" --config "$BRATU_BUILD/bratu_ci.json" --residual-tolerance 1e-5 --relation-tolerance 1e-2 --min-points 20 --min-saved-points 20 --expected-curves 1 --require-fold --min-max-u 2.0
 
   circle-bd-cuda:
+    needs: [scfd-vector-operations-cuda, lapack-wrap-cuda]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -382,6 +394,7 @@ jobs:
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
 
   star-shaped-bd-cuda:
+    needs: [scfd-vector-operations-cuda, lapack-wrap-cuda]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -408,6 +421,7 @@ jobs:
           python3 scripts/validate_star_shaped_diagram.py "$STAR_BUILD/project" --config "$STAR_BUILD/star_shaped_ci.json" --residual-tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-star --min-angle-coverage 6.0 --max-closure-distance 5e-2
 
   circle-bd-hip:
+    needs: [scfd-vector-operations-hip]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -447,6 +461,7 @@ jobs:
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
 
   star-shaped-bd-hip:
+    needs: [scfd-vector-operations-hip]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
