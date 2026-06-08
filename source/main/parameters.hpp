@@ -35,6 +35,7 @@ struct parameters
             bool is_small_alpha;
             bool save_convergence_history;
             bool divide_out_norms_by_rel_base;
+            bool verbose;
 
 
             void set_default()
@@ -47,6 +48,7 @@ struct parameters
                 is_small_alpha               = false;
                 save_convergence_history     = true;
                 divide_out_norms_by_rel_base = true;
+                verbose                      = true;
             }
 
             void plot_all()
@@ -59,6 +61,7 @@ struct parameters
                 std::cout << "||  |==is_small_alpha: " << is_small_alpha << std::endl;
                 std::cout << "||  |==save_convergence_history: " << save_convergence_history << std::endl;
                 std::cout << "||  |==divide_out_norms_by_rel_base: " << divide_out_norms_by_rel_base << std::endl;
+                std::cout << "||  |==verbose: " << verbose << std::endl;
             }
         };
         struct newton_extended_continuation_s
@@ -194,6 +197,7 @@ struct parameters
                               //those are custom parameters to be set only to high dim Krylov methods
             bool save_convergence_history;
             bool divide_out_norms_by_rel_base;
+            bool verbose;
 
             void set_default()
             {
@@ -206,6 +210,7 @@ struct parameters
                             //those are custom parameters to be set only to high dim Krylov methods
                 save_convergence_history     = true;
                 divide_out_norms_by_rel_base = true;
+                verbose                      = true;
             }
 
             void plot_all()
@@ -217,6 +222,7 @@ struct parameters
                 std::cout << "||  |==lin_solver_tol: " << lin_solver_tol << std::endl;
                 std::cout << "||  |==save_convergence_history: " << save_convergence_history << std::endl;
                 std::cout << "||  |==divide_out_norms_by_rel_base: " << divide_out_norms_by_rel_base << std::endl;
+                std::cout << "||  |==verbose: " << verbose << std::endl;
             }
         };
 
@@ -292,6 +298,7 @@ struct parameters
             T    lin_solver_tol; //relative tolerance wrt to rhs vector. For Krylov-Newton method can be set lower
             bool save_convergence_history;
             bool divide_out_norms_by_rel_base;
+            bool verbose;
 
             void set_default()
             {
@@ -303,6 +310,7 @@ struct parameters
                     5.0e-3; //relative tolerance wrt to rhs vector. For Krylov-Newton method can be set lower
                 save_convergence_history     = true;
                 divide_out_norms_by_rel_base = true;
+                verbose                      = true;
             }
 
             void plot_all()
@@ -314,6 +322,7 @@ struct parameters
                 std::cout << "||  |==lin_solver_tol: " << lin_solver_tol << std::endl;
                 std::cout << "||  |==save_convergence_history: " << save_convergence_history << std::endl;
                 std::cout << "||  |==divide_out_norms_by_rel_base: " << divide_out_norms_by_rel_base << std::endl;
+                std::cout << "||  |==verbose: " << verbose << std::endl;
             }
         };
 
@@ -460,7 +469,8 @@ void from_json(
         j.at( "tolerance" ).get<double>(),
         j.at( "use_small_alpha_approximation" ).get<bool>(),
         j.at( "save_convergence_history" ).get<bool>(),
-        j.at( "divide_norms_by_relative_base" ).get<bool>()
+        j.at( "divide_norms_by_relative_base" ).get<bool>(),
+        j.value( "verbose", true )
     };
 }
 void from_json(
@@ -475,7 +485,8 @@ void from_json(
         j.at( "tolerance" ).get<float>(),
         j.at( "use_small_alpha_approximation" ).get<bool>(),
         j.at( "save_convergence_history" ).get<bool>(),
-        j.at( "divide_norms_by_relative_base" ).get<bool>()
+        j.at( "divide_norms_by_relative_base" ).get<bool>(),
+        j.value( "verbose", true )
     };
 }
 
@@ -597,7 +608,8 @@ void from_json( const nlohmann::json &j, parameters_d::stability_continuation_s:
         j.at( "basis_size" ).get<unsigned int>(),
         j.at( "tolerance" ).get<double>(),
         j.at( "save_convergence_history" ).get<bool>(),
-        j.at( "divide_norms_by_relative_base" ).get<bool>()
+        j.at( "divide_norms_by_relative_base" ).get<bool>(),
+        j.value( "verbose", true )
     };
 }
 void from_json( const nlohmann::json &j, parameters_f::stability_continuation_s::linear_solver_s &params_dc_lse_ )
@@ -609,7 +621,8 @@ void from_json( const nlohmann::json &j, parameters_f::stability_continuation_s:
         j.at( "basis_size" ).get<unsigned int>(),
         j.at( "tolerance" ).get<float>(),
         j.at( "save_convergence_history" ).get<bool>(),
-        j.at( "divide_norms_by_relative_base" ).get<bool>()
+        j.at( "divide_norms_by_relative_base" ).get<bool>(),
+        j.value( "verbose", true )
     };
 }
 
@@ -660,6 +673,7 @@ void from_json( const nlohmann::json &j, parameters_d::nonlinear_operator_s::lin
     // T lin_solver_tol; //relative tolerance wrt to rhs vector. For Krylov-Newton method can be set lower
     // bool save_convergence_history;
     // bool divide_out_norms_by_rel_base;
+    // bool verbose;
     params_no_ls_ = parameters_d::nonlinear_operator_s::linear_solver_s{
         j.at( "maximum_iterations" ).get<unsigned int>(),
         j.at( "use_preconditioned_residual" ).get<unsigned int>(),
@@ -667,7 +681,8 @@ void from_json( const nlohmann::json &j, parameters_d::nonlinear_operator_s::lin
         j.at( "basis_size" ).get<unsigned int>(),
         j.at( "tolerance" ).get<double>(),
         j.at( "save_convergence_history" ).get<bool>(),
-        j.at( "divide_norms_by_relative_base" ).get<bool>()
+        j.at( "divide_norms_by_relative_base" ).get<bool>(),
+        j.value( "verbose", true )
     };
 }
 void from_json( const nlohmann::json &j, parameters_f::nonlinear_operator_s::linear_solver_s &params_no_ls_ )
@@ -679,7 +694,8 @@ void from_json( const nlohmann::json &j, parameters_f::nonlinear_operator_s::lin
         j.at( "basis_size" ).get<unsigned int>(),
         j.at( "tolerance" ).get<float>(),
         j.at( "save_convergence_history" ).get<bool>(),
-        j.at( "divide_norms_by_relative_base" ).get<bool>()
+        j.at( "divide_norms_by_relative_base" ).get<bool>(),
+        j.value( "verbose", true )
     };
 }
 

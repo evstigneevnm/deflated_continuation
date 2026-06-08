@@ -251,6 +251,7 @@ public:
         unsigned int lin_solver_max_it = parameters->nonlinear_operator.linear_solver.lin_solver_max_it;
         bool save_convergence_history_ = parameters->nonlinear_operator.linear_solver.save_convergence_history;
         bool divide_out_norms_by_rel_base_ = parameters->nonlinear_operator.linear_solver.divide_out_norms_by_rel_base;
+        bool verbose_ = parameters->nonlinear_operator.linear_solver.verbose;
         int use_precond_resid = parameters->nonlinear_operator.linear_solver.use_precond_resid;
         int resid_recalc_freq = parameters->nonlinear_operator.linear_solver.resid_recalc_freq;
         int basis_sz = parameters->nonlinear_operator.linear_solver.basis_size;
@@ -258,6 +259,7 @@ public:
         mon_orig->init(lin_solver_tol, T(0), lin_solver_max_it);
         mon_orig->set_save_convergence_history(save_convergence_history_);
         mon_orig->set_divide_out_norms_by_rel_base(divide_out_norms_by_rel_base_);
+        mon_orig->set_verbose(verbose_);
         mon_orig->out_min_resid_norm();
 //
         if(use_precond_resid >= 0)
@@ -278,6 +280,7 @@ public:
         unsigned int lin_solver_max_it = parameters->deflation_continuation.linear_solver_extended.lin_solver_max_it;
         bool save_convergence_history_ = parameters->deflation_continuation.linear_solver_extended.save_convergence_history;
         bool divide_out_norms_by_rel_base_ = parameters->deflation_continuation.linear_solver_extended.divide_out_norms_by_rel_base;
+        bool verbose_ = parameters->deflation_continuation.linear_solver_extended.verbose;
         int use_precond_resid = parameters->deflation_continuation.linear_solver_extended.use_precond_resid;
         int resid_recalc_freq = parameters->deflation_continuation.linear_solver_extended.resid_recalc_freq;
         int basis_sz = parameters->deflation_continuation.linear_solver_extended.basis_size;
@@ -286,6 +289,7 @@ public:
         mon->init(lin_solver_tol, T(0), lin_solver_max_it);
         mon->set_save_convergence_history(save_convergence_history_);
         mon->set_divide_out_norms_by_rel_base(divide_out_norms_by_rel_base_);
+        mon->set_verbose(verbose_);
         mon->out_min_resid_norm();
 //
         if(use_precond_resid >= 0)

@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -236,6 +237,11 @@ public:
         res.reserve(2);
         res.push_back(val);
         res.push_back(common::scalar_math::abs(val));
+    }
+
+    std::vector<std::string> norm_bifurcation_diagram_labels() const
+    {
+        return {"x", "abs_x"};
     }
 
     void randomize_vector(T_vec& u_out)

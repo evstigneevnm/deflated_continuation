@@ -13,12 +13,48 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <filesystem>
+#include <fstream>
+#include <system_error>
+#include <type_traits>
+#include <utility>
 //using boost for serialization
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
 
 namespace container
 {
+
+namespace bifurcation_diagram_detail
+{
+
+template<class NonlinearOperator, class = void>
+struct has_norm_labels: std::false_type
+{
+};
+
+template<class NonlinearOperator>
+struct has_norm_labels<
+    NonlinearOperator,
+    std::void_t<decltype(std::declval<const NonlinearOperator&>().norm_bifurcation_diagram_labels())>
+>: std::true_type
+{
+};
+
+template<class NonlinearOperator>
+std::vector<std::string> norm_labels(const NonlinearOperator* nonlin_op)
+{
+    if constexpr(has_norm_labels<NonlinearOperator>::value)
+    {
+        return nonlin_op->norm_bifurcation_diagram_labels();
+    }
+    else
+    {
+        return {};
+    }
+}
+
+}
 
 template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperator, class Newton, class SolutionStorage,  class Curve, class CurveHelper>
 class bifurcation_diagram
@@ -39,6 +75,7 @@ private:
     cont_help_t* cont_help;
     unsigned int skip_output;
     std::string directory;
+    bool legend_written = false;
 
 public:
     typedef typename Curve::values_t curve_point_type;
@@ -55,7 +92,7 @@ public:
     {
         cont_help = new cont_help_t(vec_ops);
         curve_number = -1;
-
+        write_legend_file();
     }
 
     bifurcation_diagram()
@@ -100,6 +137,7 @@ public:
     
     void init_new_curve()
     {
+        write_legend_file();
         curve_number++;
         curve_container.emplace_back( vec_ops, file_ops, log, nonlin_op, newton, curve_number, directory, cont_help, skip_output ) ;
     }
@@ -198,6 +236,46 @@ public:
 private:
     std::vector<Curve> curve_container;
     int curve_number = -1;
+
+    void write_legend_file()
+    {
+        if(legend_written || nonlin_op == nullptr || directory.empty())
+        {
+            return;
+        }
+
+        const auto labels = bifurcation_diagram_detail::norm_labels(nonlin_op);
+        if(labels.empty())
+        {
+            legend_written = true;
+            return;
+        }
+
+        std::error_code ec;
+        const std::filesystem::path project_dir(directory);
+        if(!std::filesystem::is_directory(project_dir, ec))
+        {
+            return;
+        }
+
+        const auto legend_path = project_dir / "legend.dat";
+        std::ofstream legend_file(legend_path);
+        if(!legend_file)
+        {
+            if(log != nullptr)
+            {
+                log->warning_f("container::bifurcation_diagram: failed to open norm legend file: %s", legend_path.string().c_str());
+            }
+            return;
+        }
+
+        for(const auto& label: labels)
+        {
+            legend_file << label << '\n';
+        }
+
+        legend_written = true;
+    }
 
 
     template<class Archive>

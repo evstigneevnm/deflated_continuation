@@ -395,6 +395,11 @@ public:
         res.push_back(host_u[interior_size/2]);
     }
 
+    std::vector<std::string> norm_bifurcation_diagram_labels() const
+    {
+        return {"max_u", "l2_norm", "center_u"};
+    }
+
     void randomize_vector(T_vec& u_out)
     {
         std::vector<T> host_values(interior_size);

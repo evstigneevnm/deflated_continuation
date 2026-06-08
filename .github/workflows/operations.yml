@@ -143,10 +143,10 @@ jobs:
             echo "Skipping CUDA vector operations: nvcc not found"
             exit 0
           fi
-          make scfd_vector_operations.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cuda_double" REAL_TYPE=double
-          ./"$BUILD_DIR"/scfd_cuda_double/test_scfd_vector_operations.bin auto
-          make scfd_vector_operations.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cuda_float" REAL_TYPE=float
-          ./"$BUILD_DIR"/scfd_cuda_float/test_scfd_vector_operations.bin auto
+          make scfd_vector_operations_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cuda_double" REAL_TYPE=double
+          ./"$BUILD_DIR"/scfd_cuda_double/test_scfd_vector_operations_cuda.bin auto
+          make scfd_vector_operations_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cuda_float" REAL_TYPE=float
+          ./"$BUILD_DIR"/scfd_cuda_float/test_scfd_vector_operations_cuda.bin auto
 
   scfd-vector-operations-hip:
     runs-on: ubuntu-latest
@@ -209,6 +209,31 @@ jobs:
           fi
           make test_fft_facade_cufft.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fft_facade_cufft" REAL_TYPE=double
           ./"$BUILD_DIR"/fft_facade_cufft/test_fft_facade_cufft.bin auto
+
+  ks1d-sym-cpu-omp:
+    needs: [scfd-vector-operations-cpu, fftw-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev libfftw3-dev
+          fi
+      - name: Build and validate symmetrized KS1D
+        run: |
+          export OMP_NUM_THREADS=8
+          KS1D_BUILD="$BUILD_DIR/ks1d_sym_cpu_omp"
+          make KS1D_operator_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          ./"$KS1D_BUILD"/test_KS1D_operator_cpu_omp.bin
+          make KS1D_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
+          timeout 120s ./"$KS1D_BUILD"/KS1D_bd_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
+          python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
 
   circle-bd-cpu-omp:
     needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
@@ -413,9 +438,9 @@ jobs:
             exit 0
           fi
           CIRCLE_BUILD="$BUILD_DIR/circle_bd_cuda"
-          make circle_bd CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double
+          make circle_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double
           python3 scripts/write_circle_ci_config.py "$CIRCLE_BUILD/circle_ci.json" "$CIRCLE_BUILD/project" --clean-project
-          timeout 120s ./"$CIRCLE_BUILD"/circle_bd.bin "$CIRCLE_BUILD/circle_ci.json" --analytical-solution --quiet
+          timeout 120s ./"$CIRCLE_BUILD"/circle_bd_cuda.bin "$CIRCLE_BUILD/circle_ci.json" --analytical-solution --quiet
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
 
   star-shaped-bd-cuda:
@@ -440,10 +465,39 @@ jobs:
             exit 0
           fi
           STAR_BUILD="$BUILD_DIR/star_shaped_bd_cuda"
-          make star_shaped_bd CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$STAR_BUILD" REAL_TYPE=double
+          make star_shaped_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$STAR_BUILD" REAL_TYPE=double
           python3 scripts/write_star_shaped_ci_config.py "$STAR_BUILD/star_shaped_ci.json" "$STAR_BUILD/project" --clean-project --curvature 0.3
-          timeout 120s ./"$STAR_BUILD"/star_shaped_bd.bin "$STAR_BUILD/star_shaped_ci.json" --seed-exact 0.25 --continue-seed-only --quiet
+          timeout 120s ./"$STAR_BUILD"/star_shaped_bd_cuda.bin "$STAR_BUILD/star_shaped_ci.json" --seed-exact 0.25 --continue-seed-only --quiet
           python3 scripts/validate_star_shaped_diagram.py "$STAR_BUILD/project" --config "$STAR_BUILD/star_shaped_ci.json" --residual-tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-star --min-angle-coverage 6.0 --max-closure-distance 5e-2
+
+  ks1d-sym-cuda:
+    needs: [scfd-vector-operations-cuda, fft-facade-cuda]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Build and validate when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA KS1D: nvidia-smi not found"
+            exit 0
+          fi
+          if ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA KS1D: nvidia-smi is present but no usable NVIDIA device was reported"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA KS1D: nvcc not found"
+            exit 0
+          fi
+          KS1D_BUILD="$BUILD_DIR/ks1d_sym_cuda"
+          make KS1D_operator_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          ./"$KS1D_BUILD"/test_KS1D_operator_cuda.bin auto
+          make KS1D_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
+          timeout 120s ./"$KS1D_BUILD"/KS1D_bd_cuda.bin "$KS1D_BUILD/ks1d_ci.json" --quiet auto
+          python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
 
   circle-bd-hip:
     needs: [scfd-vector-operations-hip]

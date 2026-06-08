@@ -189,6 +189,7 @@ T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int
         unsigned int lin_solver_max_it = parameters->nonlinear_operator.linear_solver.lin_solver_max_it;
         bool save_convergence_history_ = parameters->nonlinear_operator.linear_solver.save_convergence_history;
         bool divide_out_norms_by_rel_base_ = parameters->nonlinear_operator.linear_solver.divide_out_norms_by_rel_base;
+        bool verbose_ = parameters->nonlinear_operator.linear_solver.verbose;
         int use_precond_resid = parameters->nonlinear_operator.linear_solver.use_precond_resid;
         int resid_recalc_freq = parameters->nonlinear_operator.linear_solver.resid_recalc_freq;
         int basis_sz = parameters->nonlinear_operator.linear_solver.basis_size;
@@ -196,6 +197,7 @@ T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int
         mon->init(lin_solver_tol, T(0), lin_solver_max_it);
         mon->set_save_convergence_history(save_convergence_history_);
         mon->set_divide_out_norms_by_rel_base(divide_out_norms_by_rel_base_);
+        mon->set_verbose(verbose_);
         mon->out_min_resid_norm();
 //
         if(use_precond_resid >= 0)

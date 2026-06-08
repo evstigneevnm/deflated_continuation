@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write a Bratu bifurcation-diagram config for local CI."""
+"""Write a KS1D bifurcation-diagram config for local/GitHub CI."""
 
 from __future__ import annotations
 
@@ -64,15 +64,9 @@ def write_config(args: argparse.Namespace) -> None:
     continuation["newton_deflation"]["save_norms_history"] = False
     continuation["newton_deflation"]["verbose"] = False
 
-    discretization_ids = {
-        "chebyshev": 0,
-        "fd3": 1,
-    }
-    config["nonlinear_operator"]["discrete_problem_dimensions"] = [args.interior_size]
-    config["nonlinear_operator"]["spatial_discretization"] = args.spatial_discretization
-    config["nonlinear_operator"]["problem_int_parameters_vector"] = [
-        discretization_ids[args.spatial_discretization]
-    ]
+    config["nonlinear_operator"]["discrete_problem_dimensions"] = [args.grid_size]
+    config["nonlinear_operator"]["problem_real_parameters_vector"] = [args.a_val, args.b_val]
+    config["nonlinear_operator"]["linear_solver"]["save_convergence_history"] = False
     config["nonlinear_operator"]["linear_solver"]["verbose"] = False
     config["nonlinear_operator"]["newton"]["save_norms_history"] = False
     config["nonlinear_operator"]["newton"]["verbose"] = False
@@ -92,29 +86,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("project_dir", help="Root project directory used by the solver.")
     parser.add_argument(
         "--base-config",
-        default="json_project_files/bratu_test.json",
-        help="Base Bratu JSON file.",
+        default="json_project_files/KS1D_sym_test.json",
+        help="Base KS1D JSON file.",
     )
-    parser.add_argument("--interior-size", type=int, default=31)
-    parser.add_argument(
-        "--spatial-discretization",
-        choices=("chebyshev", "fd3"),
-        default="chebyshev",
-        help="Spatial operator for the Bratu problem.",
-    )
-    parser.add_argument("--steps", type=int, default=220)
-    parser.add_argument("--step-size", type=float, default=0.025)
-    parser.add_argument("--max-step-size", type=float, default=0.05)
+    parser.add_argument("--grid-size", type=int, default=32)
+    parser.add_argument("--a-val", type=float, default=2.0)
+    parser.add_argument("--b-val", type=float, default=4.0)
+    parser.add_argument("--steps", type=int, default=50)
+    parser.add_argument("--step-size", type=float, default=0.02)
+    parser.add_argument("--max-step-size", type=float, default=0.03)
     parser.add_argument("--deflation-attempts", type=int, default=0)
     parser.add_argument("--continuation-fail-attempts", type=int, default=8)
-    parser.add_argument("--initial-direction", type=int, default=1)
-    parser.add_argument(
-        "--knots",
-        type=float,
-        nargs="+",
-        default=[0.1, 3.6],
-        help="Continuation interval/deflation knots.",
-    )
+    parser.add_argument("--initial-direction", type=int, default=-1)
+    parser.add_argument("--knots", type=float, nargs="+", default=[2.0, 2.5, 3.0, 3.5])
     parser.add_argument("--high-precision-reduction", action="store_true")
     parser.add_argument(
         "--clean-project",

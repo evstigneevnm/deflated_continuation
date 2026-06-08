@@ -85,6 +85,7 @@ FFT_FACADE_HEADERS = source/external_libraries/fft_facade.h source/external_libr
 CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/nonlinear_operators/circle/circle.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/linear_operator_circle.h source/nonlinear_operators/circle/preconditioner_circle.h source/nonlinear_operators/circle/system_operator.h
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h
 STAR_SHAPED_MODEL_HEADERS = source/models/star_shaped/star_shaped_backend_typedefs.h source/nonlinear_operators/star_shaped/star_shaped.h source/nonlinear_operators/star_shaped/convergence_strategy.h source/nonlinear_operators/star_shaped/linear_operator_star_shaped.h source/nonlinear_operators/star_shaped/preconditioner_star_shaped.h source/nonlinear_operators/star_shaped/system_operator.h
+KS1D_MODEL_HEADERS = source/models/KS_1D/KS1D_backend_typedefs.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/linear_operator_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/preconditioner_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/system_operator.h
 
 LCUDA = -L$(CUDA_ROOT_PATH)/lib64
 LBOOST = -L$(BOOST_ROOT_PATH)/lib
@@ -187,8 +188,10 @@ cufft_test_2D.bin: source/models/tests/cufft_test_2D.cpp
 gpu_vector_operations.bin: source/common/tests/test_gpu_vector_operations.cu source/common/tests/vector_operations_template_tests.h $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/tests/test_gpu_vector_operations.cu $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/test_vector_operations.bin 2>$(RESULTS)
 
-scfd_vector_operations.bin: source/common/tests/test_scfd_vector_operations.cu source/common/tests/vector_operations_template_tests.h $(SCFD_VECTOR_OPS_TEST_HEADERS)
-	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/tests/test_scfd_vector_operations.cu $(LIBS1) -o $(BUILD_DIR)/test_scfd_vector_operations.bin 2>$(RESULTS)
+scfd_vector_operations.bin: scfd_vector_operations_cuda.bin
+
+scfd_vector_operations_cuda.bin: source/common/tests/test_scfd_vector_operations.cu source/common/tests/vector_operations_template_tests.h $(SCFD_VECTOR_OPS_TEST_HEADERS)
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/tests/test_scfd_vector_operations.cu $(LIBS1) -o $(BUILD_DIR)/test_scfd_vector_operations_cuda.bin 2>$(RESULTS)
 
 scfd_vector_operations_hip.bin: source/common/tests/test_scfd_vector_operations_hip.cpp source/common/tests/vector_operations_template_tests.h source/common/hip_init_scfd.h $(SCFD_VECTOR_OPS_TEST_HEADERS)
 	$(HIPCC) $(HIPFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/common/tests/test_scfd_vector_operations_hip.cpp -o $(BUILD_DIR)/test_scfd_vector_operations_hip.bin 2>$(RESULTS)
@@ -246,8 +249,10 @@ circle_ker: $(BUILD_DIR)/circle_ker.o
 $(BUILD_DIR)/circle_ker.o: source/nonlinear_operators/circle/circle_ker.cu | $(BUILD_STAMP)
 	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)  source/nonlinear_operators/circle/circle_ker.cu -c -o $(BUILD_DIR)/circle_ker.o 2>$(RESULTS)
 
-cont_def_circle: source/models/circle/circle_test_deflation_continuation.cpp source/models/circle/circle_test_deflation_continuation_typedefs.h $(CIRCLE_MODEL_HEADERS) source/common/cuda_init_scfd.h $(SCFD_VECTOR_OPS_HEADERS)
-	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/circle/circle_test_deflation_continuation.cpp $(LIBS1) -o $(BUILD_DIR)/circle_test_deflation_continuation.bin 2>$(RESULTS)
+cont_def_circle: cont_def_circle_cuda
+
+cont_def_circle_cuda: source/models/circle/circle_test_deflation_continuation.cpp source/models/circle/circle_test_deflation_continuation_typedefs.h $(CIRCLE_MODEL_HEADERS) source/common/cuda_init_scfd.h $(SCFD_VECTOR_OPS_HEADERS)
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/circle/circle_test_deflation_continuation.cpp $(LIBS1) -o $(BUILD_DIR)/circle_test_deflation_continuation_cuda.bin 2>$(RESULTS)
 
 cont_def_circle_cpu_omp: source/models/circle/circle_test_deflation_continuation.cpp source/models/circle/circle_test_deflation_continuation_typedefs.h $(CIRCLE_MODEL_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) source/models/circle/circle_test_deflation_continuation.cpp $(OPENMP) -o $(BUILD_DIR)/circle_test_deflation_continuation_cpu_omp.bin 2>$(RESULTS)
@@ -258,11 +263,15 @@ cont_def_circle_hip: source/models/circle/circle_test_deflation_continuation.cpp
 cont_def_circle_var_prec: source/models/circle/circle_test_deflation_continuation.cpp source/models/circle/circle_test_deflation_continuation_typedefs.h $(CIRCLE_MODEL_HEADERS) $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
 	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(IBOOST) source/models/circle/circle_test_deflation_continuation.cpp $(OPENMP) -o $(BUILD_DIR)/circle_test_deflation_continuation_var_prec.bin 2>$(RESULTS)
 
-circle_curve_container: source/models/circle/circle_test_curve_container.cpp source/models/circle/circle_test_curve_container.h source/models/circle/circle_test_deflation_continuation_typedefs.h source/nonlinear_operators/circle/circle.h $(SCFD_VECTOR_OPS_HEADERS)
-	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/circle/circle_test_curve_container.cpp $(LIBS1) -o $(BUILD_DIR)/circle_test_curve_container.bin 2>$(RESULTS)
+circle_curve_container: circle_curve_container_cuda
 
-circle_bd: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
-	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/circle/circle_bd.cpp $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd.bin 2>$(RESULTS)
+circle_curve_container_cuda: source/models/circle/circle_test_curve_container.cpp source/models/circle/circle_test_curve_container.h source/models/circle/circle_test_deflation_continuation_typedefs.h source/nonlinear_operators/circle/circle.h $(SCFD_VECTOR_OPS_HEADERS)
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/circle/circle_test_curve_container.cpp $(LIBS1) -o $(BUILD_DIR)/circle_test_curve_container_cuda.bin 2>$(RESULTS)
+
+circle_bd: circle_bd_cuda
+
+circle_bd_cuda: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/circle/circle_bd.cpp $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd_cuda.bin 2>$(RESULTS)
 
 circle_bd_cpu_omp: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) source/models/circle/circle_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd_cpu_omp.bin 2>$(RESULTS)
@@ -279,8 +288,10 @@ bratu_bd_cpu_omp: source/models/bratu/bratu_bd.cpp $(BRATU_MODEL_HEADERS) $(COMM
 bratu_bd_var_prec: source/models/bratu/bratu_bd.cpp $(BRATU_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
 	$(G++) $(G++FLAGS) -DBRATU_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(IBOOST) source/models/bratu/bratu_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/bratu_bd_var_prec.bin 2>$(RESULTS)
 
-star_shaped_bd: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
-	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/star_shaped/star_shaped_bd.cpp $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd.bin 2>$(RESULTS)
+star_shaped_bd: star_shaped_bd_cuda
+
+star_shaped_bd_cuda: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/star_shaped/star_shaped_bd.cpp $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd_cuda.bin 2>$(RESULTS)
 
 star_shaped_bd_cpu_omp: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) source/models/star_shaped/star_shaped_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd_cpu_omp.bin 2>$(RESULTS)
@@ -290,6 +301,20 @@ star_shaped_bd_hip: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_M
 
 star_shaped_bd_var_prec: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
 	$(G++) $(G++FLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(IBOOST) source/models/star_shaped/star_shaped_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd_var_prec.bin 2>$(RESULTS)
+
+KS1D_operator_cpu_omp.bin: source/models/KS_1D/test_KS1D_operator.cpp $(KS1D_MODEL_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
+	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) source/models/KS_1D/test_KS1D_operator.cpp $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/test_KS1D_operator_cpu_omp.bin 2>$(RESULTS)
+
+KS1D_operator_cuda.bin: source/models/KS_1D/test_KS1D_operator.cpp $(KS1D_MODEL_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/KS_1D/test_KS1D_operator.cpp $(LIBS2) -o $(BUILD_DIR)/test_KS1D_operator_cuda.bin 2>$(RESULTS)
+
+KS1D_bd_cpu_omp: source/models/KS_1D/KS1D_bd.cpp $(KS1D_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
+	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) source/models/KS_1D/KS1D_bd.cpp $(OPENMP) $(LFFTW) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_bd_cpu_omp.bin 2>$(RESULTS)
+
+KS1D_bd: KS1D_bd_cuda
+
+KS1D_bd_cuda: source/models/KS_1D/KS1D_bd.cpp $(KS1D_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/KS_1D/KS1D_bd.cpp $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_bd_cuda.bin 2>$(RESULTS)
 
 KS_bd: source/models/KS_2D/KS_bd_json_new.cpp
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) source/models/KS_2D/KS_bd_json_new.cpp $(BUILD_DIR)/Kuramoto_Sivashinskiy_2D_ker.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LBOOST) $(LIBBOOST) $(LIBSAll) $(LLAPACK) -o $(BUILD_DIR)/KS_bd_json.bin 2>$(RESULTS)

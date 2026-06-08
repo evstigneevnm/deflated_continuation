@@ -57,6 +57,7 @@ public:
         bool out_min_resid_norm;
         bool save_convergence_history;
         bool divide_out_norms_by_rel_base;
+        bool verbose;
 
         params(
             const std::string &log_pefix = "", const std::string &log_name = "default_monitor::"
@@ -64,7 +65,7 @@ public:
             logged_obj_type::params(0, log_pefix + log_name),
             rel_tol(1.0e-6), abs_tol(1.0e-15),max_iters_num(100),min_iters_num(0),
             out_min_resid_norm(false),save_convergence_history(false),
-            divide_out_norms_by_rel_base(true)
+            divide_out_norms_by_rel_base(true), verbose(true)
         {
         }
 
@@ -78,6 +79,7 @@ public:
             out_min_resid_norm = j.value("out_min_resid_norm", out_min_resid_norm);
             save_convergence_history = j.value("save_convergence_history", save_convergence_history);
             divide_out_norms_by_rel_base = j.value("divide_out_norms_by_rel_base", divide_out_norms_by_rel_base);
+            verbose = j.value("verbose", verbose);
         }
         nlohmann::json to_json() const
         {
@@ -90,7 +92,8 @@ public:
                     {"min_iters_num", min_iters_num},
                     {"out_min_resid_norm", out_min_resid_norm},
                     {"save_convergence_history", save_convergence_history},
-                    {"divide_out_norms_by_rel_base", divide_out_norms_by_rel_base}
+                    {"divide_out_norms_by_rel_base", divide_out_norms_by_rel_base},
+                    {"verbose", verbose}
                 };
         }
         #endif
@@ -160,6 +163,10 @@ public:
     {
         prms_.divide_out_norms_by_rel_base = divide_out_norms_by_rel_base;
     }
+    void set_verbose(bool verbose)
+    {
+        prms_.verbose = verbose;
+    }
     //TODO init with config
     //TODO add separate function to control tolerances and behaviour
     void set_temp_tolerance(T rel_tol)
@@ -209,6 +216,7 @@ public:
     bool out_min_resid_norm()const { return prms_.out_min_resid_norm; }
     bool save_convergence_history()const { return prms_.save_convergence_history; }
     bool divide_out_norms_by_rel_base()const { return prms_.divide_out_norms_by_rel_base; }
+    bool verbose()const { return prms_.verbose; }
 
     int iters_performed()const { return iters_performed_; }
     bool is_valid_number()const { return is_valid_number_; }
@@ -252,18 +260,27 @@ public:
     }
     bool check_finished(const vector_type& x, const vector_type& r)
     {
-        logged_obj_type::info_f("iter = %d, max_iters_num = %d", iters_performed(), max_iters_num() );
+        if(verbose())
+        {
+            logged_obj_type::info_f("iter = %d, max_iters_num = %d", iters_performed(), max_iters_num() );
+        }
 
         is_valid_number_ = vec_ops_.is_valid_number(x);
         if (!is_valid_number_) 
         {
-            logged_obj_type::info_f("solution is not a valid number");
+            if(verbose())
+            {
+                logged_obj_type::info_f("solution is not a valid number");
+            }
             return true;
         }
 
         resid_norm_ = vec_ops_.norm(r);
 
-        logged_obj_type::info_f("resid norm = %0.6e tol = %0.6e", (double)resid_norm_out(), (double)tol_out());
+        if(verbose())
+        {
+            logged_obj_type::info_f("resid norm = %0.6e tol = %0.6e", (double)resid_norm_out(), (double)tol_out());
+        }
         if (prms_.save_convergence_history) 
             convergence_history_.emplace_back( iters_performed(), resid_norm_out() );
 

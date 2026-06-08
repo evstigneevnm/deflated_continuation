@@ -1,0 +1,6 @@
+#ifndef __CONVERGENCE_STRATEGY_KURAMOTO_SIVASHINSKIY_1D_H__
+#define __CONVERGENCE_STRATEGY_KURAMOTO_SIVASHINSKIY_1D_H__
+
+#include <nonlinear_operators/circle/convergence_strategy.h>
+
+#endif

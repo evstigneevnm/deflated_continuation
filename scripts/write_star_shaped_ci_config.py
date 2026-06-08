@@ -75,6 +75,7 @@ def write_config(args: argparse.Namespace) -> None:
     continuation["deflation_knots"] = args.knots or default_knots(args.curvature)
 
     continuation["linear_solver_extended"]["save_convergence_history"] = False
+    continuation["linear_solver_extended"]["verbose"] = False
     continuation["newton_continuation"]["save_norms_history"] = False
     continuation["newton_continuation"]["verbose"] = False
     continuation["newton_deflation"]["save_norms_history"] = False
@@ -82,9 +83,11 @@ def write_config(args: argparse.Namespace) -> None:
 
     config["nonlinear_operator"]["discrete_problem_dimensions"] = [1]
     config["nonlinear_operator"]["problem_real_parameters_vector"] = [args.curvature]
+    config["nonlinear_operator"]["linear_solver"]["verbose"] = False
     config["nonlinear_operator"]["newton"]["save_norms_history"] = False
     config["nonlinear_operator"]["newton"]["verbose"] = False
     config["stability_continuation"]["linear_solver"]["save_convergence_history"] = False
+    config["stability_continuation"]["linear_solver"]["verbose"] = False
     config["stability_continuation"]["newton"]["save_norms_history"] = False
     config["stability_continuation"]["newton"]["verbose"] = False
 
