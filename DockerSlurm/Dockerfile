@@ -6,11 +6,11 @@ RUN apt-get install libopenblas-dev libopenblas64-dev -y
 #RUN apt-get install gfortran -y
 #building solver
 WORKDIR /continuation
-ADD ./Linsolver_test/source /continuation/source
-ADD ./Linsolver_test/O /continuation/O
-ADD ./Linsolver_test/Makefile /continuation/Makefile
-ADD ./Linsolver_test/config_dockerslurm_rel.inc /continuation/config_dockerslurm_rel.inc
-ADD ./Linsolver_test/json_project_files/config_file_continuation.json /continuation/config_file_continuation.json
+ADD ./source /continuation/source
+ADD ./O /continuation/O
+ADD ./Makefile /continuation/Makefile
+ADD ./build_configs/config_dockerslurm_rel.inc /continuation/config_dockerslurm_rel.inc
+ADD ./json_project_files/config_file_continuation.json /continuation/config_file_continuation.json
 
 # ADD ./240806/ /continuation/start_data
 RUN rm *.bin || true

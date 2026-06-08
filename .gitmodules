@@ -1,9 +1,9 @@
-[submodule "Linsolver_test/source/contrib/scfd"]
-	path = Linsolver_test/source/contrib/scfd
+[submodule "source/contrib/scfd"]
+	path = source/contrib/scfd
 	url = git@github.com:oryabkov/SCFD-all.git
-[submodule "Linsolver_test/source/contrib/nmfd-newton"]
-	path = Linsolver_test/source/contrib/nmfd-newton
+[submodule "source/contrib/nmfd-newton"]
+	path = source/contrib/nmfd-newton
 	url = git@github.com:oryabkov/NMFD-newton.git
-[submodule "Linsolver_test/source/contrib/nmfd-linsolvers"]
-	path = Linsolver_test/source/contrib/nmfd-linsolvers
+[submodule "source/contrib/nmfd-linsolvers"]
+	path = source/contrib/nmfd-linsolvers
 	url = git@github.com:evstigneevnm/NMFD-linsolvers.git

@@ -32,7 +32,7 @@
 *.app
 
 # Project build directories
-Linsolver_test/build/
+build/
 
 # Sublime workspaces
 *.sublime-workspace

@@ -12,7 +12,6 @@ env:
 defaults:
   run:
     shell: bash
-    working-directory: Linsolver_test
 
 jobs:
   cpu-vector-operations-var-prec:
