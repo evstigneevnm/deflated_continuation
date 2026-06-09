@@ -128,6 +128,36 @@ struct parameters
             }
         };
 
+        struct restart_policy_s
+        {
+            bool allow_incomplete_restart_intersections;
+            bool allow_knot_interpolation_failure;
+            bool allow_failed_continuation_curve_save;
+            bool check_duplicate_after_deflation;
+            unsigned int duplicate_after_deflation_retries;
+            T duplicate_after_deflation_tolerance;
+
+            void set_default()
+            {
+                allow_incomplete_restart_intersections = false;
+                allow_knot_interpolation_failure = false;
+                allow_failed_continuation_curve_save = false;
+                check_duplicate_after_deflation = true;
+                duplicate_after_deflation_retries = 2;
+                duplicate_after_deflation_tolerance = T(1.0e-8);
+            }
+
+            void plot_all()
+            {
+                std::cout << "||  |==allow_incomplete_restart_intersections: " << allow_incomplete_restart_intersections << std::endl;
+                std::cout << "||  |==allow_knot_interpolation_failure: " << allow_knot_interpolation_failure << std::endl;
+                std::cout << "||  |==allow_failed_continuation_curve_save: " << allow_failed_continuation_curve_save << std::endl;
+                std::cout << "||  |==check_duplicate_after_deflation: " << check_duplicate_after_deflation << std::endl;
+                std::cout << "||  |==duplicate_after_deflation_retries: " << duplicate_after_deflation_retries << std::endl;
+                std::cout << "||  |==duplicate_after_deflation_tolerance: " << duplicate_after_deflation_tolerance << std::endl;
+            }
+        };
+
         unsigned int   continuation_steps;
         T              step_size;
         T              max_step_size;
@@ -139,7 +169,7 @@ struct parameters
         unsigned int   skip_files;
         std::vector<T> deflation_knots;
 
-
+        restart_policy_s                 restart_policy;
         linear_solver_extended_s       linear_solver_extended;
         newton_extended_continuation_s newton_extended_continuation;
         newton_extended_deflation_s    newton_extended_deflation;
@@ -156,6 +186,7 @@ struct parameters
             step_ds_p                  = 0.01;
             skip_files                 = 100;
             deflation_knots            = { 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0 };
+            restart_policy.set_default();
             linear_solver_extended.set_default();
             newton_extended_continuation.set_default();
             newton_extended_deflation.set_default();
@@ -175,6 +206,8 @@ struct parameters
             for ( auto &x : deflation_knots )
                 std::cout << x << " ";
             std::cout << std::endl;
+            std::cout << "||==restart_policy: " << std::endl;
+            restart_policy.plot_all();
             std::cout << "||==linear_solver_extended: " << std::endl;
             linear_solver_extended.plot_all();
             std::cout << "||==newton_extended_continuation: " << std::endl;
@@ -549,6 +582,44 @@ void from_json(
     };
 }
 
+void from_json(
+    const nlohmann::json &j, parameters_d::deflation_continuation_s::restart_policy_s &params_dc_rp_
+)
+{
+    params_dc_rp_.set_default();
+    params_dc_rp_.allow_incomplete_restart_intersections =
+        j.value( "allow_incomplete_restart_intersections", params_dc_rp_.allow_incomplete_restart_intersections );
+    params_dc_rp_.allow_knot_interpolation_failure =
+        j.value( "allow_knot_interpolation_failure", params_dc_rp_.allow_knot_interpolation_failure );
+    params_dc_rp_.allow_failed_continuation_curve_save =
+        j.value( "allow_failed_continuation_curve_save", params_dc_rp_.allow_failed_continuation_curve_save );
+    params_dc_rp_.check_duplicate_after_deflation =
+        j.value( "check_duplicate_after_deflation", params_dc_rp_.check_duplicate_after_deflation );
+    params_dc_rp_.duplicate_after_deflation_retries =
+        j.value( "duplicate_after_deflation_retries", params_dc_rp_.duplicate_after_deflation_retries );
+    params_dc_rp_.duplicate_after_deflation_tolerance =
+        j.value( "duplicate_after_deflation_tolerance", params_dc_rp_.duplicate_after_deflation_tolerance );
+}
+
+void from_json(
+    const nlohmann::json &j, parameters_f::deflation_continuation_s::restart_policy_s &params_dc_rp_
+)
+{
+    params_dc_rp_.set_default();
+    params_dc_rp_.allow_incomplete_restart_intersections =
+        j.value( "allow_incomplete_restart_intersections", params_dc_rp_.allow_incomplete_restart_intersections );
+    params_dc_rp_.allow_knot_interpolation_failure =
+        j.value( "allow_knot_interpolation_failure", params_dc_rp_.allow_knot_interpolation_failure );
+    params_dc_rp_.allow_failed_continuation_curve_save =
+        j.value( "allow_failed_continuation_curve_save", params_dc_rp_.allow_failed_continuation_curve_save );
+    params_dc_rp_.check_duplicate_after_deflation =
+        j.value( "check_duplicate_after_deflation", params_dc_rp_.check_duplicate_after_deflation );
+    params_dc_rp_.duplicate_after_deflation_retries =
+        j.value( "duplicate_after_deflation_retries", params_dc_rp_.duplicate_after_deflation_retries );
+    params_dc_rp_.duplicate_after_deflation_tolerance =
+        j.value( "duplicate_after_deflation_tolerance", params_dc_rp_.duplicate_after_deflation_tolerance );
+}
+
 
 void from_json( const nlohmann::json &j, parameters_d::deflation_continuation_s &params_dc_ )
 {
@@ -572,6 +643,7 @@ void from_json( const nlohmann::json &j, parameters_d::deflation_continuation_s 
         j.at( "maximum_step_multiplier" ).get<double>(),
         j.at( "skip_file_output" ).get<unsigned int>(),
         j.at( "deflation_knots" ).get<std::vector<double>>(),
+        j.value( "restart_policy", nlohmann::json::object() ).get<parameters_d::deflation_continuation_s::restart_policy_s>(),
 
         j.at( "linear_solver_extended" ).get<parameters_d::deflation_continuation_s::linear_solver_extended_s>(),
         j.at( "newton_continuation" ).get<parameters_d::deflation_continuation_s::newton_extended_continuation_s>(),
@@ -591,6 +663,7 @@ void from_json( const nlohmann::json &j, parameters_f::deflation_continuation_s 
         j.at( "maximum_step_multiplier" ).get<float>(),
         j.at( "skip_file_output" ).get<unsigned int>(),
         j.at( "deflation_knots" ).get<std::vector<float>>(),
+        j.value( "restart_policy", nlohmann::json::object() ).get<parameters_f::deflation_continuation_s::restart_policy_s>(),
 
         j.at( "linear_solver_extended" ).get<parameters_f::deflation_continuation_s::linear_solver_extended_s>(),
         j.at( "newton_continuation" ).get<parameters_f::deflation_continuation_s::newton_extended_continuation_s>(),

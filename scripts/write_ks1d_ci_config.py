@@ -56,6 +56,13 @@ def write_config(args: argparse.Namespace) -> None:
     continuation["initial_direciton"] = args.initial_direction
     continuation["skip_file_output"] = 1
     continuation["deflation_knots"] = args.knots
+    restart_policy = continuation.setdefault("restart_policy", {})
+    restart_policy.setdefault("allow_incomplete_restart_intersections", False)
+    restart_policy.setdefault("allow_knot_interpolation_failure", False)
+    restart_policy.setdefault("allow_failed_continuation_curve_save", False)
+    restart_policy.setdefault("check_duplicate_after_deflation", True)
+    restart_policy.setdefault("duplicate_after_deflation_retries", 2)
+    restart_policy.setdefault("duplicate_after_deflation_tolerance", 1.0e-8)
 
     continuation["linear_solver_extended"]["save_convergence_history"] = False
     continuation["linear_solver_extended"]["verbose"] = False

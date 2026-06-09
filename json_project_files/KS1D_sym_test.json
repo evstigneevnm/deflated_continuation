@@ -9,7 +9,7 @@
         "step_size": 0.02,
         "max_step_size": 0.2,
         "deflation_attempts": 5,
-        "continuation_fail_attempts": 8,
+        "continuation_fail_attempts": 5,
         "initial_direciton": -1,
         "minimum_step_multiplier": 0.5,
         "maximum_step_multiplier": 0.15,
@@ -44,8 +44,25 @@
             52.0,
             55.0,
             57.0,
-            60.0
+            60.0,
+            62.0,
+            65.0,
+            67.0,
+            70.0,
+            71.0,
+            73.0,
+            75.0,
+            77.0,
+            80.0
         ],
+        "restart_policy": {
+            "allow_incomplete_restart_intersections": false,
+            "allow_knot_interpolation_failure": false,
+            "allow_failed_continuation_curve_save": false,
+            "check_duplicate_after_deflation": true,
+            "duplicate_after_deflation_retries": 2,
+            "duplicate_after_deflation_tolerance": 1.0e-8
+        },
         "linear_solver_extended": {
             "maximum_iterations": 150,
             "use_preconditioned_residual": 1,
@@ -59,7 +76,7 @@
         },
         "newton_continuation": {
             "maximum_iterations": 30,
-            "update_wight_maximum": 1.0,
+            "update_wight_maximum": 0.5,
             "save_norms_history": false,
             "verbose": false,
             "tolerance": 1.0e-9,
@@ -105,7 +122,7 @@
     },
     "nonlinear_operator": {
         "discrete_problem_dimensions": [
-            32
+            64
         ],
         "problem_real_parameters_vector": [
             2.0,

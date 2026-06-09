@@ -56,11 +56,15 @@ public:
         ds_0 = ds_0_;
     }
 
-    void continuate_curve(Curve*& curve_, const T_vec& x0_, const T& lambda0_)
+    bool continuate_curve(Curve*& curve_, const T_vec& x0_, const T& lambda0_)
     {
         parent_t::update_knots();
         parent_t::bif_diag = curve_;
         parent_t::direction = parent_t::initial_direciton;
+        parent_t::fail_flag = false;
+        parent_t::hard_failure = false;
+        parent_t::just_interpolated = false;
+        parent_t::continue_next_step = true;
         
         //make a copy here? or just use the provided reference
         //x0 = x0_, lambda0 = lambda0_;
@@ -87,6 +91,7 @@ public:
             }
         }
         parent_t::bif_diag->print_curve();
+        return !parent_t::hard_failure;
       
     }
 

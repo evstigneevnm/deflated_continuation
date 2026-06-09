@@ -12,6 +12,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <limits>
 // #include <type_traits> //to check linsolvers
 //boost serializatoin
 #include <boost/archive/text_oarchive.hpp>
@@ -92,6 +93,29 @@ auto set_solution_postprocessor_if_available(Continuation* continuation, Solutio
 
 inline void set_solution_postprocessor_if_available(...)
 {
+}
+
+template<class Continuation>
+auto set_allow_knot_interpolation_failure_if_available(Continuation* continuation, bool value) -> decltype(continuation->set_allow_knot_interpolation_failure(value), void())
+{
+    continuation->set_allow_knot_interpolation_failure(value);
+}
+
+inline void set_allow_knot_interpolation_failure_if_available(...)
+{
+}
+
+template<class SolutionStorage, class Vector, class Scalar>
+auto nearest_stabilized_distance_if_available(SolutionStorage* storage, Vector& x, Scalar& distance)
+    -> decltype(storage->nearest_stabilized_distance(x), bool())
+{
+    distance = static_cast<Scalar>(storage->nearest_stabilized_distance(x));
+    return true;
+}
+
+inline bool nearest_stabilized_distance_if_available(...)
+{
+    return false;
 }
 
 } // namespace detail
@@ -369,6 +393,9 @@ public:
         auto maximum_norm_increase_l = parameters->deflation_continuation.newton_extended_continuation.maximum_norm_increase;
         auto newton_wight_threshold_l = parameters->deflation_continuation.newton_extended_continuation.newton_wight_threshold;
         continuate->set_newton(tolerance_, maximum_iterations_, relax_tolerance_factor_, relax_tolerance_steps_, newton_wight_, store_norms_history_, verbose_, stagnation_max_l, maximum_norm_increase_l, newton_wight_threshold_l);
+        detail::set_allow_knot_interpolation_failure_if_available(
+            continuate,
+            parameters->deflation_continuation.restart_policy.allow_knot_interpolation_failure);
 
     }
 
@@ -560,9 +587,17 @@ public:
             detail::stabilize_solution_if_available(sol_storage_def, x_deflation);
             bif_diag->init_new_curve();
             bif_diag->get_current_ref(bdf);
-            continuate_analytical->continuate_curve(bdf, x_deflation, lambda);
+            const bool analytical_success = continuate_analytical->continuate_curve(bdf, x_deflation, lambda);
             bif_diag->close_curve();
-            save_data(file_name);
+            if(analytical_success || parameters->deflation_continuation.restart_policy.allow_failed_continuation_curve_save)
+            {
+                save_data(file_name);
+            }
+            else
+            {
+                log->warning("MAIN:deflation_continuation: analytical curve continuation failed; discarding curve according to restart policy.");
+                bif_diag->discard_current_curve();
+            }
             vec_ops->stop_use_vector(x_deflation); vec_ops->free_vector(x_deflation);
             log->info("MAIN:deflation_continuation: analytical solution formed.");
         }
@@ -581,27 +616,90 @@ public:
             sol_storage_def->set_known_solution(x_deflation);
             vec_ops->stop_use_vector(x_deflation); vec_ops->free_vector(x_deflation);
             
-            bif_diag->find_intersection(lambda, sol_storage_def);
+            const auto intersection_status = bif_diag->find_intersection(lambda, sol_storage_def);
+            if(!intersection_status.ok() && !parameters->deflation_continuation.restart_policy.allow_incomplete_restart_intersections)
+            {
+                log->warning_f(
+                    "MAIN:deflation_continuation: skipping deflation at lambda = %lf because restart intersections are incomplete: added = %u, failed = %u, missing_data = %u.",
+                    double(lambda),
+                    intersection_status.added,
+                    intersection_status.failed,
+                    intersection_status.missing_data);
+                is_there_a_next_knot = knots->next();
+                continue;
+            }
+            if(!intersection_status.ok())
+            {
+                log->warning_f(
+                    "MAIN:deflation_continuation: continuing with incomplete restart intersections at lambda = %lf because policy allows it: added = %u, failed = %u, missing_data = %u.",
+                    double(lambda),
+                    intersection_status.added,
+                    intersection_status.failed,
+                    intersection_status.missing_data);
+            }
 
-            bool is_new_solution = deflate->find_solution(lambda);
+            bool is_new_solution = false;
+            bool candidate_duplicate = false;
+            unsigned int duplicate_retry = 0;
+            const unsigned int duplicate_retry_max =
+                parameters->deflation_continuation.restart_policy.duplicate_after_deflation_retries;
+            do
+            {
+                candidate_duplicate = false;
+                is_new_solution = deflate->find_solution(lambda);
+                if(is_new_solution)
+                {
+                    deflate->get_solution_ref(x_deflation);
+                    detail::stabilize_solution_if_available(sol_storage_def, x_deflation);
+                    if(parameters->deflation_continuation.restart_policy.check_duplicate_after_deflation)
+                    {
+                        T nearest_distance = std::numeric_limits<T>::infinity();
+                        const bool distance_available =
+                            detail::nearest_stabilized_distance_if_available(sol_storage_def, x_deflation, nearest_distance);
+                        if(distance_available &&
+                           nearest_distance <= parameters->deflation_continuation.restart_policy.duplicate_after_deflation_tolerance)
+                        {
+                            candidate_duplicate = true;
+                            is_new_solution = false;
+                            log->warning_f(
+                                "MAIN:deflation_continuation: deflated Newton returned a duplicate solution at lambda = %lf with stabilized distance = %le and tolerance = %le.",
+                                double(lambda),
+                                double(nearest_distance),
+                                double(parameters->deflation_continuation.restart_policy.duplicate_after_deflation_tolerance));
+                        }
+                    }
+                }
+                duplicate_retry++;
+            }
+            while(candidate_duplicate && duplicate_retry <= duplicate_retry_max);
+
             if(is_new_solution)
             {
                 number_of_solutions++;
                 log->info_f("MAIN:deflation_continuation: found %i solutions for lambda = %lf.", number_of_solutions, double(lambda) );
                 
-                deflate->get_solution_ref(x_deflation);
-                detail::stabilize_solution_if_available(sol_storage_def, x_deflation);
                 bif_diag_curve_t* bdf;
                 
                 bif_diag->init_new_curve();
                 bif_diag->get_current_ref(bdf);
                 //std::cin.get(); 
-                continuate->continuate_curve(bdf, x_deflation, lambda);
+                const bool continuation_success = continuate->continuate_curve(bdf, x_deflation, lambda);
                 bif_diag->close_curve();
                 //std::cin.get(); 
-                save_data(file_name);
+                if(continuation_success || parameters->deflation_continuation.restart_policy.allow_failed_continuation_curve_save)
+                {
+                    save_data(file_name);
+                    bdf->find_intersection(lambda, sol_storage_def);
+                }
+                else
+                {
+                    log->warning_f(
+                        "MAIN:deflation_continuation: continuation of a new curve at lambda = %lf failed; discarding curve according to restart policy.",
+                        double(lambda));
+                    bif_diag->discard_current_curve();
+                    save_data(file_name);
+                }
                 
-                bdf->find_intersection(lambda, sol_storage_def);
             }
             else
             {

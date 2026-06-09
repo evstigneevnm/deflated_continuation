@@ -16,6 +16,7 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
 
+#include <containers/intersection_status.h>
 
 namespace container
 {
@@ -334,8 +335,9 @@ public:
     }
 
     //intersect solutions
-    void find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)
+    intersection_status find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)
     {
+        intersection_status status;
         int N = container.size();
         for(int j=0;j<N-1;j++)
         {
@@ -351,6 +353,7 @@ public:
                     std::string f_name = full_path+std::string("/")+std::to_string(local_id);
                     vec_files->read_vector(f_name, x1); 
                     solution_vector->push_back(x1); 
+                    status.added++;
                     log->info_f("container::bifurcation_diagram_curve(%i): added intersectoin at (%i) for the solution at lambda =  %lf", curve_number, ind, lambda_star);               
                 }
                 else if((p_jp.lambda == lambda_star)&&(p_jp.is_data_avaliable))
@@ -359,6 +362,7 @@ public:
                     std::string f_name = full_path+std::string("/")+std::to_string(local_id);
                     vec_files->read_vector(f_name, x1); 
                     solution_vector->push_back(x1); 
+                    status.added++;
                     log->info_f("container::bifurcation_diagram_curve(%i): added intersectoin at (%i) for the solution at lambda =  %lf", curve_number, indp, lambda_star);               
 
                 }
@@ -371,17 +375,20 @@ public:
                         if(interpolate_solutions(lambda_star))
                         {
                             solution_vector->push_back(x1);
+                            status.added++;
                             log->info_f("container::bifurcation_diagram_curve(%i): added intersectoin at (%i,%i) for the solution at lambda =  %lf", curve_number, ind, indp, lambda_star);
                         }
                         else
                         {
                             //throw std::runtime_error(std::string("container::bifurcation_diagram_curve: newton failed in solution section") );
+                            status.failed++;
                             log->warning_f("container::bifurcation_diagram_curve(%i): !!!newton failed in solution section at (%i(%i), %i(%i)) for the solution at lambda =  %lf !!!", curve_number, ind, int(stat_l), indp, int(stat_u), lambda_star);
                         }
                     }
                     else
                     {
                         //std::string fail_find_files = std::string("container::bifurcation_diagram_curve(") + std::to_string(curve_number) + std::string("): failed to find a valid solution for the parameter = ") + std::to_string(lambda_star) + std::string(" with lower flag = ") + std::to_string(stat_l) + std::string(" and upper flag = ") + std::to_string(stat_u) + std::string(", indexing = (") + std::to_string(ind) + std::string(",") + std::to_string(indp) + std::string(").");
+                        status.missing_data++;
                         log->warning_f("container::bifurcation_diagram_curve(%i): !!!failed to add intersectoin at (%i(%i), %i(%i)) for the solution at lambda =  %lf !!!", curve_number, ind, int(stat_l), indp, int(stat_u), lambda_star);
 
                         //throw std::runtime_error( fail_find_files );
@@ -389,6 +396,7 @@ public:
                 }
             }
         }
+        return status;
 
     }
 
@@ -451,6 +459,31 @@ public:
             debug_file.close();
         curve_open = false; 
         log->info_f("container::bifurcation_diagram_curve(%i) closed.", curve_number); 
+    }
+
+    void remove_output_directory()
+    {
+        if(debug_file.is_open())
+        {
+            debug_file.close();
+        }
+        std::error_code ec;
+        std::filesystem::remove_all(full_path, ec);
+        if(ec)
+        {
+            log->warning_f(
+                "container::bifurcation_diagram_curve(%i): failed to remove discarded curve directory %s: %s",
+                curve_number,
+                full_path.c_str(),
+                ec.message().c_str());
+        }
+        else
+        {
+            log->info_f(
+                "container::bifurcation_diagram_curve(%i): removed discarded curve directory %s",
+                curve_number,
+                full_path.c_str());
+        }
     }
 
 

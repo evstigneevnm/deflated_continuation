@@ -137,6 +137,11 @@ public:
         solution_postprocessor = std::move(solution_postprocessor_);
     }
 
+    void set_allow_knot_interpolation_failure(const bool allow_)
+    {
+        allow_knot_interpolation_failure = allow_;
+    }
+
 
     void update_knots()
     {
@@ -145,11 +150,15 @@ public:
         
     }
 
-    void continuate_curve(Curve*& curve_, const T_vec& x0_, const T& lambda0_)
+    bool continuate_curve(Curve*& curve_, const T_vec& x0_, const T& lambda0_)
     {
         update_knots();
         bif_diag = curve_;
         direction = initial_direciton;
+        fail_flag = false;
+        hard_failure = false;
+        just_interpolated = false;
+        continue_next_step = true;
         
         //make a copy here? or just use the provided reference
         //x0 = x0_, lambda0 = lambda0_;
@@ -176,6 +185,7 @@ public:
             }
         }
         bif_diag->print_curve();
+        return !hard_failure;
     }
 
 
@@ -218,8 +228,10 @@ protected: //changed to protected for inheritance
     T_vec x0, x0_s, x1, x1_back, x1_s, x_check, x_output;
     char break_semicurve = 0;
     bool fail_flag = false;
+    bool hard_failure = false;
     bool continue_next_step = true;
     bool just_interpolated = false;
+    bool allow_knot_interpolation_failure = false;
     std::function<void(T_vec&)> solution_postprocessor;
 
     void add_solution_to_curve(const T& lambda, const T_vec& x, const bool force_store)
@@ -423,6 +435,7 @@ private:
             log->error_f("continuation::start_semicurve exception init_tangent: %s\n", e.what());
             break_semicurve++;
             fail_flag = true;
+            hard_failure = true;
         }
         if(!fail_flag)
         {        
@@ -451,9 +464,20 @@ private:
                         {
                             vec_ops->assign(x1_back, x1);
                             lambda1 = lambda1_back;
-                            fail_flag = false;
                             did_knot_interpolation = false;
-                            log->warning("continuation::start_semicurve did_knot_interpolation falied, restoring state. May cause problems during deflation!");
+                            if(allow_knot_interpolation_failure)
+                            {
+                                fail_flag = false;
+                                log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and continuing because policy allows it. May cause problems during deflation!");
+                            }
+                            else
+                            {
+                                log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and stopping this curve.");
+                                continue_next_step = false;
+                                break_semicurve++;
+                                hard_failure = true;
+                                break;
+                            }
                         }
                     }
                     else
@@ -473,6 +497,7 @@ private:
                     log->error_f("continuation::start_semicurve exception continuation_step: %s\n", e.what());
                     break_semicurve++;
                     fail_flag = true; 
+                    hard_failure = true;
                     continue_next_step = false;                   
                 }
                 if(!continue_next_step)

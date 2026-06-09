@@ -22,6 +22,8 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
 
+#include <containers/intersection_status.h>
+
 namespace container
 {
 
@@ -151,6 +153,18 @@ public:
         }
     }
 
+    void discard_current_curve()
+    {
+        if(curve_container.empty())
+        {
+            return;
+        }
+        curve_container.back().close_curve();
+        curve_container.back().remove_output_directory();
+        curve_container.pop_back();
+        curve_number--;
+    }
+
     void close_curve()
     {
         curve_container.back().close_curve();
@@ -202,21 +216,23 @@ public:
         }
     }
 
-    void find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)
+    intersection_status find_intersection(const T& lambda_star, SolutionStorage*& solution_vector)
     {
-
+        intersection_status status;
         for(auto &x: curve_container)
         {
             try
             {
                 x.set_main_refs( vec_ops, file_ops, log, nonlin_op, newton, cont_help );
-                x.find_intersection(lambda_star, solution_vector);
+                status += x.find_intersection(lambda_star, solution_vector);
             }
             catch(const std::exception& e)
             {
+                status.failed++;
                 log->warning_f("container::bifurcation_diagram::find_intersection: %s", e.what());
             }
         }
+        return status;
 
     }
 
