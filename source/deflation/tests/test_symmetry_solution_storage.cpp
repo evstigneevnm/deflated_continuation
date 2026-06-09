@@ -69,18 +69,21 @@ int main()
     vec_ops_t::vector_type stabilized;
     vec_ops_t::vector_type query;
     vec_ops_t::vector_type shifted_query;
+    vec_ops_t::vector_type history;
     vec_ops_t::vector_type c;
     vec_ops.init_vector(x);
     vec_ops.init_vector(shifted);
     vec_ops.init_vector(stabilized);
     vec_ops.init_vector(query);
     vec_ops.init_vector(shifted_query);
+    vec_ops.init_vector(history);
     vec_ops.init_vector(c);
     vec_ops.start_use_vector(x);
     vec_ops.start_use_vector(shifted);
     vec_ops.start_use_vector(stabilized);
     vec_ops.start_use_vector(query);
     vec_ops.start_use_vector(shifted_query);
+    vec_ops.start_use_vector(history);
     vec_ops.start_use_vector(c);
 
     set_vector(vec_ops, x, {1.0, 0.0, 0.25, 0.5});
@@ -130,8 +133,30 @@ int main()
     storage.calc_distance(query, beta, c);
     require_close("known solution beta", beta, 401.0, 1e-10);
 
+    storage.clear();
+    set_vector(vec_ops, history, {0.0, 0.0, 1.0, 1.0});
+    adapter.stabilize(history, stabilized);
+    require_true("chart history selected mode 2", adapter.last_slice_data().mode == 2);
+
+    set_vector(vec_ops, x, {1.0, 0.2, 0.25, 0.5});
+    adapter.apply_shift(x, shifted, 0.37);
+    storage.push_back(x);
+    storage.push_back(shifted);
+    require_true("canonical storage ignores chart history for duplicates", storage.get_size() == 1);
+    require_close("canonical nearest shifted duplicate distance", storage.nearest_stabilized_distance(shifted), 0.0, 1e-10);
+
+    storage.clear();
+    set_vector(vec_ops, x, {0.0, 0.0, 1.0, 0.4});
+    adapter.apply_shift(x, shifted, 0.37);
+    storage.push_back(x);
+    storage.push_back(shifted);
+    require_true("mode 2 first-active shifted copy is skipped", storage.get_size() == 1);
+    require_close("mode 2 first-active nearest shifted duplicate distance", storage.nearest_stabilized_distance(shifted), 0.0, 1e-10);
+
     vec_ops.stop_use_vector(c);
     vec_ops.free_vector(c);
+    vec_ops.stop_use_vector(history);
+    vec_ops.free_vector(history);
     vec_ops.stop_use_vector(query);
     vec_ops.free_vector(query);
     vec_ops.stop_use_vector(shifted_query);

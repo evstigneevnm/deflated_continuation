@@ -30,6 +30,50 @@ auto log_symmetry_solution_storage_message(Log* log, const T& message) -> declty
     }
 }
 
+template<class SymmetryAdapter, class Vector>
+auto stabilize_canonical_if_available(
+    SymmetryAdapter* symmetry_adapter,
+    const Vector& source,
+    Vector& destination,
+    int) -> decltype(symmetry_adapter->stabilize_canonical(source, destination), void())
+{
+    symmetry_adapter->stabilize_canonical(source, destination);
+}
+
+template<class SymmetryAdapter, class Vector>
+void stabilize_canonical_if_available(
+    SymmetryAdapter* symmetry_adapter,
+    const Vector& source,
+    Vector& destination,
+    long)
+{
+    symmetry_adapter->stabilize(source, destination);
+}
+
+template<class SymmetryAdapter, class Vector>
+auto pullback_canonical_distance_gradient_if_available(
+    SymmetryAdapter* symmetry_adapter,
+    const Vector& source,
+    const Vector& slice_state,
+    const Vector& slice_gradient,
+    Vector& gradient,
+    int) -> decltype(symmetry_adapter->pullback_canonical_distance_gradient(source, slice_state, slice_gradient, gradient), void())
+{
+    symmetry_adapter->pullback_canonical_distance_gradient(source, slice_state, slice_gradient, gradient);
+}
+
+template<class SymmetryAdapter, class Vector>
+void pullback_canonical_distance_gradient_if_available(
+    SymmetryAdapter* symmetry_adapter,
+    const Vector& source,
+    const Vector& slice_state,
+    const Vector& slice_gradient,
+    Vector& gradient,
+    long)
+{
+    symmetry_adapter->pullback_distance_gradient(source, slice_state, slice_gradient, gradient);
+}
+
 } // namespace detail
 
 template<class VectorOperations>
@@ -52,6 +96,11 @@ public:
     void stabilize(const vector_type& source, vector_type& destination) const
     {
         vec_ops->assign(source, destination);
+    }
+
+    void stabilize_canonical(const vector_type& source, vector_type& destination) const
+    {
+        stabilize(source, destination);
     }
 
     void pullback_distance_gradient(
@@ -163,7 +212,7 @@ public:
     void set_known_solution(const T_vec& x0_p)
     {
         require_symmetry_adapter();
-        symmetry_adapter->stabilize(x0_p, x0_hat);
+        detail::stabilize_canonical_if_available(symmetry_adapter, x0_p, x0_hat, 0);
         ignore_zero_ = false;
     }
 
@@ -175,7 +224,7 @@ public:
     void push_back(const T_vec& vect)
     {
         require_symmetry_adapter();
-        symmetry_adapter->stabilize(vect, x_hat);
+        detail::stabilize_canonical_if_available(symmetry_adapter, vect, x_hat, 0);
         const host_state_type host_state = get_host_state(x_hat);
         if(!canonical_host_storage.add_if_new(host_state))
         {
@@ -206,20 +255,20 @@ public:
     double nearest_stabilized_distance(const T_vec& vect)
     {
         require_symmetry_adapter();
-        symmetry_adapter->stabilize(vect, x_hat);
+        detail::stabilize_canonical_if_available(symmetry_adapter, vect, x_hat, 0);
         return canonical_host_storage.nearest_distance(get_host_state(x_hat)).first;
     }
 
     void stabilize(const T_vec& source, T_vec& destination)
     {
         require_symmetry_adapter();
-        symmetry_adapter->stabilize(source, destination);
+        detail::stabilize_canonical_if_available(symmetry_adapter, source, destination, 0);
     }
 
     void stabilize_in_place(T_vec& x)
     {
         require_symmetry_adapter();
-        symmetry_adapter->stabilize(x, x_hat);
+        detail::stabilize_canonical_if_available(symmetry_adapter, x, x_hat, 0);
         vec_ops->assign(x_hat, x);
     }
 
@@ -353,7 +402,7 @@ private:
     {
         require_symmetry_adapter();
         P = p;
-        symmetry_adapter->stabilize(x, x_hat);
+        detail::stabilize_canonical_if_available(symmetry_adapter, x, x_hat, 0);
         vec_ops->assign_scalar(T(0), slice_gradient);
 
         unsigned int total_elements = elements_number + 1;
@@ -380,7 +429,7 @@ private:
             add_distance_from_reference(x_hat, container[j].get_ref(), total_elements);
         }
 
-        symmetry_adapter->pullback_distance_gradient(x, x_hat, slice_gradient, c);
+        detail::pullback_canonical_distance_gradient_if_available(symmetry_adapter, x, x_hat, slice_gradient, c, 0);
         distance += T(1);
     }
 

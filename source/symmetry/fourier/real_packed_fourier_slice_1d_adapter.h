@@ -1,6 +1,7 @@
 #ifndef __SYMMETRY_FOURIER_REAL_PACKED_FOURIER_SLICE_1D_ADAPTER_H__
 #define __SYMMETRY_FOURIER_REAL_PACKED_FOURIER_SLICE_1D_ADAPTER_H__
 
+#include <algorithm>
 #include <cmath>
 #include <complex>
 #include <cstddef>
@@ -46,6 +47,7 @@ public:
         spectrum(positive_modes_ + 1, complex_type(0)),
         reference_spectrum(positive_modes_ + 1, complex_type(0)),
         stabilized_spectrum(positive_modes_ + 1, complex_type(0)),
+        zero_spectrum(positive_modes_ + 1, complex_type(0)),
         candidate_spectrum(positive_modes_ + 1, complex_type(0)),
         best_spectrum(positive_modes_ + 1, complex_type(0)),
         tangent_spectrum(positive_modes_ + 1, complex_type(0)),
@@ -91,6 +93,20 @@ public:
         check_vector_size(destination);
         vector_to_spectrum(source, spectrum);
         slice.stabilize(spectrum.data(), stabilized_spectrum.data(), stabilized_spectrum.size(), last_data);
+        spectrum_to_vector(stabilized_spectrum, destination);
+    }
+
+    void stabilize_chart(const vector_type& source, vector_type& destination)
+    {
+        stabilize(source, destination);
+    }
+
+    void stabilize_canonical(const vector_type& source, vector_type& destination)
+    {
+        check_vector_size(source);
+        check_vector_size(destination);
+        vector_to_spectrum(source, spectrum);
+        canonicalize_spectrum(spectrum, stabilized_spectrum, last_data);
         spectrum_to_vector(stabilized_spectrum, destination);
     }
 
@@ -148,6 +164,29 @@ public:
 
         vector_to_spectrum(source, spectrum);
         slice.stabilize(spectrum.data(), stabilized_spectrum.data(), stabilized_spectrum.size(), last_data);
+        vector_to_spectrum(slice_gradient, gradient_spectrum);
+        stabilizer_adjoint_pullback_1d(
+            last_data,
+            stabilized_spectrum.data(),
+            gradient_spectrum.data(),
+            work_gradient_spectrum.data(),
+            source_gradient_spectrum.data(),
+            source_gradient_spectrum.size());
+        spectrum_to_vector(source_gradient_spectrum, gradient);
+    }
+
+    void pullback_canonical_distance_gradient(
+        const vector_type& source,
+        const vector_type&,
+        const vector_type& slice_gradient,
+        vector_type& gradient)
+    {
+        check_vector_size(source);
+        check_vector_size(slice_gradient);
+        check_vector_size(gradient);
+
+        vector_to_spectrum(source, spectrum);
+        canonicalize_spectrum(spectrum, stabilized_spectrum, last_data);
         vector_to_spectrum(slice_gradient, gradient_spectrum);
         stabilizer_adjoint_pullback_1d(
             last_data,
@@ -293,6 +332,91 @@ private:
         return result;
     }
 
+    void canonicalize_spectrum(
+        const std::vector<complex_type>& source,
+        std::vector<complex_type>& destination,
+        slice_data_type& data)
+    {
+        data = slice.choose_slice_data(source.data(), source.size(), 0);
+        if(!data.active())
+        {
+            destination = source;
+            zero_small_components(destination, canonical_zero_tolerance(destination));
+            return;
+        }
+
+        const scalar_type base_shift = data.shift;
+        const std::size_t order = data.residual_group_order() == 0 ? std::size_t(1) : data.residual_group_order();
+        const scalar_type two_pi = scalar_type(2)*static_cast<scalar_type>(std::acos(static_cast<scalar_type>(-1)));
+        const scalar_type tolerance = canonical_zero_tolerance(source);
+        scalar_type best_shift = base_shift;
+        bool have_best = false;
+
+        for(std::size_t j = 0; j < order; ++j)
+        {
+            const scalar_type shift = base_shift + two_pi*static_cast<scalar_type>(j)/static_cast<scalar_type>(order);
+            slice.apply_shift(source.data(), candidate_spectrum.data(), candidate_spectrum.size(), shift);
+            zero_small_components(candidate_spectrum, tolerance);
+            if(!have_best || lexicographically_greater(candidate_spectrum, best_spectrum, tolerance))
+            {
+                best_spectrum = candidate_spectrum;
+                best_shift = shift;
+                have_best = true;
+            }
+        }
+
+        destination = best_spectrum;
+        data.shift = best_shift;
+        data.set_shift(0, best_shift);
+    }
+
+    scalar_type canonical_zero_tolerance(const std::vector<complex_type>& values) const
+    {
+        const scalar_type norm = std::sqrt(spectrum_distance_sq(values, zero_spectrum));
+        return slice.active_mode_tolerance()*std::max<scalar_type>(scalar_type(1), norm);
+    }
+
+    static void zero_small_components(std::vector<complex_type>& values, const scalar_type tolerance)
+    {
+        for(auto& value: values)
+        {
+            const scalar_type real_part = std::abs(value.real()) <= tolerance ? scalar_type(0) : value.real();
+            const scalar_type imag_part = std::abs(value.imag()) <= tolerance ? scalar_type(0) : value.imag();
+            value = complex_type(real_part, imag_part);
+        }
+    }
+
+    static bool lexicographically_greater(
+        const std::vector<complex_type>& left,
+        const std::vector<complex_type>& right,
+        const scalar_type tolerance)
+    {
+        const std::size_t n = std::min(left.size(), right.size());
+        for(std::size_t mode = 1; mode < n; ++mode)
+        {
+            const scalar_type real_delta = left[mode].real() - right[mode].real();
+            if(real_delta > tolerance)
+            {
+                return true;
+            }
+            if(real_delta < -tolerance)
+            {
+                return false;
+            }
+
+            const scalar_type imag_delta = left[mode].imag() - right[mode].imag();
+            if(imag_delta > tolerance)
+            {
+                return true;
+            }
+            if(imag_delta < -tolerance)
+            {
+                return false;
+            }
+        }
+        return false;
+    }
+
 private:
     VectorOperations* vec_ops;
     std::size_t positive_modes_;
@@ -304,6 +428,7 @@ private:
     std::vector<complex_type> spectrum;
     std::vector<complex_type> reference_spectrum;
     std::vector<complex_type> stabilized_spectrum;
+    std::vector<complex_type> zero_spectrum;
     std::vector<complex_type> candidate_spectrum;
     std::vector<complex_type> best_spectrum;
     std::vector<complex_type> tangent_spectrum;

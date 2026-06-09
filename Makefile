@@ -172,6 +172,9 @@ test_quotient_classifier.bin: source/symmetry/tests/test_quotient_classifier.cpp
 test_fourier_slice_1d.bin: source/symmetry/tests/test_fourier_slice_1d.cpp $(SYMMETRY_FOURIER_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_slice_1d.cpp -o $(BUILD_DIR)/test_fourier_slice_1d.bin 2>$(RESULTS)
 
+test_real_packed_fourier_canonical_adapter.bin: source/symmetry/tests/test_real_packed_fourier_canonical_adapter.cpp $(SYMMETRY_FOURIER_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_real_packed_fourier_canonical_adapter.cpp $(OPENMP) -o $(BUILD_DIR)/test_real_packed_fourier_canonical_adapter.bin 2>$(RESULTS)
+
 test_fourier_slice_differential_1d.bin: source/symmetry/tests/test_fourier_slice_differential_1d.cpp $(SYMMETRY_FOURIER_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_slice_differential_1d.cpp -o $(BUILD_DIR)/test_fourier_slice_differential_1d.bin 2>$(RESULTS)
 
