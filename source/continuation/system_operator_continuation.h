@@ -58,6 +58,11 @@ public:
         log->info_f("continuation::system_operator: tangent space set: dS = %le, tangent norm = %le", (double)ds_l, (double)tangent_norm);
     }
 
+    void set_tangent_space(T_vec& x_0_, T& lambda_0_, T_vec& x_0_s_, T& lambda_0_s_, T& ds_l_, char continuation_type_, NonlinearOperator*)
+    {
+        set_tangent_space(x_0_, lambda_0_, x_0_s_, lambda_0_s_, ds_l_, continuation_type_);
+    }
+
     T arclength_residual(const T_vec& x_1, const T& lambda_1)
     {
         if(!tangent_set)

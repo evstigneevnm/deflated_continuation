@@ -150,7 +150,7 @@ public:
 
     {
         
-        project_dir = parameters->path_to_prject;
+        project_dir = parameters->path_to_project;
         skip_files = parameters->deflation_continuation.skip_files;
 
         //set project directory the same way as in deflation_continuation

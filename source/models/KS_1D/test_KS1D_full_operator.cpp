@@ -10,7 +10,13 @@
 #include <common/cuda_init_scfd.h>
 #endif
 
+#include <continuation/projected_system_operator_continuation.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/projected_linear_operator_KS_1D.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/projected_preconditioner_KS_1D.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h>
+#include <numerical_algos/lin_solvers/bicgstabl.h>
+#include <numerical_algos/lin_solvers/default_monitor.h>
+#include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 #include <symmetry/fourier/real_packed_fourier_slice_1d_adapter.h>
 
 #include "KS1D_backend_typedefs.h"
@@ -22,6 +28,22 @@ using ks1d_t = nonlinear_operators::kuramoto_sivashinskiy_1d_full<vec_ops_real, 
 using ks1d_reduced_t = nonlinear_operators::kuramoto_sivashinskiy_1d<vec_ops_real, fft_backend_t, Blocks_x_>;
 using real_vec = typename vec_ops_real::vector_type;
 using symmetry_adapter_t = symmetry::fourier::real_packed_fourier_slice_1d_adapter<vec_ops_real>;
+using lin_op_t = nonlinear_operators::projected_linear_operator_KS_1D<vec_ops_real, ks1d_t>;
+using prec_t = nonlinear_operators::projected_preconditioner_KS_1D<vec_ops_real, ks1d_t, lin_op_t>;
+using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
+using sm_solver_t = numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
+    lin_op_t,
+    prec_t,
+    vec_ops_real,
+    monitor_t,
+    log_t,
+    numerical_algos::lin_solvers::bicgstabl>;
+using projected_continuation_system_t = continuation::projected_system_operator_continuation<
+    vec_ops_real,
+    ks1d_t,
+    lin_op_t,
+    sm_solver_t,
+    log_t>;
 
 int checks = 0;
 int failures = 0;
@@ -548,6 +570,121 @@ void test_projected_operator_hooks(vec_ops_real& vec_ops, ks1d_t& ks, symmetry_a
         projected_finite_difference);
 }
 
+void test_projected_bordered_continuation_correction(vec_ops_real& vec_ops, ks1d_t& ks)
+{
+    real_vec x0;
+    real_vec tangent;
+    real_vec candidate;
+    real_vec dx;
+    real_vec projected_dx;
+    real_vec jlambda;
+    real_vec rhs;
+    real_vec lhs;
+    real_vec linear_residual;
+    vec_ops.init_vectors(x0, tangent, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
+    vec_ops.start_use_vectors(x0, tangent, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
+
+    std::vector<real> host_x0(vec_ops.get_default_size(), real(0));
+    if(host_x0.size() >= 6)
+    {
+        host_x0[0] = real(1.10);
+        host_x0[1] = real(0.25);
+        host_x0[2] = real(0.40);
+        host_x0[3] = real(-0.30);
+        host_x0[4] = real(0.10);
+        host_x0[5] = real(0.05);
+    }
+    vec_ops.set(host_x0.data(), x0, host_x0.size());
+    ks.project(x0);
+    host_x0 = host_vector(vec_ops, x0);
+
+    std::vector<real> host_tangent(vec_ops.get_default_size(), real(0));
+    const std::size_t mode_count = host_tangent.size()/2;
+    for(std::size_t mode = 1; mode <= mode_count; ++mode)
+    {
+        const real k = static_cast<real>(mode);
+        const std::size_t offset = 2*(mode - 1);
+        const real re = host_x0[offset];
+        const real im = host_x0[offset + 1];
+        host_tangent[offset] = real(0.02)/(k + real(1)) - real(2.0)*k*im;
+        host_tangent[offset + 1] = -real(0.015)/(k + real(2)) + real(2.0)*k*re;
+    }
+    vec_ops.set(host_tangent.data(), tangent, host_tangent.size());
+
+    real lambda0 = real(6);
+    real lambda_s = real(0.25);
+    const real tangent_norm = vec_ops.norm_rank1(tangent, lambda_s);
+    vec_ops.scale(real(1)/tangent_norm, tangent);
+    lambda_s /= tangent_norm;
+
+    const real ds = real(1.0e-3);
+    vec_ops.assign_mul(real(1), x0, ds, tangent, candidate);
+    real lambda_candidate = lambda0 + ds*lambda_s;
+
+    log_t log;
+    log.set_verbosity(0);
+    lin_op_t lin_op(&ks);
+    prec_t prec(&ks);
+    sm_solver_t sm_solver(&prec, &vec_ops, &log);
+    sm_solver.get_linsolver_handle()->monitor().init(
+        std::is_same<real, float>::value ? real(1.0e-5) : real(1.0e-10),
+        real(1.0e-14),
+        1000,
+        0,
+        false,
+        false,
+        true);
+    sm_solver.get_linsolver_handle()->set_basis_size(8);
+
+    projected_continuation_system_t system_operator(&vec_ops, &log, &lin_op, &sm_solver);
+    real ds_mutable = ds;
+    system_operator.set_tangent_space(x0, lambda0, tangent, lambda_s, ds_mutable, 'S', &ks);
+    const real beta = -system_operator.arclength_residual(candidate, lambda_candidate);
+    real d_lambda = real(0);
+    const bool solved = system_operator.solve(&ks, candidate, lambda_candidate, dx, d_lambda);
+    ++checks;
+    if(!solved)
+    {
+        record_failure("projected bordered correction linear solver did not converge");
+    }
+
+    const real scalar_residual = vec_ops.scalar_prod(tangent, dx) + lambda_s*d_lambda - beta;
+    check_close(
+        scalar_residual,
+        real(0),
+        std::is_same<real, float>::value ? real(2.0e-4) : real(1.0e-8),
+        "projected bordered correction scalar row");
+
+    ks.project_current_tangent(dx, projected_dx);
+    check_vector_close(
+        vec_ops,
+        projected_dx,
+        dx,
+        (std::is_same<real, float>::value ? real(2.0e-4) : real(1.0e-8))*(real(1) + vec_ops.norm_l2(dx)),
+        "projected bordered correction is tangent");
+
+    ks.set_projected_linearization_point(candidate, lambda_candidate);
+    ks.projected_jacobian_alpha(jlambda);
+    ks.projected_F_at_linearization(rhs);
+    vec_ops.assign_mul(real(-1), rhs, rhs);
+    lin_op.apply(dx, lhs);
+    vec_ops.add_mul(d_lambda, jlambda, lhs);
+    vec_ops.assign_mul(real(1), lhs, real(-1), rhs, linear_residual);
+    const real linear_residual_norm = vec_ops.norm_l2(linear_residual);
+    ++checks;
+    const real linear_tol = std::is_same<real, float>::value ? real(1.0e-2) : real(1.0e-5);
+    if(!(linear_residual_norm <= linear_tol*(real(1) + vec_ops.norm_l2(rhs))))
+    {
+        record_failure(
+            "projected bordered correction vector row residual=" +
+            std::to_string(static_cast<double>(linear_residual_norm)) +
+            " tol=" + std::to_string(static_cast<double>(linear_tol*(real(1) + vec_ops.norm_l2(rhs)))));
+    }
+
+    vec_ops.stop_use_vectors(x0, tangent, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
+    vec_ops.free_vectors(x0, tangent, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -588,6 +725,7 @@ int main(int argc, char** argv)
     test_equivariance(vec_ops, ks, symmetry);
     test_project_hook(vec_ops, ks, symmetry);
     test_projected_operator_hooks(vec_ops, ks, symmetry);
+    test_projected_bordered_continuation_correction(vec_ops, ks);
 
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;
     if(failures != 0)

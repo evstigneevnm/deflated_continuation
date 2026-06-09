@@ -127,7 +127,7 @@ public:
             log_linsolver(log_linsolver_),
             parameters(parameters_)
     {
-        project_dir = parameters->path_to_prject;
+        project_dir = parameters->path_to_project;
         //set project directory the same way as in deflation_continuation
         if(!project_dir.empty() && *project_dir.rbegin() != '/')
             project_dir += '/';

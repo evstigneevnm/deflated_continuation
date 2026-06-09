@@ -24,6 +24,21 @@
 namespace continuation
 {
 
+namespace detail
+{
+
+template<class Curve>
+auto start_new_curve_segment_if_available(Curve* curve) -> decltype(curve->start_new_segment(), void())
+{
+    curve->start_new_segment();
+}
+
+inline void start_new_curve_segment_if_available(...)
+{
+}
+
+}
+
 template<class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperator, class LinearOperator,  class Knots, class LinearSolver, class Newton, class Curve, template<class, class, class, class, class> class SystemOperatorContinuation = system_operator_continuation>
 class continuation
 {
@@ -33,6 +48,15 @@ protected:
 
 private:
     typedef std::pair<bool, bool> bools2;
+    typedef std::function<bool(const T& requested_lambda, T& effective_lambda)> knot_resolver_t;
+    typedef std::function<bool(
+        const T& requested_lambda,
+        const T& lambda_left,
+        const T_vec& x_left,
+        const T& lambda_right,
+        const T_vec& x_right,
+        T& effective_lambda,
+        T_vec& effective_x)> knot_relocator_t;
 
 
     typedef SystemOperatorContinuation<
@@ -137,6 +161,16 @@ public:
         solution_postprocessor = std::move(solution_postprocessor_);
     }
 
+    void set_knot_resolver(knot_resolver_t knot_resolver_)
+    {
+        knot_resolver = std::move(knot_resolver_);
+    }
+
+    void set_knot_relocator(knot_relocator_t knot_relocator_)
+    {
+        knot_relocator = std::move(knot_relocator_);
+    }
+
     void set_allow_knot_interpolation_failure(const bool allow_)
     {
         allow_knot_interpolation_failure = allow_;
@@ -174,6 +208,7 @@ public:
         while (break_semicurve < 2)
         {
             continue_next_step = true;
+            detail::start_new_curve_segment_if_available(bif_diag);
             start_semicurve();
             change_direction(); //if we reached the origin, then this is irrelevant. Else, change direction and do it again
             vec_ops->assign(x_start, x0);
@@ -225,14 +260,19 @@ protected: //changed to protected for inheritance
     T lambda_start; T_vec x_start;
     T lambda0, lambda0_s, lambda1, lambda1_s;
     T lambda_min, lambda_max;
-    T_vec x0, x0_s, x1, x1_back, x1_s, x_check, x_output;
+    T_vec x0, x0_s, x1, x1_back, x1_s, x_check, x_output, x_relocated_knot;
     char break_semicurve = 0;
     bool fail_flag = false;
     bool hard_failure = false;
     bool continue_next_step = true;
     bool just_interpolated = false;
     bool allow_knot_interpolation_failure = false;
+    bool last_failed_knot_interpolation = false;
+    T last_failed_requested_knot = T(0);
+    T last_failed_effective_knot = T(0);
     std::function<void(T_vec&)> solution_postprocessor;
+    knot_resolver_t knot_resolver;
+    knot_relocator_t knot_relocator;
 
     void add_solution_to_curve(const T& lambda, const T_vec& x, const bool force_store)
     {
@@ -260,6 +300,7 @@ private:
         vec_ops->init_vector(x1_s); vec_ops->start_use_vector(x1_s);
         vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
         vec_ops->init_vector(x1_back); vec_ops->start_use_vector(x1_back);
+        vec_ops->init_vector(x_relocated_knot); vec_ops->start_use_vector(x_relocated_knot);
     }
     void unset_all_vectors()
     {
@@ -271,6 +312,7 @@ private:
         vec_ops->stop_use_vector(x1_s); vec_ops->free_vector(x1_s);
         vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
         vec_ops->stop_use_vector(x1_back); vec_ops->free_vector(x1_back);
+        vec_ops->stop_use_vector(x_relocated_knot); vec_ops->free_vector(x_relocated_knot);
     }
 
 
@@ -325,6 +367,9 @@ private:
             if(!ret)
             {
                 log->warning_f("continuation::check_intersection::interpolate_solutions: returned failed for lambda_star = %le, lambda_0 = %le, lambda_1 = %le", lambda_star, lambda0, lambda1);
+                last_failed_knot_interpolation = true;
+                last_failed_requested_knot = lambda_star;
+                last_failed_effective_knot = lambda_star;
                 fail_flag = true;
                 return(bools2(true, true));
             }
@@ -400,8 +445,14 @@ private:
         bool res = false;
         for(auto &x: *knots)
         {
+            const T requested_lambda = x;
+            T effective_lambda = requested_lambda;
+            if(knot_resolver)
+            {
+                knot_resolver(requested_lambda, effective_lambda);
+            }
 
-            bools2 res_l = check_intersection(x);
+            bools2 res_l = check_intersection(effective_lambda);
             if(!fail_flag)
             {
                 if(res_l.first)
@@ -413,11 +464,50 @@ private:
             }
             else
             {
+                if(last_failed_knot_interpolation)
+                {
+                    last_failed_requested_knot = requested_lambda;
+                    last_failed_effective_knot = effective_lambda;
+                }
                 res = false;
                 break;                
             }
         }
         return res;
+    }
+
+    bool try_relocate_failed_knot(const T& lambda1_original)
+    {
+        if(!last_failed_knot_interpolation || !knot_relocator)
+        {
+            return false;
+        }
+
+        T effective_lambda = last_failed_requested_knot;
+        const bool relocated = knot_relocator(
+            last_failed_requested_knot,
+            lambda0,
+            x0,
+            lambda1_original,
+            x1_back,
+            effective_lambda,
+            x_relocated_knot);
+        if(!relocated)
+        {
+            return false;
+        }
+
+        vec_ops->assign(x_relocated_knot, x1);
+        lambda1 = effective_lambda;
+        fail_flag = false;
+        just_interpolated = true;
+        last_failed_knot_interpolation = false;
+        log->warning_f(
+            "continuation::start_semicurve: shifted failed active knot interpolation from requested lambda = %le, effective lambda = %le to validated lambda = %le.",
+            double(last_failed_requested_knot),
+            double(last_failed_effective_knot),
+            double(lambda1));
+        return true;
     }
 
 
@@ -458,6 +548,7 @@ private:
                         vec_ops->assign(x1, x1_back);
                         T lambda1_back = lambda1;
                         
+                        last_failed_knot_interpolation = false;
                         did_knot_interpolation = interpolate_all_knots();
                         //if fail flag after the interpolation, restore (x1, lambda1) and continue?
                         if((fail_flag)&&(!fail_flag_b4_interpolation))
@@ -465,9 +556,14 @@ private:
                             vec_ops->assign(x1_back, x1);
                             lambda1 = lambda1_back;
                             did_knot_interpolation = false;
-                            if(allow_knot_interpolation_failure)
+                            if(try_relocate_failed_knot(lambda1_back))
+                            {
+                                did_knot_interpolation = true;
+                            }
+                            else if(allow_knot_interpolation_failure)
                             {
                                 fail_flag = false;
+                                last_failed_knot_interpolation = false;
                                 log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and continuing because policy allows it. May cause problems during deflation!");
                             }
                             else

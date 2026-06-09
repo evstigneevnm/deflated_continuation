@@ -9,6 +9,7 @@ struct intersection_status
     unsigned int added = 0;
     unsigned int failed = 0;
     unsigned int missing_data = 0;
+    unsigned int skipped_discontinuous = 0;
 
     bool ok() const
     {
@@ -25,6 +26,7 @@ struct intersection_status
         added += that.added;
         failed += that.failed;
         missing_data += that.missing_data;
+        skipped_discontinuous += that.skipped_discontinuous;
         return *this;
     }
 };

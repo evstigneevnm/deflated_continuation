@@ -43,7 +43,7 @@ def write_config(args: argparse.Namespace) -> None:
     project_dir.mkdir(parents=True, exist_ok=True)
     output_config.parent.mkdir(parents=True, exist_ok=True)
 
-    config["path_to_prject"] = str(project_dir)
+    config["path_to_project"] = str(project_dir)
     config["use_high_precision_reduction"] = args.high_precision_reduction
     config["bifurcaiton_diagram_file_name"] = "bifurcation_diagram.dat"
 
@@ -63,6 +63,17 @@ def write_config(args: argparse.Namespace) -> None:
     restart_policy.setdefault("check_duplicate_after_deflation", True)
     restart_policy.setdefault("duplicate_after_deflation_retries", 2)
     restart_policy.setdefault("duplicate_after_deflation_tolerance", 1.0e-8)
+    restart_policy.setdefault("max_failed_continuations_per_knot", 3)
+    restart_policy.setdefault("failed_continuation_rejection_tolerance", 1.0e-8)
+    knot_relocation = restart_policy.setdefault("knot_relocation", {})
+    knot_relocation.setdefault("enabled", False)
+    knot_relocation.setdefault("registry_file", "knot_registry.json")
+    knot_relocation.setdefault("min_shift_abs", 1.0e-5)
+    knot_relocation.setdefault("max_shift_abs", 0.05)
+    knot_relocation.setdefault("candidate_count", 12)
+    knot_relocation.setdefault("prefer_positive_shift", True)
+    knot_relocation.setdefault("require_all_intersections", True)
+    knot_relocation.setdefault("save_registry", True)
 
     continuation["linear_solver_extended"]["save_convergence_history"] = False
     continuation["linear_solver_extended"]["verbose"] = False

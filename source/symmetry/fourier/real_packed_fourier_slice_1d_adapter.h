@@ -1,8 +1,10 @@
 #ifndef __SYMMETRY_FOURIER_REAL_PACKED_FOURIER_SLICE_1D_ADAPTER_H__
 #define __SYMMETRY_FOURIER_REAL_PACKED_FOURIER_SLICE_1D_ADAPTER_H__
 
+#include <cmath>
 #include <complex>
 #include <cstddef>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -42,7 +44,10 @@ public:
         host_source(expected_vector_size(), scalar_type(0)),
         host_destination(expected_vector_size(), scalar_type(0)),
         spectrum(positive_modes_ + 1, complex_type(0)),
+        reference_spectrum(positive_modes_ + 1, complex_type(0)),
         stabilized_spectrum(positive_modes_ + 1, complex_type(0)),
+        candidate_spectrum(positive_modes_ + 1, complex_type(0)),
+        best_spectrum(positive_modes_ + 1, complex_type(0)),
         tangent_spectrum(positive_modes_ + 1, complex_type(0)),
         vector_field_spectrum(positive_modes_ + 1, complex_type(0)),
         vector_field_derivative_spectrum(positive_modes_ + 1, complex_type(0)),
@@ -86,6 +91,48 @@ public:
         check_vector_size(destination);
         vector_to_spectrum(source, spectrum);
         slice.stabilize(spectrum.data(), stabilized_spectrum.data(), stabilized_spectrum.size(), last_data);
+        spectrum_to_vector(stabilized_spectrum, destination);
+    }
+
+    void stabilize_closest_to_reference(const vector_type& reference, const vector_type& source, vector_type& destination)
+    {
+        check_vector_size(reference);
+        check_vector_size(source);
+        check_vector_size(destination);
+
+        vector_to_spectrum(source, spectrum);
+        vector_to_spectrum(reference, reference_spectrum);
+
+        last_data = slice.choose_slice_data(spectrum.data(), spectrum.size(), last_data.mode);
+        if(!last_data.active())
+        {
+            stabilized_spectrum = spectrum;
+            spectrum_to_vector(stabilized_spectrum, destination);
+            return;
+        }
+
+        const scalar_type base_shift = last_data.shift;
+        const std::size_t order = last_data.residual_group_order() == 0 ? std::size_t(1) : last_data.residual_group_order();
+        const scalar_type two_pi = scalar_type(2)*static_cast<scalar_type>(std::acos(static_cast<scalar_type>(-1)));
+        scalar_type best_distance = std::numeric_limits<scalar_type>::max();
+        scalar_type best_shift = base_shift;
+
+        for(std::size_t j = 0; j < order; ++j)
+        {
+            const scalar_type shift = base_shift + two_pi*static_cast<scalar_type>(j)/static_cast<scalar_type>(order);
+            slice.apply_shift(spectrum.data(), candidate_spectrum.data(), candidate_spectrum.size(), shift);
+            const scalar_type distance = spectrum_distance_sq(candidate_spectrum, reference_spectrum);
+            if(j == 0 || distance < best_distance)
+            {
+                best_distance = distance;
+                best_shift = shift;
+                best_spectrum = candidate_spectrum;
+            }
+        }
+
+        last_data.shift = best_shift;
+        last_data.set_shift(0, best_shift);
+        stabilized_spectrum = best_spectrum;
         spectrum_to_vector(stabilized_spectrum, destination);
     }
 
@@ -230,6 +277,22 @@ private:
         vec_ops->set(host_destination.data(), destination, host_destination.size());
     }
 
+    scalar_type spectrum_distance_sq(const std::vector<complex_type>& x, const std::vector<complex_type>& y) const
+    {
+        if(x.size() != y.size())
+        {
+            throw std::runtime_error("real_packed_fourier_slice_1d_adapter spectrum sizes do not match");
+        }
+        scalar_type result = scalar_type(0);
+        for(std::size_t i = 0; i < x.size(); ++i)
+        {
+            const scalar_type real_delta = x[i].real() - y[i].real();
+            const scalar_type imag_delta = x[i].imag() - y[i].imag();
+            result += real_delta*real_delta + imag_delta*imag_delta;
+        }
+        return result;
+    }
+
 private:
     VectorOperations* vec_ops;
     std::size_t positive_modes_;
@@ -239,7 +302,10 @@ private:
     std::vector<scalar_type> host_source;
     std::vector<scalar_type> host_destination;
     std::vector<complex_type> spectrum;
+    std::vector<complex_type> reference_spectrum;
     std::vector<complex_type> stabilized_spectrum;
+    std::vector<complex_type> candidate_spectrum;
+    std::vector<complex_type> best_spectrum;
     std::vector<complex_type> tangent_spectrum;
     std::vector<complex_type> vector_field_spectrum;
     std::vector<complex_type> vector_field_derivative_spectrum;

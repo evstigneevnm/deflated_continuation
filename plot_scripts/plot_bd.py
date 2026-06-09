@@ -22,12 +22,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("config", help="JSON project config file")
     parser.add_argument(
         "--project-dir",
-        help="Override the project directory from the JSON path_to_prject field",
+        help="Override the project directory from the JSON path_to_project field",
     )
     parser.add_argument(
         "--config-relative",
         action="store_true",
-        help="Resolve a relative path_to_prject against the config file directory",
+        help="Resolve a relative path_to_project against the config file directory",
     )
     parser.add_argument(
         "--norm",
@@ -96,9 +96,9 @@ def project_directory(args: argparse.Namespace, config_path: Path, config: dict)
     if args.project_dir:
         return Path(args.project_dir).expanduser().resolve()
 
-    raw_path = config.get("path_to_prject", config.get("path_to_project"))
+    raw_path = config.get("path_to_project")
     if raw_path is None:
-        raise ValueError("JSON config does not contain path_to_prject/path_to_project")
+        raise ValueError("JSON config does not contain path_to_project")
 
     path = Path(raw_path).expanduser()
     if path.is_absolute():

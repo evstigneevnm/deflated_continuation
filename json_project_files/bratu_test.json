@@ -1,6 +1,6 @@
 {
     "gpu_pci_id": -1,
-    "path_to_prject": "./bratu_test/",
+    "path_to_project": "./bratu_test/",
     "use_high_precision_reduction": false,
     "bifurcaiton_diagram_file_name": "bifurcation_diagram.dat",
     "stability_diagram_file_name": "stability_diagram.dat",

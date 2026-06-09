@@ -67,7 +67,7 @@ int main(int argc, char const *argv[])
     
 // problem parameters
     char what_to_execute = 'E';
-    std::string path_to_prject_(argv[1]);
+    std::string path_to_project_(argv[1]);
     size_t N = atoi(argv[2]);
 
     real dS = 0.1;
@@ -185,7 +185,7 @@ int main(int argc, char const *argv[])
 
         typedef main_classes::deflation_continuation<vec_ops_real_im, files_real_im_t, log_t, monitor_t, KS_2D_t, lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator> deflation_continuation_t;
 
-        deflation_continuation_t DC( (vec_ops_real_im*) &vec_ops_R_im, (files_real_im_t*) &file_ops_im, (log_t*) &log, (log_t*) &log_linsolver, (KS_2D_t*) &KS2D, path_to_prject_, skip_files_ );
+        deflation_continuation_t DC( (vec_ops_real_im*) &vec_ops_R_im, (files_real_im_t*) &file_ops_im, (log_t*) &log, (log_t*) &log_linsolver, (KS_2D_t*) &KS2D, path_to_project_, skip_files_ );
 
 
         DC.set_linsolver(lin_solver_tol, lin_solver_max_it, use_precond_resid, resid_recalc_freq, basis_sz);
@@ -214,7 +214,7 @@ int main(int argc, char const *argv[])
         vec_ops_real_im vec_ops_small(m_Krylov, CUBLAS);
         mat_vec_ops_t mat_ops_small(m_Krylov, m_Krylov, CUBLAS);
 
-        stability_t ST( (vec_ops_real_im*) &vec_ops_R_im, (mat_vec_ops_t*) &mat_vec_ops, (vec_ops_real_im*) &vec_ops_small, (mat_vec_ops_t*) &mat_ops_small, (files_real_im_t*) &file_ops_im, (log_t*) &log, (log_t*) &log_linsolver, (KS_2D_t*) &KS2D, path_to_prject_, skip_files_ );
+        stability_t ST( (vec_ops_real_im*) &vec_ops_R_im, (mat_vec_ops_t*) &mat_vec_ops, (vec_ops_real_im*) &vec_ops_small, (mat_vec_ops_t*) &mat_ops_small, (files_real_im_t*) &file_ops_im, (log_t*) &log, (log_t*) &log_linsolver, (KS_2D_t*) &KS2D, path_to_project_, skip_files_ );
 
         ST.set_linsolver(lin_solver_tol, lin_solver_max_it, use_precond_resid, resid_recalc_freq, basis_sz);
         ST.set_newton(newton_tol, newton_max_it, real(1.0), true);
@@ -227,7 +227,7 @@ int main(int argc, char const *argv[])
     {
         typedef main_classes::plot_diagram_to_pos<vec_ops_real_im, mat_vec_ops_t, files_real_im_t, log_t, monitor_t, KS_2D_t, lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator> plot_diagram_t;       
 
-        plot_diagram_t PD( (vec_ops_real_im*) &vec_ops_R_im, (files_real_im_t*) &file_ops_im, (log_t*) &log, (log_t*) &log_linsolver, (KS_2D_t*) &KS2D, path_to_prject_);
+        plot_diagram_t PD( (vec_ops_real_im*) &vec_ops_R_im, (files_real_im_t*) &file_ops_im, (log_t*) &log, (log_t*) &log_linsolver, (KS_2D_t*) &KS2D, path_to_project_);
 
         PD.set_linsolver(lin_solver_tol, lin_solver_max_it, use_precond_resid, resid_recalc_freq, basis_sz);
         PD.set_newton(newton_tol, newton_max_it, real(1.0), true);

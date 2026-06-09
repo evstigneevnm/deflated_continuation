@@ -132,6 +132,15 @@ public:
         return (&curve_container.back());
     }
 
+    void reset_curve_output_directories()
+    {
+        for(auto& curve: curve_container)
+        {
+            curve.set_main_refs(vec_ops, file_ops, log, nonlin_op, newton, cont_help);
+            curve.reset_output_directory(directory);
+        }
+    }
+
     int current_curve()
     {
         return curve_container.size();

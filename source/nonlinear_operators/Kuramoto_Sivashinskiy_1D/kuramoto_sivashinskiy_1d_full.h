@@ -34,6 +34,7 @@ public:
     using memory_type = typename VectorOperations::memory_type;
     using complex_vector_type = scfd::arrays::array<complex_type, memory_type>;
     using symmetry_adapter_type = symmetry::fourier::real_packed_fourier_slice_1d_adapter<VectorOperations>;
+    using slice_data_type = typename symmetry_adapter_type::slice_data_type;
 
     kuramoto_sivashinskiy_1d_full(
         const T& a_val_,
@@ -150,7 +151,7 @@ public:
 
     void set_projected_linearization_point(const T_vec& u_0_, const T lambda_0_)
     {
-        symmetry_adapter.stabilize(u_0_, projected_state);
+        symmetry_adapter.stabilize_closest_to_reference(u_0_, u_0_, projected_state);
         set_linearization_point(projected_state, lambda_0_);
     }
 
@@ -198,7 +199,7 @@ public:
 
     void projected_F(const T_vec& u, const T lambda, T_vec& v)
     {
-        symmetry_adapter.stabilize(u, projected_state);
+        symmetry_adapter.stabilize_closest_to_reference(u, u, projected_state);
         F(projected_state, lambda, projected_residual);
         symmetry_adapter.project_tangent(projected_state, projected_residual, v);
     }
@@ -271,7 +272,38 @@ public:
 
     void project(T_vec& x)
     {
-        symmetry_adapter.stabilize(x, x);
+        symmetry_adapter.stabilize_closest_to_reference(x, x, x);
+    }
+
+    void project_relative_to(const T_vec& reference, T_vec& x)
+    {
+        symmetry_adapter.stabilize_closest_to_reference(reference, x, x);
+    }
+
+    void stabilize_for_arclength(const T_vec& reference, const T_vec& source, T_vec& destination)
+    {
+        symmetry_adapter.stabilize_closest_to_reference(reference, source, destination);
+    }
+
+    const slice_data_type& last_slice_data() const
+    {
+        return symmetry_adapter.last_slice_data();
+    }
+
+    template<class Log>
+    void log_projection_diagnostics(Log* log, const char* context) const
+    {
+        const auto& data = symmetry_adapter.last_slice_data();
+        log->info_f(
+            "%s: Fourier slice diagnostics: active = %i, mode = %lu, residual_group_order = %lu, shift = %le, selected_abs = %le, selected_real_on_slice = %le, slice_matrix = %le",
+            context,
+            data.active() ? 1 : 0,
+            static_cast<unsigned long>(data.mode),
+            static_cast<unsigned long>(data.residual_group_order()),
+            static_cast<double>(data.shift),
+            static_cast<double>(data.selected_abs),
+            static_cast<double>(data.selected_real_on_slice),
+            static_cast<double>(data.slice_matrix));
     }
 
     void exact_solution(const T&, T_vec& u_out)

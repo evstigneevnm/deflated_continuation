@@ -40,6 +40,7 @@ public:
     {
         vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
         vec_ops->init_vector(x1_storage); vec_ops->start_use_vector(x1_storage);
+        vec_ops->init_vector(projection_trial); vec_ops->start_use_vector(projection_trial);
         lambda1_storage = T(0.0);
         vec_ops->init_vector(Fx); vec_ops->start_use_vector(Fx);
         if(store_norms_history)
@@ -61,6 +62,7 @@ public:
     {
         vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
         vec_ops->stop_use_vector(x1_storage); vec_ops->free_vector(x1_storage);
+        vec_ops->stop_use_vector(projection_trial); vec_ops->free_vector(projection_trial);
         vec_ops->stop_use_vector(Fx); vec_ops->free_vector(Fx);
     }
 
@@ -120,8 +122,19 @@ public:
     T inline update_solution(system_operator* sys_op, nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, T_vec& x1, T& lambda1, T& normF1, T& arclength_res1)
     {
         vec_ops->assign_mul(static_cast<T>(1.0), x, newton_wight, delta_x, x1);
-        nonlin_op->project(x1); // project to invariant solution subspace. Should be blank if nothing is needed to be projected.
         lambda1 = lambda + newton_wight*delta_lambda;
+        const T arclength_before_projection = constraint_residual(sys_op, x1, lambda1);
+        vec_ops->assign(x1, projection_trial);
+        nonlinear_operators::detail::project_state_relative_to(vec_ops, nonlin_op, x, x1);
+        vec_ops->assign_mul(T(1), x1, T(-1), projection_trial, projection_trial);
+        const T projection_displacement = vec_ops->norm_l2(projection_trial);
+        const T arclength_after_projection = constraint_residual(sys_op, x1, lambda1);
+        log->info_f(
+            "continuation::convergence: projection diagnostics: arclength before project = %le, arclength after project = %le, ||projected_x1 - trial_x1|| = %le",
+            (double)arclength_before_projection,
+            (double)arclength_after_projection,
+            (double)projection_displacement);
+        nonlinear_operators::detail::log_projection_diagnostics(log, nonlin_op, "continuation::convergence");
         return residual_norm(sys_op, nonlin_op, x1, lambda1, normF1, arclength_res1);
     }
 
@@ -376,7 +389,7 @@ private:
     T tolerance;
     T tolerance_0;
     T lambda1_storage;
-    T_vec x1, x1_storage, Fx;
+    T_vec x1, x1_storage, projection_trial, Fx;
     T newton_wight, newton_wight_initial;
     bool verbose, store_norms_history;
     std::vector<T> norms_evolution;

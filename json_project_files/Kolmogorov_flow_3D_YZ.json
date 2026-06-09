@@ -1,6 +1,6 @@
 {
     "gpu_pci_id": -1,
-    "path_to_prject": "../KF3D_0-11/",
+    "path_to_project": "../KF3D_0-11/",
     "bifurcaiton_diagram_file_name": "bifurcation_diagram.dat",
     "stability_diagram_file_name": "stability_diagram.dat",
     "deflation_continuation":{

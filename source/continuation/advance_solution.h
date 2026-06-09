@@ -68,11 +68,11 @@ public:
             log->info_f("continuation::predict: dS = %le, max dS = %le, tangent norm = %le, ||x_p|| = %le, lambda_p = %le, ||x1|| = %le, lambda1 = %le", (double)ds_l, (double)ds_max, (double)tangent_norm, (double)vec_ops->norm(x_p), (double)lambda_p, (double)vec_ops->norm(x1), (double)lambda1);
             if(continuation_type == 'S')
             {
-                sys_op->set_tangent_space((T_vec&)x0, (T&)lambda0, (T_vec&)x0_s, (T&)lambda0_s, ds_l, continuation_type);
+                sys_op->set_tangent_space((T_vec&)x0, (T&)lambda0, (T_vec&)x0_s, (T&)lambda0_s, ds_l, continuation_type, nonlin_op);
             }
             else if(continuation_type == 'O')
             {
-                sys_op->set_tangent_space(x_p, lambda_p, (T_vec&)x0_s, (T&)lambda0_s, ds_l, continuation_type);
+                sys_op->set_tangent_space(x_p, lambda_p, (T_vec&)x0_s, (T&)lambda0_s, ds_l, continuation_type, nonlin_op);
             }
             else
             {
@@ -135,11 +135,11 @@ public:
             bool converged_p, converged_m;
             if(continuation_type == 'S')
             {
-                sys_op->set_tangent_space((T_vec&)x0, (T&)lambda0, (T_vec&)x0_s, (T&)lambda0_s, ds_m, continuation_type);
+                sys_op->set_tangent_space((T_vec&)x0, (T&)lambda0, (T_vec&)x0_s, (T&)lambda0_s, ds_m, continuation_type, nonlin_op);
             }
             else if(continuation_type == 'O')
             {
-                sys_op->set_tangent_space(x1_l, lambda1_l, (T_vec&)x0_s, (T&)lambda0_s, ds_m, continuation_type);
+                sys_op->set_tangent_space(x1_l, lambda1_l, (T_vec&)x0_s, (T&)lambda0_s, ds_m, continuation_type, nonlin_op);
             }
             else
             {

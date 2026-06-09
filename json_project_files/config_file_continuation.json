@@ -1,5 +1,4 @@
 {
-    // expecting "input_file_name R direction" to be command line parameters
     "skip_output": 10,
     "steps": 3000,
     "R_min": 10.0,
@@ -11,7 +10,7 @@
     "dSmax": 10.0,
     "dSdec_mult":0.25,
     "dSinc_mult":-0.05,
-    "nz": 1, //1 for generalized, 0 for classic Kf3D
+    "nz": 1,
     "solvers_config":{
         "linear_solver":{
             "max_iterations":3000,
@@ -45,4 +44,3 @@
     }
 
 }
-

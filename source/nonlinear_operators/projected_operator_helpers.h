@@ -121,6 +121,65 @@ void project_state(NonlinearOperator* op, Vector& x)
     project_state(op, x, 0);
 }
 
+template<class VectorOperations, class NonlinearOperator, class Vector>
+auto project_state_relative_to(VectorOperations*, NonlinearOperator* op, const Vector& reference, Vector& x, int)
+    -> decltype(op->project_relative_to(reference, x), void())
+{
+    op->project_relative_to(reference, x);
+}
+
+template<class VectorOperations, class NonlinearOperator, class Vector>
+void project_state_relative_to(VectorOperations*, NonlinearOperator* op, const Vector&, Vector& x, long)
+{
+    project_state(op, x);
+}
+
+template<class VectorOperations, class NonlinearOperator, class Vector>
+void project_state_relative_to(VectorOperations* vec_ops, NonlinearOperator* op, const Vector& reference, Vector& x)
+{
+    project_state_relative_to(vec_ops, op, reference, x, 0);
+}
+
+template<class VectorOperations, class NonlinearOperator, class Vector>
+auto stabilize_for_arclength(VectorOperations*, NonlinearOperator* op, const Vector& reference, const Vector& source, Vector& destination, int)
+    -> decltype(op->stabilize_for_arclength(reference, source, destination), void())
+{
+    op->stabilize_for_arclength(reference, source, destination);
+}
+
+template<class VectorOperations, class NonlinearOperator, class Vector>
+void stabilize_for_arclength(VectorOperations* vec_ops, NonlinearOperator*, const Vector&, const Vector& source, Vector& destination, long)
+{
+    if(&source != &destination)
+    {
+        vec_ops->assign(source, destination);
+    }
+}
+
+template<class VectorOperations, class NonlinearOperator, class Vector>
+void stabilize_for_arclength(VectorOperations* vec_ops, NonlinearOperator* op, const Vector& reference, const Vector& source, Vector& destination)
+{
+    stabilize_for_arclength(vec_ops, op, reference, source, destination, 0);
+}
+
+template<class Log, class NonlinearOperator>
+auto log_projection_diagnostics(Log* log, NonlinearOperator* op, const char* context, int)
+    -> decltype(op->log_projection_diagnostics(log, context), void())
+{
+    op->log_projection_diagnostics(log, context);
+}
+
+template<class Log, class NonlinearOperator>
+void log_projection_diagnostics(Log*, NonlinearOperator*, const char*, long)
+{
+}
+
+template<class Log, class NonlinearOperator>
+void log_projection_diagnostics(Log* log, NonlinearOperator* op, const char* context)
+{
+    log_projection_diagnostics(log, op, context, 0);
+}
+
 } // namespace detail
 } // namespace nonlinear_operators
 

@@ -1,6 +1,6 @@
 {
     "gpu_pci_id": 6,
-    "path_to_prject": "./star_shaped_test/",
+    "path_to_project": "./star_shaped_test/",
     "use_high_precision_reduction": true,
     "bifurcaiton_diagram_file_name": "bifurcation_diagram.dat",
     "stability_diagram_file_name": "stability_diagram.dat",

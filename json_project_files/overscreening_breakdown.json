@@ -1,6 +1,6 @@
 {
     "gpu_pci_id": -1,
-    "path_to_prject": "../ob/",
+    "path_to_project": "../ob/",
     "use_high_precision_reduction": true,
     "bifurcaiton_diagram_file_name": "bifurcation_diagram.dat",
     "stability_diagram_file_name": "stability_diagram.dat",

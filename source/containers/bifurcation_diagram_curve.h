@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <system_error>
 #include <cstdint>
+#include <sstream>
 
 
 //using boost for serialization
@@ -28,6 +29,10 @@ struct complex_values
     bool is_data_avaliable = false;
     std::vector<T> vector_norms;
     uint64_t id_file_name;
+    uint64_t point_index = 0;
+    uint64_t segment_id = 0;
+    uint64_t semicurve_id = 0;
+    bool forced_store = false;
 
 private:
     friend class boost::serialization::access;
@@ -60,6 +65,8 @@ private:
     typedef typename VectorOperations::vector_type  T_vec;
 
 public:
+    typedef complex_values<T> values_t;
+    typedef std::vector<values_t> b_d_container_t;
     
 
     //for boost serialization!
@@ -74,6 +81,7 @@ public:
             newton = newton_;
             helper_vectors_->get_refs(x0, x1);
             refs_set = true;
+            load_metadata_if_available();
         }
     }
 
@@ -156,6 +164,7 @@ public:
             full_path = std::move(that.full_path);
             container = std::move(that.container);
             global_id = that.global_id;
+            global_index = that.global_index;
             curve_number = that.curve_number;
             x0 = that.x0;
             x1 = that.x1;
@@ -163,8 +172,13 @@ public:
             lambda1 = that.lambda1;
             skip_output = that.skip_output;
             debug_f_name  = std::move(that.debug_f_name);
+            metadata_f_name = std::move(that.metadata_f_name);
             debug_file = std::move(that.debug_file); //std::move(that.debug_file). Move of std::ofstream supported only from C++5.X and above!
             curve_open = that.curve_open;
+            refs_set = that.refs_set;
+            current_segment_id = that.current_segment_id;
+            current_semicurve_id = that.current_semicurve_id;
+            segment_metadata_available = that.segment_metadata_available;
             return *this;
             
             //
@@ -186,8 +200,12 @@ private:
     std::string full_path = ".";
     unsigned int skip_output;
     std::string debug_f_name;
+    std::string metadata_f_name;
     std::ofstream debug_file;
     bool refs_set = false;
+    uint64_t current_segment_id = 0;
+    uint64_t current_semicurve_id = 0;
+    bool segment_metadata_available = false;
 
 
     bool directory_exists(const std::string& name) const
@@ -235,6 +253,89 @@ private:
         log->info_f("container::bifurcation_diagram_curve: created curve output directory: %s", full_path.c_str());
     }
 
+    void write_metadata_file()
+    {
+        if(metadata_f_name.empty())
+        {
+            return;
+        }
+        std::ofstream f(metadata_f_name.c_str(), std::ofstream::out);
+        if(!f)
+        {
+            if(log != nullptr)
+            {
+                log->warning_f("container::bifurcation_diagram_curve(%i): failed to open metadata file %s", curve_number, metadata_f_name.c_str());
+            }
+            return;
+        }
+        f << "# index lambda saved id_file_name segment_id semicurve_id forced_store\n";
+        for(std::size_t i = 0; i < container.size(); ++i)
+        {
+            const auto& x = container[i];
+            f << i << " "
+              << std::setprecision(16) << x.lambda << " "
+              << (x.is_data_avaliable ? 1 : 0) << " "
+              << x.id_file_name << " "
+              << x.segment_id << " "
+              << x.semicurve_id << " "
+              << (x.forced_store ? 1 : 0) << "\n";
+        }
+    }
+
+    void load_metadata_if_available()
+    {
+        if(metadata_f_name.empty())
+        {
+            metadata_f_name.assign(full_path + std::string("/") + std::string("metadata_curve.dat"));
+        }
+        std::ifstream f(metadata_f_name.c_str());
+        if(!f)
+        {
+            segment_metadata_available = false;
+            return;
+        }
+
+        std::string line;
+        bool loaded_any = false;
+        while(std::getline(f, line))
+        {
+            if(line.empty() || line[0] == '#')
+            {
+                continue;
+            }
+            std::istringstream stream(line);
+            std::size_t index = 0;
+            T lambda = T(0);
+            unsigned int saved = 0;
+            uint64_t id_file_name = 0;
+            uint64_t segment_id = 0;
+            uint64_t semicurve_id = 0;
+            unsigned int forced_store = 0;
+            stream >> index >> lambda >> saved >> id_file_name >> segment_id >> semicurve_id >> forced_store;
+            if(!stream || index >= container.size())
+            {
+                continue;
+            }
+            auto& point = container[index];
+            point.point_index = static_cast<uint64_t>(index);
+            point.segment_id = segment_id;
+            point.semicurve_id = semicurve_id;
+            point.forced_store = forced_store != 0;
+            loaded_any = true;
+        }
+        segment_metadata_available = loaded_any;
+    }
+
+    bool can_interpolate_between(const values_t& lower, const values_t& upper) const
+    {
+        return !segment_metadata_available || lower.segment_id == upper.segment_id;
+    }
+
+    bool point_in_segment(const values_t& point, const uint64_t segment_id) const
+    {
+        return !segment_metadata_available || point.segment_id == segment_id;
+    }
+
 public:
 
 
@@ -262,9 +363,24 @@ public:
         curve_number = curve_number_;
         full_path.assign((std::filesystem::path(data_directory) / std::to_string(curve_number)).string());
         debug_f_name.assign(full_path.c_str() + std::string("/") + std::string("debug_curve.dat"));
+        metadata_f_name.assign(full_path.c_str() + std::string("/") + std::string("metadata_curve.dat"));
         log->info_f("container::bifurcation_diagram_curve: FULL PATH: %s", full_path.c_str());
         ensure_curve_directory_exists();
 
+    }
+
+    void reset_output_directory(const std::string& data_directory_)
+    {
+        set_directory(data_directory_);
+        set_curve_number(curve_number);
+        load_metadata_if_available();
+    }
+
+    void start_new_segment()
+    {
+        current_segment_id++;
+        current_semicurve_id = current_segment_id;
+        segment_metadata_available = true;
     }
 
     void add(const T& lambda_, const T_vec& x_, bool force_store = false)
@@ -280,6 +396,10 @@ public:
             form_values.is_data_avaliable = store_result.first;
             form_values.id_file_name = store_result.second;
             form_values.vector_norms = bif_diag_norms;
+            form_values.point_index = static_cast<uint64_t>(container.size());
+            form_values.segment_id = current_segment_id;
+            form_values.semicurve_id = current_semicurve_id;
+            form_values.forced_store = force_store;
 
             container.push_back(form_values);
 
@@ -345,6 +465,11 @@ public:
             int indp = j+1;
             auto &p_j = container[ind];
             auto &p_jp = container[indp];
+            if(!can_interpolate_between(p_j, p_jp))
+            {
+                status.skipped_discontinuous++;
+                continue;
+            }
             if(intersection(p_j, p_jp, lambda_star))
             {
                 if((p_j.lambda == lambda_star)&&(p_j.is_data_avaliable))
@@ -368,8 +493,8 @@ public:
                 }
                 else
                 {
-                    bool stat_l = get_lower(ind);
-                    bool stat_u = get_upper(indp);
+                    bool stat_l = get_lower(ind, p_j.segment_id);
+                    bool stat_u = get_upper(indp, p_jp.segment_id);
                     if(stat_l&&stat_u)
                     {
                         if(interpolate_solutions(lambda_star))
@@ -441,6 +566,7 @@ public:
             f << x.id_file_name << std::endl;
         }
         f.close();
+        write_metadata_file();
         log->info_f("container::bifurcation_diagram_curve(%i): printed final bifurcation curve data.", curve_number); 
     }
 
@@ -457,6 +583,7 @@ public:
         container.shrink_to_fit();
         if(debug_file.is_open())
             debug_file.close();
+        write_metadata_file();
         curve_open = false; 
         log->info_f("container::bifurcation_diagram_curve(%i) closed.", curve_number); 
     }
@@ -503,11 +630,8 @@ public:
 
     }
 
-public:
-    typedef complex_values<T> values_t;
 private:
     typedef std::pair<bool, uint64_t> store_t;
-    typedef std::vector<values_t> b_d_container_t;
 public:
     //takes some memory, can be used only for visualization
     //makes a copy so that original container is undamaged!
@@ -574,7 +698,7 @@ private:
         return(res);
     }
 
-    bool get_lower(int index)
+    bool get_lower(int index, uint64_t segment_id)
     {
 
         int j = index;
@@ -582,6 +706,10 @@ private:
         while(!saved_data)
         {
             values_t local_data = container[j];
+            if(!point_in_segment(local_data, segment_id))
+            {
+                break;
+            }
             saved_data = local_data.is_data_avaliable;
             if(saved_data)
             {
@@ -600,7 +728,7 @@ private:
         return(saved_data);
         
     }
-    bool get_upper(int index)
+    bool get_upper(int index, uint64_t segment_id)
     {
 
         int j = index;
@@ -611,6 +739,10 @@ private:
             //std::cout << "container_size = " << container_size << std::endl;
             
             values_t local_data = container[j];
+            if(!point_in_segment(local_data, segment_id))
+            {
+                break;
+            }
             saved_data = local_data.is_data_avaliable;
             if(saved_data)
             {

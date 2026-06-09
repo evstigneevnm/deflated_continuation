@@ -60,7 +60,7 @@ def write_config(args: argparse.Namespace) -> None:
     project_dir.mkdir(parents=True, exist_ok=True)
     output_config.parent.mkdir(parents=True, exist_ok=True)
 
-    config["path_to_prject"] = str(project_dir)
+    config["path_to_project"] = str(project_dir)
     config["use_high_precision_reduction"] = args.high_precision_reduction
     config["bifurcaiton_diagram_file_name"] = "bifurcation_diagram.dat"
 

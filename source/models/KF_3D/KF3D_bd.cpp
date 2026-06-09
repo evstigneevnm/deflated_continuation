@@ -50,7 +50,7 @@ int main(int argc, char const *argv[])
     }
     typedef SCALAR_TYPE real;
     
-    std::string path_to_prject_(argv[1]);
+    std::string path_to_project_(argv[1]);
     real dS = atof(argv[2]);
     unsigned int S = atoi(argv[3]);
 
@@ -137,7 +137,7 @@ int main(int argc, char const *argv[])
         lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl, 
         nonlinear_operators::system_operator> deflation_continuation_t;
 
-    deflation_continuation_t DC( (vec_ops_t*) &vec_ops, (files_t*) &file_ops_im, (log_t*) &log,  (log_t*) &log_linsolver, (KF_3D_t*) &KF3D, path_to_prject_, skip_files_);
+    deflation_continuation_t DC( (vec_ops_t*) &vec_ops, (files_t*) &file_ops_im, (log_t*) &log,  (log_t*) &log_linsolver, (KF_3D_t*) &KF3D, path_to_project_, skip_files_);
 
 
     DC.set_linsolver(lin_solver_tol, lin_solver_max_it, use_precond_resid, resid_recalc_freq, basis_sz, save_convergence_history, divide_out_norms_by_rel_base);

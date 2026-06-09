@@ -102,10 +102,16 @@ private:
         bool res = false;
         for(auto &x: *parent_t::knots)
         {
-
-            if( (x - parent_t::lambda1)*(x - parent_t::lambda0)<=T(0.0) )
+            const T requested_lambda = x;
+            T effective_lambda = requested_lambda;
+            if(parent_t::knot_resolver)
             {
-                parent_t::lambda1 = x;
+                parent_t::knot_resolver(requested_lambda, effective_lambda);
+            }
+
+            if( (effective_lambda - parent_t::lambda1)*(effective_lambda - parent_t::lambda0)<=T(0.0) )
+            {
+                parent_t::lambda1 = effective_lambda;
                 parent_t::nonlin_op->exact_solution(parent_t::lambda1, parent_t::x1);
                 parent_t::just_interpolated = true;
                 res = true;

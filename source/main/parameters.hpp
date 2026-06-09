@@ -130,12 +130,51 @@ struct parameters
 
         struct restart_policy_s
         {
+            struct knot_relocation_s
+            {
+                bool enabled;
+                std::string registry_file;
+                T min_shift_abs;
+                T max_shift_abs;
+                unsigned int candidate_count;
+                bool prefer_positive_shift;
+                bool require_all_intersections;
+                bool save_registry;
+
+                void set_default()
+                {
+                    enabled = false;
+                    registry_file = "knot_registry.json";
+                    min_shift_abs = T(1.0e-6);
+                    max_shift_abs = T(5.0e-2);
+                    candidate_count = 12;
+                    prefer_positive_shift = true;
+                    require_all_intersections = true;
+                    save_registry = true;
+                }
+
+                void plot_all()
+                {
+                    std::cout << "||  |  |==enabled: " << enabled << std::endl;
+                    std::cout << "||  |  |==registry_file: " << registry_file << std::endl;
+                    std::cout << "||  |  |==min_shift_abs: " << min_shift_abs << std::endl;
+                    std::cout << "||  |  |==max_shift_abs: " << max_shift_abs << std::endl;
+                    std::cout << "||  |  |==candidate_count: " << candidate_count << std::endl;
+                    std::cout << "||  |  |==prefer_positive_shift: " << prefer_positive_shift << std::endl;
+                    std::cout << "||  |  |==require_all_intersections: " << require_all_intersections << std::endl;
+                    std::cout << "||  |  |==save_registry: " << save_registry << std::endl;
+                }
+            };
+
             bool allow_incomplete_restart_intersections;
             bool allow_knot_interpolation_failure;
             bool allow_failed_continuation_curve_save;
             bool check_duplicate_after_deflation;
             unsigned int duplicate_after_deflation_retries;
             T duplicate_after_deflation_tolerance;
+            unsigned int max_failed_continuations_per_knot;
+            T failed_continuation_rejection_tolerance;
+            knot_relocation_s knot_relocation;
 
             void set_default()
             {
@@ -145,6 +184,9 @@ struct parameters
                 check_duplicate_after_deflation = true;
                 duplicate_after_deflation_retries = 2;
                 duplicate_after_deflation_tolerance = T(1.0e-8);
+                max_failed_continuations_per_knot = 3;
+                failed_continuation_rejection_tolerance = T(1.0e-8);
+                knot_relocation.set_default();
             }
 
             void plot_all()
@@ -155,6 +197,10 @@ struct parameters
                 std::cout << "||  |==check_duplicate_after_deflation: " << check_duplicate_after_deflation << std::endl;
                 std::cout << "||  |==duplicate_after_deflation_retries: " << duplicate_after_deflation_retries << std::endl;
                 std::cout << "||  |==duplicate_after_deflation_tolerance: " << duplicate_after_deflation_tolerance << std::endl;
+                std::cout << "||  |==max_failed_continuations_per_knot: " << max_failed_continuations_per_knot << std::endl;
+                std::cout << "||  |==failed_continuation_rejection_tolerance: " << failed_continuation_rejection_tolerance << std::endl;
+                std::cout << "||  |==knot_relocation: " << std::endl;
+                knot_relocation.plot_all();
             }
         };
 
@@ -441,7 +487,7 @@ struct parameters
 
     int         nvidia_pci_id;
     bool        use_high_precision_reduction;
-    std::string path_to_prject; //relative to the execution root directory
+    std::string path_to_project; //relative to the execution root directory
     //for serialization, just the filenames
     std::string bifurcaiton_diagram_file_name;
     std::string stability_diagram_file_name;
@@ -456,7 +502,7 @@ struct parameters
     {
         nvidia_pci_id                 = -1;
         use_high_precision_reduction  = false;
-        path_to_prject                = "../KS2D/";
+        path_to_project                = "./";
         bifurcaiton_diagram_file_name = "bifurcation_diagram.dat";
         stability_diagram_file_name   = "stability_diagram.dat";
 
@@ -471,7 +517,7 @@ struct parameters
         std::cout << std::endl;
         std::cout << "nvidia_pci_id: " << nvidia_pci_id << std::endl;
         std::cout << "use_high_precision_reduction: " << use_high_precision_reduction << std::endl;
-        std::cout << "path_to_prject: " << path_to_prject << std::endl;
+        std::cout << "path_to_project: " << path_to_project << std::endl;
         std::cout << "bifurcaiton_diagram_file_name: " << bifurcaiton_diagram_file_name << std::endl;
         std::cout << "stability_diagram_file_name: " << stability_diagram_file_name << std::endl;
         std::cout << "deflation_continuation: " << std::endl;
@@ -583,6 +629,36 @@ void from_json(
 }
 
 void from_json(
+    const nlohmann::json &j, parameters_d::deflation_continuation_s::restart_policy_s::knot_relocation_s &params_dc_kr_
+)
+{
+    params_dc_kr_.set_default();
+    params_dc_kr_.enabled = j.value( "enabled", params_dc_kr_.enabled );
+    params_dc_kr_.registry_file = j.value( "registry_file", params_dc_kr_.registry_file );
+    params_dc_kr_.min_shift_abs = j.value( "min_shift_abs", params_dc_kr_.min_shift_abs );
+    params_dc_kr_.max_shift_abs = j.value( "max_shift_abs", params_dc_kr_.max_shift_abs );
+    params_dc_kr_.candidate_count = j.value( "candidate_count", params_dc_kr_.candidate_count );
+    params_dc_kr_.prefer_positive_shift = j.value( "prefer_positive_shift", params_dc_kr_.prefer_positive_shift );
+    params_dc_kr_.require_all_intersections = j.value( "require_all_intersections", params_dc_kr_.require_all_intersections );
+    params_dc_kr_.save_registry = j.value( "save_registry", params_dc_kr_.save_registry );
+}
+
+void from_json(
+    const nlohmann::json &j, parameters_f::deflation_continuation_s::restart_policy_s::knot_relocation_s &params_dc_kr_
+)
+{
+    params_dc_kr_.set_default();
+    params_dc_kr_.enabled = j.value( "enabled", params_dc_kr_.enabled );
+    params_dc_kr_.registry_file = j.value( "registry_file", params_dc_kr_.registry_file );
+    params_dc_kr_.min_shift_abs = j.value( "min_shift_abs", params_dc_kr_.min_shift_abs );
+    params_dc_kr_.max_shift_abs = j.value( "max_shift_abs", params_dc_kr_.max_shift_abs );
+    params_dc_kr_.candidate_count = j.value( "candidate_count", params_dc_kr_.candidate_count );
+    params_dc_kr_.prefer_positive_shift = j.value( "prefer_positive_shift", params_dc_kr_.prefer_positive_shift );
+    params_dc_kr_.require_all_intersections = j.value( "require_all_intersections", params_dc_kr_.require_all_intersections );
+    params_dc_kr_.save_registry = j.value( "save_registry", params_dc_kr_.save_registry );
+}
+
+void from_json(
     const nlohmann::json &j, parameters_d::deflation_continuation_s::restart_policy_s &params_dc_rp_
 )
 {
@@ -599,6 +675,12 @@ void from_json(
         j.value( "duplicate_after_deflation_retries", params_dc_rp_.duplicate_after_deflation_retries );
     params_dc_rp_.duplicate_after_deflation_tolerance =
         j.value( "duplicate_after_deflation_tolerance", params_dc_rp_.duplicate_after_deflation_tolerance );
+    params_dc_rp_.max_failed_continuations_per_knot =
+        j.value( "max_failed_continuations_per_knot", params_dc_rp_.max_failed_continuations_per_knot );
+    params_dc_rp_.failed_continuation_rejection_tolerance =
+        j.value( "failed_continuation_rejection_tolerance", params_dc_rp_.failed_continuation_rejection_tolerance );
+    params_dc_rp_.knot_relocation =
+        j.value( "knot_relocation", nlohmann::json::object() ).get<parameters_d::deflation_continuation_s::restart_policy_s::knot_relocation_s>();
 }
 
 void from_json(
@@ -618,6 +700,12 @@ void from_json(
         j.value( "duplicate_after_deflation_retries", params_dc_rp_.duplicate_after_deflation_retries );
     params_dc_rp_.duplicate_after_deflation_tolerance =
         j.value( "duplicate_after_deflation_tolerance", params_dc_rp_.duplicate_after_deflation_tolerance );
+    params_dc_rp_.max_failed_continuations_per_knot =
+        j.value( "max_failed_continuations_per_knot", params_dc_rp_.max_failed_continuations_per_knot );
+    params_dc_rp_.failed_continuation_rejection_tolerance =
+        j.value( "failed_continuation_rejection_tolerance", params_dc_rp_.failed_continuation_rejection_tolerance );
+    params_dc_rp_.knot_relocation =
+        j.value( "knot_relocation", nlohmann::json::object() ).get<parameters_f::deflation_continuation_s::restart_policy_s::knot_relocation_s>();
 }
 
 
@@ -829,7 +917,7 @@ void from_json( const nlohmann::json &j, parameters_d &params_ )
     params_ = parameters_d{
         j.at( "gpu_pci_id" ).get<int>(),
         j.at( "use_high_precision_reduction" ).get<bool>(),
-        j.at( "path_to_prject" ).get<std::string>(),
+        j.at( "path_to_project" ).get<std::string>(),
         j.at( "bifurcaiton_diagram_file_name" ).get<std::string>(),
         j.at( "stability_diagram_file_name" ).get<std::string>(),
 
@@ -845,7 +933,7 @@ void from_json( const nlohmann::json &j, parameters_f &params_ )
     params_ = parameters_f{
         j.at( "gpu_pci_id" ).get<int>(),
         j.at( "use_high_precision_reduction" ).get<bool>(),
-        j.at( "path_to_prject" ).get<std::string>(),
+        j.at( "path_to_project" ).get<std::string>(),
         j.at( "bifurcaiton_diagram_file_name" ).get<std::string>(),
         j.at( "stability_diagram_file_name" ).get<std::string>(),
 
@@ -892,12 +980,10 @@ parameters<T> read_parameters_json( const std::string &project_file_name_ )
     }
     catch ( const std::exception &e )
     {
-        std::cout << "====================X====================" << std::endl;
-        std::cout << "failed to read json file because:" << std::endl;
-        std::cout << e.what() << std::endl;
-        std::cout << "setting default values for parameters structure" << std::endl;
-        std::cout << "====================X====================" << std::endl;
-        parameters_str.set_default();
+        std::throw_with_nested(
+            std::runtime_error{
+                "failed to read parameters JSON file: " + project_file_name_ + "\n" + e.what()
+            });
     }
     return parameters_str;
 }
