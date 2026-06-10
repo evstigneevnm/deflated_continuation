@@ -75,6 +75,14 @@
                 "save_registry": true
             }
         },
+        "branch_intersection_policy": {
+            "enabled": true,
+            "signature_norm_index": 0,
+            "signature_tolerance": 1.0e-6,
+            "state_tolerance": 1.0e-8,
+            "minimum_step_fraction_from_start": 1.0e-3,
+            "verbose": true
+        },
         "linear_solver_extended": {
             "maximum_iterations": 150,
             "use_preconditioned_residual": 1,

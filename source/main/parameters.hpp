@@ -204,6 +204,36 @@ struct parameters
             }
         };
 
+        struct branch_intersection_policy_s
+        {
+            bool enabled;
+            unsigned int signature_norm_index;
+            T signature_tolerance;
+            T state_tolerance;
+            T minimum_step_fraction_from_start;
+            bool verbose;
+
+            void set_default()
+            {
+                enabled = false;
+                signature_norm_index = 0;
+                signature_tolerance = T(1.0e-6);
+                state_tolerance = T(1.0e-8);
+                minimum_step_fraction_from_start = T(1.0e-3);
+                verbose = false;
+            }
+
+            void plot_all()
+            {
+                std::cout << "||  |==enabled: " << enabled << std::endl;
+                std::cout << "||  |==signature_norm_index: " << signature_norm_index << std::endl;
+                std::cout << "||  |==signature_tolerance: " << signature_tolerance << std::endl;
+                std::cout << "||  |==state_tolerance: " << state_tolerance << std::endl;
+                std::cout << "||  |==minimum_step_fraction_from_start: " << minimum_step_fraction_from_start << std::endl;
+                std::cout << "||  |==verbose: " << verbose << std::endl;
+            }
+        };
+
         unsigned int   continuation_steps;
         T              step_size;
         T              max_step_size;
@@ -216,6 +246,7 @@ struct parameters
         std::vector<T> deflation_knots;
 
         restart_policy_s                 restart_policy;
+        branch_intersection_policy_s     branch_intersection_policy;
         linear_solver_extended_s       linear_solver_extended;
         newton_extended_continuation_s newton_extended_continuation;
         newton_extended_deflation_s    newton_extended_deflation;
@@ -233,6 +264,7 @@ struct parameters
             skip_files                 = 100;
             deflation_knots            = { 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0 };
             restart_policy.set_default();
+            branch_intersection_policy.set_default();
             linear_solver_extended.set_default();
             newton_extended_continuation.set_default();
             newton_extended_deflation.set_default();
@@ -254,6 +286,8 @@ struct parameters
             std::cout << std::endl;
             std::cout << "||==restart_policy: " << std::endl;
             restart_policy.plot_all();
+            std::cout << "||==branch_intersection_policy: " << std::endl;
+            branch_intersection_policy.plot_all();
             std::cout << "||==linear_solver_extended: " << std::endl;
             linear_solver_extended.plot_all();
             std::cout << "||==newton_extended_continuation: " << std::endl;
@@ -708,6 +742,34 @@ void from_json(
         j.value( "knot_relocation", nlohmann::json::object() ).get<parameters_f::deflation_continuation_s::restart_policy_s::knot_relocation_s>();
 }
 
+void from_json(
+    const nlohmann::json &j, parameters_d::deflation_continuation_s::branch_intersection_policy_s &params_dc_bip_
+)
+{
+    params_dc_bip_.set_default();
+    params_dc_bip_.enabled = j.value( "enabled", params_dc_bip_.enabled );
+    params_dc_bip_.signature_norm_index = j.value( "signature_norm_index", params_dc_bip_.signature_norm_index );
+    params_dc_bip_.signature_tolerance = j.value( "signature_tolerance", params_dc_bip_.signature_tolerance );
+    params_dc_bip_.state_tolerance = j.value( "state_tolerance", params_dc_bip_.state_tolerance );
+    params_dc_bip_.minimum_step_fraction_from_start =
+        j.value( "minimum_step_fraction_from_start", params_dc_bip_.minimum_step_fraction_from_start );
+    params_dc_bip_.verbose = j.value( "verbose", params_dc_bip_.verbose );
+}
+
+void from_json(
+    const nlohmann::json &j, parameters_f::deflation_continuation_s::branch_intersection_policy_s &params_dc_bip_
+)
+{
+    params_dc_bip_.set_default();
+    params_dc_bip_.enabled = j.value( "enabled", params_dc_bip_.enabled );
+    params_dc_bip_.signature_norm_index = j.value( "signature_norm_index", params_dc_bip_.signature_norm_index );
+    params_dc_bip_.signature_tolerance = j.value( "signature_tolerance", params_dc_bip_.signature_tolerance );
+    params_dc_bip_.state_tolerance = j.value( "state_tolerance", params_dc_bip_.state_tolerance );
+    params_dc_bip_.minimum_step_fraction_from_start =
+        j.value( "minimum_step_fraction_from_start", params_dc_bip_.minimum_step_fraction_from_start );
+    params_dc_bip_.verbose = j.value( "verbose", params_dc_bip_.verbose );
+}
+
 
 void from_json( const nlohmann::json &j, parameters_d::deflation_continuation_s &params_dc_ )
 {
@@ -732,6 +794,7 @@ void from_json( const nlohmann::json &j, parameters_d::deflation_continuation_s 
         j.at( "skip_file_output" ).get<unsigned int>(),
         j.at( "deflation_knots" ).get<std::vector<double>>(),
         j.value( "restart_policy", nlohmann::json::object() ).get<parameters_d::deflation_continuation_s::restart_policy_s>(),
+        j.value( "branch_intersection_policy", nlohmann::json::object() ).get<parameters_d::deflation_continuation_s::branch_intersection_policy_s>(),
 
         j.at( "linear_solver_extended" ).get<parameters_d::deflation_continuation_s::linear_solver_extended_s>(),
         j.at( "newton_continuation" ).get<parameters_d::deflation_continuation_s::newton_extended_continuation_s>(),
@@ -752,6 +815,7 @@ void from_json( const nlohmann::json &j, parameters_f::deflation_continuation_s 
         j.at( "skip_file_output" ).get<unsigned int>(),
         j.at( "deflation_knots" ).get<std::vector<float>>(),
         j.value( "restart_policy", nlohmann::json::object() ).get<parameters_f::deflation_continuation_s::restart_policy_s>(),
+        j.value( "branch_intersection_policy", nlohmann::json::object() ).get<parameters_f::deflation_continuation_s::branch_intersection_policy_s>(),
 
         j.at( "linear_solver_extended" ).get<parameters_f::deflation_continuation_s::linear_solver_extended_s>(),
         j.at( "newton_continuation" ).get<parameters_f::deflation_continuation_s::newton_extended_continuation_s>(),

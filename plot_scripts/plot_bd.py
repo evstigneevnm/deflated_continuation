@@ -56,6 +56,11 @@ def parse_args() -> argparse.Namespace:
         "--legend",
         help="Override legend.dat path. One non-comment norm label per line.",
     )
+    parser.add_argument(
+        "--disable-legend",
+        action="store_true",
+        help="Do not draw branch legends on figures.",
+    )
     return parser.parse_args()
 
 
@@ -257,7 +262,8 @@ def plot_curves(args: argparse.Namespace, plt, project_dir: Path, curves: dict[s
                 axis.plot(xs, ys, label=f"branch {branch_name}", **style)
         axis.set_ylabel(labels[norm_index])
         axis.grid(True, alpha=0.3)
-        axis.legend(loc="best", fontsize="small")
+        if not args.disable_legend:
+            axis.legend(loc="best", fontsize="small")
 
     axes_flat[-1].set_xlabel("lambda")
     figure.suptitle(args.title or project_dir.name or "Bifurcation diagram")

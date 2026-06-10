@@ -11,12 +11,15 @@
 #include <system_error>
 #include <cstdint>
 #include <sstream>
+#include <algorithm>
+#include <limits>
 
 
 //using boost for serialization
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
 
+#include <containers/branch_intersection.h>
 #include <containers/intersection_status.h>
 
 namespace container
@@ -336,6 +339,156 @@ private:
         return !segment_metadata_available || point.segment_id == segment_id;
     }
 
+    static T scalar_abs_value(const T& value)
+    {
+        return value < T(0) ? -value : value;
+    }
+
+    static bool same_scalar(const T& a, const T& b)
+    {
+        const T scale = std::max<T>(T(1), std::max<T>(scalar_abs_value(a), scalar_abs_value(b)));
+        return scalar_abs_value(a - b) <= T(64)*std::numeric_limits<T>::epsilon()*scale;
+    }
+
+    static bool interval_overlap(
+        const T& a0,
+        const T& a1,
+        const T& b0,
+        const T& b1,
+        T& lower,
+        T& upper)
+    {
+        const T a_min = std::min(a0, a1);
+        const T a_max = std::max(a0, a1);
+        const T b_min = std::min(b0, b1);
+        const T b_max = std::max(b0, b1);
+        lower = std::max(a_min, b_min);
+        upper = std::min(a_max, b_max);
+        return lower <= upper || same_scalar(lower, upper);
+    }
+
+    static T interpolation_weight(const T& lambda, const T& lambda0_, const T& lambda1_)
+    {
+        if(same_scalar(lambda0_, lambda1_))
+        {
+            return T(0.5);
+        }
+        return (lambda - lambda0_)/(lambda1_ - lambda0_);
+    }
+
+    static T interpolate_scalar(
+        const T& lambda,
+        const T& lambda0_,
+        const T& value0,
+        const T& lambda1_,
+        const T& value1)
+    {
+        const T w = interpolation_weight(lambda, lambda0_, lambda1_);
+        return (T(1) - w)*value0 + w*value1;
+    }
+
+    static bool get_signature_value(
+        const values_t& point,
+        const unsigned int signature_index,
+        T& value)
+    {
+        if(point.vector_norms.size() <= signature_index)
+        {
+            return false;
+        }
+        value = point.vector_norms[signature_index];
+        return true;
+    }
+
+    static bool signature_envelopes_overlap(
+        const T& new_signature0,
+        const T& new_signature1,
+        const T& old_signature0,
+        const T& old_signature1,
+        const T& tolerance)
+    {
+        const T new_min = std::min(new_signature0, new_signature1);
+        const T new_max = std::max(new_signature0, new_signature1);
+        const T old_min = std::min(old_signature0, old_signature1);
+        const T old_max = std::max(old_signature0, old_signature1);
+        return (new_min - tolerance) <= old_max && (old_min - tolerance) <= new_max;
+    }
+
+    static bool find_signature_candidate_lambda(
+        const T& lambda_lower,
+        const T& lambda_upper,
+        const T& step_lambda0,
+        const T& step_signature0,
+        const T& step_lambda1,
+        const T& step_signature1,
+        const T& old_lambda0,
+        const T& old_signature0,
+        const T& old_lambda1,
+        const T& old_signature1,
+        const T& tolerance,
+        T& candidate_lambda,
+        T& signature_distance)
+    {
+        const T d_lower =
+            interpolate_scalar(lambda_lower, step_lambda0, step_signature0, step_lambda1, step_signature1) -
+            interpolate_scalar(lambda_lower, old_lambda0, old_signature0, old_lambda1, old_signature1);
+        const T d_upper =
+            interpolate_scalar(lambda_upper, step_lambda0, step_signature0, step_lambda1, step_signature1) -
+            interpolate_scalar(lambda_upper, old_lambda0, old_signature0, old_lambda1, old_signature1);
+
+        const T abs_lower = scalar_abs_value(d_lower);
+        const T abs_upper = scalar_abs_value(d_upper);
+        if(abs_lower <= tolerance || same_scalar(lambda_lower, lambda_upper))
+        {
+            candidate_lambda = lambda_lower;
+            signature_distance = abs_lower;
+            return signature_distance <= tolerance;
+        }
+        if(abs_upper <= tolerance)
+        {
+            candidate_lambda = lambda_upper;
+            signature_distance = abs_upper;
+            return true;
+        }
+        if(d_lower*d_upper > T(0))
+        {
+            return false;
+        }
+
+        const T denominator = d_upper - d_lower;
+        if(same_scalar(denominator, T(0)))
+        {
+            candidate_lambda = T(0.5)*(lambda_lower + lambda_upper);
+        }
+        else
+        {
+            candidate_lambda = lambda_lower - d_lower*(lambda_upper - lambda_lower)/denominator;
+        }
+        if(candidate_lambda < lambda_lower || candidate_lambda > lambda_upper)
+        {
+            return false;
+        }
+        const T d_candidate =
+            interpolate_scalar(candidate_lambda, step_lambda0, step_signature0, step_lambda1, step_signature1) -
+            interpolate_scalar(candidate_lambda, old_lambda0, old_signature0, old_lambda1, old_signature1);
+        signature_distance = scalar_abs_value(d_candidate);
+        return signature_distance <= tolerance;
+    }
+
+    static bool candidate_has_step_progress(
+        const T& candidate_lambda,
+        const T& step_lambda0,
+        const T& step_lambda1,
+        const T& minimum_step_fraction_from_start)
+    {
+        if(same_scalar(step_lambda0, step_lambda1))
+        {
+            return false;
+        }
+        const T fraction = (candidate_lambda - step_lambda0)/(step_lambda1 - step_lambda0);
+        return fraction > minimum_step_fraction_from_start && fraction <= T(1) + minimum_step_fraction_from_start;
+    }
+
 public:
 
 
@@ -525,6 +678,209 @@ public:
 
     }
 
+    bool evaluate_at_lambda(const T& lambda_star, T_vec& x_out)
+    {
+        const int N = static_cast<int>(container.size());
+        for(int j = 0; j < N - 1; ++j)
+        {
+            const auto& p_j = container[j];
+            const auto& p_jp = container[j + 1];
+            if(!can_interpolate_between(p_j, p_jp))
+            {
+                continue;
+            }
+            if(intersection(p_j, p_jp, lambda_star))
+            {
+                return evaluate_segment_at_lambda(j, j + 1, lambda_star, x_out);
+            }
+        }
+        return false;
+    }
+
+    template<class StateDistance>
+    bool find_branch_intersection(
+        const T& step_lambda0,
+        const T_vec& step_x0,
+        const T& step_lambda1,
+        const T_vec& step_x1,
+        const std::vector<T>& step_norms0,
+        const std::vector<T>& step_norms1,
+        const branch_intersection_policy<T>& policy,
+        T_vec& hit_x,
+        branch_intersection_result<T>& result,
+        StateDistance&& state_distance)
+    {
+        if(!policy.enabled)
+        {
+            return false;
+        }
+        if(step_norms0.size() <= policy.signature_norm_index ||
+           step_norms1.size() <= policy.signature_norm_index)
+        {
+            return false;
+        }
+
+        const T step_signature0 = step_norms0[policy.signature_norm_index];
+        const T step_signature1 = step_norms1[policy.signature_norm_index];
+        const int N = static_cast<int>(container.size());
+        for(int j = 0; j < N - 1; ++j)
+        {
+            const auto& p_j = container[j];
+            const auto& p_jp = container[j + 1];
+            if(!can_interpolate_between(p_j, p_jp))
+            {
+                continue;
+            }
+
+            T lambda_lower = T(0);
+            T lambda_upper = T(0);
+            if(!interval_overlap(step_lambda0, step_lambda1, p_j.lambda, p_jp.lambda, lambda_lower, lambda_upper))
+            {
+                continue;
+            }
+
+            T old_signature0 = T(0);
+            T old_signature1 = T(0);
+            if(!get_signature_value(p_j, policy.signature_norm_index, old_signature0) ||
+               !get_signature_value(p_jp, policy.signature_norm_index, old_signature1))
+            {
+                continue;
+            }
+
+            const T signature_scale = std::max<T>(
+                T(1),
+                std::max<T>(
+                    std::max<T>(scalar_abs_value(step_signature0), scalar_abs_value(step_signature1)),
+                    std::max<T>(scalar_abs_value(old_signature0), scalar_abs_value(old_signature1))));
+            const T signature_tolerance = policy.signature_tolerance*signature_scale;
+            if(!signature_envelopes_overlap(
+                   step_signature0,
+                   step_signature1,
+                   old_signature0,
+                   old_signature1,
+                   signature_tolerance))
+            {
+                continue;
+            }
+
+            T candidate_lambda = T(0);
+            T signature_distance = T(0);
+            if(!find_signature_candidate_lambda(
+                   lambda_lower,
+                   lambda_upper,
+                   step_lambda0,
+                   step_signature0,
+                   step_lambda1,
+                   step_signature1,
+                   p_j.lambda,
+                   old_signature0,
+                   p_jp.lambda,
+                   old_signature1,
+                   signature_tolerance,
+                   candidate_lambda,
+                   signature_distance))
+            {
+                continue;
+            }
+            if(!candidate_has_step_progress(
+                   candidate_lambda,
+                   step_lambda0,
+                   step_lambda1,
+                   policy.minimum_step_fraction_from_start))
+            {
+                candidate_lambda = lambda_upper;
+                const T d_upper =
+                    interpolate_scalar(
+                        candidate_lambda,
+                        step_lambda0,
+                        step_signature0,
+                        step_lambda1,
+                        step_signature1) -
+                    interpolate_scalar(
+                        candidate_lambda,
+                        p_j.lambda,
+                        old_signature0,
+                        p_jp.lambda,
+                        old_signature1);
+                signature_distance = scalar_abs_value(d_upper);
+                if(signature_distance > signature_tolerance ||
+                   !candidate_has_step_progress(
+                       candidate_lambda,
+                       step_lambda0,
+                       step_lambda1,
+                       policy.minimum_step_fraction_from_start))
+                {
+                    candidate_lambda = T(0.5)*(lambda_lower + lambda_upper);
+                    const T d_mid =
+                        interpolate_scalar(
+                            candidate_lambda,
+                            step_lambda0,
+                            step_signature0,
+                            step_lambda1,
+                            step_signature1) -
+                        interpolate_scalar(
+                            candidate_lambda,
+                            p_j.lambda,
+                            old_signature0,
+                            p_jp.lambda,
+                            old_signature1);
+                    signature_distance = scalar_abs_value(d_mid);
+                    if(signature_distance > signature_tolerance ||
+                       !candidate_has_step_progress(
+                           candidate_lambda,
+                           step_lambda0,
+                           step_lambda1,
+                           policy.minimum_step_fraction_from_start))
+                    {
+                        continue;
+                    }
+                }
+            }
+
+            if(!evaluate_segment_at_lambda(j, j + 1, candidate_lambda, x1))
+            {
+                continue;
+            }
+
+            const T w = interpolation_weight(candidate_lambda, step_lambda0, step_lambda1);
+            vec_ops->assign_mul(T(1) - w, step_x0, w, step_x1, x0);
+            const T distance = static_cast<T>(state_distance(x0, x1));
+            const T state_scale = std::max<T>(
+                T(1),
+                std::max<T>(
+                    scalar_abs_value(interpolate_scalar(
+                        candidate_lambda,
+                        step_lambda0,
+                        step_signature0,
+                        step_lambda1,
+                        step_signature1)),
+                    scalar_abs_value(interpolate_scalar(
+                        candidate_lambda,
+                        p_j.lambda,
+                        old_signature0,
+                        p_jp.lambda,
+                        old_signature1))));
+            const T state_tolerance = policy.state_tolerance*state_scale;
+            if(distance <= state_tolerance)
+            {
+                vec_ops->assign(x1, hit_x);
+                result.found = true;
+                result.lambda = candidate_lambda;
+                result.signature_distance = signature_distance;
+                result.state_distance = distance;
+                result.state_tolerance = state_tolerance;
+                result.curve_number = curve_number;
+                result.segment_id = p_j.segment_id;
+                result.semicurve_id = p_j.semicurve_id;
+                result.lower_point_index = p_j.point_index;
+                result.upper_point_index = p_jp.point_index;
+                result.reason = "known_branch_intersection";
+                return true;
+            }
+        }
+        return false;
+    }
+
 
 
 
@@ -696,6 +1052,45 @@ private:
             res.second = 0;
         }
         return(res);
+    }
+
+    bool read_saved_point(const values_t& point, T_vec& x_out)
+    {
+        if(!point.is_data_avaliable)
+        {
+            return false;
+        }
+        const uint64_t local_id = point.id_file_name;
+        const std::string f_name = full_path + std::string("/") + std::to_string(local_id);
+        vec_files->read_vector(f_name, x_out);
+        return true;
+    }
+
+    bool evaluate_segment_at_lambda(const int lower_index, const int upper_index, const T& lambda_star, T_vec& x_out)
+    {
+        auto& p_j = container[lower_index];
+        auto& p_jp = container[upper_index];
+        if((same_scalar(p_j.lambda, lambda_star)) && read_saved_point(p_j, x_out))
+        {
+            return true;
+        }
+        if((same_scalar(p_jp.lambda, lambda_star)) && read_saved_point(p_jp, x_out))
+        {
+            return true;
+        }
+
+        const bool stat_l = get_lower(lower_index, p_j.segment_id);
+        const bool stat_u = get_upper(upper_index, p_jp.segment_id);
+        if(!stat_l || !stat_u)
+        {
+            return false;
+        }
+        if(!interpolate_solutions(lambda_star))
+        {
+            return false;
+        }
+        vec_ops->assign(x1, x_out);
+        return true;
     }
 
     bool get_lower(int index, uint64_t segment_id)

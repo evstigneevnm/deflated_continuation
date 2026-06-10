@@ -22,6 +22,7 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
 
+#include <containers/branch_intersection.h>
 #include <containers/intersection_status.h>
 
 namespace container
@@ -243,6 +244,52 @@ public:
         }
         return status;
 
+    }
+
+    template<class StateDistance>
+    bool find_branch_intersection(
+        const T& step_lambda0,
+        const T_vec& step_x0,
+        const T& step_lambda1,
+        const T_vec& step_x1,
+        const branch_intersection_policy<T>& policy,
+        T_vec& hit_x,
+        branch_intersection_result<T>& result,
+        StateDistance&& state_distance)
+    {
+        if(!policy.enabled)
+        {
+            return false;
+        }
+
+        std::vector<T> step_norms0;
+        std::vector<T> step_norms1;
+        nonlin_op->norm_bifurcation_diagram(step_x0, step_norms0);
+        nonlin_op->norm_bifurcation_diagram(step_x1, step_norms1);
+
+        for(auto &curve: curve_container)
+        {
+            curve.set_main_refs(vec_ops, file_ops, log, nonlin_op, newton, cont_help);
+            if(curve.is_curve_open())
+            {
+                continue;
+            }
+            if(curve.find_branch_intersection(
+                   step_lambda0,
+                   step_x0,
+                   step_lambda1,
+                   step_x1,
+                   step_norms0,
+                   step_norms1,
+                   policy,
+                   hit_x,
+                   result,
+                   state_distance))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
 

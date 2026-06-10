@@ -15,6 +15,8 @@
 #include <utility>
 #include <vector>
 #include <limits>
+#include <memory>
+#include <sstream>
 // #include <type_traits> //to check linsolvers
 //boost serializatoin
 #include <boost/archive/text_oarchive.hpp>
@@ -28,6 +30,7 @@
 
 #include <containers/knots.hpp>
 #include <containers/knot_registry.h>
+#include <containers/branch_intersection.h>
 #include <containers/curve_helper_container.h>
 #include <containers/bifurcation_diagram_curve.h>
 #include <containers/bifurcation_diagram.h>
@@ -333,6 +336,49 @@ private:
         T_vec diff;
     };
 
+    class branch_distance_workspace
+    {
+    public:
+        branch_distance_workspace(VectorOperations* vec_ops_, sol_storage_def_t* storage_):
+            vec_ops(vec_ops_),
+            storage(storage_)
+        {
+            vec_ops->init_vector(a_work);
+            vec_ops->start_use_vector(a_work);
+            vec_ops->init_vector(b_work);
+            vec_ops->start_use_vector(b_work);
+            vec_ops->init_vector(diff);
+            vec_ops->start_use_vector(diff);
+        }
+
+        ~branch_distance_workspace()
+        {
+            vec_ops->stop_use_vector(diff);
+            vec_ops->free_vector(diff);
+            vec_ops->stop_use_vector(b_work);
+            vec_ops->free_vector(b_work);
+            vec_ops->stop_use_vector(a_work);
+            vec_ops->free_vector(a_work);
+        }
+
+        T distance(const T_vec& a, const T_vec& b)
+        {
+            vec_ops->assign(a, a_work);
+            vec_ops->assign(b, b_work);
+            detail::stabilize_solution_if_available(storage, a_work);
+            detail::stabilize_solution_if_available(storage, b_work);
+            vec_ops->assign_mul(T(1), a_work, T(-1), b_work, diff);
+            return vec_ops->norm_l2(diff);
+        }
+
+    private:
+        VectorOperations* vec_ops;
+        sol_storage_def_t* storage;
+        T_vec a_work;
+        T_vec b_work;
+        T_vec diff;
+    };
+
     static bool same_parameter_value(const T& a, const T& b)
     {
         const T scale = std::max<T>(T(1), std::max<T>(scalar_abs(a), scalar_abs(b)));
@@ -416,6 +462,7 @@ public:
         set_newton_deflation();
         set_steps();
         set_deflation_knots();
+        set_branch_intersection_policy();
     }
 
     void set_linsolver()
@@ -552,6 +599,79 @@ public:
 /*std::vector<T> knots_*/    
     {
         knots->add_element(parameters->deflation_continuation.deflation_knots);
+    }
+
+    void set_branch_intersection_policy()
+    {
+        container::branch_intersection_policy<T> policy;
+        const auto& params = parameters->deflation_continuation.branch_intersection_policy;
+        policy.enabled = params.enabled;
+        policy.signature_norm_index = params.signature_norm_index;
+        policy.signature_tolerance = params.signature_tolerance;
+        policy.state_tolerance = params.state_tolerance;
+        policy.minimum_step_fraction_from_start = params.minimum_step_fraction_from_start;
+        policy.verbose = params.verbose;
+
+        if(!policy.enabled)
+        {
+            continuate->set_branch_intersection_checker({});
+            continuate_analytical->set_branch_intersection_checker({});
+            return;
+        }
+
+        auto workspace = std::make_shared<branch_distance_workspace>(vec_ops, sol_storage_def);
+        auto checker =
+            [this, policy, workspace](
+                const T& lambda_left,
+                const T_vec& x_left,
+                const T& lambda_right,
+                const T_vec& x_right,
+                T& hit_lambda,
+                T_vec& hit_x,
+                std::string& reason) -> bool
+            {
+                container::branch_intersection_result<T> result;
+                auto distance =
+                    [workspace](const T_vec& a, const T_vec& b) -> T
+                    {
+                        return workspace->distance(a, b);
+                    };
+                const bool found = bif_diag->find_branch_intersection(
+                    lambda_left,
+                    x_left,
+                    lambda_right,
+                    x_right,
+                    policy,
+                    hit_x,
+                    result,
+                    distance);
+                if(!found)
+                {
+                    return false;
+                }
+
+                hit_lambda = result.lambda;
+                std::ostringstream stream;
+                stream << "known branch intersection with curve " << result.curve_number
+                       << ", segment " << result.segment_id
+                       << ", state distance = " << result.state_distance
+                       << ", tolerance = " << result.state_tolerance;
+                reason = stream.str();
+                if(policy.verbose)
+                {
+                    log->info_f(
+                        "MAIN:deflation_continuation: branch intersection detected at lambda = %le: curve = %i, segment = %llu, state distance = %le, tolerance = %le.",
+                        double(result.lambda),
+                        result.curve_number,
+                        static_cast<unsigned long long>(result.segment_id),
+                        double(result.state_distance),
+                        double(result.state_tolerance));
+                }
+                return true;
+            };
+
+        continuate->set_branch_intersection_checker(checker);
+        continuate_analytical->set_branch_intersection_checker(checker);
     }
 
     void use_analytical_solution(bool analytical_solution_ = false)

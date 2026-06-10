@@ -57,6 +57,14 @@ private:
         const T_vec& x_right,
         T& effective_lambda,
         T_vec& effective_x)> knot_relocator_t;
+    typedef std::function<bool(
+        const T& lambda_left,
+        const T_vec& x_left,
+        const T& lambda_right,
+        const T_vec& x_right,
+        T& hit_lambda,
+        T_vec& hit_x,
+        std::string& reason)> branch_intersection_checker_t;
 
 
     typedef SystemOperatorContinuation<
@@ -176,6 +184,11 @@ public:
         allow_knot_interpolation_failure = allow_;
     }
 
+    void set_branch_intersection_checker(branch_intersection_checker_t checker_)
+    {
+        branch_intersection_checker = std::move(checker_);
+    }
+
 
     void update_knots()
     {
@@ -260,7 +273,7 @@ protected: //changed to protected for inheritance
     T lambda_start; T_vec x_start;
     T lambda0, lambda0_s, lambda1, lambda1_s;
     T lambda_min, lambda_max;
-    T_vec x0, x0_s, x1, x1_back, x1_s, x_check, x_output, x_relocated_knot;
+    T_vec x0, x0_s, x1, x1_back, x1_s, x_check, x_output, x_relocated_knot, x_branch_intersection;
     char break_semicurve = 0;
     bool fail_flag = false;
     bool hard_failure = false;
@@ -273,6 +286,7 @@ protected: //changed to protected for inheritance
     std::function<void(T_vec&)> solution_postprocessor;
     knot_resolver_t knot_resolver;
     knot_relocator_t knot_relocator;
+    branch_intersection_checker_t branch_intersection_checker;
 
     void add_solution_to_curve(const T& lambda, const T_vec& x, const bool force_store)
     {
@@ -301,9 +315,11 @@ private:
         vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
         vec_ops->init_vector(x1_back); vec_ops->start_use_vector(x1_back);
         vec_ops->init_vector(x_relocated_knot); vec_ops->start_use_vector(x_relocated_knot);
+        vec_ops->init_vector(x_branch_intersection); vec_ops->start_use_vector(x_branch_intersection);
     }
     void unset_all_vectors()
     {
+        vec_ops->stop_use_vector(x_branch_intersection); vec_ops->free_vector(x_branch_intersection);
         vec_ops->stop_use_vector(x_output); vec_ops->free_vector(x_output);
         vec_ops->stop_use_vector(x_check); vec_ops->free_vector(x_check);
         vec_ops->stop_use_vector(x_start); vec_ops->free_vector(x_start);
@@ -579,6 +595,32 @@ private:
                     else
                     {
                         just_interpolated = false;
+                    }
+                    bool branch_intersection_found = false;
+                    if(branch_intersection_checker)
+                    {
+                        T hit_lambda = lambda1;
+                        std::string hit_reason;
+                        branch_intersection_found = branch_intersection_checker(
+                            lambda0,
+                            x0,
+                            lambda1,
+                            x1,
+                            hit_lambda,
+                            x_branch_intersection,
+                            hit_reason);
+                        if(branch_intersection_found)
+                        {
+                            lambda1 = hit_lambda;
+                            vec_ops->assign(x_branch_intersection, x1);
+                            did_knot_interpolation = true;
+                            continue_next_step = false;
+                            break_semicurve++;
+                            log->warning_f(
+                                "continuation::start_semicurve: stopped semicurve at lambda = %le due to %s.",
+                                double(lambda1),
+                                hit_reason.empty() ? "known branch intersection" : hit_reason.c_str());
+                        }
                     }
                     //if try blocks passes, THIS is executed:
                     add_solution_to_curve(lambda1, x1, did_knot_interpolation);
