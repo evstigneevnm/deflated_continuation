@@ -60,6 +60,7 @@ public:
         {
             throw std::runtime_error("kuramoto_sivashinskiy_1d_full vector size must be 2*(physical_size/2 - 1).");
         }
+        symmetry_adapter.set_relative_active_mode_tolerance(default_relative_active_mode_tolerance());
         common_constructor_operation();
     }
 
@@ -125,6 +126,24 @@ public:
     std::size_t complex_size() const
     {
         return complex_size_;
+    }
+
+    static T default_relative_active_mode_tolerance()
+    {
+        return T(1.0e-5);
+    }
+
+    template<class SymmetryAdapter>
+    void configure_continuation_symmetry_adapter(SymmetryAdapter& adapter) const
+    {
+        adapter.set_relative_active_mode_tolerance(default_relative_active_mode_tolerance());
+    }
+
+    template<class FiniteActionRegistry>
+    void configure_finite_symmetry_actions(FiniteActionRegistry& registry) const
+    {
+        registry.reset_to_identity();
+        symmetry::fourier::add_real_packed_negative_reflection_action(registry);
     }
 
     T linear_multiplier(const std::size_t mode, const T lambda) const
@@ -275,6 +294,31 @@ public:
         symmetry_adapter.stabilize_closest_to_reference(x, x, x);
     }
 
+    void begin_continuation_chart(const T_vec& x_0_, const T& lambda_0_, const T_vec&, const T&)
+    {
+        (void)lambda_0_;
+        symmetry_adapter.stabilize_closest_to_reference(x_0_, x_0_, projected_state);
+    }
+
+    void stabilize_predictor_for_continuation(
+        const T_vec& x_0_,
+        const T&,
+        const T_vec&,
+        const T&,
+        const T_vec& x_predictor,
+        const T& lambda_predictor,
+        T_vec& x_trial,
+        T& lambda_trial)
+    {
+        symmetry_adapter.stabilize_closest_to_reference(x_0_, x_predictor, x_trial);
+        lambda_trial = lambda_predictor;
+    }
+
+    void stabilize_corrector_trial(const T_vec& reference, const T&, T_vec& trial, T&)
+    {
+        project_relative_to(reference, trial);
+    }
+
     void project_relative_to(const T_vec& reference, T_vec& x)
     {
         symmetry_adapter.stabilize_closest_to_reference(reference, x, x);
@@ -304,6 +348,12 @@ public:
             static_cast<double>(data.selected_abs),
             static_cast<double>(data.selected_real_on_slice),
             static_cast<double>(data.slice_matrix));
+    }
+
+    template<class Log>
+    void log_continuation_chart(Log* log, const char* context) const
+    {
+        log_projection_diagnostics(log, context);
     }
 
     void exact_solution(const T&, T_vec& u_out)

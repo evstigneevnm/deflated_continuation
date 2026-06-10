@@ -19,6 +19,7 @@
 #include <external_libraries/fft_facade.h>
 #include <scfd/arrays/array.h>
 #include <scfd/utils/device_tag.h>
+#include <symmetry/fourier/real_packed_fourier_actions_1d.h>
 
 namespace nonlinear_operators
 {
@@ -260,6 +261,13 @@ public:
         const T k = static_cast<T>(mode);
         const T k2 = k*k;
         return lambda*(-k2) + b_val*k2*k2;
+    }
+
+    template<class FiniteActionRegistry>
+    void configure_finite_symmetry_actions(FiniteActionRegistry& registry) const
+    {
+        registry.reset_to_identity();
+        symmetry::fourier::add_sine_half_period_shift_action(registry);
     }
 
     void F(const T_vec& u, const T lambda, T_vec& v)

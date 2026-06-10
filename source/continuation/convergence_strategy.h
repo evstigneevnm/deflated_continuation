@@ -6,6 +6,7 @@ convergence rules for Newton iterator for continuation process
 #include <cmath>
 #include <vector>
 #include <common/scalar_math.h>
+#include <continuation/chart_helpers.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
 #include <scfd/utils/logged_obj_base.h>
 #include <algorithm> // std::min_element
@@ -125,7 +126,7 @@ public:
         lambda1 = lambda + newton_wight*delta_lambda;
         const T arclength_before_projection = constraint_residual(sys_op, x1, lambda1);
         vec_ops->assign(x1, projection_trial);
-        nonlinear_operators::detail::project_state_relative_to(vec_ops, nonlin_op, x, x1);
+        continuation::chart::stabilize_corrector_trial(vec_ops, log, nonlin_op, x, lambda, x1, lambda1);
         vec_ops->assign_mul(T(1), x1, T(-1), projection_trial, projection_trial);
         const T projection_displacement = vec_ops->norm_l2(projection_trial);
         const T arclength_after_projection = constraint_residual(sys_op, x1, lambda1);
@@ -134,7 +135,7 @@ public:
             (double)arclength_before_projection,
             (double)arclength_after_projection,
             (double)projection_displacement);
-        nonlinear_operators::detail::log_projection_diagnostics(log, nonlin_op, "continuation::convergence");
+        continuation::chart::log_continuation_chart(log, nonlin_op, "continuation::convergence");
         return residual_norm(sys_op, nonlin_op, x1, lambda1, normF1, arclength_res1);
     }
 

@@ -11,6 +11,8 @@
 #endif
 
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h>
+#include <symmetry/finite_action_registry.h>
+#include <symmetry/fourier/real_packed_fourier_actions_1d.h>
 
 #include "KS1D_backend_typedefs.h"
 
@@ -19,6 +21,7 @@ namespace
 
 using ks1d_t = nonlinear_operators::kuramoto_sivashinskiy_1d<vec_ops_real, fft_backend_t, Blocks_x_>;
 using real_vec = typename vec_ops_real::vector_type;
+using finite_actions_t = symmetry::finite_action_registry<vec_ops_real>;
 
 int checks = 0;
 int failures = 0;
@@ -83,6 +86,30 @@ std::vector<real> host_vector(vec_ops_real& vec_ops, const real_vec& x, std::siz
     std::vector<real> host(n, real(0));
     vec_ops.get(x, host.data(), n);
     return host;
+}
+
+void check_vector_close(
+    vec_ops_real& vec_ops,
+    const real_vec& value,
+    const real_vec& expected,
+    const real tol,
+    const std::string& label)
+{
+    const auto value_host = host_vector(vec_ops, value, vec_ops.get_size(value));
+    const auto expected_host = host_vector(vec_ops, expected, vec_ops.get_size(expected));
+    check_condition(value_host.size() == expected_host.size(), label + " size");
+    if(value_host.size() != expected_host.size())
+    {
+        return;
+    }
+    for(std::size_t i = 0; i < value_host.size(); ++i)
+    {
+        check_close(
+            value_host[i],
+            expected_host[i],
+            tol*(real(1) + common::scalar_math::abs(expected_host[i])),
+            label + " component " + std::to_string(i));
+    }
 }
 
 void test_zero_branch(vec_ops_real& vec_ops, ks1d_t& ks)
@@ -301,6 +328,51 @@ void test_preconditioner_at_zero(vec_ops_real& vec_ops, ks1d_t& ks)
     vec_ops.free_vector(zero);
 }
 
+void test_half_period_shift_equivariance(vec_ops_real& vec_ops, ks1d_t& ks)
+{
+    finite_actions_t finite_actions(&vec_ops);
+    ks.configure_finite_symmetry_actions(finite_actions);
+    const int action_index = finite_actions.find("sine_half_period_shift");
+    check_condition(action_index >= 0, "reduced KS1D registers sine half-period shift action");
+    if(action_index < 0)
+    {
+        return;
+    }
+
+    real_vec u;
+    real_vec du;
+    real_vec shifted_u;
+    real_vec shifted_du;
+    real_vec f;
+    real_vec shifted_f;
+    real_vec action_f;
+    real_vec jdu;
+    real_vec shifted_jdu;
+    real_vec action_jdu;
+    vec_ops.init_vectors(u, du, shifted_u, shifted_du, f, shifted_f, action_f, jdu, shifted_jdu, action_jdu);
+    vec_ops.start_use_vectors(u, du, shifted_u, shifted_du, f, shifted_f, action_f, jdu, shifted_jdu, action_jdu);
+
+    fill_test_vectors(vec_ops, u, du);
+    finite_actions.apply(static_cast<std::size_t>(action_index), u, shifted_u);
+    finite_actions.apply(static_cast<std::size_t>(action_index), du, shifted_du);
+
+    const real lambda = real(4.25);
+    ks.F(u, lambda, f);
+    ks.F(shifted_u, lambda, shifted_f);
+    finite_actions.apply(static_cast<std::size_t>(action_index), f, action_f);
+    check_vector_close(vec_ops, shifted_f, action_f, real(20)*tolerance<real>(), "reduced KS1D half-period F equivariance");
+
+    ks.set_linearization_point(u, lambda);
+    ks.jacobian_u(du, jdu);
+    ks.set_linearization_point(shifted_u, lambda);
+    ks.jacobian_u(shifted_du, shifted_jdu);
+    finite_actions.apply(static_cast<std::size_t>(action_index), jdu, action_jdu);
+    check_vector_close(vec_ops, shifted_jdu, action_jdu, real(20)*tolerance<real>(), "reduced KS1D half-period J equivariance");
+
+    vec_ops.stop_use_vectors(u, du, shifted_u, shifted_du, f, shifted_f, action_f, jdu, shifted_jdu, action_jdu);
+    vec_ops.free_vectors(u, du, shifted_u, shifted_du, f, shifted_f, action_f, jdu, shifted_jdu, action_jdu);
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -334,6 +406,7 @@ int main(int argc, char** argv)
     test_jacobian_u(vec_ops, ks);
     test_jacobian_alpha(vec_ops, ks);
     test_preconditioner_at_zero(vec_ops, ks);
+    test_half_period_shift_equivariance(vec_ops, ks);
 
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;
     if(failures != 0)

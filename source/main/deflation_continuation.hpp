@@ -647,6 +647,26 @@ public:
                     distance);
                 if(!found)
                 {
+                    if(suppress_analytical_branch_endpoint)
+                    {
+                        return false;
+                    }
+                    nonlin_op->exact_solution(lambda_right, hit_x);
+                    const T exact_distance = workspace->distance(x_right, hit_x);
+                    if(exact_distance <= policy.state_tolerance)
+                    {
+                        hit_lambda = lambda_right;
+                        reason = "analytical branch endpoint";
+                        if(policy.verbose)
+                        {
+                            log->info_f(
+                                "MAIN:deflation_continuation: analytical branch endpoint detected at lambda = %le: state distance = %le, tolerance = %le.",
+                                double(hit_lambda),
+                                double(exact_distance),
+                                double(policy.state_tolerance));
+                        }
+                        return true;
+                    }
                     return false;
                 }
 
@@ -689,7 +709,18 @@ public:
         detail::stabilize_solution_if_available(sol_storage_def, x0_stabilized);
         bif_diag->init_new_curve();
         bif_diag->get_current_ref(bdf);
-        continuate->continuate_curve(bdf, x0_stabilized, lambda0_);
+        const bool old_suppress_analytical_branch_endpoint = suppress_analytical_branch_endpoint;
+        suppress_analytical_branch_endpoint = true;
+        try
+        {
+            continuate->continuate_curve(bdf, x0_stabilized, lambda0_);
+        }
+        catch(...)
+        {
+            suppress_analytical_branch_endpoint = old_suppress_analytical_branch_endpoint;
+            throw;
+        }
+        suppress_analytical_branch_endpoint = old_suppress_analytical_branch_endpoint;
         bif_diag->close_curve();
         vec_ops->stop_use_vector(x0_stabilized);
         vec_ops->free_vector(x0_stabilized);
@@ -1346,6 +1377,7 @@ private:
     deflate_t* deflate;
     sol_storage_def_t* sol_storage_def = nullptr;
     bool owns_solution_storage = true;
+    bool suppress_analytical_branch_endpoint = false;
     std::string project_dir;
     bool analytical_solution = false;
     unsigned int skip_files;

@@ -5,6 +5,9 @@
 
 #include <common/scfd_serial_cpu_vector_operations.h>
 #include <deflation/symmetry_solution_storage.h>
+#include <symmetry/finite_action_registry.h>
+#include <symmetry/finite_quotient_adapter.h>
+#include <symmetry/fourier/real_packed_fourier_actions_1d.h>
 #include <symmetry/fourier/real_packed_fourier_slice_1d_adapter.h>
 
 namespace
@@ -58,11 +61,15 @@ int main()
     using real = double;
     using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
     using adapter_t = symmetry::fourier::real_packed_fourier_slice_1d_adapter<vec_ops_t>;
-    using storage_t = deflation::symmetry_solution_storage<vec_ops_t, adapter_t>;
+    using finite_actions_t = symmetry::finite_action_registry<vec_ops_t>;
+    using quotient_adapter_t = symmetry::finite_quotient_adapter<vec_ops_t, adapter_t>;
+    using storage_t = deflation::symmetry_solution_storage<vec_ops_t, quotient_adapter_t>;
 
     vec_ops_t vec_ops(4);
     adapter_t adapter(&vec_ops, 2);
-    storage_t storage(&vec_ops, 8, real(1), real(2), &adapter, 1e-10);
+    finite_actions_t finite_actions(&vec_ops);
+    quotient_adapter_t quotient_adapter(&vec_ops, &adapter, &finite_actions);
+    storage_t storage(&vec_ops, 8, real(1), real(2), &quotient_adapter, 1e-10);
 
     vec_ops_t::vector_type x;
     vec_ops_t::vector_type shifted;
@@ -152,6 +159,16 @@ int main()
     storage.push_back(shifted);
     require_true("mode 2 first-active shifted copy is skipped", storage.get_size() == 1);
     require_close("mode 2 first-active nearest shifted duplicate distance", storage.nearest_stabilized_distance(shifted), 0.0, 1e-10);
+
+    storage.clear();
+    symmetry::fourier::add_real_packed_negative_reflection_action(finite_actions);
+    set_vector(vec_ops, x, {1.0, 0.3, -0.2, 0.5});
+    adapter.apply_negative_reflection(x, query);
+    adapter.apply_shift(query, shifted, 0.41);
+    storage.push_back(x);
+    storage.push_back(shifted);
+    require_true("negative-reflection shifted copy is skipped", storage.get_size() == 1);
+    require_close("negative-reflection nearest duplicate distance", storage.nearest_stabilized_distance(shifted), 0.0, 1e-10);
 
     vec_ops.stop_use_vector(c);
     vec_ops.free_vector(c);

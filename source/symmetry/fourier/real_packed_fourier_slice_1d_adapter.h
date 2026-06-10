@@ -22,6 +22,12 @@ enum class real_packed_fourier_1d_layout
     interleaved_real_imag
 };
 
+enum class real_packed_fourier_1d_discrete_action
+{
+    identity,
+    negative_reflection
+};
+
 template<class VectorOperations>
 class real_packed_fourier_slice_1d_adapter
 {
@@ -48,6 +54,7 @@ public:
         reference_spectrum(positive_modes_ + 1, complex_type(0)),
         stabilized_spectrum(positive_modes_ + 1, complex_type(0)),
         zero_spectrum(positive_modes_ + 1, complex_type(0)),
+        action_spectrum(positive_modes_ + 1, complex_type(0)),
         candidate_spectrum(positive_modes_ + 1, complex_type(0)),
         best_spectrum(positive_modes_ + 1, complex_type(0)),
         tangent_spectrum(positive_modes_ + 1, complex_type(0)),
@@ -55,7 +62,8 @@ public:
         vector_field_derivative_spectrum(positive_modes_ + 1, complex_type(0)),
         gradient_spectrum(positive_modes_ + 1, complex_type(0)),
         work_gradient_spectrum(positive_modes_ + 1, complex_type(0)),
-        source_gradient_spectrum(positive_modes_ + 1, complex_type(0))
+        source_gradient_spectrum(positive_modes_ + 1, complex_type(0)),
+        physical_pullback_spectrum(positive_modes_ + 1, complex_type(0))
     {
         if(vec_ops == nullptr)
         {
@@ -87,12 +95,50 @@ public:
         return last_data;
     }
 
+    void enable_negative_reflection_symmetry(const bool enabled = true)
+    {
+        negative_reflection_symmetry_enabled = enabled;
+    }
+
+    bool negative_reflection_symmetry() const
+    {
+        return negative_reflection_symmetry_enabled;
+    }
+
+    void set_relative_active_mode_tolerance(const scalar_type tolerance)
+    {
+        if(tolerance < scalar_type(0))
+        {
+            throw std::invalid_argument("relative active mode tolerance must be non-negative");
+        }
+        relative_active_mode_tolerance = tolerance;
+    }
+
+    scalar_type get_relative_active_mode_tolerance() const
+    {
+        return relative_active_mode_tolerance;
+    }
+
+    real_packed_fourier_1d_discrete_action last_discrete_action() const
+    {
+        return last_action;
+    }
+
     void stabilize(const vector_type& source, vector_type& destination)
     {
         check_vector_size(source);
         check_vector_size(destination);
         vector_to_spectrum(source, spectrum);
-        slice.stabilize(spectrum.data(), stabilized_spectrum.data(), stabilized_spectrum.size(), last_data);
+        last_action = real_packed_fourier_1d_discrete_action::identity;
+        last_data = choose_reliable_slice_data(spectrum, last_data.mode);
+        if(last_data.active())
+        {
+            slice.apply_shift(spectrum.data(), stabilized_spectrum.data(), stabilized_spectrum.size(), last_data.shift);
+        }
+        else
+        {
+            stabilized_spectrum = spectrum;
+        }
         spectrum_to_vector(stabilized_spectrum, destination);
     }
 
@@ -119,7 +165,8 @@ public:
         vector_to_spectrum(source, spectrum);
         vector_to_spectrum(reference, reference_spectrum);
 
-        last_data = slice.choose_slice_data(spectrum.data(), spectrum.size(), last_data.mode);
+        last_action = real_packed_fourier_1d_discrete_action::identity;
+        last_data = choose_reliable_slice_data(spectrum, last_data.mode);
         if(!last_data.active())
         {
             stabilized_spectrum = spectrum;
@@ -163,7 +210,16 @@ public:
         check_vector_size(gradient);
 
         vector_to_spectrum(source, spectrum);
-        slice.stabilize(spectrum.data(), stabilized_spectrum.data(), stabilized_spectrum.size(), last_data);
+        last_action = real_packed_fourier_1d_discrete_action::identity;
+        last_data = choose_reliable_slice_data(spectrum, last_data.mode);
+        if(last_data.active())
+        {
+            slice.apply_shift(spectrum.data(), stabilized_spectrum.data(), stabilized_spectrum.size(), last_data.shift);
+        }
+        else
+        {
+            stabilized_spectrum = spectrum;
+        }
         vector_to_spectrum(slice_gradient, gradient_spectrum);
         stabilizer_adjoint_pullback_1d(
             last_data,
@@ -187,6 +243,7 @@ public:
 
         vector_to_spectrum(source, spectrum);
         canonicalize_spectrum(spectrum, stabilized_spectrum, last_data);
+        apply_discrete_action_spectrum(spectrum, action_spectrum, last_action);
         vector_to_spectrum(slice_gradient, gradient_spectrum);
         stabilizer_adjoint_pullback_1d(
             last_data,
@@ -195,7 +252,8 @@ public:
             work_gradient_spectrum.data(),
             source_gradient_spectrum.data(),
             source_gradient_spectrum.size());
-        spectrum_to_vector(source_gradient_spectrum, gradient);
+        apply_discrete_action_spectrum(source_gradient_spectrum, physical_pullback_spectrum, last_action);
+        spectrum_to_vector(physical_pullback_spectrum, gradient);
     }
 
     void stabilizer_differential_from_last(const vector_type& source_tangent, vector_type& tangent_on_slice)
@@ -221,7 +279,7 @@ public:
         check_vector_size(projected);
 
         vector_to_spectrum(state_on_slice, spectrum);
-        const slice_data_type local_data = slice.choose_slice_data(spectrum.data(), spectrum.size(), last_data.mode);
+        const slice_data_type local_data = choose_reliable_slice_data(spectrum, last_data.mode);
         vector_to_spectrum(vector_on_slice, gradient_spectrum);
         slice.translation_generator(spectrum.data(), work_gradient_spectrum.data(), work_gradient_spectrum.size());
         typename slice_type::projection_info info;
@@ -269,6 +327,18 @@ public:
         check_vector_size(destination);
         vector_to_spectrum(source, spectrum);
         slice.apply_shift(spectrum.data(), stabilized_spectrum.data(), stabilized_spectrum.size(), shift);
+        spectrum_to_vector(stabilized_spectrum, destination);
+    }
+
+    void apply_negative_reflection(const vector_type& source, vector_type& destination)
+    {
+        check_vector_size(source);
+        check_vector_size(destination);
+        vector_to_spectrum(source, spectrum);
+        apply_discrete_action_spectrum(
+            spectrum,
+            stabilized_spectrum,
+            real_packed_fourier_1d_discrete_action::negative_reflection);
         spectrum_to_vector(stabilized_spectrum, destination);
     }
 
@@ -332,42 +402,156 @@ private:
         return result;
     }
 
+    scalar_type active_mode_threshold(const std::vector<complex_type>& values) const
+    {
+        const scalar_type norm = std::sqrt(spectrum_distance_sq(values, zero_spectrum));
+        return std::max(slice.active_mode_tolerance(), relative_active_mode_tolerance*norm);
+    }
+
+    slice_data_type choose_reliable_slice_data(
+        const std::vector<complex_type>& values,
+        const std::size_t preferred_mode) const
+    {
+        slice_data_type data;
+        data.group_dimension = 1;
+        data.tolerance = active_mode_threshold(values);
+
+        std::size_t selected_mode = 0;
+        if(preferred_mode != 0 && preferred_mode < values.size() &&
+           std::abs(values[preferred_mode]) > data.tolerance)
+        {
+            selected_mode = preferred_mode;
+        }
+        else
+        {
+            for(std::size_t mode = 1; mode < values.size(); ++mode)
+            {
+                if(std::abs(values[mode]) > data.tolerance)
+                {
+                    selected_mode = mode;
+                    break;
+                }
+            }
+        }
+
+        if(selected_mode == 0)
+        {
+            return data;
+        }
+
+        const complex_type coeff = values[selected_mode];
+        const scalar_type real_part = coeff.real();
+        const scalar_type imag_part = coeff.imag();
+        const scalar_type magnitude = std::abs(coeff);
+
+        data.mode = selected_mode;
+        data.active_rank = 1;
+        data.residual_group_order_value = selected_mode;
+        data.selected_abs = magnitude;
+        data.selected_real_on_slice = magnitude;
+        data.shift = -std::atan2(imag_part, real_part)/static_cast<scalar_type>(selected_mode);
+        data.set_shift(0, data.shift);
+        data.slice_matrix = static_cast<scalar_type>(selected_mode)*magnitude;
+        return data;
+    }
+
+    std::size_t discrete_action_count() const
+    {
+        return negative_reflection_symmetry_enabled ? std::size_t(2) : std::size_t(1);
+    }
+
+    real_packed_fourier_1d_discrete_action discrete_action_at(const std::size_t index) const
+    {
+        if(index == 0)
+        {
+            return real_packed_fourier_1d_discrete_action::identity;
+        }
+        return real_packed_fourier_1d_discrete_action::negative_reflection;
+    }
+
+    static complex_type apply_discrete_action_value(
+        const complex_type& value,
+        const real_packed_fourier_1d_discrete_action action)
+    {
+        switch(action)
+        {
+            case real_packed_fourier_1d_discrete_action::identity:
+                return value;
+            case real_packed_fourier_1d_discrete_action::negative_reflection:
+                return complex_type(-value.real(), value.imag());
+        }
+        throw std::runtime_error("unknown Fourier discrete action");
+    }
+
+    void apply_discrete_action_spectrum(
+        const std::vector<complex_type>& source,
+        std::vector<complex_type>& destination,
+        const real_packed_fourier_1d_discrete_action action) const
+    {
+        if(source.size() != destination.size())
+        {
+            throw std::runtime_error("discrete action spectrum sizes do not match");
+        }
+        for(std::size_t mode = 0; mode < source.size(); ++mode)
+        {
+            destination[mode] = apply_discrete_action_value(source[mode], action);
+        }
+    }
+
     void canonicalize_spectrum(
         const std::vector<complex_type>& source,
         std::vector<complex_type>& destination,
         slice_data_type& data)
     {
-        data = slice.choose_slice_data(source.data(), source.size(), 0);
-        if(!data.active())
-        {
-            destination = source;
-            zero_small_components(destination, canonical_zero_tolerance(destination));
-            return;
-        }
-
-        const scalar_type base_shift = data.shift;
-        const std::size_t order = data.residual_group_order() == 0 ? std::size_t(1) : data.residual_group_order();
         const scalar_type two_pi = scalar_type(2)*static_cast<scalar_type>(std::acos(static_cast<scalar_type>(-1)));
         const scalar_type tolerance = canonical_zero_tolerance(source);
-        scalar_type best_shift = base_shift;
         bool have_best = false;
+        slice_data_type best_data;
+        real_packed_fourier_1d_discrete_action best_action = real_packed_fourier_1d_discrete_action::identity;
 
-        for(std::size_t j = 0; j < order; ++j)
+        for(std::size_t action_index = 0; action_index < discrete_action_count(); ++action_index)
         {
-            const scalar_type shift = base_shift + two_pi*static_cast<scalar_type>(j)/static_cast<scalar_type>(order);
-            slice.apply_shift(source.data(), candidate_spectrum.data(), candidate_spectrum.size(), shift);
-            zero_small_components(candidate_spectrum, tolerance);
-            if(!have_best || lexicographically_greater(candidate_spectrum, best_spectrum, tolerance))
+            const auto action = discrete_action_at(action_index);
+            apply_discrete_action_spectrum(source, action_spectrum, action);
+            slice_data_type candidate_data = choose_reliable_slice_data(action_spectrum, 0);
+            if(!candidate_data.active())
             {
-                best_spectrum = candidate_spectrum;
-                best_shift = shift;
-                have_best = true;
+                candidate_spectrum = action_spectrum;
+                zero_small_components(candidate_spectrum, tolerance);
+                if(!have_best || lexicographically_greater(candidate_spectrum, best_spectrum, tolerance))
+                {
+                    best_spectrum = candidate_spectrum;
+                    best_data = candidate_data;
+                    best_action = action;
+                    have_best = true;
+                }
+                continue;
+            }
+
+            const scalar_type base_shift = candidate_data.shift;
+            const std::size_t order =
+                candidate_data.residual_group_order() == 0 ? std::size_t(1) : candidate_data.residual_group_order();
+            for(std::size_t j = 0; j < order; ++j)
+            {
+                const scalar_type shift =
+                    base_shift + two_pi*static_cast<scalar_type>(j)/static_cast<scalar_type>(order);
+                slice.apply_shift(action_spectrum.data(), candidate_spectrum.data(), candidate_spectrum.size(), shift);
+                zero_small_components(candidate_spectrum, tolerance);
+                if(!have_best || lexicographically_greater(candidate_spectrum, best_spectrum, tolerance))
+                {
+                    best_spectrum = candidate_spectrum;
+                    best_data = candidate_data;
+                    best_data.shift = shift;
+                    best_data.set_shift(0, shift);
+                    best_action = action;
+                    have_best = true;
+                }
             }
         }
 
         destination = best_spectrum;
-        data.shift = best_shift;
-        data.set_shift(0, best_shift);
+        data = best_data;
+        last_action = best_action;
     }
 
     scalar_type canonical_zero_tolerance(const std::vector<complex_type>& values) const
@@ -423,12 +607,16 @@ private:
     real_packed_fourier_1d_layout layout;
     slice_type slice;
     slice_data_type last_data;
+    real_packed_fourier_1d_discrete_action last_action = real_packed_fourier_1d_discrete_action::identity;
+    bool negative_reflection_symmetry_enabled = false;
+    scalar_type relative_active_mode_tolerance = scalar_type(0);
     std::vector<scalar_type> host_source;
     std::vector<scalar_type> host_destination;
     std::vector<complex_type> spectrum;
     std::vector<complex_type> reference_spectrum;
     std::vector<complex_type> stabilized_spectrum;
     std::vector<complex_type> zero_spectrum;
+    std::vector<complex_type> action_spectrum;
     std::vector<complex_type> candidate_spectrum;
     std::vector<complex_type> best_spectrum;
     std::vector<complex_type> tangent_spectrum;
@@ -437,6 +625,7 @@ private:
     std::vector<complex_type> gradient_spectrum;
     std::vector<complex_type> work_gradient_spectrum;
     std::vector<complex_type> source_gradient_spectrum;
+    std::vector<complex_type> physical_pullback_spectrum;
 };
 
 } // namespace fourier

@@ -9,6 +9,8 @@
 #include <common/gpu_file_operations.h>
 
 #include <deflation/symmetry_solution_storage.h>
+#include <symmetry/finite_action_registry.h>
+#include <symmetry/finite_quotient_adapter.h>
 #include <symmetry/fourier/real_packed_fourier_slice_1d_adapter.h>
 
 #include <continuation/projected_system_operator_continuation.h>
@@ -104,7 +106,9 @@ int main(int argc, char const* argv[])
     using prec_t = nonlinear_operators::projected_preconditioner_KS_1D<vec_ops_real, ks1d_t, lin_op_t>;
     using parameters_t = main_classes::parameters<real>;
     using symmetry_adapter_t = symmetry::fourier::real_packed_fourier_slice_1d_adapter<vec_ops_real>;
-    using sol_storage_t = deflation::symmetry_solution_storage<vec_ops_real, symmetry_adapter_t, log_t>;
+    using finite_actions_t = symmetry::finite_action_registry<vec_ops_real>;
+    using quotient_adapter_t = symmetry::finite_quotient_adapter<vec_ops_real, symmetry_adapter_t>;
+    using sol_storage_t = deflation::symmetry_solution_storage<vec_ops_real, quotient_adapter_t, log_t>;
 
     std::string path_to_config_file = "json_project_files/KS1D_sym_test.json";
     std::string device_selector = "auto";
@@ -223,12 +227,16 @@ int main(int argc, char const* argv[])
     files_ops_t file_ops(&vec_ops_R);
     ks1d_t KS1D(a_val, b_val, physical_size, &vec_ops_R);
     symmetry_adapter_t symmetry_adapter(&vec_ops_R, positive_modes);
+    KS1D.configure_continuation_symmetry_adapter(symmetry_adapter);
+    finite_actions_t finite_actions(&vec_ops_R);
+    KS1D.configure_finite_symmetry_actions(finite_actions);
+    quotient_adapter_t quotient_adapter(&vec_ops_R, &symmetry_adapter, &finite_actions);
 
     log_t log;
     log_t log_linsolver;
     log.set_verbosity(quiet ? 0 : 1);
     log_linsolver.set_verbosity(quiet ? 0 : 1);
-    sol_storage_t sol_storage_with_log(&vec_ops_R, 50, vec_ops_R.get_l2_size(), real(2), &symmetry_adapter, 1e-10, &log);
+    sol_storage_t sol_storage_with_log(&vec_ops_R, 50, vec_ops_R.get_l2_size(), real(2), &quotient_adapter, 1e-10, &log);
 
     using deflation_continuation_t = main_classes::deflation_continuation<
         vec_ops_real,

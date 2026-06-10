@@ -172,6 +172,43 @@ void test_residual_group_representatives_collapse()
     free_bundle(vec_ops, v);
 }
 
+void test_negative_reflection_representatives_collapse_when_enabled()
+{
+    vec_ops_t vec_ops(8);
+    adapter_t adapter(&vec_ops, 4);
+    adapter.enable_negative_reflection_symmetry();
+    vector_bundle v;
+    init_bundle(vec_ops, v);
+
+    set_vector(vec_ops, v.x, {1.0, 0.3, -0.2, 0.5, 0.05, -0.1, 0.03, 0.02});
+    adapter.apply_negative_reflection(v.x, v.y);
+    adapter.apply_shift(v.y, v.w, 0.41);
+    adapter.stabilize_canonical(v.x, v.z);
+    adapter.stabilize_canonical(v.w, v.y);
+
+    require_vector_close(vec_ops, "canonical negative-reflection shifted copy", v.z, v.y, 2e-12);
+
+    free_bundle(vec_ops, v);
+}
+
+void test_relative_active_mode_threshold_skips_tiny_low_mode()
+{
+    vec_ops_t vec_ops(6);
+    adapter_t adapter(&vec_ops, 3);
+    vector_bundle v;
+    init_bundle(vec_ops, v);
+
+    adapter.set_relative_active_mode_tolerance(1e-4);
+    set_vector(vec_ops, v.x, {1.0e-6, 0.0, 1.0, 0.25, 0.1, 0.05});
+    adapter.stabilize_canonical(v.x, v.z);
+    require_true("relative threshold selects mode 2", adapter.last_slice_data().mode == 2);
+    const auto canonical = get_vector(vec_ops, v.z);
+    require_true("mode 2 real positive after relative threshold", canonical[2] > 0.0);
+    require_close("mode 2 imag after relative threshold", canonical[3], 0.0, 1e-12);
+
+    free_bundle(vec_ops, v);
+}
+
 } // namespace
 
 int main()
@@ -179,6 +216,8 @@ int main()
     test_shifted_copies_have_one_canonical_representative();
     test_canonical_ignores_chart_history();
     test_residual_group_representatives_collapse();
+    test_negative_reflection_representatives_collapse_when_enabled();
+    test_relative_active_mode_threshold_skips_tiny_low_mode();
 
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;
     if(failures != 0)

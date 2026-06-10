@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string>
 
+#include <continuation/chart_helpers.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
 
 namespace continuation
@@ -75,13 +76,13 @@ public:
     {
         set_tangent_space(x_0_, lambda_0_, x_0_s_, lambda_0_s_, ds_l_, continuation_type_);
         nonlin_op_for_chart = nonlin_op_;
-        nonlinear_operators::detail::stabilize_for_arclength(vec_ops, nonlin_op_for_chart, x_0_, x_0_, x_0_chart);
+        chart::stabilize_for_arclength(vec_ops, nonlin_op_for_chart, x_0_, x_0_, x_0_chart);
         vec_ops->assign_mul(T(1), x_0_chart, T(-1), x_0_, chart_delta);
         const T chart_base_displacement = vec_ops->norm_l2(chart_delta);
         log->info_f(
             "continuation::projected_system_operator: arclength chart base displacement = %le",
             (double)chart_base_displacement);
-        nonlinear_operators::detail::log_projection_diagnostics(log, nonlin_op_for_chart, "continuation::projected_system_operator::set_tangent_space");
+        chart::log_continuation_chart(log, nonlin_op_for_chart, "continuation::projected_system_operator::set_tangent_space");
     }
 
     T arclength_residual(const T_vec& x_1, const T& lambda_1)
@@ -169,7 +170,7 @@ private:
     {
         if(nonlin_op_for_chart != nullptr)
         {
-            nonlinear_operators::detail::stabilize_for_arclength(vec_ops, nonlin_op_for_chart, x_0_chart, x_1, x_1_chart);
+            chart::stabilize_for_arclength(vec_ops, nonlin_op_for_chart, x_0_chart, x_1, x_1_chart);
         }
         else
         {
@@ -187,7 +188,7 @@ private:
             (double)chart_displacement);
         if(nonlin_op_for_chart != nullptr)
         {
-            nonlinear_operators::detail::log_projection_diagnostics(log, nonlin_op_for_chart, "continuation::projected_system_operator::arclength");
+            chart::log_continuation_chart(log, nonlin_op_for_chart, "continuation::projected_system_operator::arclength");
         }
         return residual;
     }

@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <cmath>
 #include <common/scalar_math.h>
+#include <continuation/chart_helpers.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
 /**
   continuation of a single solution forward or backward on a single step
@@ -58,14 +59,31 @@ public:
         T lambda_p;
         log->info("continuation::advance_solution::starting point:");
         log->info_f("   ||x0|| = %le, lambda0 = %le, ||x0_s|| = %le, lambda0_s = %le", (double)vec_ops->norm(x0), (double)lambda0, (double)vec_ops->norm(x0_s), (double)lambda0_s);
+        chart::begin_continuation_chart(vec_ops, log, nonlin_op, x0, lambda0, x0_s, lambda0_s);
+        chart::log_continuation_chart(log, nonlin_op, "continuation::advance_solution::begin_chart");
         predictor->reset_tangent_space(x0, lambda0, x0_s, lambda0_s);
         while((!converged)&&(!failed))
         {
             predictor->apply(x_p, lambda_p, x1, lambda1);
+            chart::stabilize_predictor_for_continuation(
+                vec_ops,
+                log,
+                nonlin_op,
+                x0,
+                lambda0,
+                x0_s,
+                lambda0_s,
+                x_p,
+                lambda_p,
+                x1,
+                lambda1);
             T ds_l = predictor->get_ds();
             T ds_max = predictor->get_ds_max();
             T tangent_norm = vec_ops->norm_rank1(x0_s, lambda0_s);
-            log->info_f("continuation::predict: dS = %le, max dS = %le, tangent norm = %le, ||x_p|| = %le, lambda_p = %le, ||x1|| = %le, lambda1 = %le", (double)ds_l, (double)ds_max, (double)tangent_norm, (double)vec_ops->norm(x_p), (double)lambda_p, (double)vec_ops->norm(x1), (double)lambda1);
+            vec_ops->assign_mul(T(1), x1, T(-1), x_p, dx10);
+            const T predictor_chart_displacement = vec_ops->norm_l2(dx10);
+            log->info_f("continuation::predict: dS = %le, max dS = %le, tangent norm = %le, ||x_p|| = %le, lambda_p = %le, ||x1|| = %le, lambda1 = %le, ||x1 - x_p|| = %le", (double)ds_l, (double)ds_max, (double)tangent_norm, (double)vec_ops->norm(x_p), (double)lambda_p, (double)vec_ops->norm(x1), (double)lambda1, (double)predictor_chart_displacement);
+            chart::log_continuation_chart(log, nonlin_op, "continuation::advance_solution::predictor");
             if(continuation_type == 'S')
             {
                 sys_op->set_tangent_space((T_vec&)x0, (T&)lambda0, (T_vec&)x0_s, (T&)lambda0_s, ds_l, continuation_type, nonlin_op);

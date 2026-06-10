@@ -54,6 +54,25 @@ jobs:
           make scfd_vector_operations_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cpu_float" REAL_TYPE=float
           ./"$BUILD_DIR"/scfd_cpu_float/test_scfd_vector_operations_cpu.bin
 
+  continuation-core-cpu:
+    needs: [scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3
+          fi
+      - name: Build and test continuation chart helpers
+        run: |
+          make test_continuation_chart_helpers.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/continuation_chart_helpers"
+          ./"$BUILD_DIR"/continuation_chart_helpers/test_continuation_chart_helpers.bin
+
   symmetry-foundation-cpu:
     needs: [scfd-vector-operations-cpu]
     runs-on: ubuntu-latest
@@ -244,7 +263,7 @@ jobs:
           ./"$BUILD_DIR"/fft_facade_cufft/test_fft_facade_cufft.bin auto
 
   ks1d-sym-cpu-omp:
-    needs: [scfd-vector-operations-cpu, fftw-operations-cpu]
+    needs: [scfd-vector-operations-cpu, continuation-core-cpu, fftw-operations-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

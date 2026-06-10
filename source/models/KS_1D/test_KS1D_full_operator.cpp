@@ -11,12 +11,14 @@
 #endif
 
 #include <continuation/projected_system_operator_continuation.h>
+#include <continuation/chart_helpers.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/projected_linear_operator_KS_1D.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/projected_preconditioner_KS_1D.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
+#include <symmetry/finite_action_registry.h>
 #include <symmetry/fourier/real_packed_fourier_slice_1d_adapter.h>
 
 #include "KS1D_backend_typedefs.h"
@@ -28,6 +30,7 @@ using ks1d_t = nonlinear_operators::kuramoto_sivashinskiy_1d_full<vec_ops_real, 
 using ks1d_reduced_t = nonlinear_operators::kuramoto_sivashinskiy_1d<vec_ops_real, fft_backend_t, Blocks_x_>;
 using real_vec = typename vec_ops_real::vector_type;
 using symmetry_adapter_t = symmetry::fourier::real_packed_fourier_slice_1d_adapter<vec_ops_real>;
+using finite_actions_t = symmetry::finite_action_registry<vec_ops_real>;
 using lin_op_t = nonlinear_operators::projected_linear_operator_KS_1D<vec_ops_real, ks1d_t>;
 using prec_t = nonlinear_operators::projected_preconditioner_KS_1D<vec_ops_real, ks1d_t, lin_op_t>;
 using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
@@ -419,6 +422,62 @@ void test_equivariance(vec_ops_real& vec_ops, ks1d_t& ks, symmetry_adapter_t& sy
     vec_ops.free_vectors(u, du, u_shift, du_shift, f, f_shift, shifted_f, jdu, jdu_shift, shifted_jdu);
 }
 
+void test_finite_action_equivariance(vec_ops_real& vec_ops, ks1d_t& ks)
+{
+    finite_actions_t finite_actions(&vec_ops);
+    ks.configure_finite_symmetry_actions(finite_actions);
+    const int action_index = finite_actions.find("real_packed_negative_reflection");
+    ++checks;
+    if(action_index < 0)
+    {
+        record_failure("full KS1D registers real-packed negative reflection action");
+        return;
+    }
+
+    real_vec u;
+    real_vec du;
+    real_vec action_u;
+    real_vec action_du;
+    real_vec f;
+    real_vec action_f_expected;
+    real_vec action_f;
+    real_vec jdu;
+    real_vec action_jdu_expected;
+    real_vec action_jdu;
+    vec_ops.init_vectors(u, du, action_u, action_du, f, action_f_expected, action_f, jdu, action_jdu_expected, action_jdu);
+    vec_ops.start_use_vectors(u, du, action_u, action_du, f, action_f_expected, action_f, jdu, action_jdu_expected, action_jdu);
+
+    fill_test_vectors(vec_ops, u, du);
+    finite_actions.apply(static_cast<std::size_t>(action_index), u, action_u);
+    finite_actions.apply(static_cast<std::size_t>(action_index), du, action_du);
+
+    const real lambda = real(4.15);
+    ks.F(u, lambda, f);
+    ks.F(action_u, lambda, action_f);
+    finite_actions.apply(static_cast<std::size_t>(action_index), f, action_f_expected);
+    check_vector_close(
+        vec_ops,
+        action_f,
+        action_f_expected,
+        real(30)*tolerance<real>()*(real(1) + vec_ops.norm_l2(action_f_expected)),
+        "full KS1D finite-action F equivariance");
+
+    ks.set_linearization_point(u, lambda);
+    ks.jacobian_u(du, jdu);
+    ks.set_linearization_point(action_u, lambda);
+    ks.jacobian_u(action_du, action_jdu);
+    finite_actions.apply(static_cast<std::size_t>(action_index), jdu, action_jdu_expected);
+    check_vector_close(
+        vec_ops,
+        action_jdu,
+        action_jdu_expected,
+        real(30)*tolerance<real>()*(real(1) + vec_ops.norm_l2(action_jdu_expected)),
+        "full KS1D finite-action J equivariance");
+
+    vec_ops.stop_use_vectors(u, du, action_u, action_du, f, action_f_expected, action_f, jdu, action_jdu_expected, action_jdu);
+    vec_ops.free_vectors(u, du, action_u, action_du, f, action_f_expected, action_f, jdu, action_jdu_expected, action_jdu);
+}
+
 void test_project_hook(vec_ops_real& vec_ops, ks1d_t& ks, symmetry_adapter_t& symmetry)
 {
     real_vec u;
@@ -442,6 +501,161 @@ void test_project_hook(vec_ops_real& vec_ops, ks1d_t& ks, symmetry_adapter_t& sy
     vec_ops.free_vector(du_unused);
     vec_ops.stop_use_vectors(u, shifted, projected, expected);
     vec_ops.free_vectors(u, shifted, projected, expected);
+}
+
+void test_continuation_chart_bridge(vec_ops_real& vec_ops, ks1d_t& ks, symmetry_adapter_t& symmetry)
+{
+    real_vec u;
+    real_vec tangent;
+    real_vec predictor;
+    real_vec trial;
+    real_vec expected;
+    real_vec corrector_trial;
+    real_vec expected_corrector;
+    real_vec arclength_chart;
+    real_vec expected_arclength;
+    vec_ops.init_vectors(
+        u,
+        tangent,
+        predictor,
+        trial,
+        expected,
+        corrector_trial,
+        expected_corrector,
+        arclength_chart,
+        expected_arclength);
+    vec_ops.start_use_vectors(
+        u,
+        tangent,
+        predictor,
+        trial,
+        expected,
+        corrector_trial,
+        expected_corrector,
+        arclength_chart,
+        expected_arclength);
+
+    fill_test_vectors(vec_ops, u, tangent);
+    ks.project(u);
+    symmetry.apply_shift(u, predictor, real(0.41));
+
+    log_t log;
+    log.set_verbosity(0);
+    const real lambda0 = real(5.9);
+    const real lambda0_s = real(0.2);
+    const real lambda_predictor = real(6.1);
+    real lambda_trial = real(0);
+
+    continuation::chart::begin_continuation_chart(&vec_ops, &log, &ks, u, lambda0, tangent, lambda0_s);
+    continuation::chart::stabilize_predictor_for_continuation(
+        &vec_ops,
+        &log,
+        &ks,
+        u,
+        lambda0,
+        tangent,
+        lambda0_s,
+        predictor,
+        lambda_predictor,
+        trial,
+        lambda_trial);
+    symmetry.stabilize_closest_to_reference(u, predictor, expected);
+    check_vector_close(vec_ops, trial, expected, tolerance<real>(), "full KS continuation predictor chart bridge");
+    check_close(lambda_trial, lambda_predictor, real(0), "full KS continuation predictor preserves lambda");
+
+    symmetry.apply_shift(u, corrector_trial, real(-0.29));
+    vec_ops.assign(corrector_trial, expected_corrector);
+    ks.project_relative_to(u, expected_corrector);
+    real lambda_corrector = lambda0;
+    continuation::chart::stabilize_corrector_trial(&vec_ops, &log, &ks, u, lambda0, corrector_trial, lambda_corrector);
+    check_vector_close(
+        vec_ops,
+        corrector_trial,
+        expected_corrector,
+        tolerance<real>(),
+        "full KS continuation corrector chart bridge");
+    check_close(lambda_corrector, lambda0, real(0), "full KS continuation corrector preserves lambda");
+
+    continuation::chart::stabilize_for_arclength(&vec_ops, &ks, u, predictor, arclength_chart);
+    symmetry.stabilize_closest_to_reference(u, predictor, expected_arclength);
+    check_vector_close(
+        vec_ops,
+        arclength_chart,
+        expected_arclength,
+        tolerance<real>(),
+        "full KS continuation arclength chart bridge");
+
+    vec_ops.stop_use_vectors(
+        u,
+        tangent,
+        predictor,
+        trial,
+        expected,
+        corrector_trial,
+        expected_corrector,
+        arclength_chart,
+        expected_arclength);
+    vec_ops.free_vectors(
+        u,
+        tangent,
+        predictor,
+        trial,
+        expected,
+        corrector_trial,
+        expected_corrector,
+        arclength_chart,
+        expected_arclength);
+}
+
+void test_reduced_continuation_chart_fallback(vec_ops_real& vec_ops, ks1d_reduced_t& ks)
+{
+    real_vec u;
+    real_vec tangent;
+    real_vec predictor;
+    real_vec trial;
+    real_vec arclength_chart;
+    vec_ops.init_vectors(u, tangent, predictor, trial, arclength_chart);
+    vec_ops.start_use_vectors(u, tangent, predictor, trial, arclength_chart);
+
+    fill_reduced_low_mode_vectors(vec_ops, u, tangent);
+    std::vector<real> predictor_host(vec_ops.get_default_size(), real(0));
+    for(std::size_t i = 0; i < predictor_host.size(); ++i)
+    {
+        predictor_host[i] = real(0.1)*static_cast<real>(i + 1);
+    }
+    vec_ops.set(predictor_host.data(), predictor, predictor_host.size());
+
+    log_t log;
+    log.set_verbosity(0);
+    const real lambda0 = real(5.9);
+    const real lambda0_s = real(0.2);
+    const real lambda_predictor = real(6.1);
+    real lambda_trial = real(0);
+
+    continuation::chart::begin_continuation_chart(&vec_ops, &log, &ks, u, lambda0, tangent, lambda0_s);
+    continuation::chart::stabilize_predictor_for_continuation(
+        &vec_ops,
+        &log,
+        &ks,
+        u,
+        lambda0,
+        tangent,
+        lambda0_s,
+        predictor,
+        lambda_predictor,
+        trial,
+        lambda_trial);
+    check_vector_close(vec_ops, trial, predictor, tolerance<real>(), "reduced KS continuation predictor fallback");
+    check_close(lambda_trial, lambda_predictor, real(0), "reduced KS continuation predictor fallback lambda");
+
+    continuation::chart::stabilize_corrector_trial(&vec_ops, &log, &ks, u, lambda0, trial, lambda_trial);
+    check_vector_close(vec_ops, trial, predictor, tolerance<real>(), "reduced KS continuation corrector fallback");
+
+    continuation::chart::stabilize_for_arclength(&vec_ops, &ks, u, predictor, arclength_chart);
+    check_vector_close(vec_ops, arclength_chart, predictor, tolerance<real>(), "reduced KS continuation arclength fallback");
+
+    vec_ops.stop_use_vectors(u, tangent, predictor, trial, arclength_chart);
+    vec_ops.free_vectors(u, tangent, predictor, trial, arclength_chart);
 }
 
 void test_projected_operator_hooks(vec_ops_real& vec_ops, ks1d_t& ks, symmetry_adapter_t& symmetry)
@@ -723,7 +937,10 @@ int main(int argc, char** argv)
     test_jacobian_alpha(vec_ops, ks);
     test_preconditioner_at_zero(vec_ops, ks);
     test_equivariance(vec_ops, ks, symmetry);
+    test_finite_action_equivariance(vec_ops, ks);
     test_project_hook(vec_ops, ks, symmetry);
+    test_continuation_chart_bridge(vec_ops, ks, symmetry);
+    test_reduced_continuation_chart_fallback(reduced_vec_ops, reduced_ks);
     test_projected_operator_hooks(vec_ops, ks, symmetry);
     test_projected_bordered_continuation_correction(vec_ops, ks);
 
