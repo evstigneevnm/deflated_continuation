@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -70,6 +71,63 @@ int init_device_from_selector(const std::string& selector)
     (void)selector;
     return -1;
 #endif
+}
+
+template<class SymmetryAdapter>
+void configure_symmetry_stabilizer_from_json(
+    SymmetryAdapter& adapter,
+    const std::string& path_to_config_file,
+    const bool quiet)
+{
+    std::ifstream file(path_to_config_file.c_str());
+    if(!file)
+    {
+        throw std::runtime_error("failed to reopen config file for symmetry stabilizer options");
+    }
+
+    nlohmann::json root;
+    file >> root;
+    nlohmann::json config = nlohmann::json::object();
+    if(root.contains("nonlinear_operator") && root["nonlinear_operator"].contains("symmetry_stabilizer"))
+    {
+        config = root["nonlinear_operator"]["symmetry_stabilizer"];
+    }
+    if(root.contains("symmetry_stabilizer"))
+    {
+        config = root["symmetry_stabilizer"];
+    }
+
+    const std::string type = config.value("type", "single_mode");
+    if(type == "single_mode")
+    {
+        adapter.set_stabilizer_policy(symmetry::fourier::real_packed_fourier_1d_stabilizer_policy::single_mode);
+    }
+    else if(type == "lsq_multimode")
+    {
+        adapter.set_stabilizer_policy(symmetry::fourier::real_packed_fourier_1d_stabilizer_policy::lsq_multimode);
+    }
+    else
+    {
+        throw std::runtime_error("unknown symmetry_stabilizer.type '" + type + "'");
+    }
+
+    const std::size_t mode_min = config.value("mode_min", std::size_t(1));
+    const std::size_t mode_max = config.value("mode_max", std::size_t(0));
+    adapter.set_lsq_mode_range(mode_min, mode_max);
+    adapter.set_lsq_max_active_modes(config.value("max_active_modes", std::size_t(8)));
+    adapter.set_lsq_grid_points(config.value("grid_points", std::size_t(64)));
+    adapter.set_lsq_newton_iterations(config.value("newton_iterations", std::size_t(8)));
+
+    if(!quiet)
+    {
+        std::cout << "symmetry_stabilizer: type=" << type
+                  << ", mode_min=" << mode_min
+                  << ", mode_max=" << mode_max
+                  << ", max_active_modes=" << config.value("max_active_modes", std::size_t(8))
+                  << ", grid_points=" << config.value("grid_points", std::size_t(64))
+                  << ", newton_iterations=" << config.value("newton_iterations", std::size_t(8))
+                  << std::endl;
+    }
 }
 
 } // namespace
@@ -206,6 +264,7 @@ int main(int argc, char const* argv[])
     ks1d_t KS1D(a_val, b_val, physical_size, &vec_ops_R);
     symmetry_adapter_t symmetry_adapter(&vec_ops_R, positive_modes);
     KS1D.configure_continuation_symmetry_adapter(symmetry_adapter);
+    configure_symmetry_stabilizer_from_json(symmetry_adapter, path_to_config_file, quiet);
     finite_actions_t finite_actions(&vec_ops_R);
     KS1D.configure_finite_symmetry_actions(finite_actions);
     quotient_adapter_t quotient_adapter(&vec_ops_R, &symmetry_adapter, &finite_actions);

@@ -2,6 +2,14 @@
     "gpu_pci_id": -1,
     "path_to_project": "./KS1D_test_full/",
     "use_high_precision_reduction": true,
+    "symmetry_stabilizer": {
+        "type": "lsq_multimode",
+        "mode_min": 1,
+        "mode_max": 12,
+        "max_active_modes": 6,
+        "grid_points": 96,
+        "newton_iterations": 8
+    },
     "bifurcaiton_diagram_file_name": "bifurcation_diagram.dat",
     "stability_diagram_file_name": "stability_diagram.dat",
     "deflation_continuation": {

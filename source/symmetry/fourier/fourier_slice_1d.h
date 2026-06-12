@@ -35,10 +35,12 @@ public:
         real_type selected_abs = real_type( 0 );
         real_type selected_real_on_slice = real_type( 0 );
         real_type slice_matrix = real_type( 0 );
+        real_type lsq_objective = real_type( 0 );
+        std::vector<std::size_t> active_modes;
 
         std::size_t residual_group_order() const
         {
-            return this->active() ? mode : std::size_t( 1 );
+            return this->active() ? this->residual_group_order_value : std::size_t( 1 );
         }
     };
 

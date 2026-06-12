@@ -278,6 +278,93 @@ void test_continuation_residual_copy_uses_tangent_direction()
     free_bundle(vec_ops, v);
 }
 
+void set_group_tangent_from_state(vec_ops_t& vec_ops, const vector_t& state, vector_t& tangent)
+{
+    const auto source = get_vector(vec_ops, state);
+    std::vector<real> values(source.size(), real(0));
+    for(std::size_t mode = 1; 2*(mode - 1) + 1 < source.size(); ++mode)
+    {
+        const std::size_t offset = 2*(mode - 1);
+        const real re = source[offset];
+        const real im = source[offset + 1];
+        values[offset] = -static_cast<real>(mode)*im;
+        values[offset + 1] = static_cast<real>(mode)*re;
+    }
+    vec_ops.set(values.data(), tangent, values.size());
+}
+
+void test_lsq_continuation_collapses_high_mode_shift_with_c3_residual()
+{
+    vec_ops_t vec_ops(18);
+    adapter_t adapter(&vec_ops, 9);
+    adapter.set_stabilizer_policy(symmetry::fourier::real_packed_fourier_1d_stabilizer_policy::lsq_multimode);
+    adapter.set_lsq_mode_range(1, 9);
+    adapter.set_lsq_max_active_modes(6);
+    adapter.set_lsq_grid_points(96);
+    vector_bundle v;
+    init_bundle(vec_ops, v);
+
+    set_vector(
+        vec_ops,
+        v.x,
+        {
+            0.0, 0.0,
+            0.0, 0.0,
+            2.0, 0.3,
+            0.0, 0.0,
+            0.0, 0.0,
+            -0.4, 0.1,
+            0.0, 0.0,
+            0.0, 0.0,
+            0.05, -0.02
+        });
+    adapter.apply_shift(v.x, v.y, 0.41);
+    set_vector(vec_ops, v.z, std::vector<real>(18, real(0)));
+    adapter.stabilize_continuation_chart(v.x, v.z, v.y, v.w);
+
+    require_vector_close(vec_ops, "LSQ C3 shifted copy", v.w, v.x, 1e-10);
+    require_true("LSQ C3 active", adapter.last_slice_data().active());
+    require_true("LSQ C3 residual group", adapter.last_slice_data().residual_group_order() == 3);
+    require_true("LSQ C3 uses multiple modes", adapter.last_slice_data().active_modes.size() >= 3);
+
+    set_group_tangent_from_state(vec_ops, v.y, v.z);
+    adapter.stabilizer_differential_from_last(v.z, v.w);
+    require_close("LSQ C3 group tangent projected out", vec_ops.norm_l2(v.w), 0.0, 1e-10);
+
+    free_bundle(vec_ops, v);
+}
+
+void test_lsq_continuation_primitive_modes_remove_residual_group()
+{
+    vec_ops_t vec_ops(8);
+    adapter_t adapter(&vec_ops, 4);
+    adapter.set_stabilizer_policy(symmetry::fourier::real_packed_fourier_1d_stabilizer_policy::lsq_multimode);
+    adapter.set_lsq_mode_range(1, 4);
+    adapter.set_lsq_max_active_modes(4);
+    adapter.set_lsq_grid_points(96);
+    vector_bundle v;
+    init_bundle(vec_ops, v);
+
+    set_vector(
+        vec_ops,
+        v.x,
+        {
+            0.0, 0.0,
+            0.0, 0.0,
+            1.0, 0.25,
+            -0.7, 0.15
+        });
+    adapter.apply_shift(v.x, v.y, -0.27);
+    set_vector(vec_ops, v.z, std::vector<real>(8, real(0)));
+    adapter.stabilize_continuation_chart(v.x, v.z, v.y, v.w);
+
+    require_vector_close(vec_ops, "LSQ primitive shifted copy", v.w, v.x, 1e-10);
+    require_true("LSQ primitive residual group is trivial", adapter.last_slice_data().residual_group_order() == 1);
+    require_true("LSQ primitive has modes 3 and 4", adapter.last_slice_data().active_modes.size() == 2);
+
+    free_bundle(vec_ops, v);
+}
+
 } // namespace
 
 int main()
@@ -290,6 +377,8 @@ int main()
     test_continuation_hysteresis_switches_before_mode_vanishes();
     test_continuation_hysteresis_keeps_usable_current_mode();
     test_continuation_residual_copy_uses_tangent_direction();
+    test_lsq_continuation_collapses_high_mode_shift_with_c3_residual();
+    test_lsq_continuation_primitive_modes_remove_residual_group();
 
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;
     if(failures != 0)
