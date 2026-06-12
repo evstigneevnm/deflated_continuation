@@ -102,6 +102,7 @@ struct hook_operator
     int predictor_calls = 0;
     int corrector_calls = 0;
     int arclength_calls = 0;
+    int arclength_tangent_calls = 0;
     int log_calls = 0;
 
     void begin_continuation_chart(
@@ -150,6 +151,17 @@ struct hook_operator
     {
         ++arclength_calls;
         destination = source;
+        destination[0] += reference[0];
+        destination[1] += reference[1];
+    }
+
+    void stabilize_tangent_for_arclength(
+        const std::vector<double>& reference,
+        const std::vector<double>& tangent,
+        std::vector<double>& destination)
+    {
+        ++arclength_tangent_calls;
+        destination = tangent;
         destination[0] += reference[0];
         destination[1] += reference[1];
     }
@@ -233,6 +245,10 @@ void test_plain_fallback()
     continuation::chart::stabilize_for_arclength(&ops, &op, x0, predictor, charted);
     require_vector(charted, predictor, "plain arclength fallback copies vector");
 
+    std::vector<double> charted_tangent;
+    continuation::chart::stabilize_tangent_for_arclength(&ops, &op, x0, x0_s, charted_tangent);
+    require_vector(charted_tangent, x0_s, "plain arclength tangent fallback copies vector");
+
     continuation::chart::log_continuation_chart(&log, &op, "plain");
     require_true(log.contexts.empty(), "plain log fallback is no-op");
 }
@@ -282,6 +298,11 @@ void test_new_hooks_take_priority()
     require_true(op.arclength_calls == 1, "arclength hook called");
     require_vector(charted, {4.0, 6.0}, "arclength hook owns charted vector");
 
+    std::vector<double> charted_tangent;
+    continuation::chart::stabilize_tangent_for_arclength(&ops, &op, x0, x0_s, charted_tangent);
+    require_true(op.arclength_tangent_calls == 1, "arclength tangent hook called");
+    require_vector(charted_tangent, {1.5, 1.75}, "arclength tangent hook owns charted vector");
+
     continuation::chart::log_continuation_chart(&log, &op, "hook");
     require_true(op.log_calls == 1, "chart log hook called");
     require_true(log.contexts.size() == 1 && log.contexts[0] == "hook", "chart log hook receives context");
@@ -325,6 +346,10 @@ void test_legacy_projection_compatibility()
     continuation::chart::stabilize_for_arclength(&ops, &op, x0, predictor, charted);
     require_true(op.arclength_calls == 1, "legacy arclength hook called");
     require_vector(charted, {-2.0, -2.0}, "legacy arclength hook result");
+
+    std::vector<double> charted_tangent;
+    continuation::chart::stabilize_tangent_for_arclength(&ops, &op, x0, x0_s, charted_tangent);
+    require_vector(charted_tangent, x0_s, "legacy arclength tangent fallback copies vector");
 
     continuation::chart::log_continuation_chart(&log, &op, "legacy");
     require_true(op.log_calls == 1, "legacy projection diagnostics used for chart log fallback");

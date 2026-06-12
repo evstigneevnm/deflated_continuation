@@ -29,6 +29,7 @@ public:
     {
         vec_ops->init_vector(dx); vec_ops->start_use_vector(dx);
         vec_ops->init_vector(x_0_chart); vec_ops->start_use_vector(x_0_chart);
+        vec_ops->init_vector(x_0_s_chart); vec_ops->start_use_vector(x_0_s_chart);
         vec_ops->init_vector(x_1_chart); vec_ops->start_use_vector(x_1_chart);
         vec_ops->init_vector(chart_delta); vec_ops->start_use_vector(chart_delta);
         vec_ops->init_vector(f); vec_ops->start_use_vector(f);
@@ -39,6 +40,7 @@ public:
     {
         vec_ops->stop_use_vector(dx); vec_ops->free_vector(dx);
         vec_ops->stop_use_vector(x_0_chart); vec_ops->free_vector(x_0_chart);
+        vec_ops->stop_use_vector(x_0_s_chart); vec_ops->free_vector(x_0_s_chart);
         vec_ops->stop_use_vector(x_1_chart); vec_ops->free_vector(x_1_chart);
         vec_ops->stop_use_vector(chart_delta); vec_ops->free_vector(chart_delta);
         vec_ops->stop_use_vector(f); vec_ops->free_vector(f);
@@ -52,6 +54,7 @@ public:
         x_0_s = x_0_s_;
         lambda_0_s = lambda_0_s_;
         vec_ops->assign(x_0_, x_0_chart);
+        vec_ops->assign(x_0_s_, x_0_s_chart);
         nonlin_op_for_chart = nullptr;
         tangent_set = true;
 
@@ -77,6 +80,7 @@ public:
         set_tangent_space(x_0_, lambda_0_, x_0_s_, lambda_0_s_, ds_l_, continuation_type_);
         nonlin_op_for_chart = nonlin_op_;
         chart::stabilize_for_arclength(vec_ops, nonlin_op_for_chart, x_0_, x_0_, x_0_chart);
+        chart::stabilize_tangent_for_arclength(vec_ops, nonlin_op_for_chart, x_0_chart, x_0_s_, x_0_s_chart);
         vec_ops->assign_mul(T(1), x_0_chart, T(-1), x_0_, chart_delta);
         const T chart_base_displacement = vec_ops->norm_l2(chart_delta);
         log->info_f(
@@ -116,9 +120,9 @@ public:
         T tolerance_local = T(1.0e-5)*vec_ops->get_l2_size();
         SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(tolerance_local);
         SM_solver->get_linsolver_handle()->monitor().set_temp_max_iterations(1000);
-        const bool flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, x_1_s, lambda_1_s);
+        const bool flag_lin_solver = SM_solver->solve((*lin_op), x_0_s_chart, Jlambda, alpha, f, beta, x_1_s, lambda_1_s);
         nonlinear_operators::detail::project_current_tangent(vec_ops, nonlin_op, x_1_s, x_1_s);
-        lambda_1_s = (beta - vec_ops->scalar_prod(x_0_s, x_1_s))/alpha;
+        lambda_1_s = (beta - vec_ops->scalar_prod(x_0_s_chart, x_1_s))/alpha;
 
         T minimum_resid = SM_solver->get_linsolver_handle()->monitor().resid_norm_out();
         int iters_performed = SM_solver->get_linsolver_handle()->monitor().iters_performed();
@@ -157,10 +161,10 @@ public:
 
         vec_ops->assign_scalar(T(0), d_x);
         d_lambda = T(0);
-        const bool flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, d_x, d_lambda);
+        const bool flag_lin_solver = SM_solver->solve((*lin_op), x_0_s_chart, Jlambda, alpha, f, beta, d_x, d_lambda);
         nonlinear_operators::detail::project_current_tangent(vec_ops, nonlin_op, d_x, d_x);
-        d_lambda = (beta - vec_ops->scalar_prod(x_0_s, d_x))/alpha;
-        const T projected_arclength_residual = vec_ops->scalar_prod(x_0_s, d_x) + alpha*d_lambda - beta;
+        d_lambda = (beta - vec_ops->scalar_prod(x_0_s_chart, d_x))/alpha;
+        const T projected_arclength_residual = vec_ops->scalar_prod(x_0_s_chart, d_x) + alpha*d_lambda - beta;
         log->info_f("continuation::projected_system_operator: projected correction arclength linear residual = %le", (double)projected_arclength_residual);
         return flag_lin_solver;
     }
@@ -179,7 +183,7 @@ private:
         vec_ops->assign_mul(T(1), x_1_chart, T(-1), x_1, chart_delta);
         const T chart_displacement = vec_ops->norm_l2(chart_delta);
         vec_ops->assign_mul(T(1), x_1_chart, T(-1), x_0_chart, dx);
-        T x_proj = vec_ops->scalar_prod(dx, x_0_s);
+        T x_proj = vec_ops->scalar_prod(dx, x_0_s_chart);
         T lambda_proj = (lambda_1 - lambda_0)*lambda_0_s;
         const T residual = x_proj + lambda_proj - ds_l;
         log->info_f(
@@ -203,7 +207,7 @@ private:
     bool tangent_set = false;
     T_vec x_0, x_0_s;
     T lambda_0, lambda_0_s;
-    T_vec dx, x_0_chart, x_1_chart, chart_delta, f, Jlambda;
+    T_vec dx, x_0_chart, x_0_s_chart, x_1_chart, chart_delta, f, Jlambda;
     T ds_l;
 };
 

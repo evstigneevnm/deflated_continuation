@@ -1,6 +1,7 @@
 #ifndef __CONTINUATION_ANALYTICAL_HPP__
 #define __CONTINUATION_ANALYTICAL_HPP__
 
+#include <functional>
 #include <sstream>
 #include <string>
 
@@ -33,7 +34,9 @@ private:
     typedef typename parent_t::T_vec T_vec;
 
 //  local variables
-    T ds_0;
+    T ds_0 = T(0);
+    T ds_max = T(0);
+    std::function<bool(const T&, T_vec&)> exact_solution_provider;
 
 
 public:
@@ -54,6 +57,17 @@ public:
         parent_t::initial_direciton = initial_direciton_;
         parent_t::predict->set_steps(ds_0_, ds_max_, step_ds_m_, step_ds_p_, attempts_0_);
         ds_0 = ds_0_;
+        ds_max = ds_max_;
+    }
+
+    void set_exact_solution_provider(std::function<bool(const T&, T_vec&)> provider)
+    {
+        exact_solution_provider = std::move(provider);
+    }
+
+    void clear_exact_solution_provider()
+    {
+        exact_solution_provider = {};
     }
 
     bool continuate_curve(Curve*& curve_, const T_vec& x0_, const T& lambda0_)
@@ -63,6 +77,8 @@ public:
         parent_t::direction = parent_t::initial_direciton;
         parent_t::fail_flag = false;
         parent_t::hard_failure = false;
+        parent_t::incomplete_curve = false;
+        parent_t::pending_endpoint_reason = container::curve_endpoint_reason::none;
         parent_t::just_interpolated = false;
         parent_t::continue_next_step = true;
         
@@ -112,7 +128,12 @@ private:
             if( (effective_lambda - parent_t::lambda1)*(effective_lambda - parent_t::lambda0)<=T(0.0) )
             {
                 parent_t::lambda1 = effective_lambda;
-                parent_t::nonlin_op->exact_solution(parent_t::lambda1, parent_t::x1);
+                if(!evaluate_exact_solution(parent_t::lambda1, parent_t::x1))
+                {
+                    parent_t::continue_next_step = false;
+                    parent_t::break_semicurve++;
+                    return res;
+                }
                 parent_t::just_interpolated = true;
                 res = true;
             }
@@ -137,18 +158,42 @@ private:
         if( (parent_t::lambda_min - parent_t::lambda1)*(parent_t::lambda_min - parent_t::lambda0)<=T(0.0) )
         {
             parent_t::lambda1 = parent_t::lambda_min;
-            parent_t::nonlin_op->exact_solution(parent_t::lambda1, parent_t::x1);
+            if(!evaluate_exact_solution(parent_t::lambda1, parent_t::x1))
+            {
+                parent_t::break_semicurve++;
+                parent_t::continue_next_step = false;
+                return;
+            }
+            parent_t::set_pending_endpoint_reason(container::curve_endpoint_reason::boundary_min);
             intersect_min = true;
         }
         if( (parent_t::lambda_max - parent_t::lambda1)*(parent_t::lambda_max - parent_t::lambda0)<=T(0.0) )
         {
             parent_t::lambda1 = parent_t::lambda_max;
-            parent_t::nonlin_op->exact_solution(parent_t::lambda1, parent_t::x1);
+            if(!evaluate_exact_solution(parent_t::lambda1, parent_t::x1))
+            {
+                parent_t::break_semicurve++;
+                parent_t::continue_next_step = false;
+                return;
+            }
+            parent_t::set_pending_endpoint_reason(container::curve_endpoint_reason::boundary_max);
             intersect_max = true;
         }
 
         if( intersect_min || intersect_max )
         {
+            if(intersect_min)
+            {
+                parent_t::log->warning_f(
+                    "continuation_analytical::check_interval: reached lambda_min = %le; stopping semicurve at parameter boundary.",
+                    double(parent_t::lambda_min));
+            }
+            if(intersect_max)
+            {
+                parent_t::log->warning_f(
+                    "continuation_analytical::check_interval: reached lambda_max = %le; stopping semicurve at parameter boundary.",
+                    double(parent_t::lambda_max));
+            }
             parent_t::break_semicurve++;
             parent_t::fail_flag = false;
             parent_t::continue_next_step = false;
@@ -162,11 +207,27 @@ private:
         unsigned int s;
         for(s=0;s<parent_t::max_S;s++)
         {
-            T norm_vector = parent_t::vec_ops->norm(parent_t::x0);
-            T d_lambda = ds_0/norm_vector*10.0*parent_t::lambda0;     //must put finite difference tangent Jacobian instead!
+            parent_t::pending_endpoint_reason = container::curve_endpoint_reason::none;
+            T d_lambda = ds_max;
+            if(d_lambda <= T(0) || !common::scalar_math::isfinite(d_lambda))
+            {
+                d_lambda = ds_0;
+            }
+            if(d_lambda <= T(0) || !common::scalar_math::isfinite(d_lambda))
+            {
+                d_lambda = T(1);
+            }
 
             parent_t::lambda1 = parent_t::lambda0 + parent_t::direction*d_lambda;
-            parent_t::nonlin_op->exact_solution(parent_t::lambda1, parent_t::x1);
+            if(!evaluate_exact_solution(parent_t::lambda1, parent_t::x1))
+            {
+                parent_t::log->warning_f(
+                    "continuation_analytical::start_semicurve: analytical branch is not defined at lambda = %le; stopping semicurve.",
+                    double(parent_t::lambda1));
+                parent_t::continue_next_step = false;
+                parent_t::break_semicurve++;
+                break;
+            }
             // continuation_step->solve(nonlin_op, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
             // (x0, lambda0)->(x1, lambda1)
             bool did_knot_interpolation = false;
@@ -174,7 +235,10 @@ private:
             {
                 check_interval();
                 //check_returning();
-                did_knot_interpolation = interpolate_all_knots();
+                if(parent_t::continue_next_step)
+                {
+                    did_knot_interpolation = interpolate_all_knots();
+                }
                 //if fail flag after the interpolation, restore (x1, lambda1)?!
             }
             else
@@ -182,7 +246,8 @@ private:
                 parent_t::just_interpolated = false;
             }
             //if try blocks passes, THIS is executed:
-            parent_t::add_solution_to_curve(parent_t::lambda1, parent_t::x1, did_knot_interpolation);
+            parent_t::add_solution_to_curve(parent_t::lambda1, parent_t::x1, did_knot_interpolation, parent_t::pending_endpoint_reason);
+            parent_t::pending_endpoint_reason = container::curve_endpoint_reason::none;
                     
             parent_t::vec_ops->assign(parent_t::x1, parent_t::x0);
             //parent_t::vec_ops->assign(parent_t::x1_s, parent_t::x0_s);
@@ -192,14 +257,26 @@ private:
             { 
                 break;
             }
-            if(s==parent_t::max_S)
-            {
-                parent_t::continue_next_step = false;
-                parent_t::break_semicurve++;
-            }
-
         }       
+        if(parent_t::continue_next_step)
+        {
+            parent_t::log->warning_f(
+                "continuation_analytical::start_semicurve: reached maximum analytical sampling steps = %i.",
+                parent_t::max_S);
+            parent_t::continue_next_step = false;
+            parent_t::break_semicurve++;
+        }
 
+    }
+
+    bool evaluate_exact_solution(const T& lambda, T_vec& x)
+    {
+        if(exact_solution_provider)
+        {
+            return exact_solution_provider(lambda, x);
+        }
+        parent_t::nonlin_op->exact_solution(lambda, x);
+        return true;
     }
 
 

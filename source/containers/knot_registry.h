@@ -98,7 +98,8 @@ public:
                             {"added", item.status.added},
                             {"failed", item.status.failed},
                             {"missing_data", item.status.missing_data},
-                            {"skipped_discontinuous", item.status.skipped_discontinuous}
+                            {"skipped_discontinuous", item.status.skipped_discontinuous},
+                            {"skipped_incomplete", item.status.skipped_incomplete}
                         }
                     }
                 });
@@ -157,6 +158,7 @@ private:
             parsed.status.failed = status.value("failed", 0u);
             parsed.status.missing_data = status.value("missing_data", 0u);
             parsed.status.skipped_discontinuous = status.value("skipped_discontinuous", 0u);
+            parsed.status.skipped_incomplete = status.value("skipped_incomplete", 0u);
             entries.push_back(parsed);
         }
     }

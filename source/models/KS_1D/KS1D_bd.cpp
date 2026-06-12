@@ -1,10 +1,8 @@
 #include <cstdlib>
-#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 #include <common/gpu_file_operations.h>
 
@@ -66,26 +64,6 @@ int init_device_from_selector(const std::string& selector)
     (void)selector;
     return -1;
 #endif
-}
-
-template<class T>
-T default_zero_seed_lambda(std::vector<T> knots)
-{
-    if(knots.empty())
-    {
-        return T(0);
-    }
-    std::sort(knots.begin(), knots.end());
-    knots.erase(std::unique(knots.begin(), knots.end()), knots.end());
-    if(knots.size() >= 3)
-    {
-        return knots[1];
-    }
-    if(knots.size() == 2)
-    {
-        return (knots[0] + knots[1])/T(2);
-    }
-    return knots.front();
 }
 
 } // namespace
@@ -241,15 +219,6 @@ int main(int argc, char const* argv[])
 
     DC.set_parameters();
 
-    if(!seed_zero && parameters.deflation_continuation.deflation_attempts == 0)
-    {
-        seed_zero = true;
-        continue_seed_only = true;
-        seed_lambda = default_zero_seed_lambda(parameters.deflation_continuation.deflation_knots);
-        std::cout << "KS1D deflation_attempts is 0; auto-seeding zero branch at lambda="
-                  << seed_lambda << std::endl;
-    }
-
     if(seed_zero)
     {
         real_vec x_seed;
@@ -262,7 +231,7 @@ int main(int argc, char const* argv[])
         vec_ops_R.free_vector(x_seed);
     }
 
-    if(!continue_seed_only)
+    if(!continue_seed_only || !seed_zero)
     {
         DC.execute();
     }

@@ -209,6 +209,75 @@ void test_relative_active_mode_threshold_skips_tiny_low_mode()
     free_bundle(vec_ops, v);
 }
 
+void test_continuation_hysteresis_switches_before_mode_vanishes()
+{
+    vec_ops_t vec_ops(4);
+    adapter_t adapter(&vec_ops, 2);
+    adapter.set_relative_active_mode_tolerance(1e-12);
+    adapter.set_continuation_mode_switch_ratio(0.25);
+    vector_bundle v;
+    init_bundle(vec_ops, v);
+
+    set_vector(vec_ops, v.x, {1.0, 0.0, 0.0, 0.0});
+    adapter.stabilize(v.x, v.w);
+    require_true("history starts on mode 1", adapter.last_slice_data().mode == 1);
+
+    set_vector(vec_ops, v.x, {0.01, 0.0, 1.0, 0.25});
+    set_vector(vec_ops, v.y, {0.0, 0.0, 0.0, 0.0});
+    adapter.begin_continuation_chart(v.x, v.y);
+    require_true("continuation switches to better conditioned mode 2", adapter.last_slice_data().mode == 2);
+    require_true("continuation mode 2 has strong slice matrix", adapter.last_slice_data().slice_matrix > 1.0);
+
+    free_bundle(vec_ops, v);
+}
+
+void test_continuation_hysteresis_keeps_usable_current_mode()
+{
+    vec_ops_t vec_ops(4);
+    adapter_t adapter(&vec_ops, 2);
+    adapter.set_relative_active_mode_tolerance(1e-12);
+    adapter.set_continuation_mode_switch_ratio(0.25);
+    vector_bundle v;
+    init_bundle(vec_ops, v);
+
+    set_vector(vec_ops, v.x, {1.0, 0.0, 0.0, 0.0});
+    adapter.stabilize(v.x, v.w);
+    require_true("history starts on mode 1 for keep test", adapter.last_slice_data().mode == 1);
+
+    set_vector(vec_ops, v.x, {0.6, 0.0, 1.0, 0.0});
+    set_vector(vec_ops, v.y, {0.0, 0.0, 0.0, 0.0});
+    adapter.begin_continuation_chart(v.x, v.y);
+    require_true("continuation keeps sufficiently conditioned mode 1", adapter.last_slice_data().mode == 1);
+
+    free_bundle(vec_ops, v);
+}
+
+void test_continuation_residual_copy_uses_tangent_direction()
+{
+    vec_ops_t vec_ops(4);
+    adapter_t adapter(&vec_ops, 2);
+    adapter.set_relative_active_mode_tolerance(1e-12);
+    vector_bundle v;
+    init_bundle(vec_ops, v);
+
+    set_vector(vec_ops, v.x, {0.0, 0.0, 1.0, 0.0});
+    set_vector(vec_ops, v.z, {0.1, 0.0, 1.0, 0.0});
+
+    set_vector(vec_ops, v.y, {1.0, 0.0, 0.0, 0.0});
+    adapter.stabilize_continuation_chart(v.x, v.y, v.z, v.w);
+    auto positive = get_vector(vec_ops, v.w);
+    require_true("positive tangent selects positive residual copy", positive[0] > 0.0);
+    require_close("positive tangent mode 2 imag", positive[3], 0.0, 1e-12);
+
+    set_vector(vec_ops, v.y, {-1.0, 0.0, 0.0, 0.0});
+    adapter.stabilize_continuation_chart(v.x, v.y, v.z, v.w);
+    auto negative = get_vector(vec_ops, v.w);
+    require_true("negative tangent selects negative residual copy", negative[0] < 0.0);
+    require_close("negative tangent mode 2 imag", negative[3], 0.0, 1e-12);
+
+    free_bundle(vec_ops, v);
+}
+
 } // namespace
 
 int main()
@@ -218,6 +287,9 @@ int main()
     test_residual_group_representatives_collapse();
     test_negative_reflection_representatives_collapse_when_enabled();
     test_relative_active_mode_threshold_skips_tiny_low_mode();
+    test_continuation_hysteresis_switches_before_mode_vanishes();
+    test_continuation_hysteresis_keeps_usable_current_mode();
+    test_continuation_residual_copy_uses_tangent_direction();
 
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;
     if(failures != 0)

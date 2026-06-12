@@ -137,6 +137,8 @@ public:
     void configure_continuation_symmetry_adapter(SymmetryAdapter& adapter) const
     {
         adapter.set_relative_active_mode_tolerance(default_relative_active_mode_tolerance());
+        adapter.set_continuation_mode_switch_ratio(T(0.25));
+        adapter.set_tangent_continuity_weight(T(0.25));
     }
 
     template<class FiniteActionRegistry>
@@ -294,29 +296,29 @@ public:
         symmetry_adapter.stabilize_closest_to_reference(x, x, x);
     }
 
-    void begin_continuation_chart(const T_vec& x_0_, const T& lambda_0_, const T_vec&, const T&)
+    void begin_continuation_chart(const T_vec& x_0_, const T& lambda_0_, const T_vec& x_0_s_, const T&)
     {
         (void)lambda_0_;
-        symmetry_adapter.stabilize_closest_to_reference(x_0_, x_0_, projected_state);
+        symmetry_adapter.begin_continuation_chart(x_0_, x_0_s_);
     }
 
     void stabilize_predictor_for_continuation(
         const T_vec& x_0_,
         const T&,
-        const T_vec&,
+        const T_vec& x_0_s_,
         const T&,
         const T_vec& x_predictor,
         const T& lambda_predictor,
         T_vec& x_trial,
         T& lambda_trial)
     {
-        symmetry_adapter.stabilize_closest_to_reference(x_0_, x_predictor, x_trial);
+        symmetry_adapter.stabilize_continuation_chart(x_0_, x_0_s_, x_predictor, x_trial);
         lambda_trial = lambda_predictor;
     }
 
     void stabilize_corrector_trial(const T_vec& reference, const T&, T_vec& trial, T&)
     {
-        project_relative_to(reference, trial);
+        symmetry_adapter.stabilize_continuation_chart(reference, trial, trial);
     }
 
     void project_relative_to(const T_vec& reference, T_vec& x)
@@ -326,7 +328,12 @@ public:
 
     void stabilize_for_arclength(const T_vec& reference, const T_vec& source, T_vec& destination)
     {
-        symmetry_adapter.stabilize_closest_to_reference(reference, source, destination);
+        symmetry_adapter.stabilize_continuation_chart(reference, source, destination);
+    }
+
+    void stabilize_tangent_for_arclength(const T_vec&, const T_vec& tangent, T_vec& destination)
+    {
+        symmetry_adapter.stabilizer_differential_from_last(tangent, destination);
     }
 
     const slice_data_type& last_slice_data() const

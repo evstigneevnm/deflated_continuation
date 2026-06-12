@@ -260,6 +260,45 @@ void stabilize_for_arclength(
     stabilize_for_arclength_impl(vec_ops, op, reference, source, destination, 0);
 }
 
+template<class VectorOperations, class NonlinearOperator, class Vector>
+auto stabilize_tangent_for_arclength_impl(
+    VectorOperations*,
+    NonlinearOperator* op,
+    const Vector& reference,
+    const Vector& tangent,
+    Vector& destination,
+    int)
+    -> decltype(op->stabilize_tangent_for_arclength(reference, tangent, destination), void())
+{
+    op->stabilize_tangent_for_arclength(reference, tangent, destination);
+}
+
+template<class VectorOperations, class NonlinearOperator, class Vector>
+void stabilize_tangent_for_arclength_impl(
+    VectorOperations* vec_ops,
+    NonlinearOperator*,
+    const Vector&,
+    const Vector& tangent,
+    Vector& destination,
+    long)
+{
+    if(&tangent != &destination)
+    {
+        vec_ops->assign(tangent, destination);
+    }
+}
+
+template<class VectorOperations, class NonlinearOperator, class Vector>
+void stabilize_tangent_for_arclength(
+    VectorOperations* vec_ops,
+    NonlinearOperator* op,
+    const Vector& reference,
+    const Vector& tangent,
+    Vector& destination)
+{
+    stabilize_tangent_for_arclength_impl(vec_ops, op, reference, tangent, destination, 0);
+}
+
 template<class Log, class NonlinearOperator>
 auto log_continuation_chart_impl(
     Log* log,

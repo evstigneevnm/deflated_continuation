@@ -19,6 +19,18 @@ struct branch_intersection_policy
 };
 
 template<class T>
+struct self_intersection_policy
+{
+    bool enabled = false;
+    unsigned int signature_norm_index = 0;
+    T signature_tolerance = T(1.0e-6);
+    T state_tolerance = T(1.0e-8);
+    T minimum_step_fraction_from_start = T(1.0e-3);
+    uint64_t minimum_index_gap = 50;
+    bool verbose = false;
+};
+
+template<class T>
 struct branch_intersection_result
 {
     bool found = false;

@@ -5,9 +5,9 @@
     "bifurcaiton_diagram_file_name": "bifurcation_diagram.dat",
     "stability_diagram_file_name": "stability_diagram.dat",
     "deflation_continuation": {
-        "maximum_continuation_steps": 1000,
+        "maximum_continuation_steps": 5000,
         "step_size": 0.02,
-        "max_step_size": 0.2,
+        "max_step_size": 0.25,
         "deflation_attempts": 5,
         "continuation_fail_attempts": 5,
         "initial_direciton": -1,
@@ -55,6 +55,8 @@
             77.0,
             80.0
         ],
+        "add_analytical_solution_to_diagram": true,
+        "analytical_solution_branches": [],
         "restart_policy": {
             "allow_incomplete_restart_intersections": false,
             "allow_knot_interpolation_failure": false,
@@ -81,6 +83,15 @@
             "signature_tolerance": 1.0e-6,
             "state_tolerance": 1.0e-8,
             "minimum_step_fraction_from_start": 1.0e-3,
+            "verbose": true
+        },
+        "self_intersection_policy": {
+            "enabled": true,
+            "signature_norm_index": 0,
+            "signature_tolerance": 1.0e-6,
+            "state_tolerance": 1.0e-8,
+            "minimum_step_fraction_from_start": 1.0e-3,
+            "minimum_index_gap": 50,
             "verbose": true
         },
         "linear_solver_extended": {

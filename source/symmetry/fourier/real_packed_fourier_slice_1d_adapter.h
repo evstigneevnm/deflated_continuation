@@ -63,6 +63,7 @@ public:
         gradient_spectrum(positive_modes_ + 1, complex_type(0)),
         work_gradient_spectrum(positive_modes_ + 1, complex_type(0)),
         source_gradient_spectrum(positive_modes_ + 1, complex_type(0)),
+        continuation_tangent_spectrum(positive_modes_ + 1, complex_type(0)),
         physical_pullback_spectrum(positive_modes_ + 1, complex_type(0))
     {
         if(vec_ops == nullptr)
@@ -117,6 +118,34 @@ public:
     scalar_type get_relative_active_mode_tolerance() const
     {
         return relative_active_mode_tolerance;
+    }
+
+    void set_continuation_mode_switch_ratio(const scalar_type ratio)
+    {
+        if(ratio < scalar_type(0) || ratio > scalar_type(1))
+        {
+            throw std::invalid_argument("continuation mode switch ratio must be in [0,1]");
+        }
+        continuation_mode_switch_ratio = ratio;
+    }
+
+    scalar_type get_continuation_mode_switch_ratio() const
+    {
+        return continuation_mode_switch_ratio;
+    }
+
+    void set_tangent_continuity_weight(const scalar_type weight)
+    {
+        if(weight < scalar_type(0))
+        {
+            throw std::invalid_argument("tangent continuity weight must be non-negative");
+        }
+        tangent_continuity_weight = weight;
+    }
+
+    scalar_type get_tangent_continuity_weight() const
+    {
+        return tangent_continuity_weight;
     }
 
     real_packed_fourier_1d_discrete_action last_discrete_action() const
@@ -197,6 +226,59 @@ public:
         last_data.set_shift(0, best_shift);
         stabilized_spectrum = best_spectrum;
         spectrum_to_vector(stabilized_spectrum, destination);
+    }
+
+    void begin_continuation_chart(const vector_type& reference, const vector_type& reference_tangent)
+    {
+        check_vector_size(reference);
+        check_vector_size(reference_tangent);
+        vector_to_spectrum(reference, reference_spectrum);
+        vector_to_spectrum(reference_tangent, continuation_tangent_spectrum);
+        last_action = real_packed_fourier_1d_discrete_action::identity;
+        last_data = choose_continuation_slice_data(reference_spectrum, last_data.mode);
+        if(last_data.active())
+        {
+            slice.apply_shift(
+                reference_spectrum.data(),
+                stabilized_spectrum.data(),
+                stabilized_spectrum.size(),
+                last_data.shift);
+        }
+        else
+        {
+            stabilized_spectrum = reference_spectrum;
+        }
+        continuation_chart_active = true;
+    }
+
+    void stabilize_continuation_chart(
+        const vector_type& reference,
+        const vector_type& reference_tangent,
+        const vector_type& source,
+        vector_type& destination)
+    {
+        check_vector_size(reference);
+        check_vector_size(reference_tangent);
+        check_vector_size(source);
+        check_vector_size(destination);
+        vector_to_spectrum(source, spectrum);
+        vector_to_spectrum(reference, reference_spectrum);
+        vector_to_spectrum(reference_tangent, continuation_tangent_spectrum);
+        continuation_chart_active = true;
+        stabilize_continuation_spectra(true, destination);
+    }
+
+    void stabilize_continuation_chart(
+        const vector_type& reference,
+        const vector_type& source,
+        vector_type& destination)
+    {
+        check_vector_size(reference);
+        check_vector_size(source);
+        check_vector_size(destination);
+        vector_to_spectrum(source, spectrum);
+        vector_to_spectrum(reference, reference_spectrum);
+        stabilize_continuation_spectra(continuation_chart_active, destination);
     }
 
     void pullback_distance_gradient(
@@ -402,37 +484,54 @@ private:
         return result;
     }
 
+    scalar_type spectrum_inner(
+        const std::vector<complex_type>& x,
+        const std::vector<complex_type>& y) const
+    {
+        if(x.size() != y.size())
+        {
+            throw std::runtime_error("real_packed_fourier_slice_1d_adapter spectrum sizes do not match");
+        }
+        scalar_type result = scalar_type(0);
+        for(std::size_t i = 0; i < x.size(); ++i)
+        {
+            result += x[i].real()*y[i].real() + x[i].imag()*y[i].imag();
+        }
+        return result;
+    }
+
+    scalar_type spectrum_delta_inner(
+        const std::vector<complex_type>& x,
+        const std::vector<complex_type>& y,
+        const std::vector<complex_type>& tangent) const
+    {
+        if(x.size() != y.size() || x.size() != tangent.size())
+        {
+            throw std::runtime_error("real_packed_fourier_slice_1d_adapter spectrum sizes do not match");
+        }
+        scalar_type result = scalar_type(0);
+        for(std::size_t i = 0; i < x.size(); ++i)
+        {
+            result += (x[i].real() - y[i].real())*tangent[i].real() +
+                      (x[i].imag() - y[i].imag())*tangent[i].imag();
+        }
+        return result;
+    }
+
     scalar_type active_mode_threshold(const std::vector<complex_type>& values) const
     {
         const scalar_type norm = std::sqrt(spectrum_distance_sq(values, zero_spectrum));
         return std::max(slice.active_mode_tolerance(), relative_active_mode_tolerance*norm);
     }
 
-    slice_data_type choose_reliable_slice_data(
+    slice_data_type make_slice_data(
         const std::vector<complex_type>& values,
-        const std::size_t preferred_mode) const
+        const std::size_t selected_mode,
+        const scalar_type tolerance) const
     {
         slice_data_type data;
         data.group_dimension = 1;
-        data.tolerance = active_mode_threshold(values);
-
-        std::size_t selected_mode = 0;
-        if(preferred_mode != 0 && preferred_mode < values.size() &&
-           std::abs(values[preferred_mode]) > data.tolerance)
-        {
-            selected_mode = preferred_mode;
-        }
-        else
-        {
-            for(std::size_t mode = 1; mode < values.size(); ++mode)
-            {
-                if(std::abs(values[mode]) > data.tolerance)
-                {
-                    selected_mode = mode;
-                    break;
-                }
-            }
-        }
+        data.tolerance = tolerance;
 
         if(selected_mode == 0)
         {
@@ -453,6 +552,136 @@ private:
         data.set_shift(0, data.shift);
         data.slice_matrix = static_cast<scalar_type>(selected_mode)*magnitude;
         return data;
+    }
+
+    slice_data_type choose_reliable_slice_data(
+        const std::vector<complex_type>& values,
+        const std::size_t preferred_mode) const
+    {
+        const scalar_type threshold = active_mode_threshold(values);
+
+        std::size_t selected_mode = 0;
+        if(preferred_mode != 0 && preferred_mode < values.size() &&
+           std::abs(values[preferred_mode]) > threshold)
+        {
+            selected_mode = preferred_mode;
+        }
+        else
+        {
+            for(std::size_t mode = 1; mode < values.size(); ++mode)
+            {
+                if(std::abs(values[mode]) > threshold)
+                {
+                    selected_mode = mode;
+                    break;
+                }
+            }
+        }
+
+        return make_slice_data(values, selected_mode, threshold);
+    }
+
+    slice_data_type choose_continuation_slice_data(
+        const std::vector<complex_type>& values,
+        const std::size_t preferred_mode) const
+    {
+        const scalar_type threshold = active_mode_threshold(values);
+        std::size_t best_mode = 0;
+        scalar_type best_matrix = scalar_type(0);
+        for(std::size_t mode = 1; mode < values.size(); ++mode)
+        {
+            const scalar_type magnitude = std::abs(values[mode]);
+            if(magnitude <= threshold)
+            {
+                continue;
+            }
+            const scalar_type slice_matrix = static_cast<scalar_type>(mode)*magnitude;
+            if(best_mode == 0 || slice_matrix > best_matrix)
+            {
+                best_mode = mode;
+                best_matrix = slice_matrix;
+            }
+        }
+
+        std::size_t selected_mode = best_mode;
+        if(preferred_mode != 0 && preferred_mode < values.size())
+        {
+            const scalar_type preferred_abs = std::abs(values[preferred_mode]);
+            const scalar_type preferred_matrix = static_cast<scalar_type>(preferred_mode)*preferred_abs;
+            if(preferred_abs > threshold &&
+               (best_mode == 0 || preferred_matrix >= continuation_mode_switch_ratio*best_matrix))
+            {
+                selected_mode = preferred_mode;
+            }
+        }
+
+        return make_slice_data(values, selected_mode, threshold);
+    }
+
+    scalar_type continuation_candidate_score(
+        const std::vector<complex_type>& candidate,
+        const bool use_tangent) const
+    {
+        const scalar_type distance_sq = spectrum_distance_sq(candidate, reference_spectrum);
+        if(!use_tangent)
+        {
+            return distance_sq;
+        }
+
+        const scalar_type tangent_norm_sq = spectrum_inner(continuation_tangent_spectrum, continuation_tangent_spectrum);
+        if(tangent_norm_sq <= scalar_type(0) || distance_sq <= scalar_type(0))
+        {
+            return distance_sq;
+        }
+
+        const scalar_type progress = spectrum_delta_inner(candidate, reference_spectrum, continuation_tangent_spectrum);
+        const scalar_type alignment = std::max(
+            scalar_type(-1),
+            std::min(
+                scalar_type(1),
+                progress/std::sqrt(distance_sq*tangent_norm_sq)));
+        scalar_type score = distance_sq*(scalar_type(1) + tangent_continuity_weight*(scalar_type(1) - alignment));
+        if(progress < scalar_type(0))
+        {
+            score += tangent_backward_penalty*progress*progress/tangent_norm_sq;
+        }
+        return score;
+    }
+
+    void stabilize_continuation_spectra(const bool use_tangent, vector_type& destination)
+    {
+        last_action = real_packed_fourier_1d_discrete_action::identity;
+        last_data = choose_continuation_slice_data(spectrum, last_data.mode);
+        if(!last_data.active())
+        {
+            stabilized_spectrum = spectrum;
+            spectrum_to_vector(stabilized_spectrum, destination);
+            return;
+        }
+
+        const scalar_type base_shift = last_data.shift;
+        const std::size_t order = last_data.residual_group_order() == 0 ? std::size_t(1) : last_data.residual_group_order();
+        const scalar_type two_pi = scalar_type(2)*static_cast<scalar_type>(std::acos(static_cast<scalar_type>(-1)));
+        scalar_type best_score = std::numeric_limits<scalar_type>::max();
+        scalar_type best_shift = base_shift;
+
+        for(std::size_t j = 0; j < order; ++j)
+        {
+            const scalar_type shift = base_shift + two_pi*static_cast<scalar_type>(j)/static_cast<scalar_type>(order);
+            slice.apply_shift(spectrum.data(), candidate_spectrum.data(), candidate_spectrum.size(), shift);
+            const scalar_type score = continuation_candidate_score(candidate_spectrum, use_tangent);
+            if(j == 0 || score < best_score)
+            {
+                best_score = score;
+                best_shift = shift;
+                best_spectrum = candidate_spectrum;
+            }
+        }
+
+        last_data.shift = best_shift;
+        last_data.set_shift(0, best_shift);
+        stabilized_spectrum = best_spectrum;
+        spectrum_to_vector(stabilized_spectrum, destination);
     }
 
     std::size_t discrete_action_count() const
@@ -610,6 +839,10 @@ private:
     real_packed_fourier_1d_discrete_action last_action = real_packed_fourier_1d_discrete_action::identity;
     bool negative_reflection_symmetry_enabled = false;
     scalar_type relative_active_mode_tolerance = scalar_type(0);
+    scalar_type continuation_mode_switch_ratio = scalar_type(0.25);
+    scalar_type tangent_continuity_weight = scalar_type(0.25);
+    scalar_type tangent_backward_penalty = scalar_type(4);
+    bool continuation_chart_active = false;
     std::vector<scalar_type> host_source;
     std::vector<scalar_type> host_destination;
     std::vector<complex_type> spectrum;
@@ -625,6 +858,7 @@ private:
     std::vector<complex_type> gradient_spectrum;
     std::vector<complex_type> work_gradient_spectrum;
     std::vector<complex_type> source_gradient_spectrum;
+    std::vector<complex_type> continuation_tangent_spectrum;
     std::vector<complex_type> physical_pullback_spectrum;
 };
 

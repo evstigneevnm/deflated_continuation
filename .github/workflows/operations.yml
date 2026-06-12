@@ -99,6 +99,8 @@ jobs:
           ./"$BUILD_DIR"/quotient_classifier/test_quotient_classifier.bin
           make test_fourier_slice_1d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fourier_slice_1d"
           ./"$BUILD_DIR"/fourier_slice_1d/test_fourier_slice_1d.bin
+          make test_real_packed_fourier_canonical_adapter.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/real_packed_fourier_canonical_adapter"
+          ./"$BUILD_DIR"/real_packed_fourier_canonical_adapter/test_real_packed_fourier_canonical_adapter.bin
           make test_fourier_slice_differential_1d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fourier_slice_differential_1d"
           ./"$BUILD_DIR"/fourier_slice_differential_1d/test_fourier_slice_differential_1d.bin
           make test_stabilized_storage.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stabilized_storage"

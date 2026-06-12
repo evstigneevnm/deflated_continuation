@@ -20,6 +20,7 @@
 #include <boost/serialization/string.hpp>
 
 #include <containers/branch_intersection.h>
+#include <containers/curve_endpoint_reason.h>
 #include <containers/intersection_status.h>
 
 namespace container
@@ -36,6 +37,7 @@ struct complex_values
     uint64_t segment_id = 0;
     uint64_t semicurve_id = 0;
     bool forced_store = false;
+    curve_endpoint_reason endpoint_reason = curve_endpoint_reason::none;
 
 private:
     friend class boost::serialization::access;
@@ -182,6 +184,7 @@ public:
             current_segment_id = that.current_segment_id;
             current_semicurve_id = that.current_semicurve_id;
             segment_metadata_available = that.segment_metadata_available;
+            incomplete_segment_ids = std::move(that.incomplete_segment_ids);
             return *this;
             
             //
@@ -209,6 +212,20 @@ private:
     uint64_t current_segment_id = 0;
     uint64_t current_semicurve_id = 0;
     bool segment_metadata_available = false;
+    std::vector<uint64_t> incomplete_segment_ids;
+
+    void mark_incomplete_segment(const uint64_t segment_id)
+    {
+        if(std::find(incomplete_segment_ids.begin(), incomplete_segment_ids.end(), segment_id) == incomplete_segment_ids.end())
+        {
+            incomplete_segment_ids.push_back(segment_id);
+        }
+    }
+
+    bool is_incomplete_segment(const uint64_t segment_id) const
+    {
+        return std::find(incomplete_segment_ids.begin(), incomplete_segment_ids.end(), segment_id) != incomplete_segment_ids.end();
+    }
 
 
     bool directory_exists(const std::string& name) const
@@ -271,7 +288,7 @@ private:
             }
             return;
         }
-        f << "# index lambda saved id_file_name segment_id semicurve_id forced_store\n";
+        f << "# index lambda saved id_file_name segment_id semicurve_id forced_store endpoint_reason\n";
         for(std::size_t i = 0; i < container.size(); ++i)
         {
             const auto& x = container[i];
@@ -281,7 +298,8 @@ private:
               << x.id_file_name << " "
               << x.segment_id << " "
               << x.semicurve_id << " "
-              << (x.forced_store ? 1 : 0) << "\n";
+              << (x.forced_store ? 1 : 0) << " "
+              << to_string(x.endpoint_reason) << "\n";
         }
     }
 
@@ -300,6 +318,7 @@ private:
 
         std::string line;
         bool loaded_any = false;
+        incomplete_segment_ids.clear();
         while(std::getline(f, line))
         {
             if(line.empty() || line[0] == '#')
@@ -314,16 +333,23 @@ private:
             uint64_t segment_id = 0;
             uint64_t semicurve_id = 0;
             unsigned int forced_store = 0;
+            std::string endpoint_reason_value;
             stream >> index >> lambda >> saved >> id_file_name >> segment_id >> semicurve_id >> forced_store;
             if(!stream || index >= container.size())
             {
                 continue;
             }
+            stream >> endpoint_reason_value;
             auto& point = container[index];
             point.point_index = static_cast<uint64_t>(index);
             point.segment_id = segment_id;
             point.semicurve_id = semicurve_id;
             point.forced_store = forced_store != 0;
+            point.endpoint_reason = curve_endpoint_reason_from_string(endpoint_reason_value);
+            if(is_incomplete_endpoint(point.endpoint_reason))
+            {
+                mark_incomplete_segment(segment_id);
+            }
             loaded_any = true;
         }
         segment_metadata_available = loaded_any;
@@ -331,7 +357,18 @@ private:
 
     bool can_interpolate_between(const values_t& lower, const values_t& upper) const
     {
-        return !segment_metadata_available || lower.segment_id == upper.segment_id;
+        if(!segment_metadata_available)
+        {
+            return true;
+        }
+        return lower.segment_id == upper.segment_id && !is_incomplete_segment(lower.segment_id);
+    }
+
+    bool is_incomplete_pair(const values_t& lower, const values_t& upper) const
+    {
+        return segment_metadata_available &&
+               lower.segment_id == upper.segment_id &&
+               is_incomplete_segment(lower.segment_id);
     }
 
     bool point_in_segment(const values_t& point, const uint64_t segment_id) const
@@ -536,7 +573,11 @@ public:
         segment_metadata_available = true;
     }
 
-    void add(const T& lambda_, const T_vec& x_, bool force_store = false)
+    void add(
+        const T& lambda_,
+        const T_vec& x_,
+        bool force_store = false,
+        curve_endpoint_reason endpoint_reason = curve_endpoint_reason::none)
     {
         if(curve_open)
         {
@@ -553,6 +594,11 @@ public:
             form_values.segment_id = current_segment_id;
             form_values.semicurve_id = current_semicurve_id;
             form_values.forced_store = force_store;
+            form_values.endpoint_reason = endpoint_reason;
+            if(is_incomplete_endpoint(endpoint_reason))
+            {
+                mark_incomplete_segment(form_values.segment_id);
+            }
 
             container.push_back(form_values);
 
@@ -567,6 +613,20 @@ public:
     std::string get_full_path()
     {
         return(full_path);
+    }
+
+    void set_last_endpoint_reason(curve_endpoint_reason endpoint_reason)
+    {
+        if(container.empty())
+        {
+            return;
+        }
+        container.back().endpoint_reason = endpoint_reason;
+        if(is_incomplete_endpoint(endpoint_reason))
+        {
+            mark_incomplete_segment(container.back().segment_id);
+        }
+        write_metadata_file();
     }
 
     //return a solution pair (x,\lambda) from the container
@@ -618,12 +678,22 @@ public:
             int indp = j+1;
             auto &p_j = container[ind];
             auto &p_jp = container[indp];
-            if(!can_interpolate_between(p_j, p_jp))
+            if(!intersection(p_j, p_jp, lambda_star))
             {
-                status.skipped_discontinuous++;
                 continue;
             }
-            if(intersection(p_j, p_jp, lambda_star))
+            if(!can_interpolate_between(p_j, p_jp))
+            {
+                if(is_incomplete_pair(p_j, p_jp))
+                {
+                    status.skipped_incomplete++;
+                }
+                else
+                {
+                    status.skipped_discontinuous++;
+                }
+                continue;
+            }
             {
                 if((p_j.lambda == lambda_star)&&(p_j.is_data_avaliable))
                 {
@@ -875,6 +945,151 @@ public:
                 result.lower_point_index = p_j.point_index;
                 result.upper_point_index = p_jp.point_index;
                 result.reason = "known_branch_intersection";
+                return true;
+            }
+        }
+        return false;
+    }
+
+    template<class StateDistance>
+    bool find_self_intersection(
+        const T& step_lambda0,
+        const T_vec& step_x0,
+        const T& step_lambda1,
+        const T_vec& step_x1,
+        const std::vector<T>& step_norms0,
+        const std::vector<T>& step_norms1,
+        const self_intersection_policy<T>& policy,
+        T_vec& hit_x,
+        branch_intersection_result<T>& result,
+        StateDistance&& state_distance)
+    {
+        if(!policy.enabled)
+        {
+            return false;
+        }
+        if(step_norms0.size() <= policy.signature_norm_index ||
+           step_norms1.size() <= policy.signature_norm_index ||
+           container.size() < 2)
+        {
+            return false;
+        }
+
+        const uint64_t latest_index = container.back().point_index;
+        const T step_signature0 = step_norms0[policy.signature_norm_index];
+        const T step_signature1 = step_norms1[policy.signature_norm_index];
+        const int N = static_cast<int>(container.size());
+        for(int j = 0; j < N - 1; ++j)
+        {
+            const auto& p_j = container[j];
+            const auto& p_jp = container[j + 1];
+            const uint64_t candidate_latest_index = std::max(p_j.point_index, p_jp.point_index);
+            if(latest_index <= candidate_latest_index + policy.minimum_index_gap)
+            {
+                continue;
+            }
+            if(!can_interpolate_between(p_j, p_jp))
+            {
+                continue;
+            }
+
+            T lambda_lower = T(0);
+            T lambda_upper = T(0);
+            if(!interval_overlap(step_lambda0, step_lambda1, p_j.lambda, p_jp.lambda, lambda_lower, lambda_upper))
+            {
+                continue;
+            }
+
+            T old_signature0 = T(0);
+            T old_signature1 = T(0);
+            if(!get_signature_value(p_j, policy.signature_norm_index, old_signature0) ||
+               !get_signature_value(p_jp, policy.signature_norm_index, old_signature1))
+            {
+                continue;
+            }
+
+            const T signature_scale = std::max<T>(
+                T(1),
+                std::max<T>(
+                    std::max<T>(scalar_abs_value(step_signature0), scalar_abs_value(step_signature1)),
+                    std::max<T>(scalar_abs_value(old_signature0), scalar_abs_value(old_signature1))));
+            const T signature_tolerance = policy.signature_tolerance*signature_scale;
+            if(!signature_envelopes_overlap(
+                   step_signature0,
+                   step_signature1,
+                   old_signature0,
+                   old_signature1,
+                   signature_tolerance))
+            {
+                continue;
+            }
+
+            T candidate_lambda = T(0);
+            T signature_distance = T(0);
+            if(!find_signature_candidate_lambda(
+                   lambda_lower,
+                   lambda_upper,
+                   step_lambda0,
+                   step_signature0,
+                   step_lambda1,
+                   step_signature1,
+                   p_j.lambda,
+                   old_signature0,
+                   p_jp.lambda,
+                   old_signature1,
+                   signature_tolerance,
+                   candidate_lambda,
+                   signature_distance))
+            {
+                continue;
+            }
+            if(!candidate_has_step_progress(
+                   candidate_lambda,
+                   step_lambda0,
+                   step_lambda1,
+                   policy.minimum_step_fraction_from_start))
+            {
+                continue;
+            }
+
+            if(!evaluate_segment_at_lambda(j, j + 1, candidate_lambda, x1))
+            {
+                continue;
+            }
+
+            const T w = interpolation_weight(candidate_lambda, step_lambda0, step_lambda1);
+            vec_ops->assign_mul(T(1) - w, step_x0, w, step_x1, x0);
+            const T distance = static_cast<T>(state_distance(x0, x1));
+            const T state_scale = std::max<T>(
+                T(1),
+                std::max<T>(
+                    scalar_abs_value(interpolate_scalar(
+                        candidate_lambda,
+                        step_lambda0,
+                        step_signature0,
+                        step_lambda1,
+                        step_signature1)),
+                    scalar_abs_value(interpolate_scalar(
+                        candidate_lambda,
+                        p_j.lambda,
+                        old_signature0,
+                        p_jp.lambda,
+                        old_signature1))));
+            const T state_tolerance = policy.state_tolerance*state_scale;
+            if(distance <= state_tolerance)
+            {
+                vec_ops->assign(x1, hit_x);
+                result.found = true;
+                result.lambda = candidate_lambda;
+                result.signature_distance = signature_distance;
+                result.state_distance = distance;
+                result.state_tolerance = state_tolerance;
+                result.curve_number = curve_number;
+                result.segment_id = p_j.segment_id;
+                result.semicurve_id = p_j.semicurve_id;
+                result.lower_point_index = p_j.point_index;
+                result.upper_point_index = p_jp.point_index;
+                result.reason = "self_intersection";
                 return true;
             }
         }

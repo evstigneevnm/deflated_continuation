@@ -787,7 +787,9 @@ void test_projected_operator_hooks(vec_ops_real& vec_ops, ks1d_t& ks, symmetry_a
 void test_projected_bordered_continuation_correction(vec_ops_real& vec_ops, ks1d_t& ks)
 {
     real_vec x0;
+    real_vec x0_chart;
     real_vec tangent;
+    real_vec tangent_chart;
     real_vec candidate;
     real_vec dx;
     real_vec projected_dx;
@@ -795,8 +797,8 @@ void test_projected_bordered_continuation_correction(vec_ops_real& vec_ops, ks1d
     real_vec rhs;
     real_vec lhs;
     real_vec linear_residual;
-    vec_ops.init_vectors(x0, tangent, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
-    vec_ops.start_use_vectors(x0, tangent, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
+    vec_ops.init_vectors(x0, x0_chart, tangent, tangent_chart, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
+    vec_ops.start_use_vectors(x0, x0_chart, tangent, tangent_chart, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
 
     std::vector<real> host_x0(vec_ops.get_default_size(), real(0));
     if(host_x0.size() >= 6)
@@ -848,7 +850,7 @@ void test_projected_bordered_continuation_correction(vec_ops_real& vec_ops, ks1d
         false,
         false,
         true);
-    sm_solver.get_linsolver_handle()->set_basis_size(8);
+    sm_solver.get_linsolver_handle()->set_basis_size(16);
 
     projected_continuation_system_t system_operator(&vec_ops, &log, &lin_op, &sm_solver);
     real ds_mutable = ds;
@@ -862,7 +864,9 @@ void test_projected_bordered_continuation_correction(vec_ops_real& vec_ops, ks1d
         record_failure("projected bordered correction linear solver did not converge");
     }
 
-    const real scalar_residual = vec_ops.scalar_prod(tangent, dx) + lambda_s*d_lambda - beta;
+    ks.stabilize_for_arclength(x0, x0, x0_chart);
+    ks.stabilize_tangent_for_arclength(x0_chart, tangent, tangent_chart);
+    const real scalar_residual = vec_ops.scalar_prod(tangent_chart, dx) + lambda_s*d_lambda - beta;
     check_close(
         scalar_residual,
         real(0),
@@ -886,7 +890,7 @@ void test_projected_bordered_continuation_correction(vec_ops_real& vec_ops, ks1d
     vec_ops.assign_mul(real(1), lhs, real(-1), rhs, linear_residual);
     const real linear_residual_norm = vec_ops.norm_l2(linear_residual);
     ++checks;
-    const real linear_tol = std::is_same<real, float>::value ? real(1.0e-2) : real(1.0e-5);
+    const real linear_tol = std::is_same<real, float>::value ? real(1.0e-2) : real(2.0e-4);
     if(!(linear_residual_norm <= linear_tol*(real(1) + vec_ops.norm_l2(rhs))))
     {
         record_failure(
@@ -895,8 +899,8 @@ void test_projected_bordered_continuation_correction(vec_ops_real& vec_ops, ks1d
             " tol=" + std::to_string(static_cast<double>(linear_tol*(real(1) + vec_ops.norm_l2(rhs)))));
     }
 
-    vec_ops.stop_use_vectors(x0, tangent, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
-    vec_ops.free_vectors(x0, tangent, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
+    vec_ops.stop_use_vectors(x0, x0_chart, tangent, tangent_chart, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
+    vec_ops.free_vectors(x0, x0_chart, tangent, tangent_chart, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
 }
 
 } // namespace

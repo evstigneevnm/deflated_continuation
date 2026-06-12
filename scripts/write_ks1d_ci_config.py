@@ -56,6 +56,8 @@ def write_config(args: argparse.Namespace) -> None:
     continuation["initial_direciton"] = args.initial_direction
     continuation["skip_file_output"] = 1
     continuation["deflation_knots"] = args.knots
+    continuation["add_analytical_solution_to_diagram"] = True
+    continuation.setdefault("analytical_solution_branches", [])
     restart_policy = continuation.setdefault("restart_policy", {})
     restart_policy.setdefault("allow_incomplete_restart_intersections", False)
     restart_policy.setdefault("allow_knot_interpolation_failure", False)

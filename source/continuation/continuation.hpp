@@ -18,6 +18,7 @@
 #include <continuation/advance_solution.h>
 #include <continuation/initial_tangent.h>
 #include <continuation/convergence_strategy.h>
+#include <containers/curve_endpoint_reason.h>
 
 
 
@@ -45,6 +46,7 @@ class continuation
 protected:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
+    typedef container::curve_endpoint_reason endpoint_reason_t;
 
 private:
     typedef std::pair<bool, bool> bools2;
@@ -65,6 +67,15 @@ private:
         T& hit_lambda,
         T_vec& hit_x,
         std::string& reason)> branch_intersection_checker_t;
+    typedef std::function<bool(
+        Curve* curve,
+        const T& lambda_left,
+        const T_vec& x_left,
+        const T& lambda_right,
+        const T_vec& x_right,
+        T& hit_lambda,
+        T_vec& hit_x,
+        std::string& reason)> self_intersection_checker_t;
 
 
     typedef SystemOperatorContinuation<
@@ -189,6 +200,11 @@ public:
         branch_intersection_checker = std::move(checker_);
     }
 
+    void set_self_intersection_checker(self_intersection_checker_t checker_)
+    {
+        self_intersection_checker = std::move(checker_);
+    }
+
 
     void update_knots()
     {
@@ -204,6 +220,8 @@ public:
         direction = initial_direciton;
         fail_flag = false;
         hard_failure = false;
+        incomplete_curve = false;
+        pending_endpoint_reason = endpoint_reason_t::none;
         just_interpolated = false;
         continue_next_step = true;
         
@@ -233,7 +251,7 @@ public:
             }
         }
         bif_diag->print_curve();
-        return !hard_failure;
+        return !hard_failure && !incomplete_curve;
     }
 
 
@@ -279,6 +297,8 @@ protected: //changed to protected for inheritance
     bool hard_failure = false;
     bool continue_next_step = true;
     bool just_interpolated = false;
+    bool incomplete_curve = false;
+    endpoint_reason_t pending_endpoint_reason = endpoint_reason_t::none;
     bool allow_knot_interpolation_failure = false;
     bool last_failed_knot_interpolation = false;
     T last_failed_requested_knot = T(0);
@@ -287,18 +307,44 @@ protected: //changed to protected for inheritance
     knot_resolver_t knot_resolver;
     knot_relocator_t knot_relocator;
     branch_intersection_checker_t branch_intersection_checker;
+    self_intersection_checker_t self_intersection_checker;
 
-    void add_solution_to_curve(const T& lambda, const T_vec& x, const bool force_store)
+    void set_pending_endpoint_reason(endpoint_reason_t reason)
     {
+        pending_endpoint_reason = reason;
+    }
+
+    void mark_last_curve_point(endpoint_reason_t reason)
+    {
+        if(bif_diag != nullptr)
+        {
+            bif_diag->set_last_endpoint_reason(reason);
+        }
+        if(container::is_incomplete_endpoint(reason))
+        {
+            incomplete_curve = true;
+        }
+    }
+
+    void add_solution_to_curve(
+        const T& lambda,
+        const T_vec& x,
+        const bool force_store,
+        endpoint_reason_t endpoint_reason = endpoint_reason_t::none)
+    {
+        if(container::is_incomplete_endpoint(endpoint_reason))
+        {
+            incomplete_curve = true;
+        }
         if(solution_postprocessor)
         {
             vec_ops->assign(x, x_output);
             solution_postprocessor(x_output);
-            bif_diag->add(lambda, x_output, force_store);
+            bif_diag->add(lambda, x_output, force_store, endpoint_reason);
         }
         else
         {
-            bif_diag->add(lambda, x, force_store);
+            bif_diag->add(lambda, x, force_store, endpoint_reason);
         }
     }
 
@@ -373,7 +419,9 @@ private:
         }
     }
 
-    bools2 check_intersection(T lambda_star) //check current interseciton with the parameter value lambda_star
+    bools2 check_intersection(
+        T lambda_star,
+        endpoint_reason_t endpoint_reason = endpoint_reason_t::none) //check current interseciton with the parameter value lambda_star
     {
         if( (lambda_star - lambda1)*(lambda_star - lambda0)<=T(0.0) )
         {
@@ -387,7 +435,17 @@ private:
                 last_failed_requested_knot = lambda_star;
                 last_failed_effective_knot = lambda_star;
                 fail_flag = true;
+                set_pending_endpoint_reason(endpoint_reason_t::knot_interpolation_failure);
                 return(bools2(true, true));
+            }
+            if(endpoint_reason != endpoint_reason_t::none)
+            {
+                set_pending_endpoint_reason(endpoint_reason);
+                if(endpoint_reason == endpoint_reason_t::boundary_min ||
+                   endpoint_reason == endpoint_reason_t::boundary_max)
+                {
+                    return(bools2(true, false));
+                }
             }
             bool vectors_coincide = check_vector_distances();
 
@@ -395,14 +453,32 @@ private:
         }
         else if(lambda1>lambda_max) // if we somehow magically sliped out?!
         {
-            log->error_f("continuation::check_intersection: slipped out with lambda_max = %le, lambda_1 = %le.", lambda_max, lambda1);
-            fail_flag = true;
+            if(endpoint_reason == endpoint_reason_t::boundary_max)
+            {
+                log->warning_f("continuation::check_intersection: passed lambda_max = %le without bracketed interpolation, lambda_1 = %le.", lambda_max, lambda1);
+                set_pending_endpoint_reason(endpoint_reason_t::boundary_max);
+            }
+            else
+            {
+                log->error_f("continuation::check_intersection: slipped out with lambda_max = %le, lambda_1 = %le.", lambda_max, lambda1);
+                fail_flag = true;
+                set_pending_endpoint_reason(endpoint_reason_t::hard_failure);
+            }
             return(bools2(true, true));            
         }
         else if(lambda1<lambda_min) // if we somehow magically sliped out?!
         {
-            log->error_f("continuation::check_intersection: slipped out with lambda_min = %le, lambda_1 = %le.", lambda_min, lambda1);
-            fail_flag = true;
+            if(endpoint_reason == endpoint_reason_t::boundary_min)
+            {
+                log->warning_f("continuation::check_intersection: passed lambda_min = %le without bracketed interpolation, lambda_1 = %le.", lambda_min, lambda1);
+                set_pending_endpoint_reason(endpoint_reason_t::boundary_min);
+            }
+            else
+            {
+                log->error_f("continuation::check_intersection: slipped out with lambda_min = %le, lambda_1 = %le.", lambda_min, lambda1);
+                fail_flag = true;
+                set_pending_endpoint_reason(endpoint_reason_t::hard_failure);
+            }
             return(bools2(true, true));
         }
         else
@@ -435,6 +511,7 @@ private:
             {
                 break_semicurve = 2;
                 fail_flag = false;
+                set_pending_endpoint_reason(endpoint_reason_t::closed_return);
                 continue_next_step = false;
 
             }
@@ -443,11 +520,40 @@ private:
 
     void check_interval()
     {
-        bools2 intersect_min = check_intersection(lambda_min);
-        bools2 intersect_max = check_intersection(lambda_max);
+        bools2 intersect_min(false, false);
+        bools2 intersect_max(false, false);
+
+        if(lambda1 < lambda_min)
+        {
+            intersect_min = check_intersection(lambda_min, endpoint_reason_t::boundary_min);
+        }
+        else if(lambda1 > lambda_max)
+        {
+            intersect_max = check_intersection(lambda_max, endpoint_reason_t::boundary_max);
+        }
+        else
+        {
+            intersect_min = check_intersection(lambda_min, endpoint_reason_t::boundary_min);
+            if(!intersect_min.first)
+            {
+                intersect_max = check_intersection(lambda_max, endpoint_reason_t::boundary_max);
+            }
+        }
 
         if( intersect_min.first || intersect_max.first )
         {
+            if(intersect_min.first)
+            {
+                log->warning_f(
+                    "continuation::check_interval: reached lambda_min = %le; stopping semicurve at parameter boundary.",
+                    double(lambda_min));
+            }
+            if(intersect_max.first)
+            {
+                log->warning_f(
+                    "continuation::check_interval: reached lambda_max = %le; stopping semicurve at parameter boundary.",
+                    double(lambda_max));
+            }
             break_semicurve++;
             fail_flag = false;
             continue_next_step = false;
@@ -542,6 +648,7 @@ private:
             break_semicurve++;
             fail_flag = true;
             hard_failure = true;
+            incomplete_curve = true;
         }
         if(!fail_flag)
         {        
@@ -550,6 +657,7 @@ private:
             unsigned int s;
             for(s=0;s<max_S;s++)
             {
+                pending_endpoint_reason = endpoint_reason_t::none;
                 try
                 {
                     continuation_step->solve(nonlin_op, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
@@ -557,38 +665,45 @@ private:
                     if((s>1)&&(!just_interpolated))
                     {
                         check_interval();
-                        check_returning();
-                        
-                        //save for restoring if interpolation fails!
-                        bool fail_flag_b4_interpolation = fail_flag;
-                        vec_ops->assign(x1, x1_back);
-                        T lambda1_back = lambda1;
-                        
-                        last_failed_knot_interpolation = false;
-                        did_knot_interpolation = interpolate_all_knots();
-                        //if fail flag after the interpolation, restore (x1, lambda1) and continue?
-                        if((fail_flag)&&(!fail_flag_b4_interpolation))
+                        if(continue_next_step)
                         {
-                            vec_ops->assign(x1_back, x1);
-                            lambda1 = lambda1_back;
-                            did_knot_interpolation = false;
-                            if(try_relocate_failed_knot(lambda1_back))
+                            check_returning();
+                        }
+                        if(continue_next_step)
+                        {
+                            //save for restoring if interpolation fails!
+                            bool fail_flag_b4_interpolation = fail_flag;
+                            vec_ops->assign(x1, x1_back);
+                            T lambda1_back = lambda1;
+
+                            last_failed_knot_interpolation = false;
+                            did_knot_interpolation = interpolate_all_knots();
+                            //if fail flag after the interpolation, restore (x1, lambda1) and continue?
+                            if((fail_flag)&&(!fail_flag_b4_interpolation))
                             {
-                                did_knot_interpolation = true;
-                            }
-                            else if(allow_knot_interpolation_failure)
-                            {
-                                fail_flag = false;
-                                last_failed_knot_interpolation = false;
-                                log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and continuing because policy allows it. May cause problems during deflation!");
-                            }
-                            else
-                            {
-                                log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and stopping this curve.");
-                                continue_next_step = false;
-                                break_semicurve++;
-                                hard_failure = true;
-                                break;
+                                vec_ops->assign(x1_back, x1);
+                                lambda1 = lambda1_back;
+                                did_knot_interpolation = false;
+                                if(try_relocate_failed_knot(lambda1_back))
+                                {
+                                    did_knot_interpolation = true;
+                                }
+                                else if(allow_knot_interpolation_failure)
+                                {
+                                    fail_flag = false;
+                                    last_failed_knot_interpolation = false;
+                                    log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and continuing because policy allows it. May cause problems during deflation!");
+                                }
+                                else
+                                {
+                                    log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and stopping this curve.");
+                                    continue_next_step = false;
+                                    break_semicurve++;
+                                    hard_failure = true;
+                                    incomplete_curve = true;
+                                    mark_last_curve_point(endpoint_reason_t::knot_interpolation_failure);
+                                    break;
+                                }
                             }
                         }
                     }
@@ -597,7 +712,7 @@ private:
                         just_interpolated = false;
                     }
                     bool branch_intersection_found = false;
-                    if(branch_intersection_checker)
+                    if(continue_next_step && branch_intersection_checker)
                     {
                         T hit_lambda = lambda1;
                         std::string hit_reason;
@@ -616,14 +731,51 @@ private:
                             did_knot_interpolation = true;
                             continue_next_step = false;
                             break_semicurve++;
+                            if(hit_reason == "analytical branch endpoint")
+                            {
+                                set_pending_endpoint_reason(endpoint_reason_t::analytical_branch);
+                            }
+                            else
+                            {
+                                set_pending_endpoint_reason(endpoint_reason_t::known_branch);
+                            }
                             log->warning_f(
                                 "continuation::start_semicurve: stopped semicurve at lambda = %le due to %s.",
                                 double(lambda1),
                                 hit_reason.empty() ? "known branch intersection" : hit_reason.c_str());
                         }
                     }
+                    bool self_intersection_found = false;
+                    if(continue_next_step && self_intersection_checker)
+                    {
+                        T hit_lambda = lambda1;
+                        std::string hit_reason;
+                        self_intersection_found = self_intersection_checker(
+                            bif_diag,
+                            lambda0,
+                            x0,
+                            lambda1,
+                            x1,
+                            hit_lambda,
+                            x_branch_intersection,
+                            hit_reason);
+                        if(self_intersection_found)
+                        {
+                            lambda1 = hit_lambda;
+                            vec_ops->assign(x_branch_intersection, x1);
+                            did_knot_interpolation = true;
+                            continue_next_step = false;
+                            break_semicurve++;
+                            set_pending_endpoint_reason(endpoint_reason_t::self_intersection);
+                            log->warning_f(
+                                "continuation::start_semicurve: stopped semicurve at lambda = %le due to %s.",
+                                double(lambda1),
+                                hit_reason.empty() ? "curve-local self intersection" : hit_reason.c_str());
+                        }
+                    }
                     //if try blocks passes, THIS is executed:
-                    add_solution_to_curve(lambda1, x1, did_knot_interpolation);
+                    add_solution_to_curve(lambda1, x1, did_knot_interpolation, pending_endpoint_reason);
+                    pending_endpoint_reason = endpoint_reason_t::none;
                     
                     vec_ops->assign(x1, x0);
                     vec_ops->assign(x1_s, x0_s);
@@ -636,6 +788,8 @@ private:
                     break_semicurve++;
                     fail_flag = true; 
                     hard_failure = true;
+                    incomplete_curve = true;
+                    mark_last_curve_point(endpoint_reason_t::hard_failure);
                     continue_next_step = false;                   
                 }
                 if(!continue_next_step)
@@ -649,6 +803,8 @@ private:
                 log->warning_f("continuation::start_semicurve: reached maximum steps = %i", s);
                 continue_next_step = false;
                 break_semicurve++;
+                incomplete_curve = true;
+                mark_last_curve_point(endpoint_reason_t::max_steps);
             }
 
         }       

@@ -15,6 +15,7 @@
         "maximum_step_multiplier": 0.0777,
         "skip_file_output": 1,
         "deflation_knots": [
+            0.025,
             0.1,
             1.0,
             1.5,
