@@ -37,12 +37,14 @@ public:
         vec_ops->init_vector(f); vec_ops->start_use_vector(f);
         vec_ops->init_vector(f1); vec_ops->start_use_vector(f1);
         vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
+        vec_ops->init_vector(x2); vec_ops->start_use_vector(x2);
     }
     ~initial_tangent()
     {
         vec_ops->stop_use_vector(f); vec_ops->free_vector(f);
         vec_ops->stop_use_vector(f1); vec_ops->free_vector(f1);
         vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
+        vec_ops->stop_use_vector(x2); vec_ops->free_vector(x2);
     }
 
     bool execute(NonlinearOperator*& nonlin_op, const T sign, const T_vec& x, const T& lambda, T_vec& x_s, T& lambda_s)
@@ -98,34 +100,19 @@ public:
             lambda_s/=norm;
             vec_ops->scale(T(1)/norm, x_s);
             //vec_ops->scale(T(1)/T(vec_ops->get_l2_size()), x_s);
+            log_tangent_diagnostics(nonlin_op, x, lambda, "linear solve", x_s, lambda_s);
             log->info("continuation::initial_tangent: execute ends successfully.");
 
         }
         else
         {
             log->warning("continuation::initial_tangent: execute falied to converge. Attempting to use approximate tangent solution via the Newton-Raphson method.");
-            T x_norm = vec_ops->norm(x);
-            T d_lambda = sign*T(1.0)/x_norm;
-            T lambda1 = lambda + d_lambda;
-            vec_ops->assign(x, x1); //guess for x1 
-            bool converged = newton->solve(nonlin_op, x1, lambda1);
+            const bool converged = estimate_tangent_with_secant_fallback(nonlin_op, sign, x, lambda, x_s, lambda_s);
             if(!converged)
             {
-                //newton method failed to converge!
                 throw std::runtime_error(std::string("continuation::initial_tangent " __FILE__ " " __STR(__LINE__) " tangent space couldn't be obtained - Newton method failed to converge.") );
             }
-            else
-            {
-                lambda_s = lambda1 - lambda; //lambda_s = ds*d(lambda)/ds
-                //x_s = x1 - x;      
-                vec_ops->assign_mul(T(1.0), x1, T(-1.0), x, x_s);  //x_s = ds*d(x)/ds
-                T ds_l = vec_ops->norm_rank1(x_s, lambda_s); 
-                lambda_s/=ds_l;
-                vec_ops->scale(T(1.0)/ds_l, x_s);
-                log->info_f("continuation::initial_tangent: estimated local ds = %le", (double) ds_l);
-                linear_system_converged = true;
-                log->info("continuation::initial_tangent: Newton-Raphson estimate ends successfully.");
-            }
+            linear_system_converged = true;
 
         }
         return linear_system_converged;
@@ -134,6 +121,127 @@ public:
 
 
 private:
+    bool estimate_tangent_with_secant_fallback(
+        NonlinearOperator* nonlin_op,
+        const T sign,
+        const T_vec& x,
+        const T& lambda,
+        T_vec& x_s,
+        T& lambda_s)
+    {
+        const T x_norm = vec_ops->norm(x);
+        const T d_lambda = x_norm > T(0) ? T(1.0)/x_norm : T(1.0);
+        const T lambda_plus = lambda + d_lambda;
+        const T lambda_minus = lambda - d_lambda;
+
+        const bool plus_converged = solve_shifted_newton(nonlin_op, x, lambda_plus, x1);
+        const bool minus_converged = solve_shifted_newton(nonlin_op, x, lambda_minus, x2);
+
+        log->info_f(
+            "continuation::initial_tangent: two-sided secant fallback shifted solves: d_lambda = %le, plus_converged = %i, minus_converged = %i.",
+            (double)d_lambda,
+            plus_converged ? 1 : 0,
+            minus_converged ? 1 : 0);
+
+        if(plus_converged && minus_converged)
+        {
+            vec_ops->assign_mul(sign, x1, -sign, x2, x_s);
+            lambda_s = sign*(lambda_plus - lambda_minus);
+            if(normalize_secant_tangent("two-sided Newton-Raphson secant fallback", x_s, lambda_s))
+            {
+                log_tangent_diagnostics(nonlin_op, x, lambda, "two-sided Newton-Raphson secant fallback", x_s, lambda_s);
+                log->info("continuation::initial_tangent: two-sided Newton-Raphson estimate ends successfully.");
+                return true;
+            }
+            log->warning("continuation::initial_tangent: two-sided Newton-Raphson estimate produced a degenerate tangent.");
+        }
+
+        if(plus_converged)
+        {
+            vec_ops->assign_mul(sign, x1, -sign, x, x_s);
+            lambda_s = sign*d_lambda;
+            if(normalize_secant_tangent("one-sided Newton-Raphson secant fallback from plus side", x_s, lambda_s))
+            {
+                log_tangent_diagnostics(nonlin_op, x, lambda, "one-sided Newton-Raphson secant fallback from plus side", x_s, lambda_s);
+                log->info("continuation::initial_tangent: one-sided plus Newton-Raphson estimate ends successfully.");
+                return true;
+            }
+        }
+
+        if(minus_converged)
+        {
+            vec_ops->assign_mul(sign, x, -sign, x2, x_s);
+            lambda_s = sign*d_lambda;
+            if(normalize_secant_tangent("one-sided Newton-Raphson secant fallback from minus side", x_s, lambda_s))
+            {
+                log_tangent_diagnostics(nonlin_op, x, lambda, "one-sided Newton-Raphson secant fallback from minus side", x_s, lambda_s);
+                log->info("continuation::initial_tangent: one-sided minus Newton-Raphson estimate ends successfully.");
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool solve_shifted_newton(NonlinearOperator* nonlin_op, const T_vec& x, const T& lambda_shifted, T_vec& x_shifted)
+    {
+        vec_ops->assign(x, x_shifted);
+        const bool converged = newton->solve(nonlin_op, x_shifted, lambda_shifted);
+        if(converged)
+        {
+            nonlinear_operators::detail::project_state_relative_to(vec_ops, nonlin_op, x, x_shifted);
+        }
+        return converged;
+    }
+
+    bool normalize_secant_tangent(const char* method, T_vec& x_s, T& lambda_s)
+    {
+        const T ds_l = vec_ops->norm_rank1(x_s, lambda_s);
+        if(!(ds_l > T(0)))
+        {
+            return false;
+        }
+        lambda_s /= ds_l;
+        vec_ops->scale(T(1.0)/ds_l, x_s);
+        log->info_f("continuation::initial_tangent: estimated local ds = %le using %s", (double)ds_l, method);
+        return true;
+    }
+
+    void log_tangent_diagnostics(
+        NonlinearOperator* nonlin_op,
+        const T_vec& x,
+        const T& lambda,
+        const char* method,
+        const T_vec& x_s,
+        const T& lambda_s)
+    {
+        nonlinear_operators::detail::set_linearization_point(nonlin_op, x, lambda);
+        const T x_s_norm = vec_ops->norm_l2(x_s);
+        const T rank1_norm = vec_ops->norm_rank1(x_s, lambda_s);
+
+        // f stores -J_lambda at this point, so J*x_s - lambda_s*f is
+        // J*x_s + J_lambda*lambda_s, the tangent equation residual.
+        lin_op->apply(x_s, f1);
+        vec_ops->add_mul(-lambda_s, f, f1);
+        const T tangent_residual = vec_ops->norm_l2(f1);
+
+        log->info_f(
+            "continuation::initial_tangent: diagnostics: method = %s, ||x_s|| = %le, lambda_s = %le, ||(x_s,lambda_s)|| = %le, tangent equation residual = %le",
+            method,
+            (double)x_s_norm,
+            (double)lambda_s,
+            (double)rank1_norm,
+            (double)tangent_residual);
+        if(tangent_residual > T(1))
+        {
+            log->warning_f(
+                "continuation::initial_tangent: validation warning: tangent equation residual is large: method = %s, residual = %le, lambda_s = %le.",
+                method,
+                (double)tangent_residual,
+                (double)lambda_s);
+        }
+    }
+
     VectorOperations* vec_ops;
     Loggin* log;
     NewtonMethod* newton;
@@ -141,7 +249,7 @@ private:
     LinearSystemSolver* lin_solv;
     bool verbose;
     T_vec f, f1;
-    T_vec x1;
+    T_vec x1, x2;
     
 };
 

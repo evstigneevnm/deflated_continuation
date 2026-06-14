@@ -364,6 +364,23 @@ private:
         return lower.segment_id == upper.segment_id && !is_incomplete_segment(lower.segment_id);
     }
 
+    bool terminal_pair_not_at_lambda(const values_t& lower, const values_t& upper, const T& lambda_star) const
+    {
+        const bool lower_terminal = is_terminal_endpoint(lower.endpoint_reason);
+        const bool upper_terminal = is_terminal_endpoint(upper.endpoint_reason);
+        if(!lower_terminal && !upper_terminal)
+        {
+            return false;
+        }
+        return !(lower.lambda == lambda_star || upper.lambda == lambda_star);
+    }
+
+    bool terminal_pair(const values_t& lower, const values_t& upper) const
+    {
+        return is_terminal_endpoint(lower.endpoint_reason) ||
+               is_terminal_endpoint(upper.endpoint_reason);
+    }
+
     bool is_incomplete_pair(const values_t& lower, const values_t& upper) const
     {
         return segment_metadata_available &&
@@ -694,6 +711,11 @@ public:
                 }
                 continue;
             }
+            if(terminal_pair_not_at_lambda(p_j, p_jp, lambda_star))
+            {
+                status.skipped_discontinuous++;
+                continue;
+            }
             {
                 if((p_j.lambda == lambda_star)&&(p_j.is_data_avaliable))
                 {
@@ -735,9 +757,16 @@ public:
                     }
                     else
                     {
-                        //std::string fail_find_files = std::string("container::bifurcation_diagram_curve(") + std::to_string(curve_number) + std::string("): failed to find a valid solution for the parameter = ") + std::to_string(lambda_star) + std::string(" with lower flag = ") + std::to_string(stat_l) + std::string(" and upper flag = ") + std::to_string(stat_u) + std::string(", indexing = (") + std::to_string(ind) + std::string(",") + std::to_string(indp) + std::string(").");
-                        status.missing_data++;
-                        log->warning_f("container::bifurcation_diagram_curve(%i): !!!failed to add intersectoin at (%i(%i), %i(%i)) for the solution at lambda =  %lf !!!", curve_number, ind, int(stat_l), indp, int(stat_u), lambda_star);
+                        if(terminal_pair(p_j, p_jp))
+                        {
+                            status.skipped_discontinuous++;
+                        }
+                        else
+                        {
+                            //std::string fail_find_files = std::string("container::bifurcation_diagram_curve(") + std::to_string(curve_number) + std::string("): failed to find a valid solution for the parameter = ") + std::to_string(lambda_star) + std::string(" with lower flag = ") + std::to_string(stat_l) + std::string(" and upper flag = ") + std::to_string(stat_u) + std::string(", indexing = (") + std::to_string(ind) + std::string(",") + std::to_string(indp) + std::string(").");
+                            status.missing_data++;
+                            log->warning_f("container::bifurcation_diagram_curve(%i): !!!failed to add intersectoin at (%i(%i), %i(%i)) for the solution at lambda =  %lf !!!", curve_number, ind, int(stat_l), indp, int(stat_u), lambda_star);
+                        }
 
                         //throw std::runtime_error( fail_find_files );
                     }
@@ -756,6 +785,10 @@ public:
             const auto& p_j = container[j];
             const auto& p_jp = container[j + 1];
             if(!can_interpolate_between(p_j, p_jp))
+            {
+                continue;
+            }
+            if(terminal_pair_not_at_lambda(p_j, p_jp, lambda_star))
             {
                 continue;
             }
@@ -798,6 +831,10 @@ public:
             const auto& p_j = container[j];
             const auto& p_jp = container[j + 1];
             if(!can_interpolate_between(p_j, p_jp))
+            {
+                continue;
+            }
+            if(terminal_pair(p_j, p_jp))
             {
                 continue;
             }
@@ -989,6 +1026,10 @@ public:
                 continue;
             }
             if(!can_interpolate_between(p_j, p_jp))
+            {
+                continue;
+            }
+            if(terminal_pair(p_j, p_jp))
             {
                 continue;
             }

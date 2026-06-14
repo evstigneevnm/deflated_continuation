@@ -332,6 +332,8 @@ protected: //changed to protected for inheritance
         const bool force_store,
         endpoint_reason_t endpoint_reason = endpoint_reason_t::none)
     {
+        const bool should_force_store =
+            force_store || container::is_terminal_endpoint(endpoint_reason);
         if(container::is_incomplete_endpoint(endpoint_reason))
         {
             incomplete_curve = true;
@@ -340,11 +342,11 @@ protected: //changed to protected for inheritance
         {
             vec_ops->assign(x, x_output);
             solution_postprocessor(x_output);
-            bif_diag->add(lambda, x_output, force_store, endpoint_reason);
+            bif_diag->add(lambda, x_output, should_force_store, endpoint_reason);
         }
         else
         {
-            bif_diag->add(lambda, x, force_store, endpoint_reason);
+            bif_diag->add(lambda, x, should_force_store, endpoint_reason);
         }
     }
 
