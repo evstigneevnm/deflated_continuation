@@ -102,7 +102,7 @@ CPU_VECTOR_OPS_VAR_PREC_HEADERS = source/common/cpu_vector_operations_var_prec.h
 COMMON_FILE_OPS_HEADERS = source/common/file_operations.h source/common/cpu_file_operations.h source/common/cpu_matrix_file_operations.h source/common/gpu_file_operations.h source/common/gpu_matrix_file_operations.h source/common/NMFD-operations/nmfd/operations/io/file_operations.h source/common/NMFD-operations/nmfd/operations/io/vector_file_operations.h source/common/NMFD-operations/nmfd/operations/io/matrix_file_operations.h
 SMALL_DENSE_LINALG_HEADERS = source/common/NMFD-operations/nmfd/operations/linalg/small_dense.h
 COMPLEX_TRAITS_HEADERS = source/common/scfd_backend_ext/complex.h
-CONTINUATION_CHART_HEADERS = source/continuation/chart_helpers.h
+CONTINUATION_CHART_HEADERS = source/continuation/chart_helpers.h source/continuation/predictor_chart_validation.h
 SYMMETRY_CORE_HEADERS = source/symmetry/slice_data.h source/symmetry/slice_projector.h source/symmetry/quotient_classifier.h source/symmetry/stabilized_storage.h source/symmetry/finite_action_registry.h source/symmetry/finite_quotient_adapter.h
 SYMMETRY_FOURIER_HEADERS = source/symmetry/fourier/mode_descriptor.h source/symmetry/fourier/mode_access.h source/symmetry/fourier/phase_conditions.h source/symmetry/fourier/translation_generators.h source/symmetry/fourier/fourier_slice_1d.h source/symmetry/fourier/fourier_slice_differential_1d.h source/symmetry/fourier/lsq_phase_solver_1d.h source/symmetry/fourier/fourier_slice.h source/symmetry/fourier/real_packed_fourier_slice_1d_adapter.h source/symmetry/fourier/real_packed_fourier_actions_1d.h $(SYMMETRY_CORE_HEADERS) $(COMPLEX_TRAITS_HEADERS) $(SMALL_DENSE_LINALG_HEADERS)
 DEFLATION_SYMMETRY_HEADERS = source/deflation/symmetry_solution_storage.h $(SYMMETRY_FOURIER_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
@@ -167,6 +167,9 @@ test_complex_traits.bin: source/common/tests/test_complex_traits.cpp $(COMPLEX_T
 
 test_continuation_chart_helpers.bin: source/continuation/tests/test_chart_helpers.cpp $(CONTINUATION_CHART_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/continuation/tests/test_chart_helpers.cpp -o $(BUILD_DIR)/test_continuation_chart_helpers.bin 2>$(RESULTS)
+
+test_predictor_chart_validation.bin: source/continuation/tests/test_predictor_chart_validation.cpp $(CONTINUATION_CHART_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/continuation/tests/test_predictor_chart_validation.cpp -o $(BUILD_DIR)/test_predictor_chart_validation.bin 2>$(RESULTS)
 
 test_fourier_mode_primitives.bin: source/symmetry/tests/test_fourier_mode_primitives.cpp $(SYMMETRY_FOURIER_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_mode_primitives.cpp -o $(BUILD_DIR)/test_fourier_mode_primitives.bin 2>$(RESULTS)

@@ -340,11 +340,12 @@ public:
         const auto &data = symmetry_adapter.last_slice_data();
         log->info_f(
             "%s: Fourier slice diagnostics: active = %i, mode = %lu, residual_group_order = %lu, shift = %le, "
-            "selected_abs = %le, selected_real_on_slice = %le, slice_matrix = %le",
+            "selected_abs = %le, selected_real_on_slice = %le, slice_matrix = %le, discrete_action = %i",
             context, data.active() ? 1 : 0, static_cast<unsigned long>( data.mode ),
             static_cast<unsigned long>( data.residual_group_order() ), static_cast<double>( data.shift ),
             static_cast<double>( data.selected_abs ), static_cast<double>( data.selected_real_on_slice ),
-            static_cast<double>( data.slice_matrix )
+            static_cast<double>( data.slice_matrix ),
+            static_cast<int>( symmetry_adapter.last_discrete_action() )
         );
     }
 

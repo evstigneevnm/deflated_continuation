@@ -191,6 +191,50 @@ void test_negative_reflection_representatives_collapse_when_enabled()
     free_bundle(vec_ops, v);
 }
 
+void test_closest_to_reference_uses_negative_reflection_action()
+{
+    vec_ops_t vec_ops(4);
+    adapter_t adapter(&vec_ops, 2);
+    adapter.enable_negative_reflection_symmetry();
+    vector_bundle v;
+    init_bundle(vec_ops, v);
+
+    set_vector(vec_ops, v.x, {1.0, 0.0, 0.25, 0.4});
+    adapter.apply_negative_reflection(v.x, v.y);
+    adapter.stabilize_closest_to_reference(v.x, v.y, v.z);
+
+    require_vector_close(vec_ops, "closest-to-reference negative reflection", v.z, v.x, 2e-12);
+    require_true(
+        "closest-to-reference selected negative reflection",
+        adapter.last_discrete_action() ==
+            symmetry::fourier::real_packed_fourier_1d_discrete_action::negative_reflection);
+
+    free_bundle(vec_ops, v);
+}
+
+void test_continuation_chart_uses_negative_reflection_action()
+{
+    vec_ops_t vec_ops(4);
+    adapter_t adapter(&vec_ops, 2);
+    adapter.enable_negative_reflection_symmetry();
+    vector_bundle v;
+    init_bundle(vec_ops, v);
+
+    set_vector(vec_ops, v.x, {1.0, 0.0, 0.25, 0.4});
+    adapter.apply_negative_reflection(v.x, v.y);
+    adapter.apply_shift(v.y, v.z, 0.43);
+    set_vector(vec_ops, v.w, {0.0, 0.0, 0.0, 0.0});
+    adapter.stabilize_continuation_chart(v.x, v.w, v.z, v.y);
+
+    require_vector_close(vec_ops, "continuation-chart negative reflection", v.y, v.x, 2e-12);
+    require_true(
+        "continuation-chart selected negative reflection",
+        adapter.last_discrete_action() ==
+            symmetry::fourier::real_packed_fourier_1d_discrete_action::negative_reflection);
+
+    free_bundle(vec_ops, v);
+}
+
 void test_relative_active_mode_threshold_skips_tiny_low_mode()
 {
     vec_ops_t vec_ops(6);
@@ -373,6 +417,8 @@ int main()
     test_canonical_ignores_chart_history();
     test_residual_group_representatives_collapse();
     test_negative_reflection_representatives_collapse_when_enabled();
+    test_closest_to_reference_uses_negative_reflection_action();
+    test_continuation_chart_uses_negative_reflection_action();
     test_relative_active_mode_threshold_skips_tiny_low_mode();
     test_continuation_hysteresis_switches_before_mode_vanishes();
     test_continuation_hysteresis_keeps_usable_current_mode();

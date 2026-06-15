@@ -6,6 +6,7 @@
 #include <cmath>
 #include <common/scalar_math.h>
 #include <continuation/chart_helpers.h>
+#include <continuation/predictor_chart_validation.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
 /**
   continuation of a single solution forward or backward on a single step
@@ -90,6 +91,11 @@ public:
             const T charted_x_progress = vec_ops->scalar_prod(dx10, x0_s);
             const T charted_lambda_progress = (lambda1 - lambda0)*lambda0_s;
             const T charted_tangent_progress = charted_x_progress + charted_lambda_progress;
+            const auto predictor_validation = validate_predictor_chart(
+                ds_l,
+                raw_tangent_progress,
+                charted_tangent_progress,
+                predictor_chart_displacement);
             log->info_f("continuation::predict: dS = %le, max dS = %le, tangent norm = %le, ||x_p|| = %le, lambda_p = %le, ||x1|| = %le, lambda1 = %le, ||x1 - x_p|| = %le", (double)ds_l, (double)ds_max, (double)tangent_norm, (double)vec_ops->norm(x_p), (double)lambda_p, (double)vec_ops->norm(x1), (double)lambda1, (double)predictor_chart_displacement);
             log->info_f(
                 "continuation::predict: tangent progress diagnostics: raw = %le (x = %le, lambda = %le), charted = %le (x = %le, lambda = %le), charted/raw = %le",
@@ -104,7 +110,8 @@ public:
                 ds_l,
                 raw_tangent_progress,
                 charted_tangent_progress,
-                predictor_chart_displacement);
+                predictor_chart_displacement,
+                predictor_validation);
             chart::log_continuation_chart(log, nonlin_op, "continuation::advance_solution::predictor");
             if(continuation_type == 'S')
             {
@@ -258,23 +265,17 @@ private:
         const T& ds_l,
         const T& raw_tangent_progress,
         const T& charted_tangent_progress,
-        const T& predictor_chart_displacement) const
+        const T& predictor_chart_displacement,
+        const predictor_chart_validation_result<T>& validation) const
     {
-        const T abs_raw_progress = common::scalar_math::abs(raw_tangent_progress);
-        const T abs_charted_progress = common::scalar_math::abs(charted_tangent_progress);
-        const T progress_scale = abs_raw_progress > T(0) ? abs_raw_progress : common::scalar_math::abs(ds_l);
-        const T progress_ratio = progress_scale > T(0) ? charted_tangent_progress/progress_scale : T(0);
-        const T displacement_ratio =
-            common::scalar_math::abs(ds_l) > T(0) ? predictor_chart_displacement/common::scalar_math::abs(ds_l) : T(0);
-
-        if(raw_tangent_progress <= T(0))
+        if(validation.raw_non_positive)
         {
             log->warning_f(
                 "continuation::predict: validation warning: raw predictor progress is non-positive: raw = %le, ds = %le.",
                 (double)raw_tangent_progress,
                 (double)ds_l);
         }
-        if(charted_tangent_progress <= T(0))
+        if(validation.charted_non_positive)
         {
             log->warning_f(
                 "continuation::predict: validation warning: charted predictor progress is non-positive: raw = %le, charted = %le, chart displacement = %le.",
@@ -282,30 +283,30 @@ private:
                 (double)charted_tangent_progress,
                 (double)predictor_chart_displacement);
         }
-        else if(abs_charted_progress < T(0.2)*progress_scale)
+        else if(validation.charted_weak_warning)
         {
             log->warning_f(
                 "continuation::predict: validation warning: charted predictor progress is weak: raw = %le, charted = %le, charted/raw-scale = %le.",
                 (double)raw_tangent_progress,
                 (double)charted_tangent_progress,
-                (double)progress_ratio);
+                (double)validation.progress_ratio);
         }
 
-        if(progress_ratio > T(5) || progress_ratio < T(-5))
+        if(validation.progress_jump_warning)
         {
             log->warning_f(
                 "continuation::predict: validation warning: charted predictor progress changed too much: raw = %le, charted = %le, charted/raw-scale = %le.",
                 (double)raw_tangent_progress,
                 (double)charted_tangent_progress,
-                (double)progress_ratio);
+                (double)validation.progress_ratio);
         }
-        if(displacement_ratio > T(20))
+        if(validation.displacement_warning)
         {
             log->warning_f(
                 "continuation::predict: validation warning: chart displacement is large relative to ds: ||x1 - x_p|| = %le, ds = %le, ratio = %le.",
                 (double)predictor_chart_displacement,
-                (double)ds_l,
-                (double)displacement_ratio);
+                (double)(validation.displacement_ratio > T(0) ? predictor_chart_displacement/validation.displacement_ratio : T(0)),
+                (double)validation.displacement_ratio);
         }
     }
 

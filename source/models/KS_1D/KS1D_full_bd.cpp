@@ -117,6 +117,10 @@ void configure_symmetry_stabilizer_from_json(
     adapter.set_lsq_max_active_modes(config.value("max_active_modes", std::size_t(8)));
     adapter.set_lsq_grid_points(config.value("grid_points", std::size_t(64)));
     adapter.set_lsq_newton_iterations(config.value("newton_iterations", std::size_t(8)));
+    const bool negative_reflection = config.value(
+        "negative_reflection",
+        config.value("enable_negative_reflection", false));
+    adapter.enable_negative_reflection_symmetry(negative_reflection);
 
     if(!quiet)
     {
@@ -126,6 +130,7 @@ void configure_symmetry_stabilizer_from_json(
                   << ", max_active_modes=" << config.value("max_active_modes", std::size_t(8))
                   << ", grid_points=" << config.value("grid_points", std::size_t(64))
                   << ", newton_iterations=" << config.value("newton_iterations", std::size_t(8))
+                  << ", negative_reflection=" << (negative_reflection ? 1 : 0)
                   << std::endl;
     }
 }

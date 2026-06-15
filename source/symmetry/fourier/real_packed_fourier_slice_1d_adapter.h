@@ -248,37 +248,58 @@ public:
         vector_to_spectrum(source, spectrum);
         vector_to_spectrum(reference, reference_spectrum);
 
-        last_action = real_packed_fourier_1d_discrete_action::identity;
-        last_data = choose_reliable_slice_data(spectrum, last_data.mode);
-        last_data_uses_lsq = false;
-        if(!last_data.active())
-        {
-            stabilized_spectrum = spectrum;
-            spectrum_to_vector(stabilized_spectrum, destination);
-            return;
-        }
-
-        const scalar_type base_shift = last_data.shift;
-        const std::size_t order = last_data.residual_group_order() == 0 ? std::size_t(1) : last_data.residual_group_order();
         const scalar_type two_pi = scalar_type(2)*static_cast<scalar_type>(std::acos(static_cast<scalar_type>(-1)));
         scalar_type best_distance = std::numeric_limits<scalar_type>::max();
-        scalar_type best_shift = base_shift;
+        slice_data_type best_data;
+        real_packed_fourier_1d_discrete_action best_action = real_packed_fourier_1d_discrete_action::identity;
+        bool have_best = false;
 
-        for(std::size_t j = 0; j < order; ++j)
+        for(std::size_t action_index = 0; action_index < discrete_action_count(); ++action_index)
         {
-            const scalar_type shift = base_shift + two_pi*static_cast<scalar_type>(j)/static_cast<scalar_type>(order);
-            slice.apply_shift(spectrum.data(), candidate_spectrum.data(), candidate_spectrum.size(), shift);
-            const scalar_type distance = spectrum_distance_sq(candidate_spectrum, reference_spectrum);
-            if(j == 0 || distance < best_distance)
+            const auto action = discrete_action_at(action_index);
+            apply_discrete_action_spectrum(spectrum, action_spectrum, action);
+            slice_data_type candidate_data = choose_reliable_slice_data(action_spectrum, last_data.mode);
+
+            if(!candidate_data.active())
             {
-                best_distance = distance;
-                best_shift = shift;
-                best_spectrum = candidate_spectrum;
+                const scalar_type distance = spectrum_distance_sq(action_spectrum, reference_spectrum);
+                if(!have_best || distance < best_distance)
+                {
+                    best_distance = distance;
+                    best_spectrum = action_spectrum;
+                    best_data = candidate_data;
+                    best_action = action;
+                    have_best = true;
+                }
+                continue;
+            }
+
+            const scalar_type base_shift = candidate_data.shift;
+            const std::size_t order =
+                candidate_data.residual_group_order() == 0 ? std::size_t(1) : candidate_data.residual_group_order();
+
+            for(std::size_t j = 0; j < order; ++j)
+            {
+                const scalar_type shift =
+                    base_shift + two_pi*static_cast<scalar_type>(j)/static_cast<scalar_type>(order);
+                slice.apply_shift(action_spectrum.data(), candidate_spectrum.data(), candidate_spectrum.size(), shift);
+                const scalar_type distance = spectrum_distance_sq(candidate_spectrum, reference_spectrum);
+                if(!have_best || distance < best_distance)
+                {
+                    best_distance = distance;
+                    best_spectrum = candidate_spectrum;
+                    best_data = candidate_data;
+                    best_data.shift = shift;
+                    best_data.set_shift(0, shift);
+                    best_action = action;
+                    have_best = true;
+                }
             }
         }
 
-        last_data.shift = best_shift;
-        last_data.set_shift(0, best_shift);
+        last_data = best_data;
+        last_action = best_action;
+        last_data_uses_lsq = false;
         stabilized_spectrum = best_spectrum;
         spectrum_to_vector(stabilized_spectrum, destination);
     }
@@ -410,6 +431,11 @@ public:
         check_vector_size(tangent_on_slice);
 
         vector_to_spectrum(source_tangent, gradient_spectrum);
+        if(last_action != real_packed_fourier_1d_discrete_action::identity)
+        {
+            apply_discrete_action_spectrum(gradient_spectrum, action_spectrum, last_action);
+            gradient_spectrum = action_spectrum;
+        }
         if(last_data_uses_lsq &&
            last_data.active() && !last_data.active_modes.empty())
         {
@@ -872,46 +898,74 @@ private:
 
     void stabilize_continuation_spectra(const bool use_tangent, vector_type& destination)
     {
-        last_action = real_packed_fourier_1d_discrete_action::identity;
-        if(stabilizer_policy == real_packed_fourier_1d_stabilizer_policy::lsq_multimode)
-        {
-            const scalar_type threshold = std::max(active_mode_threshold(spectrum), active_mode_threshold(reference_spectrum));
-            last_data = make_lsq_slice_data(spectrum, reference_spectrum, threshold);
-            last_data_uses_lsq = last_data.active();
-        }
-        else
-        {
-            last_data = choose_continuation_slice_data(spectrum, last_data.mode);
-            last_data_uses_lsq = false;
-        }
-        if(!last_data.active())
-        {
-            stabilized_spectrum = spectrum;
-            spectrum_to_vector(stabilized_spectrum, destination);
-            return;
-        }
-
-        const scalar_type base_shift = last_data.shift;
-        const std::size_t order = last_data.residual_group_order() == 0 ? std::size_t(1) : last_data.residual_group_order();
         const scalar_type two_pi = scalar_type(2)*static_cast<scalar_type>(std::acos(static_cast<scalar_type>(-1)));
         scalar_type best_score = std::numeric_limits<scalar_type>::max();
-        scalar_type best_shift = base_shift;
+        slice_data_type best_data;
+        real_packed_fourier_1d_discrete_action best_action = real_packed_fourier_1d_discrete_action::identity;
+        bool best_uses_lsq = false;
+        bool have_best = false;
 
-        for(std::size_t j = 0; j < order; ++j)
+        for(std::size_t action_index = 0; action_index < discrete_action_count(); ++action_index)
         {
-            const scalar_type shift = base_shift + two_pi*static_cast<scalar_type>(j)/static_cast<scalar_type>(order);
-            slice.apply_shift(spectrum.data(), candidate_spectrum.data(), candidate_spectrum.size(), shift);
-            const scalar_type score = continuation_candidate_score(candidate_spectrum, use_tangent);
-            if(j == 0 || score < best_score)
+            const auto action = discrete_action_at(action_index);
+            apply_discrete_action_spectrum(spectrum, action_spectrum, action);
+
+            slice_data_type candidate_data;
+            bool candidate_uses_lsq = false;
+            if(stabilizer_policy == real_packed_fourier_1d_stabilizer_policy::lsq_multimode)
             {
-                best_score = score;
-                best_shift = shift;
-                best_spectrum = candidate_spectrum;
+                const scalar_type threshold =
+                    std::max(active_mode_threshold(action_spectrum), active_mode_threshold(reference_spectrum));
+                candidate_data = make_lsq_slice_data(action_spectrum, reference_spectrum, threshold);
+                candidate_uses_lsq = candidate_data.active();
+            }
+            else
+            {
+                candidate_data = choose_continuation_slice_data(action_spectrum, last_data.mode);
+            }
+
+            if(!candidate_data.active())
+            {
+                const scalar_type score = continuation_candidate_score(action_spectrum, use_tangent);
+                if(!have_best || score < best_score)
+                {
+                    best_score = score;
+                    best_spectrum = action_spectrum;
+                    best_data = candidate_data;
+                    best_action = action;
+                    best_uses_lsq = false;
+                    have_best = true;
+                }
+                continue;
+            }
+
+            const scalar_type base_shift = candidate_data.shift;
+            const std::size_t order =
+                candidate_data.residual_group_order() == 0 ? std::size_t(1) : candidate_data.residual_group_order();
+
+            for(std::size_t j = 0; j < order; ++j)
+            {
+                const scalar_type shift =
+                    base_shift + two_pi*static_cast<scalar_type>(j)/static_cast<scalar_type>(order);
+                slice.apply_shift(action_spectrum.data(), candidate_spectrum.data(), candidate_spectrum.size(), shift);
+                const scalar_type score = continuation_candidate_score(candidate_spectrum, use_tangent);
+                if(!have_best || score < best_score)
+                {
+                    best_score = score;
+                    best_spectrum = candidate_spectrum;
+                    best_data = candidate_data;
+                    best_data.shift = shift;
+                    best_data.set_shift(0, shift);
+                    best_action = action;
+                    best_uses_lsq = candidate_uses_lsq;
+                    have_best = true;
+                }
             }
         }
 
-        last_data.shift = best_shift;
-        last_data.set_shift(0, best_shift);
+        last_data = best_data;
+        last_action = best_action;
+        last_data_uses_lsq = best_uses_lsq;
         stabilized_spectrum = best_spectrum;
         spectrum_to_vector(stabilized_spectrum, destination);
     }

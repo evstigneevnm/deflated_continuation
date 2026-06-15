@@ -72,6 +72,10 @@ jobs:
         run: |
           make test_continuation_chart_helpers.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/continuation_chart_helpers"
           ./"$BUILD_DIR"/continuation_chart_helpers/test_continuation_chart_helpers.bin
+      - name: Build and test predictor chart validation
+        run: |
+          make test_predictor_chart_validation.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/predictor_chart_validation"
+          ./"$BUILD_DIR"/predictor_chart_validation/test_predictor_chart_validation.bin
 
   symmetry-foundation-cpu:
     needs: [scfd-vector-operations-cpu]
