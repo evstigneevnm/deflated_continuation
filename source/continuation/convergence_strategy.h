@@ -94,7 +94,10 @@ public:
         maximum_norm_increase_ = maximum_norm_increase_p;
         newton_wight_threshold_ = newton_wight_threshold_p;
 
-        log->info_f("continuation::convergence: check: relax_tolerance_factor = %le, maximum_norm_increase = %le, newton_wight_threshold = %le", (double)relax_tolerance_factor, (double)maximum_norm_increase_, double(newton_wight_threshold_) );
+        if(verbose)
+        {
+            log->info_f("continuation::convergence: check: relax_tolerance_factor = %le, maximum_norm_increase = %le, newton_wight_threshold = %le", (double)relax_tolerance_factor, (double)maximum_norm_increase_, double(newton_wight_threshold_) );
+        }
 
     }   
 
@@ -130,12 +133,15 @@ public:
         vec_ops->assign_mul(T(1), x1, T(-1), projection_trial, projection_trial);
         const T projection_displacement = vec_ops->norm_l2(projection_trial);
         const T arclength_after_projection = constraint_residual(sys_op, x1, lambda1);
-        log->info_f(
-            "continuation::convergence: projection diagnostics: arclength before project = %le, arclength after project = %le, ||projected_x1 - trial_x1|| = %le",
-            (double)arclength_before_projection,
-            (double)arclength_after_projection,
-            (double)projection_displacement);
-        continuation::chart::log_continuation_chart(log, nonlin_op, "continuation::convergence");
+        if(verbose)
+        {
+            log->info_f(
+                "continuation::convergence: projection diagnostics: arclength before project = %le, arclength after project = %le, ||projected_x1 - trial_x1|| = %le",
+                (double)arclength_before_projection,
+                (double)arclength_after_projection,
+                (double)projection_displacement);
+            continuation::chart::log_continuation_chart(log, nonlin_op, "continuation::convergence");
+        }
         return residual_norm(sys_op, nonlin_op, x1, lambda1, normF1, arclength_res1);
     }
 
@@ -222,7 +228,10 @@ public:
         if(normFx < tolerance) //do nothing is my kind of problem =)
         {
             result_status = 0;
-            log->info_f("continuation::convergence: iteration %i, extended residual n: %le, F residual: %le, arclength residual: %le < tolerance: %le => finished.",iterations, (double)normFx, (double)normF, (double)arclength_res, (double)tolerance );
+            if(verbose)
+            {
+                log->info_f("continuation::convergence: iteration %i, extended residual n: %le, F residual: %le, arclength residual: %le < tolerance: %le => finished.",iterations, (double)normFx, (double)normF, (double)arclength_res, (double)tolerance );
+            }
             return true;
         }
         if(norms_storage.size() == 0)
@@ -257,7 +266,10 @@ public:
                 {
                     newton_wight *= 0.7;
                     normFx1 = update_solution(sys_op, nonlin_op, x, lambda, delta_x, delta_lambda, x1, lambda1, normF1, arclength_res1);
-                    log->info_f("continuation::convergence: increase threshold: %.01f, weight update from %le to %le with weight: %le and weight threshold: %le ", (double)maximum_norm_increase_, (double)normFx, (double)normFx1, (double)newton_wight, (double)newton_wight_threshold_);
+                    if(verbose)
+                    {
+                        log->info_f("continuation::convergence: increase threshold: %.01f, weight update from %le to %le with weight: %le and weight threshold: %le ", (double)maximum_norm_increase_, (double)normFx, (double)normFx1, (double)newton_wight, (double)newton_wight_threshold_);
+                    }
                     if(!common::scalar_math::isfinite(normFx1))
                     {
                         result_status = 3;
@@ -301,7 +313,10 @@ public:
         iterations++;
         auto result_status_string = parse_result_status(result_status);
         auto finish_string = parse_bool(finish);
-        log->info_f("continuation::convergence: iteration: %i, max_iterations: %i, extended residuals n: %le, n+1: %le, F residuals n: %le, n+1: %le, arclength residuals n: %le, n+1: %le, min_value: %le, result_status: %i => %s, is_finished = %s, newton_wight = %le, stagnation = %u ",iterations, maximum_iterations, (double)normFx, (double)normFx1, (double)normF, (double)normF1, (double)arclength_res, (double)arclength_res1, double(min_value), result_status,  result_status_string.c_str(), finish_string.c_str(), (double)newton_wight, stagnation );
+        if(verbose)
+        {
+            log->info_f("continuation::convergence: iteration: %i, max_iterations: %i, extended residuals n: %le, n+1: %le, F residuals n: %le, n+1: %le, arclength residuals n: %le, n+1: %le, min_value: %le, result_status: %i => %s, is_finished = %s, newton_wight = %le, stagnation = %u ",iterations, maximum_iterations, (double)normFx, (double)normFx1, (double)normF, (double)normF1, (double)arclength_res, (double)arclength_res1, double(min_value), result_status,  result_status_string.c_str(), finish_string.c_str(), (double)newton_wight, stagnation );
+        }
 
         // store this solution point if the norm is the smalles of all
         if( (min_value >= normFx1)&&((result_status == 1)||(result_status == 4)) )
@@ -351,7 +366,10 @@ public:
         if(finish)
         {   //checks whaterver is needed for nans, errors or whaterver is considered a quality solution in the nonlinear operator.
             T solution_quality = nonlin_op->check_solution_quality(x);
-            log->info_f("continuation::convergence: Newton obtained solution quality = %le.", (double)solution_quality);
+            if(verbose)
+            {
+                log->info_f("continuation::convergence: Newton obtained solution quality = %le.", (double)solution_quality);
+            }
 
         }
 

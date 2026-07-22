@@ -60,6 +60,20 @@ public:
         ds_max = ds_max_;
     }
 
+    void set_steps(
+        const unsigned int max_S_,
+        const T ds_0_,
+        const T ds_max_,
+        const int initial_direciton_,
+        const corrector_retry_policy<T>& retry_policy)
+    {
+        parent_t::max_S = max_S_;
+        parent_t::initial_direciton = initial_direciton_;
+        parent_t::predict->set_steps(ds_0_, ds_max_, retry_policy);
+        ds_0 = ds_0_;
+        ds_max = ds_max_;
+    }
+
     void set_exact_solution_provider(std::function<bool(const T&, T_vec&)> provider)
     {
         exact_solution_provider = std::move(provider);
@@ -77,8 +91,7 @@ public:
         parent_t::direction = parent_t::initial_direciton;
         parent_t::fail_flag = false;
         parent_t::hard_failure = false;
-        parent_t::incomplete_curve = false;
-        parent_t::pending_endpoint_reason = container::curve_endpoint_reason::none;
+        parent_t::endpoint_state.reset_curve();
         parent_t::just_interpolated = false;
         parent_t::continue_next_step = true;
         
@@ -207,7 +220,7 @@ private:
         unsigned int s;
         for(s=0;s<parent_t::max_S;s++)
         {
-            parent_t::pending_endpoint_reason = container::curve_endpoint_reason::none;
+            parent_t::endpoint_state.reset_step();
             T d_lambda = ds_max;
             if(d_lambda <= T(0) || !common::scalar_math::isfinite(d_lambda))
             {
@@ -246,8 +259,12 @@ private:
                 parent_t::just_interpolated = false;
             }
             //if try blocks passes, THIS is executed:
-            parent_t::add_solution_to_curve(parent_t::lambda1, parent_t::x1, did_knot_interpolation, parent_t::pending_endpoint_reason);
-            parent_t::pending_endpoint_reason = container::curve_endpoint_reason::none;
+            parent_t::add_solution_to_curve(
+                parent_t::lambda1,
+                parent_t::x1,
+                did_knot_interpolation,
+                parent_t::endpoint_state.pending_reason());
+            parent_t::endpoint_state.reset_step();
                     
             parent_t::vec_ops->assign(parent_t::x1, parent_t::x0);
             //parent_t::vec_ops->assign(parent_t::x1_s, parent_t::x0_s);

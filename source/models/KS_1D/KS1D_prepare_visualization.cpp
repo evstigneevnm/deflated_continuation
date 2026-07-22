@@ -18,7 +18,7 @@ int main(int argc, char const* argv[])
     using ks1d_t = nonlinear_operators::kuramoto_sivashinskiy_1d<vec_ops_real, fft_backend_t, Blocks_x_>;
     using parameters_t = main_classes::parameters<real>;
 
-    std::string path_to_config_file = "json_project_files/KS1D_sym_test.json";
+    std::string path_to_config_file = "json_project_files/KS1D_test_sym.json";
     visualization::bd_prepare_options options;
 
     try
@@ -30,7 +30,7 @@ int main(int argc, char const* argv[])
             {
                 continue;
             }
-            if(path_to_config_file == "json_project_files/KS1D_sym_test.json")
+            if(path_to_config_file == "json_project_files/KS1D_test_sym.json")
             {
                 path_to_config_file = arg;
             }

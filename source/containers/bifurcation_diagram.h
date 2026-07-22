@@ -82,6 +82,7 @@ private:
 
 public:
     typedef typename Curve::values_t curve_point_type;
+    typedef typename Curve::symmetry_event_record_type symmetry_event_record_type;
 
 public:
     bifurcation_diagram(VectorOperations* vec_ops_, VectorFileOperations* vec_files_, Log* log_, NonlinearOperator* nlin_op_, Newton* newton_, const std::string& directory_ = {}, unsigned int skip_output_ = 10):
@@ -178,6 +179,27 @@ public:
     void close_curve()
     {
         curve_container.back().close_curve();
+    }
+
+    bool commit_current_curve_symmetry_events()
+    {
+        if(curve_container.empty())
+        {
+            return true;
+        }
+        return curve_container.back().commit_staged_symmetry_events();
+    }
+
+    std::vector<symmetry_event_record_type> symmetry_event_records()
+    {
+        std::vector<symmetry_event_record_type> result;
+        for(auto& curve: curve_container)
+        {
+            curve.set_main_refs(vec_ops, file_ops, log, nonlin_op, newton, cont_help);
+            const auto& events = curve.symmetry_event_records();
+            result.insert(result.end(), events.begin(), events.end());
+        }
+        return result;
     }
 
     std::vector<curve_point_type> get_curve_points_vector(int curve_number_)

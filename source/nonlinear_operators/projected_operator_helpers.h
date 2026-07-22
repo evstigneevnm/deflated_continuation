@@ -1,10 +1,19 @@
 #ifndef __NONLINEAR_OPERATORS_PROJECTED_OPERATOR_HELPERS_H__
 #define __NONLINEAR_OPERATORS_PROJECTED_OPERATOR_HELPERS_H__
 
+#include <symmetry/continuation/geometry_traits.h>
+
 namespace nonlinear_operators
 {
 namespace detail
 {
+
+template<class NonlinearOperator, class Vector, class Scalar>
+using has_projected_tangent_system =
+    symmetry::continuation::geometry::has_projected_tangent_system<
+        NonlinearOperator,
+        Vector,
+        Scalar>;
 
 template<class NonlinearOperator, class Vector, class Scalar>
 auto set_linearization_point(NonlinearOperator* op, const Vector& x, const Scalar& lambda, int)

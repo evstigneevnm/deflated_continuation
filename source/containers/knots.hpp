@@ -84,8 +84,13 @@ public:
 
     bool next()
     {
+        if(container.size() <= 2)
+        {
+            current_position = 0;
+            return(false);
+        }
         current_position++;
-        if( current_position >= size() - 1 ) //size - 1 so that the first and the last knots are limiting knots, not deflation knots!
+        if( current_position >= container.size() - 1 ) //size - 1 so that the first and the last knots are limiting knots, not deflation knots!
         {
             current_position = 0;
             return(false);

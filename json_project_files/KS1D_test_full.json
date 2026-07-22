@@ -1,14 +1,25 @@
 {
     "gpu_pci_id": -1,
-    "path_to_project": "./KS1D_test_full/",
+    "path_to_project": "./build/KS1D_test_full/",
     "use_high_precision_reduction": true,
     "symmetry_stabilizer": {
-        "type": "lsq_multimode",
+        "type": "single_mode",
+        "relative_active_mode_tolerance": 1.0e-5
+    },
+    "continuation_symmetry_stabilizer": {
+        "type": "single_mode",
+        "relative_active_mode_tolerance": 1.0e-5,
+        "continuation_mode_switch_ratio": 0.25,
+        "tangent_continuity_weight": 0.25,
+        "tangent_backward_penalty": 4.0,
         "mode_min": 1,
         "mode_max": 12,
         "max_active_modes": 6,
         "grid_points": 96,
-        "newton_iterations": 8
+        "newton_iterations": 8,
+        "prefer_trivial_residual_group": true,
+        "minimum_coprime_relative_score": 0.05,
+        "local_representative_relative_tolerance": 0.05
     },
     "bifurcaiton_diagram_file_name": "bifurcation_diagram.dat",
     "stability_diagram_file_name": "stability_diagram.dat",
@@ -16,7 +27,7 @@
         "maximum_continuation_steps": 5000,
         "step_size": 0.02,
         "max_step_size": 0.25,
-        "deflation_attempts": 5,
+        "deflation_attempts": 10,
         "continuation_fail_attempts": 5,
         "initial_direciton": -1,
         "minimum_step_multiplier": 0.5,
@@ -91,6 +102,16 @@
             "signature_tolerance": 1.0e-6,
             "state_tolerance": 1.0e-8,
             "minimum_step_fraction_from_start": 1.0e-3,
+            "detect_forward_approach": true,
+            "maximum_forward_lookahead_steps": 1.0,
+            "maximum_forward_distance_step_ratio": 1.0,
+            "minimum_forward_distance_reduction_ratio": 0.05,
+            "forward_distance_extrapolation_power": 2,
+            "forward_refinement_step_factor": 0.25,
+            "maximum_forward_refinements": 8,
+            "minimum_forward_refinements_for_verification": 3,
+            "maximum_verified_forward_steps_ahead": 0.1,
+            "maximum_verified_forward_distance_step_ratio": 0.3,
             "verbose": true
         },
         "self_intersection_policy": {
@@ -101,6 +122,41 @@
             "minimum_step_fraction_from_start": 1.0e-3,
             "minimum_index_gap": 50,
             "verbose": true
+        },
+        "isotropy_transition_policy": {
+            "enabled": true,
+            "relative_mode_tolerance": 1.0e-8,
+            "maximum_order": 16,
+            "maximum_refinements": 6,
+            "refinement_step_factor": 0.5,
+            "registry_lambda_tolerance": 1.0e-3,
+            "registry_state_tolerance": 2.0e-3,
+            "verbose": true
+        },
+        "predictor_chart_policy": {
+            "enabled": true,
+            "enforce": true,
+            "weak_progress_warning_ratio": 0.2,
+            "minimum_progress_ratio": 0.02,
+            "progress_jump_warning_ratio": 5.0,
+            "maximum_progress_ratio": 50.0,
+            "displacement_warning_ratio": 20.0,
+            "maximum_displacement_ratio": 100.0,
+            "maximum_retries": 4,
+            "step_reduction_factor": 0.2
+        },
+        "corrector_retry_policy": {
+            "maximum_retries": 8,
+            "failure_reduction_factor": 0.5,
+            "minimum_step_size": 1.0e-8,
+            "minimum_step_ratio": 1.0e-6,
+            "successes_before_growth": 5,
+            "success_growth_factor": 1.25
+        },
+        "progress_monitor_policy": {
+            "enabled": true,
+            "window_size": 25,
+            "minimum_window_progress_ratio": 0.01
         },
         "linear_solver_extended": {
             "maximum_iterations": 150,
@@ -126,8 +182,8 @@
             "newton_wight_threshold": 1.0e-8
         },
         "newton_deflation": {
-            "maximum_iterations": 100,
-            "update_wight_maximum": 1.0,
+            "maximum_iterations": 500,
+            "update_wight_maximum": 0.5,
             "save_norms_history": false,
             "verbose": false,
             "tolerance": 1.0e-8
@@ -161,7 +217,7 @@
     },
     "nonlinear_operator": {
         "discrete_problem_dimensions": [
-            64
+            128
         ],
         "problem_real_parameters_vector": [
             2.0,

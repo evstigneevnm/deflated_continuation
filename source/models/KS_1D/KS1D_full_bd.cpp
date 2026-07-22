@@ -1,5 +1,4 @@
 #include <cstdlib>
-#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -11,12 +10,13 @@
 #include <symmetry/finite_action_registry.h>
 #include <symmetry/finite_quotient_adapter.h>
 #include <symmetry/fourier/real_packed_fourier_slice_1d_adapter.h>
+#include <symmetry/fourier/real_packed_fourier_slice_1d_policy_json.h>
 
 #include <continuation/projected_system_operator_continuation.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h>
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/projected_linear_operator_KS_1D.h>
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/projected_preconditioner_KS_1D.h>
+#include <symmetry/linearization/projected_linear_operator.h>
+#include <symmetry/linearization/projected_preconditioner.h>
 #include <nonlinear_operators/projected_system_operator.h>
 
 #include <main/deflation_continuation.hpp>
@@ -38,7 +38,8 @@ void print_usage(const char* executable)
 {
     std::cerr
         << "Usage: " << executable
-        << " [path_to_config_file.json] [--seed-zero lambda] [--continue-seed-only] [--quiet] [device]\n";
+        << " [path_to_config_file.json] [--seed-zero lambda | --seed-file lambda vector-file]"
+        << " [--continue-seed-only] [--quiet] [device]\n";
 }
 
 template<class T>
@@ -73,66 +74,26 @@ int init_device_from_selector(const std::string& selector)
 #endif
 }
 
-template<class SymmetryAdapter>
-void configure_symmetry_stabilizer_from_json(
-    SymmetryAdapter& adapter,
-    const std::string& path_to_config_file,
-    const bool quiet)
+template<class Policy>
+void print_symmetry_stabilizer_policy(const char* label, const Policy& policy)
 {
-    std::ifstream file(path_to_config_file.c_str());
-    if(!file)
-    {
-        throw std::runtime_error("failed to reopen config file for symmetry stabilizer options");
-    }
-
-    nlohmann::json root;
-    file >> root;
-    nlohmann::json config = nlohmann::json::object();
-    if(root.contains("nonlinear_operator") && root["nonlinear_operator"].contains("symmetry_stabilizer"))
-    {
-        config = root["nonlinear_operator"]["symmetry_stabilizer"];
-    }
-    if(root.contains("symmetry_stabilizer"))
-    {
-        config = root["symmetry_stabilizer"];
-    }
-
-    const std::string type = config.value("type", "single_mode");
-    if(type == "single_mode")
-    {
-        adapter.set_stabilizer_policy(symmetry::fourier::real_packed_fourier_1d_stabilizer_policy::single_mode);
-    }
-    else if(type == "lsq_multimode")
-    {
-        adapter.set_stabilizer_policy(symmetry::fourier::real_packed_fourier_1d_stabilizer_policy::lsq_multimode);
-    }
-    else
-    {
-        throw std::runtime_error("unknown symmetry_stabilizer.type '" + type + "'");
-    }
-
-    const std::size_t mode_min = config.value("mode_min", std::size_t(1));
-    const std::size_t mode_max = config.value("mode_max", std::size_t(0));
-    adapter.set_lsq_mode_range(mode_min, mode_max);
-    adapter.set_lsq_max_active_modes(config.value("max_active_modes", std::size_t(8)));
-    adapter.set_lsq_grid_points(config.value("grid_points", std::size_t(64)));
-    adapter.set_lsq_newton_iterations(config.value("newton_iterations", std::size_t(8)));
-    const bool negative_reflection = config.value(
-        "negative_reflection",
-        config.value("enable_negative_reflection", false));
-    adapter.enable_negative_reflection_symmetry(negative_reflection);
-
-    if(!quiet)
-    {
-        std::cout << "symmetry_stabilizer: type=" << type
-                  << ", mode_min=" << mode_min
-                  << ", mode_max=" << mode_max
-                  << ", max_active_modes=" << config.value("max_active_modes", std::size_t(8))
-                  << ", grid_points=" << config.value("grid_points", std::size_t(64))
-                  << ", newton_iterations=" << config.value("newton_iterations", std::size_t(8))
-                  << ", negative_reflection=" << (negative_reflection ? 1 : 0)
-                  << std::endl;
-    }
+    std::cout
+        << label << ": type="
+        << symmetry::fourier::real_packed_fourier_1d_stabilizer_policy_name(policy.stabilizer)
+        << ", relative_active_mode_tolerance=" << policy.relative_active_mode_tolerance
+        << ", continuation_mode_switch_ratio=" << policy.continuation_mode_switch_ratio
+        << ", tangent_continuity_weight=" << policy.tangent_continuity_weight
+        << ", tangent_backward_penalty=" << policy.tangent_backward_penalty
+        << ", mode_min=" << policy.lsq.mode_min
+        << ", mode_max=" << policy.lsq.mode_max
+        << ", max_active_modes=" << policy.lsq.max_active_modes
+        << ", grid_points=" << policy.lsq.grid_points
+        << ", newton_iterations=" << policy.lsq.newton_iterations
+        << ", prefer_trivial_residual_group=" << (policy.lsq.prefer_trivial_residual_group ? 1 : 0)
+        << ", minimum_coprime_relative_score=" << policy.lsq.minimum_coprime_relative_score
+        << ", local_representative_relative_tolerance="
+        << policy.local_representative_relative_tolerance
+        << std::endl;
 }
 
 } // namespace
@@ -143,20 +104,22 @@ int main(int argc, char const* argv[])
     using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
     using real_vec = typename vec_ops_real::vector_type;
     using ks1d_t = nonlinear_operators::kuramoto_sivashinskiy_1d_full<vec_ops_real, fft_backend_t, Blocks_x_>;
-    using lin_op_t = nonlinear_operators::projected_linear_operator_KS_1D<vec_ops_real, ks1d_t>;
-    using prec_t = nonlinear_operators::projected_preconditioner_KS_1D<vec_ops_real, ks1d_t, lin_op_t>;
+    using lin_op_t = symmetry::linearization::projected_linear_operator<vec_ops_real, ks1d_t>;
+    using prec_t = symmetry::linearization::projected_preconditioner<vec_ops_real, ks1d_t, lin_op_t>;
     using parameters_t = main_classes::parameters<real>;
     using symmetry_adapter_t = symmetry::fourier::real_packed_fourier_slice_1d_adapter<vec_ops_real>;
     using finite_actions_t = symmetry::finite_action_registry<vec_ops_real>;
     using quotient_adapter_t = symmetry::finite_quotient_adapter<vec_ops_real, symmetry_adapter_t>;
     using sol_storage_t = deflation::symmetry_solution_storage<vec_ops_real, quotient_adapter_t, log_t>;
 
-    std::string path_to_config_file = "json_project_files/KS1D_sym_test.json";
+    std::string path_to_config_file = "json_project_files/KS1D_test_sym.json";
     std::string device_selector = "auto";
     bool quiet = false;
     bool seed_zero = false;
+    bool seed_file = false;
     bool continue_seed_only = false;
     real seed_lambda = real(0);
+    std::string seed_file_path;
 
     for(int argi = 1; argi < argc; ++argi)
     {
@@ -185,13 +148,42 @@ int main(int argc, char const* argv[])
                 std::cerr << e.what() << std::endl;
                 return 2;
             }
+            if(seed_file)
+            {
+                std::cerr << "--seed-zero and --seed-file are mutually exclusive\n";
+                return 2;
+            }
             seed_zero = true;
+        }
+        else if(arg == "--seed-file")
+        {
+            if(argi + 2 >= argc)
+            {
+                print_usage(argv[0]);
+                return EXIT_FAILURE;
+            }
+            try
+            {
+                seed_lambda = parse_scalar<real>(argv[++argi], "seed lambda");
+            }
+            catch(const std::exception& e)
+            {
+                std::cerr << e.what() << std::endl;
+                return 2;
+            }
+            seed_file_path = argv[++argi];
+            if(seed_zero)
+            {
+                std::cerr << "--seed-zero and --seed-file are mutually exclusive\n";
+                return 2;
+            }
+            seed_file = true;
         }
         else if(backend_needs_device_init() && (arg == "auto" || arg == "best_mem" || arg.rfind("dev_num:", 0) == 0 || arg.rfind("pci_id:", 0) == 0))
         {
             device_selector = arg;
         }
-        else if(path_to_config_file == "json_project_files/KS1D_sym_test.json")
+        else if(path_to_config_file == "json_project_files/KS1D_test_sym.json")
         {
             path_to_config_file = arg;
         }
@@ -268,8 +260,31 @@ int main(int argc, char const* argv[])
     files_ops_t file_ops(&vec_ops_R);
     ks1d_t KS1D(a_val, b_val, physical_size, &vec_ops_R);
     symmetry_adapter_t symmetry_adapter(&vec_ops_R, positive_modes);
-    KS1D.configure_continuation_symmetry_adapter(symmetry_adapter);
-    configure_symmetry_stabilizer_from_json(symmetry_adapter, path_to_config_file, quiet);
+    const auto config_json = main_classes::read_json(path_to_config_file);
+    auto storage_symmetry_policy =
+        symmetry::fourier::read_real_packed_fourier_slice_1d_policy<real>(
+            config_json,
+            "symmetry_stabilizer",
+            ks1d_t::default_continuation_symmetry_policy());
+    auto continuation_symmetry_policy =
+        symmetry::fourier::read_real_packed_fourier_slice_1d_policy<real>(
+            config_json,
+            "continuation_symmetry_stabilizer",
+            ks1d_t::default_continuation_symmetry_policy());
+    if(continuation_symmetry_policy.stabilizer !=
+       symmetry::fourier::real_packed_fourier_1d_stabilizer_policy::single_mode)
+    {
+        throw std::runtime_error(
+            "LSQ continuation is disabled until its frozen-chart Jacobian and corrector tests pass");
+    }
+    symmetry_adapter.configure(storage_symmetry_policy);
+    KS1D.configure_continuation_symmetry(continuation_symmetry_policy);
+    if(!quiet)
+    {
+        print_symmetry_stabilizer_policy("symmetry_stabilizer", storage_symmetry_policy);
+        print_symmetry_stabilizer_policy(
+            "continuation_symmetry_stabilizer", continuation_symmetry_policy);
+    }
     finite_actions_t finite_actions(&vec_ops_R);
     KS1D.configure_finite_symmetry_actions(finite_actions);
     quotient_adapter_t quotient_adapter(&vec_ops_R, &symmetry_adapter, &finite_actions);
@@ -305,6 +320,11 @@ int main(int argc, char const* argv[])
 
     DC.set_parameters();
 
+    if(continue_seed_only && (seed_zero || seed_file))
+    {
+        DC.load_data(parameters.bifurcaiton_diagram_file_name);
+    }
+
     if(seed_zero)
     {
         real_vec x_seed;
@@ -317,7 +337,20 @@ int main(int argc, char const* argv[])
         vec_ops_R.free_vector(x_seed);
     }
 
-    if(!continue_seed_only || !seed_zero)
+    if(seed_file)
+    {
+        real_vec x_seed;
+        vec_ops_R.init_vector(x_seed);
+        vec_ops_R.start_use_vector(x_seed);
+        file_ops.read_vector(seed_file_path, x_seed);
+        std::cout << "Loaded full Fourier KS1D seed: lambda=" << seed_lambda
+                  << ", file=" << seed_file_path << std::endl;
+        DC.add_solution_curve(x_seed, seed_lambda);
+        vec_ops_R.stop_use_vector(x_seed);
+        vec_ops_R.free_vector(x_seed);
+    }
+
+    if(!continue_seed_only || (!seed_zero && !seed_file))
     {
         DC.execute();
     }

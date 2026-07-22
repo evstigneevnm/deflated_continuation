@@ -163,7 +163,9 @@ int main()
     storage.clear();
     symmetry::fourier::add_real_packed_negative_reflection_action(finite_actions);
     set_vector(vec_ops, x, {1.0, 0.3, -0.2, 0.5});
-    adapter.apply_negative_reflection(x, query);
+    const int reflection_index = finite_actions.find("real_packed_negative_reflection");
+    require_true("negative-reflection action is registered", reflection_index >= 0);
+    finite_actions.apply(static_cast<std::size_t>(reflection_index), x, query);
     adapter.apply_shift(query, shifted, 0.41);
     storage.push_back(x);
     storage.push_back(shifted);

@@ -66,7 +66,7 @@ jobs:
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
             echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
             sudo apt-get update
-            sudo apt-get install -y --no-install-recommends build-essential make python3
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev
           fi
       - name: Build and test continuation chart helpers
         run: |
@@ -76,6 +76,48 @@ jobs:
         run: |
           make test_predictor_chart_validation.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/predictor_chart_validation"
           ./"$BUILD_DIR"/predictor_chart_validation/test_predictor_chart_validation.bin
+          make test_predictor_chart_probe.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/predictor_chart_probe"
+          ./"$BUILD_DIR"/predictor_chart_probe/test_predictor_chart_probe.bin
+          make test_advance_solution_chart_retry.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/advance_solution_chart_retry"
+          ./"$BUILD_DIR"/advance_solution_chart_retry/test_advance_solution_chart_retry.bin
+          make test_continuation_retry_progress.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/continuation_retry_progress"
+          ./"$BUILD_DIR"/continuation_retry_progress/test_continuation_retry_progress.bin
+          make test_initial_tangent_components.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/initial_tangent_components"
+          ./"$BUILD_DIR"/initial_tangent_components/test_initial_tangent_components.bin
+          make test_continuation_event_state.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/continuation_event_state"
+          ./"$BUILD_DIR"/continuation_event_state/test_continuation_event_state.bin
+          make test_branch_intersection_policy.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/branch_intersection_policy"
+          ./"$BUILD_DIR"/branch_intersection_policy/test_branch_intersection_policy.bin
+          make test_symmetry_event_persistence.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/symmetry_event_persistence"
+          ./"$BUILD_DIR"/symmetry_event_persistence/test_symmetry_event_persistence.bin
+          make test_parameters_json.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/parameters_json"
+          ./"$BUILD_DIR"/parameters_json/test_parameters_json.bin
+          make test_solver_bundle.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/solver_bundle"
+          ./"$BUILD_DIR"/solver_bundle/test_solver_bundle.bin
+          make test_parameter_application.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/parameter_application"
+          ./"$BUILD_DIR"/parameter_application/test_parameter_application.bin
+          make test_rejected_candidate_cache.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/rejected_candidate_cache"
+          ./"$BUILD_DIR"/rejected_candidate_cache/test_rejected_candidate_cache.bin
+          make test_exact_solution_registry.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/exact_solution_registry"
+          ./"$BUILD_DIR"/exact_solution_registry/test_exact_solution_registry.bin
+          make test_knot_relocation_controller.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/knot_relocation_controller"
+          ./"$BUILD_DIR"/knot_relocation_controller/test_knot_relocation_controller.bin
+          make test_analytical_branch_executor.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/analytical_branch_executor"
+          ./"$BUILD_DIR"/analytical_branch_executor/test_analytical_branch_executor.bin
+          make test_knot_executor.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/knot_executor"
+          ./"$BUILD_DIR"/knot_executor/test_knot_executor.bin
+          make test_curve_metadata_io.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/curve_metadata_io"
+          ./"$BUILD_DIR"/curve_metadata_io/test_curve_metadata_io.bin
+          make test_curve_vector_store.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/curve_vector_store"
+          ./"$BUILD_DIR"/curve_vector_store/test_curve_vector_store.bin
+          make test_curve_interpolator.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/curve_interpolator"
+          ./"$BUILD_DIR"/curve_interpolator/test_curve_interpolator.bin
+          make test_curve_intersection_search.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/curve_intersection_search"
+          ./"$BUILD_DIR"/curve_intersection_search/test_curve_intersection_search.bin
+          make test_diagram_archive.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/diagram_archive"
+          ./"$BUILD_DIR"/diagram_archive/test_diagram_archive.bin
+          make test_symmetry_event_registry_sync.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/symmetry_event_registry_sync"
+          ./"$BUILD_DIR"/symmetry_event_registry_sync/test_symmetry_event_registry_sync.bin
 
   symmetry-foundation-cpu:
     needs: [scfd-vector-operations-cpu]
@@ -105,8 +147,12 @@ jobs:
           ./"$BUILD_DIR"/fourier_slice_1d/test_fourier_slice_1d.bin
           make test_real_packed_fourier_canonical_adapter.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/real_packed_fourier_canonical_adapter"
           ./"$BUILD_DIR"/real_packed_fourier_canonical_adapter/test_real_packed_fourier_canonical_adapter.bin
+          make test_fourier_isotropy_transition.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fourier_isotropy_transition"
+          ./"$BUILD_DIR"/fourier_isotropy_transition/test_fourier_isotropy_transition.bin
           make test_fourier_slice_differential_1d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fourier_slice_differential_1d"
           ./"$BUILD_DIR"/fourier_slice_differential_1d/test_fourier_slice_differential_1d.bin
+          make test_frozen_fourier_chart_1d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/frozen_fourier_chart_1d"
+          ./"$BUILD_DIR"/frozen_fourier_chart_1d/test_frozen_fourier_chart_1d.bin
           make test_stabilized_storage.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stabilized_storage"
           ./"$BUILD_DIR"/stabilized_storage/test_stabilized_storage.bin
           make test_symmetry_solution_storage.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/symmetry_solution_storage" REAL_TYPE=double

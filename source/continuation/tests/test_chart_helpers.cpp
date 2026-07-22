@@ -98,12 +98,36 @@ struct plain_operator
 
 struct hook_operator
 {
+    int prepare_calls = 0;
+    int accept_calls = 0;
     int begin_calls = 0;
     int predictor_calls = 0;
+    int restore_calls = 0;
     int corrector_calls = 0;
     int arclength_calls = 0;
     int arclength_tangent_calls = 0;
     int log_calls = 0;
+
+    void prepare_continuation_seed(
+        const std::vector<double>& source,
+        std::vector<double>& destination)
+    {
+        ++prepare_calls;
+        destination = source;
+        destination[0] += 10.0;
+    }
+
+    void accept_continuation_step(
+        std::vector<double>& state,
+        const double& lambda,
+        std::vector<double>& tangent,
+        double& tangent_lambda)
+    {
+        ++accept_calls;
+        state[0] += lambda;
+        tangent[1] += 2.0;
+        tangent_lambda += 3.0;
+    }
 
     void begin_continuation_chart(
         const std::vector<double>& x0,
@@ -130,6 +154,15 @@ struct hook_operator
         x_trial[0] += x0[0];
         x_trial[1] += x0_s[1];
         lambda_trial = lambda_predictor + lambda0 + lambda0_s;
+    }
+
+    void restore_continuation_chart(
+        const std::vector<double>&,
+        const double&,
+        const std::vector<double>&,
+        const double&)
+    {
+        ++restore_calls;
     }
 
     void stabilize_corrector_trial(
@@ -221,6 +254,15 @@ void test_plain_fallback()
     double lambda_predictor = 6.0;
     double lambda_trial = 0.0;
 
+    std::vector<double> prepared;
+    continuation::chart::prepare_continuation_seed(&ops, &log, &op, x0, prepared);
+    require_vector(prepared, x0, "plain seed preparation is identity");
+    continuation::chart::accept_continuation_step(
+        &ops, &log, &op, prepared, lambda0, x0_s, lambda0_s);
+    require_vector(prepared, x0, "plain accepted-point transition is identity");
+    require_vector(x0_s, {0.5, -0.25}, "plain accepted tangent is unchanged");
+    require_close(lambda0_s, 0.25, 0.0, "plain accepted lambda tangent is unchanged");
+
     continuation::chart::begin_continuation_chart(&ops, &log, &op, x0, lambda0, x0_s, lambda0_s);
     continuation::chart::stabilize_predictor_for_continuation(
         &ops,
@@ -268,9 +310,25 @@ void test_new_hooks_take_priority()
     double lambda_predictor = 6.0;
     double lambda_trial = 0.0;
 
+    std::vector<double> prepared;
+    continuation::chart::prepare_continuation_seed(&ops, &log, &op, x0, prepared);
+    require_true(op.prepare_calls == 1, "seed preparation hook called");
+    require_vector(prepared, {11.0, 2.0}, "seed preparation hook owns output");
+    continuation::chart::accept_continuation_step(
+        &ops, &log, &op, prepared, lambda0, x0_s, lambda0_s);
+    require_true(op.accept_calls == 1, "accepted-point hook called");
+    require_vector(prepared, {16.0, 2.0}, "accepted-point hook owns state");
+    require_vector(x0_s, {0.5, 1.75}, "accepted-point hook owns tangent");
+    require_close(lambda0_s, 3.25, 0.0, "accepted-point hook owns lambda tangent");
+
+    x0_s = {0.5, -0.25};
+    lambda0_s = 0.25;
+
     continuation::chart::begin_continuation_chart(&ops, &log, &op, x0, lambda0, x0_s, lambda0_s);
     require_true(op.begin_calls == 1, "begin hook called");
     require_close(op.last_scalar, 6.75, 0.0, "begin hook receives chart data");
+    continuation::chart::restore_continuation_chart(&ops, &log, &op, x0, lambda0, x0_s, lambda0_s);
+    require_true(op.restore_calls == 1, "restore hook called");
 
     continuation::chart::stabilize_predictor_for_continuation(
         &ops,

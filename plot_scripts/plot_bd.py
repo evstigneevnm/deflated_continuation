@@ -15,6 +15,77 @@ from pathlib import Path
 ANACONDA_PYTHON = Path("/home/noctum/anaconda3/bin/python")
 
 
+def positive_float(value: str) -> float:
+    parsed = float(value)
+    if parsed <= 0.0:
+        raise argparse.ArgumentTypeError("value must be positive")
+    return parsed
+
+
+def add_font_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--font-scale",
+        type=positive_float,
+        default=1.0,
+        help="Scale all default figure fonts by this factor (default: 1.0).",
+    )
+    parser.add_argument(
+        "--title-font-size",
+        type=positive_float,
+        metavar="POINTS",
+        help="Override the figure-title font size in points.",
+    )
+    parser.add_argument(
+        "--axis-label-font-size",
+        type=positive_float,
+        metavar="POINTS",
+        help="Override the x/y-axis label font size in points.",
+    )
+    parser.add_argument(
+        "--tick-label-font-size",
+        type=positive_float,
+        metavar="POINTS",
+        help="Override the axis tick-label font size in points.",
+    )
+    parser.add_argument(
+        "--legend-font-size",
+        type=positive_float,
+        metavar="POINTS",
+        help="Override the legend font size in points.",
+    )
+
+
+def add_branch_display_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--uniform-branch-color",
+        nargs="?",
+        const="gray",
+        metavar="COLOR",
+        help="Draw every BD branch in one color. If COLOR is omitted, gray is used.",
+    )
+    parser.add_argument(
+        "--mark-branch-endpoints",
+        action="store_true",
+        help="Mark both the first and last point of every branch.",
+    )
+    parser.add_argument(
+        "--mark-branch-starts",
+        action="store_true",
+        help="Mark the first point of every branch.",
+    )
+    parser.add_argument(
+        "--mark-branch-ends",
+        action="store_true",
+        help="Mark the last point of every branch.",
+    )
+    parser.add_argument(
+        "--branch-endpoint-color",
+        default="black",
+        metavar="COLOR",
+        help="Color for branch start/end markers (default: black).",
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot debug_curve*.dat bifurcation-diagram norms."
@@ -61,6 +132,8 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not draw branch legends on figures.",
     )
+    add_branch_display_arguments(parser)
+    add_font_arguments(parser)
     return parser.parse_args()
 
 
@@ -90,6 +163,37 @@ def import_pyplot(show: bool):
             env["BD_PLOTTER_REEXECED"] = "1"
             os.execve(str(ANACONDA_PYTHON), [str(ANACONDA_PYTHON), *sys.argv], env)
         raise
+
+
+def apply_font_scale(plt, scale: float) -> None:
+    if scale == 1.0:
+        return
+
+    from matplotlib.font_manager import FontProperties
+
+    font_keys = (
+        "font.size",
+        "axes.titlesize",
+        "axes.labelsize",
+        "xtick.labelsize",
+        "ytick.labelsize",
+        "legend.fontsize",
+        "figure.titlesize",
+    )
+    resolved_sizes = {
+        key: FontProperties(size=plt.rcParams[key]).get_size_in_points()
+        for key in font_keys
+    }
+    for key, size in resolved_sizes.items():
+        plt.rcParams[key] = size * scale
+
+
+def apply_axis_font_overrides(axis, args: argparse.Namespace) -> None:
+    if args.axis_label_font_size is not None:
+        axis.xaxis.label.set_size(args.axis_label_font_size)
+        axis.yaxis.label.set_size(args.axis_label_font_size)
+    if args.tick_label_font_size is not None:
+        axis.tick_params(axis="both", labelsize=args.tick_label_font_size)
 
 
 def load_config(config_path: Path) -> dict:
@@ -225,6 +329,49 @@ def line_style(style: str) -> dict:
     return {"marker": ".", "linewidth": 1.0, "markersize": 2.5}
 
 
+def curve_coordinates(rows: list[list[float]], norm_index: int) -> tuple[list[float], list[float]]:
+    xs: list[float] = []
+    ys: list[float] = []
+    for row in rows:
+        value = row_norm_value(row, norm_index)
+        if value is None:
+            continue
+        xs.append(row[0])
+        ys.append(value)
+    return xs, ys
+
+
+def plot_branch_endpoints(
+    axis,
+    xs: list[float],
+    ys: list[float],
+    args: argparse.Namespace,
+    include_labels: bool,
+) -> None:
+    mark_start = args.mark_branch_endpoints or args.mark_branch_starts
+    mark_end = args.mark_branch_endpoints or args.mark_branch_ends
+    if mark_start:
+        axis.scatter(
+            [xs[0]],
+            [ys[0]],
+            color=args.branch_endpoint_color,
+            marker="o",
+            s=25,
+            zorder=5,
+            label="branch start" if include_labels else None,
+        )
+    if mark_end:
+        axis.scatter(
+            [xs[-1]],
+            [ys[-1]],
+            color=args.branch_endpoint_color,
+            marker="s",
+            s=25,
+            zorder=5,
+            label="branch end" if include_labels else None,
+        )
+
+
 def default_output(project_dir: Path, labels: list[str], selected_norms: list[int]) -> Path:
     if len(selected_norms) == len(labels):
         return project_dir / "bd_all_norms.png"
@@ -249,24 +396,31 @@ def plot_curves(args: argparse.Namespace, plt, project_dir: Path, curves: dict[s
     style = line_style(args.style)
 
     for axis, norm_index in zip(axes_flat, selected_norms):
-        for branch_name, rows in curves.items():
-            xs: list[float] = []
-            ys: list[float] = []
-            for row in rows:
-                value = row_norm_value(row, norm_index)
-                if value is None:
-                    continue
-                xs.append(row[0])
-                ys.append(value)
+        for branch_index, (branch_name, rows) in enumerate(curves.items()):
+            xs, ys = curve_coordinates(rows, norm_index)
             if xs:
-                axis.plot(xs, ys, label=f"branch {branch_name}", **style)
+                branch_style = dict(style)
+                if args.uniform_branch_color is not None:
+                    branch_style["color"] = args.uniform_branch_color
+                axis.plot(xs, ys, label=f"branch {branch_name}", **branch_style)
+                plot_branch_endpoints(axis, xs, ys, args, branch_index == 0)
         axis.set_ylabel(labels[norm_index])
+        apply_axis_font_overrides(axis, args)
         axis.grid(True, alpha=0.3)
         if not args.disable_legend:
-            axis.legend(loc="best", fontsize="small")
+            axis.legend(
+                loc="best",
+                fontsize=args.legend_font_size or "small",
+            )
 
     axes_flat[-1].set_xlabel("lambda")
-    figure.suptitle(args.title or project_dir.name or "Bifurcation diagram")
+    title_options = {}
+    if args.title_font_size is not None:
+        title_options["fontsize"] = args.title_font_size
+    figure.suptitle(
+        args.title or project_dir.name or "Bifurcation diagram",
+        **title_options,
+    )
     figure.tight_layout()
 
     output_path: Path | None = None
@@ -309,6 +463,7 @@ def main() -> int:
     selected_norms = resolve_norms(args.norm, labels)
 
     plt = import_pyplot(args.show)
+    apply_font_scale(plt, args.font_scale)
     output_path = plot_curves(args, plt, project_dir, curves, labels, selected_norms)
 
     print(f"project: {project_dir}")

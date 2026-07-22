@@ -1,0 +1,91 @@
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#include <containers/bifurcation_diagram/curve_metadata_io.h>
+
+namespace
+{
+
+void require(bool condition, const std::string& message)
+{
+    if(!condition)
+    {
+        throw std::runtime_error(message);
+    }
+}
+
+}
+
+int main()
+{
+    using point_type = container::complex_values<double>;
+    const auto file_name =
+        std::filesystem::temp_directory_path()/"deflated_continuation_curve_metadata_test.dat";
+    std::error_code error;
+    std::filesystem::remove(file_name, error);
+
+    try
+    {
+        std::vector<point_type> points(3);
+        points[0].lambda = 1.25;
+        points[0].is_data_avaliable = true;
+        points[0].id_file_name = 7;
+        points[0].segment_id = 2;
+        points[0].semicurve_id = 3;
+        points[0].forced_store = true;
+        points[0].endpoint_reason = container::curve_endpoint_reason::known_branch;
+
+        points[1].lambda = 2.5;
+        points[1].id_file_name = 0;
+        points[1].segment_id = 4;
+        points[1].semicurve_id = 5;
+        points[1].endpoint_reason = container::curve_endpoint_reason::hard_failure;
+
+        points[2].lambda = 3.75;
+        points[2].id_file_name = 11;
+        points[2].segment_id = 4;
+        points[2].semicurve_id = 5;
+        points[2].endpoint_reason = container::curve_endpoint_reason::hard_failure;
+
+        require(container::write_curve_metadata(file_name.string(), points), "metadata write");
+
+        std::ifstream raw(file_name);
+        std::string header;
+        std::getline(raw, header);
+        require(
+            header == "# index lambda saved id_file_name segment_id semicurve_id forced_store endpoint_reason",
+            "metadata header");
+
+        std::vector<point_type> loaded(3);
+        const auto result = container::load_curve_metadata(file_name.string(), loaded);
+        require(result.loaded_any, "metadata load");
+        require(result.incomplete_segment_ids.size() == 1, "incomplete segment deduplication");
+        require(result.incomplete_segment_ids.front() == 4, "incomplete segment id");
+        require(loaded[0].point_index == 0, "point index");
+        require(loaded[0].segment_id == 2 && loaded[0].semicurve_id == 3, "segment metadata");
+        require(loaded[0].forced_store, "forced store");
+        require(loaded[0].endpoint_reason == container::curve_endpoint_reason::known_branch,
+                "known branch endpoint");
+        require(loaded[1].endpoint_reason == container::curve_endpoint_reason::hard_failure,
+                "hard failure endpoint");
+
+        std::vector<point_type> missing(1);
+        const auto missing_result = container::load_curve_metadata(
+            (file_name.string() + ".missing"), missing);
+        require(!missing_result.loaded_any, "missing metadata file");
+    }
+    catch(const std::exception& exception)
+    {
+        std::filesystem::remove(file_name, error);
+        std::cerr << "FAILED: " << exception.what() << '\n';
+        return 1;
+    }
+
+    std::filesystem::remove(file_name, error);
+    std::cout << "PASSED\n";
+    return 0;
+}

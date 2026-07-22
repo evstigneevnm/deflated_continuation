@@ -78,7 +78,7 @@ int main(int argc, char const* argv[])
     using prec_t = nonlinear_operators::preconditioner_KS_1D<vec_ops_real, ks1d_t, lin_op_t>;
     using parameters_t = main_classes::parameters<real>;
 
-    std::string path_to_config_file = "json_project_files/KS1D_sym_test.json";
+    std::string path_to_config_file = "json_project_files/KS1D_test_sym.json";
     std::string device_selector = "auto";
     bool quiet = false;
     bool seed_zero = false;
@@ -118,7 +118,7 @@ int main(int argc, char const* argv[])
         {
             device_selector = arg;
         }
-        else if(path_to_config_file == "json_project_files/KS1D_sym_test.json")
+        else if(path_to_config_file == "json_project_files/KS1D_test_sym.json")
         {
             path_to_config_file = arg;
         }

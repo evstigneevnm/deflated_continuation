@@ -54,6 +54,20 @@ def parse_args() -> argparse.Namespace:
         help="Maximum number of solution insets to draw.",
     )
     parser.add_argument(
+        "--one-point-per-branch",
+        "--one-per-branch",
+        dest="one_point_per_branch",
+        action="store_true",
+        help="Draw the middle available saved solution from every selected branch.",
+    )
+    parser.add_argument(
+        "--fit-solutions",
+        "--scale-to-fit-solutions",
+        dest="fit_solutions",
+        action="store_true",
+        help="Grow the figure and place solution profiles above the BD without overlap.",
+    )
+    parser.add_argument(
         "--thumbnail-stride",
         type=int,
         default=1,
@@ -85,6 +99,18 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--dpi", type=int, default=180, help="Saved image DPI")
     parser.add_argument("--title", help="Plot title")
+    parser.add_argument(
+        "--x-label",
+        "--xlabel",
+        dest="x_label",
+        help="Override the main bifurcation-diagram x-axis label.",
+    )
+    parser.add_argument(
+        "--y-label",
+        "--ylabel",
+        dest="y_label",
+        help="Override the main bifurcation-diagram y-axis label.",
+    )
     parser.add_argument("--output", help="Output image path")
     parser.add_argument("--show", action="store_true", help="Open an interactive matplotlib window")
     parser.add_argument(
@@ -96,6 +122,24 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not draw the branch legend.",
     )
+    parser.add_argument(
+        "--profile-title-font-size",
+        "--thumbnail-title-font-size",
+        dest="profile_title_font_size",
+        type=bd.positive_float,
+        metavar="POINTS",
+        help="Override the title font size above solution profiles.",
+    )
+    parser.add_argument(
+        "--point-label-font-size",
+        "--annotation-font-size",
+        dest="point_label_font_size",
+        type=bd.positive_float,
+        metavar="POINTS",
+        help="Override the numbered BD point-label font size.",
+    )
+    bd.add_branch_display_arguments(parser)
+    bd.add_font_arguments(parser)
     return parser.parse_args()
 
 
@@ -200,6 +244,13 @@ def filter_manifest_records(
             float(item.get("lambda", 0.0)),
         )
     )
+
+    if args.one_point_per_branch:
+        grouped: dict[int, list[dict[str, Any]]] = {}
+        for record in filtered:
+            grouped.setdefault(int(record.get("branch", -1)), []).append(record)
+        return [branch_records[len(branch_records) // 2] for branch_records in grouped.values()]
+
     filtered = filtered[::stride]
 
     limit = max(args.max_thumbnails, 0)
@@ -272,23 +323,24 @@ def output_for_plot(
 
 def plot_bd_base(axis, curves: dict[str, list[list[float]]], norm_index: int, labels: list[str], args: argparse.Namespace):
     style = bd.line_style(args.style)
-    for branch_name, rows in curves.items():
-        xs: list[float] = []
-        ys: list[float] = []
-        for row in rows:
-            value = bd.row_norm_value(row, norm_index)
-            if value is None:
-                continue
-            xs.append(row[0])
-            ys.append(value)
+    for branch_index, (branch_name, rows) in enumerate(curves.items()):
+        xs, ys = bd.curve_coordinates(rows, norm_index)
         if xs:
-            axis.plot(xs, ys, label=f"branch {branch_name}", **style)
+            branch_style = dict(style)
+            if args.uniform_branch_color is not None:
+                branch_style["color"] = args.uniform_branch_color
+            axis.plot(xs, ys, label=f"branch {branch_name}", **branch_style)
+            bd.plot_branch_endpoints(axis, xs, ys, args, branch_index == 0)
 
-    axis.set_xlabel("lambda")
-    axis.set_ylabel(labels[norm_index])
+    axis.set_xlabel(args.x_label or "lambda")
+    axis.set_ylabel(args.y_label or labels[norm_index])
+    bd.apply_axis_font_overrides(axis, args)
     axis.grid(True, alpha=0.3)
     if not args.disable_legend:
-        axis.legend(loc="best", fontsize="small")
+        axis.legend(
+            loc="best",
+            fontsize=args.legend_font_size or "small",
+        )
 
 
 def inset_position(index: int, count: int, columns: int, width: float, height: float) -> list[float]:
@@ -307,7 +359,28 @@ def inset_position(index: int, count: int, columns: int, width: float, height: f
     return [x0, y0, width, height]
 
 
-def add_solution_insets(figure, axis, records: list[dict[str, Any]], norm_index: int, args: argparse.Namespace):
+def fitted_inset_position(index: int, count: int, columns: int) -> list[float]:
+    columns = min(max(columns, 1), max(count, 1))
+    rows = max(math.ceil(count / columns), 1)
+    gap_x = 0.018
+    gap_y = 0.035
+    width = (1.0 - (columns - 1) * gap_x) / columns
+    height = (1.0 - (rows - 1) * gap_y) / rows
+    row = index // columns
+    col = index % columns
+    x0 = col * (width + gap_x)
+    y0 = 1.0 - (row + 1) * height - row * gap_y
+    return [x0, y0, width, height]
+
+
+def add_solution_insets(
+    figure,
+    axis,
+    inset_parent,
+    records: list[dict[str, Any]],
+    norm_index: int,
+    args: argparse.Namespace,
+):
     from matplotlib.patches import ConnectionPatch
 
     color_cycle = itertools.cycle(
@@ -324,16 +397,25 @@ def add_solution_insets(figure, axis, records: list[dict[str, Any]], norm_index:
             "tab:cyan",
         ]
     )
+    profile_title_font_size = args.profile_title_font_size or 6.0 * args.font_scale
+    point_label_font_size = args.point_label_font_size or 7.0 * args.font_scale
 
     for plot_index, record in enumerate(records, start=1):
-        position = inset_position(
-            plot_index - 1,
-            len(records),
-            args.thumbnail_columns,
-            args.thumbnail_width,
-            args.thumbnail_height,
-        )
-        inset = axis.inset_axes(position)
+        if args.fit_solutions:
+            position = fitted_inset_position(
+                plot_index - 1,
+                len(records),
+                args.thumbnail_columns,
+            )
+        else:
+            position = inset_position(
+                plot_index - 1,
+                len(records),
+                args.thumbnail_columns,
+                args.thumbnail_width,
+                args.thumbnail_height,
+            )
+        inset = inset_parent.inset_axes(position)
         xs, ys = read_profile(record["resolved_data_file"])
         color = next(color_cycle)
         inset.plot(xs, ys, color=color, linewidth=0.9)
@@ -341,7 +423,7 @@ def add_solution_insets(figure, axis, records: list[dict[str, Any]], norm_index:
         inset.set_yticks([])
         inset.set_title(
             f"{plot_index}: b{record.get('branch')}  λ={float(record.get('lambda')):.4g}",
-            fontsize=6,
+            fontsize=profile_title_font_size,
             pad=1.5,
         )
         for spine in inset.spines.values():
@@ -358,7 +440,7 @@ def add_solution_insets(figure, axis, records: list[dict[str, Any]], norm_index:
             xy=(marker_x, marker_y),
             xytext=(4, 4),
             textcoords="offset points",
-            fontsize=7,
+            fontsize=point_label_font_size,
             color=color,
             zorder=6,
         )
@@ -386,12 +468,39 @@ def render_plot(
     args: argparse.Namespace,
     all_mode: bool,
 ) -> Path:
-    figure, axis = plt.subplots(figsize=(11.5, 7.0))
+    if args.fit_solutions:
+        columns = min(max(args.thumbnail_columns, 1), max(len(records), 1))
+        solution_rows = max(math.ceil(len(records) / columns), 1)
+        solution_height = max(1.6, 1.45 * solution_rows)
+        diagram_height = 5.5
+        figure = plt.figure(figsize=(11.5, diagram_height + solution_height))
+        grid = figure.add_gridspec(
+            2,
+            1,
+            height_ratios=(solution_height, diagram_height),
+            hspace=0.08,
+        )
+        inset_parent = figure.add_subplot(grid[0])
+        inset_parent.set_axis_off()
+        axis = figure.add_subplot(grid[1])
+    else:
+        figure, axis = plt.subplots(figsize=(11.5, 7.0))
+        inset_parent = axis
+
     plot_bd_base(axis, curves, norm_index, labels, args)
-    add_solution_insets(figure, axis, records, norm_index, args)
+    add_solution_insets(figure, axis, inset_parent, records, norm_index, args)
     branch_title = f" branch {branches[0]}" if len(branches) == 1 else ""
-    figure.suptitle(args.title or f"{project_dir.name}: {labels[norm_index]}{branch_title}")
-    figure.tight_layout()
+    title_options = {}
+    if args.title_font_size is not None:
+        title_options["fontsize"] = args.title_font_size
+    figure.suptitle(
+        args.title or f"{project_dir.name}: {labels[norm_index]}{branch_title}",
+        **title_options,
+    )
+    if args.fit_solutions:
+        figure.subplots_adjust(left=0.08, right=0.98, bottom=0.06, top=0.94)
+    else:
+        figure.tight_layout()
 
     output_path = output_for_plot(project_dir, labels[norm_index], branches, args, all_mode)
     if not args.show:
@@ -449,6 +558,7 @@ def main() -> int:
         raise FileNotFoundError(f"No branches found in: {manifest}")
 
     plt = bd.import_pyplot(args.show)
+    bd.apply_font_scale(plt, args.font_scale)
     wrote_any = False
     for branches in branch_groups:
         records = filter_manifest_records(manifest_records, args, norm_index, branches)

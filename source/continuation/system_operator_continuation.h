@@ -34,6 +34,11 @@ public:
         vec_ops->stop_use_vector(Jlambda); vec_ops->free_vector(Jlambda);
     }
 
+    void set_verbose(const bool value)
+    {
+        verbose = value;
+    }
+
     void set_tangent_space(T_vec& x_0_, T& lambda_0_, T_vec& x_0_s_, T& lambda_0_s_, T& ds_l_, char continuation_type_ = 'S')
     {
         x_0 = x_0_;
@@ -55,7 +60,10 @@ public:
             throw std::runtime_error(std::string("continuation::system_operator_continuation (corrector) " __FILE__ " " __STR(__LINE__) " incorrect continuation_type parameter. Only 'S'pherical or 'O'rthogonal can be used") );
         }
         const T tangent_norm = vec_ops->norm_rank1(x_0_s, lambda_0_s);
-        log->info_f("continuation::system_operator: tangent space set: dS = %le, tangent norm = %le", (double)ds_l, (double)tangent_norm);
+        if(verbose)
+        {
+            log->info_f("continuation::system_operator: tangent space set: dS = %le, tangent norm = %le", (double)ds_l, (double)tangent_norm);
+        }
     }
 
     void set_tangent_space(T_vec& x_0_, T& lambda_0_, T_vec& x_0_s_, T& lambda_0_s_, T& ds_l_, char continuation_type_, NonlinearOperator*)
@@ -78,7 +86,10 @@ public:
         bool flag_lin_solver = false;
         if(tangent_set)
         {
-            log->info("continuation::system_operator: update_tangent_space starts.");
+            if(verbose)
+            {
+                log->info("continuation::system_operator: update_tangent_space starts.");
+            }
         
             flag_lin_solver = false;
             nonlin_op->set_linearization_point(x, lambda);
@@ -111,7 +122,10 @@ public:
 
             T minimum_resid = SM_solver->get_linsolver_handle()->monitor().resid_norm_out();
             int iters_performed = SM_solver->get_linsolver_handle()->monitor().iters_performed();
-            log->info_f("desired residual = %le, minimum attained residual = %le with %i iterations.", (double)tolerance_local, (double)minimum_resid, iters_performed);
+            if(verbose)
+            {
+                log->info_f("desired residual = %le, minimum attained residual = %le with %i iterations.", (double)tolerance_local, (double)minimum_resid, iters_performed);
+            }
 
             SM_solver->get_linsolver_handle()->monitor().restore_max_iterations();
             SM_solver->get_linsolver_handle()->monitor().restore_tolerance();
@@ -121,7 +135,10 @@ public:
             
             //vec_ops->scale(T(vec_ops->get_l2_size()), x_1_s);
 
-            log->info("continuation::system_operator: update_tangent_space ends.");
+            if(verbose)
+            {
+                log->info("continuation::system_operator: update_tangent_space ends.");
+            }
             tangent_set = false;
         }
         else
@@ -168,7 +185,10 @@ public:
             
             
             T arclength_res = orthogonal_projection(x, lambda);
-            log->info_f("continuation::system_operator: arclength residual = %le", (double)arclength_res);
+            if(verbose)
+            {
+                log->info_f("continuation::system_operator: arclength residual = %le", (double)arclength_res);
+            }
             T beta =  - arclength_res; //beta = -orth_proj
             T alpha = lambda_0_s;
 
@@ -199,6 +219,7 @@ private:
     LinearSystemSolver* SM_solver;
 
     bool tangent_set = false;
+    bool verbose = true;
     T_vec x_0, x_0_s;
     T lambda_0, lambda_0_s;
     T_vec dx, f, Jlambda;

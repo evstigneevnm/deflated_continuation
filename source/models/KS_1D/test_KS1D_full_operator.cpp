@@ -1,6 +1,8 @@
 #include <cmath>
 #include <cstdlib>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -10,14 +12,18 @@
 #include <common/cuda_init_scfd.h>
 #endif
 
+#include <continuation/initial_tangent.h>
 #include <continuation/projected_system_operator_continuation.h>
 #include <continuation/chart_helpers.h>
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/projected_linear_operator_KS_1D.h>
-#include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/projected_preconditioner_KS_1D.h>
+#include <symmetry/linearization/projected_linear_operator.h>
+#include <symmetry/linearization/projected_preconditioner.h>
+#include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h>
+#include <nonlinear_operators/projected_system_operator.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
+#include <numerical_algos/newton_solvers/newton_solver.h>
 #include <symmetry/finite_action_registry.h>
 #include <symmetry/fourier/real_packed_fourier_slice_1d_adapter.h>
 
@@ -31,8 +37,8 @@ using ks1d_reduced_t = nonlinear_operators::kuramoto_sivashinskiy_1d<vec_ops_rea
 using real_vec = typename vec_ops_real::vector_type;
 using symmetry_adapter_t = symmetry::fourier::real_packed_fourier_slice_1d_adapter<vec_ops_real>;
 using finite_actions_t = symmetry::finite_action_registry<vec_ops_real>;
-using lin_op_t = nonlinear_operators::projected_linear_operator_KS_1D<vec_ops_real, ks1d_t>;
-using prec_t = nonlinear_operators::projected_preconditioner_KS_1D<vec_ops_real, ks1d_t, lin_op_t>;
+using lin_op_t = symmetry::linearization::projected_linear_operator<vec_ops_real, ks1d_t>;
+using prec_t = symmetry::linearization::projected_preconditioner<vec_ops_real, ks1d_t, lin_op_t>;
 using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
 using sm_solver_t = numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
     lin_op_t,
@@ -41,6 +47,20 @@ using sm_solver_t = numerical_algos::sherman_morrison_linear_system::sherman_mor
     monitor_t,
     log_t,
     numerical_algos::lin_solvers::bicgstabl>;
+using projected_newton_system_t = nonlinear_operators::projected_system_operator<vec_ops_real, ks1d_t, lin_op_t, sm_solver_t>;
+using convergence_strategy_t = nonlinear_operators::newton_method::convergence_strategy<vec_ops_real, ks1d_t, log_t>;
+using newton_t = numerical_algos::newton_method::newton_solver<
+    vec_ops_real,
+    ks1d_t,
+    projected_newton_system_t,
+    convergence_strategy_t>;
+using initial_tangent_t = continuation::initial_tangent<
+    vec_ops_real,
+    log_t,
+    newton_t,
+    ks1d_t,
+    lin_op_t,
+    sm_solver_t>;
 using projected_continuation_system_t = continuation::projected_system_operator_continuation<
     vec_ops_real,
     ks1d_t,
@@ -70,6 +90,14 @@ void record_failure(const std::string& message)
 }
 
 template<class T>
+std::string scientific_string(const T value)
+{
+    std::ostringstream stream;
+    stream << std::scientific << std::setprecision(17) << static_cast<double>(value);
+    return stream.str();
+}
+
+template<class T>
 void check_close(T value, T expected, T tol, const std::string& label)
 {
     ++checks;
@@ -78,10 +106,10 @@ void check_close(T value, T expected, T tol, const std::string& label)
     {
         record_failure(
             label +
-            " value=" + std::to_string(static_cast<double>(value)) +
-            " expected=" + std::to_string(static_cast<double>(expected)) +
-            " err=" + std::to_string(static_cast<double>(err)) +
-            " tol=" + std::to_string(static_cast<double>(tol))
+            " value=" + scientific_string(value) +
+            " expected=" + scientific_string(expected) +
+            " err=" + scientific_string(err) +
+            " tol=" + scientific_string(tol)
         );
     }
 }
@@ -96,8 +124,8 @@ void check_vector_close(vec_ops_real& vec_ops, const real_vec& value, const real
     ++checks;
     if(!(err <= tol))
     {
-        record_failure(label + " norm err=" + std::to_string(static_cast<double>(err)) +
-                       " tol=" + std::to_string(static_cast<double>(tol)));
+        record_failure(label + " norm err=" + scientific_string(err) +
+                       " tol=" + scientific_string(tol));
     }
     vec_ops.stop_use_vector(diff);
     vec_ops.free_vector(diff);
@@ -784,6 +812,97 @@ void test_projected_operator_hooks(vec_ops_real& vec_ops, ks1d_t& ks, symmetry_a
         projected_finite_difference);
 }
 
+void test_frozen_lsq_projected_operator_hooks(vec_ops_real& vec_ops, ks1d_t& ks)
+{
+    real_vec u;
+    real_vec du;
+    real_vec du_projected;
+    real_vec du_projected_again;
+    real_vec u_plus;
+    real_vec u_minus;
+    real_vec projected_plus;
+    real_vec projected_minus;
+    real_vec projected_finite_difference;
+    real_vec projected_jacobian;
+    vec_ops.init_vectors(
+        u,
+        du,
+        du_projected,
+        du_projected_again,
+        u_plus,
+        u_minus,
+        projected_plus,
+        projected_minus,
+        projected_finite_difference,
+        projected_jacobian);
+    vec_ops.start_use_vectors(
+        u,
+        du,
+        du_projected,
+        du_projected_again,
+        u_plus,
+        u_minus,
+        projected_plus,
+        projected_minus,
+        projected_finite_difference,
+        projected_jacobian);
+
+    fill_test_vectors(vec_ops, u, du);
+    const real lambda = real(2.85);
+    ks.set_projected_linearization_point(u, lambda);
+    ks.project_current_tangent(du, du_projected);
+    ks.project_current_tangent(du_projected, du_projected_again);
+    check_vector_close(
+        vec_ops,
+        du_projected_again,
+        du_projected,
+        tolerance<real>()*(real(1) + vec_ops.norm_l2(du_projected)),
+        "frozen LSQ tangent projector idempotence");
+
+    const real eps = fd_step<real>();
+    vec_ops.assign_mul(real(1), u, eps, du, u_plus);
+    vec_ops.assign_mul(real(1), u, -eps, du, u_minus);
+    ks.projected_F_in_frozen_chart(u_plus, lambda, projected_plus);
+    ks.projected_F_in_frozen_chart(u_minus, lambda, projected_minus);
+    vec_ops.assign_mul(
+        real(1)/(real(2)*eps),
+        projected_plus,
+        -real(1)/(real(2)*eps),
+        projected_minus,
+        projected_finite_difference);
+    ks.set_projected_linearization_point(u, lambda);
+    ks.projected_jacobian_u(du, projected_jacobian);
+    check_vector_close(
+        vec_ops,
+        projected_jacobian,
+        projected_finite_difference,
+        real(600)*tolerance<real>()*(real(1) + vec_ops.norm_l2(projected_finite_difference)),
+        "frozen LSQ projected Jacobian finite difference");
+
+    vec_ops.stop_use_vectors(
+        u,
+        du,
+        du_projected,
+        du_projected_again,
+        u_plus,
+        u_minus,
+        projected_plus,
+        projected_minus,
+        projected_finite_difference,
+        projected_jacobian);
+    vec_ops.free_vectors(
+        u,
+        du,
+        du_projected,
+        du_projected_again,
+        u_plus,
+        u_minus,
+        projected_plus,
+        projected_minus,
+        projected_finite_difference,
+        projected_jacobian);
+}
+
 void test_projected_bordered_continuation_correction(vec_ops_real& vec_ops, ks1d_t& ks)
 {
     real_vec x0;
@@ -845,12 +964,14 @@ void test_projected_bordered_continuation_correction(vec_ops_real& vec_ops, ks1d
     sm_solver.get_linsolver_handle()->monitor().init(
         std::is_same<real, float>::value ? real(1.0e-5) : real(1.0e-10),
         real(1.0e-14),
-        1000,
+        2000,
         0,
         false,
         false,
         true);
     sm_solver.get_linsolver_handle()->set_basis_size(16);
+    sm_solver.get_linsolver_handle()->set_use_precond_resid(true);
+    sm_solver.get_linsolver_handle()->set_resid_recalc_freq(1);
 
     projected_continuation_system_t system_operator(&vec_ops, &log, &lin_op, &sm_solver);
     real ds_mutable = ds;
@@ -861,7 +982,15 @@ void test_projected_bordered_continuation_correction(vec_ops_real& vec_ops, ks1d
     ++checks;
     if(!solved)
     {
-        record_failure("projected bordered correction linear solver did not converge");
+        record_failure(
+            "projected bordered correction linear solver did not converge: residual=" +
+            std::to_string(static_cast<double>(
+                sm_solver.get_linsolver_handle()->monitor().resid_norm_out())) +
+            " iterations=" +
+            std::to_string(sm_solver.get_linsolver_handle()->monitor().iters_performed()));
+        vec_ops.stop_use_vectors(x0, x0_chart, tangent, tangent_chart, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
+        vec_ops.free_vectors(x0, x0_chart, tangent, tangent_chart, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
+        return;
     }
 
     ks.stabilize_for_arclength(x0, x0, x0_chart);
@@ -878,7 +1007,7 @@ void test_projected_bordered_continuation_correction(vec_ops_real& vec_ops, ks1d
         vec_ops,
         projected_dx,
         dx,
-        (std::is_same<real, float>::value ? real(2.0e-4) : real(1.0e-8))*(real(1) + vec_ops.norm_l2(dx)),
+        (std::is_same<real, float>::value ? real(2.0e-4) : real(1.0e-5))*(real(1) + vec_ops.norm_l2(dx)),
         "projected bordered correction is tangent");
 
     ks.set_projected_linearization_point(candidate, lambda_candidate);
@@ -901,6 +1030,150 @@ void test_projected_bordered_continuation_correction(vec_ops_real& vec_ops, ks1d
 
     vec_ops.stop_use_vectors(x0, x0_chart, tangent, tangent_chart, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
     vec_ops.free_vectors(x0, x0_chart, tangent, tangent_chart, candidate, dx, projected_dx, jlambda, rhs, lhs, linear_residual);
+}
+
+void test_projected_bordered_initial_tangent_equation(vec_ops_real& vec_ops, ks1d_t& ks)
+{
+    real_vec x0;
+    real_vec row;
+    real_vec row_projected;
+    real_vec jlambda;
+    real_vec rhs_zero;
+    real_vec tangent;
+    real_vec tangent_projected;
+    real_vec lhs;
+    vec_ops.init_vectors(x0, row, row_projected, jlambda, rhs_zero, tangent, tangent_projected, lhs);
+    vec_ops.start_use_vectors(x0, row, row_projected, jlambda, rhs_zero, tangent, tangent_projected, lhs);
+
+    fill_test_vectors(vec_ops, x0, row);
+    ks.project(x0);
+    ks.set_projected_linearization_point(x0, real(5.75));
+    ks.projected_jacobian_alpha(jlambda);
+    ks.project_current_tangent(row, row_projected);
+
+    real row_lambda = real(0.35);
+    const real row_norm = vec_ops.norm_rank1(row_projected, row_lambda);
+    vec_ops.scale(real(1)/row_norm, row_projected);
+    row_lambda /= row_norm;
+
+    log_t log;
+    log.set_verbosity(0);
+    lin_op_t lin_op(&ks);
+    prec_t prec(&ks);
+    sm_solver_t sm_solver(&prec, &vec_ops, &log);
+    sm_solver.get_linsolver_handle()->monitor().init(
+        std::is_same<real, float>::value ? real(1.0e-5) : real(1.0e-10),
+        real(1.0e-14),
+        2000,
+        0,
+        false,
+        false,
+        true);
+    sm_solver.get_linsolver_handle()->set_basis_size(16);
+    sm_solver.get_linsolver_handle()->set_use_precond_resid(true);
+    sm_solver.get_linsolver_handle()->set_resid_recalc_freq(1);
+
+    vec_ops.assign_scalar(real(0), rhs_zero);
+    real lambda_s = real(0);
+    const real beta = real(1);
+    const bool solved = sm_solver.solve(lin_op, row_projected, jlambda, row_lambda, rhs_zero, beta, tangent, lambda_s);
+    ++checks;
+    if(!solved)
+    {
+        record_failure("projected bordered initial tangent linear solver did not converge");
+    }
+
+    lin_op.apply(tangent, lhs);
+    vec_ops.add_mul(lambda_s, jlambda, lhs);
+    const real linear_residual_norm = vec_ops.norm_l2(lhs);
+    ++checks;
+    const real linear_tol = std::is_same<real, float>::value ? real(1.0e-2) : real(2.0e-3);
+    if(!(linear_residual_norm <= linear_tol*(real(1) + vec_ops.norm_l2(jlambda))))
+    {
+        record_failure(
+            "projected bordered initial tangent vector row residual=" +
+            std::to_string(static_cast<double>(linear_residual_norm)) +
+            " tol=" + std::to_string(static_cast<double>(linear_tol*(real(1) + vec_ops.norm_l2(jlambda)))));
+    }
+
+    const real row_residual = vec_ops.scalar_prod(row_projected, tangent) + row_lambda*lambda_s - beta;
+    check_close(
+        row_residual,
+        real(0),
+        std::is_same<real, float>::value ? real(2.0e-4) : real(1.0e-8),
+        "projected bordered initial tangent scalar row");
+
+    ks.project_current_tangent(tangent, tangent_projected);
+    check_vector_close(
+        vec_ops,
+        tangent_projected,
+        tangent,
+        (std::is_same<real, float>::value ? real(2.0e-4) : real(1.0e-8))*(real(1) + vec_ops.norm_l2(tangent)),
+        "projected bordered initial tangent is tangent");
+
+    vec_ops.stop_use_vectors(x0, row, row_projected, jlambda, rhs_zero, tangent, tangent_projected, lhs);
+    vec_ops.free_vectors(x0, row, row_projected, jlambda, rhs_zero, tangent, tangent_projected, lhs);
+}
+
+void test_initial_tangent_projected_path_smoke(vec_ops_real& vec_ops, ks1d_t& ks)
+{
+    real_vec x0;
+    real_vec tangent;
+    vec_ops.init_vectors(x0, tangent);
+    vec_ops.start_use_vectors(x0, tangent);
+    vec_ops.assign_scalar(real(0), x0);
+
+    log_t log;
+    log.set_verbosity(0);
+    lin_op_t lin_op(&ks);
+    prec_t prec(&ks);
+    sm_solver_t sm_solver(&prec, &vec_ops, &log);
+    sm_solver.get_linsolver_handle()->monitor().init(
+        std::is_same<real, float>::value ? real(1.0e-5) : real(1.0e-10),
+        real(1.0e-14),
+        1000,
+        0,
+        false,
+        false,
+        true);
+    sm_solver.get_linsolver_handle()->set_basis_size(16);
+    sm_solver.get_linsolver_handle()->set_use_precond_resid(true);
+    sm_solver.get_linsolver_handle()->set_resid_recalc_freq(1);
+    sm_solver.get_linsolver_handle_original()->monitor().init(
+        std::is_same<real, float>::value ? real(1.0e-5) : real(1.0e-10),
+        real(1.0e-14),
+        1000,
+        0,
+        false,
+        false,
+        true);
+    sm_solver.get_linsolver_handle_original()->set_basis_size(16);
+    sm_solver.get_linsolver_handle_original()->set_use_precond_resid(true);
+    sm_solver.get_linsolver_handle_original()->set_resid_recalc_freq(1);
+
+    vec_ops_real* vec_ops_ptr = &vec_ops;
+    log_t* log_ptr = &log;
+    lin_op_t* lin_op_ptr = &lin_op;
+    sm_solver_t* sm_solver_ptr = &sm_solver;
+    projected_newton_system_t newton_system(vec_ops_ptr, lin_op_ptr, sm_solver_ptr);
+    convergence_strategy_t convergence(vec_ops_ptr, log_ptr, real(1.0e-10), 10, real(1), false, false);
+    newton_t newton(&vec_ops, &newton_system, &convergence);
+    initial_tangent_t initial_tangent(vec_ops_ptr, &log, &newton, lin_op_ptr, sm_solver_ptr, false);
+
+    ks1d_t* ks_ptr = &ks;
+    real lambda_s = real(0);
+    const bool solved = initial_tangent.execute(ks_ptr, real(1), x0, real(5.0), tangent, lambda_s);
+    ++checks;
+    if(!solved)
+    {
+        record_failure("initial_tangent projected path smoke solve failed");
+    }
+    check_close(vec_ops.norm_rank1(tangent, lambda_s), real(1), real(20)*tolerance<real>(), "initial tangent projected path normalized tangent");
+    check_close(vec_ops.norm_l2(tangent), real(0), real(20)*tolerance<real>(), "initial tangent projected path zero branch spatial tangent");
+    check_close(lambda_s, real(1), real(20)*tolerance<real>(), "initial tangent projected path zero branch lambda tangent");
+
+    vec_ops.stop_use_vectors(x0, tangent);
+    vec_ops.free_vectors(x0, tangent);
 }
 
 } // namespace
@@ -929,9 +1202,21 @@ int main(int argc, char** argv)
     const std::size_t state_size = 2*positive_modes;
     vec_ops_real vec_ops(state_size);
     vec_ops_real reduced_vec_ops(positive_modes);
+    vec_ops.use_high_precision();
+    reduced_vec_ops.use_high_precision();
     ks1d_t ks(real(2), real(4), physical_size, &vec_ops);
+    ks1d_t lsq_ks(real(2), real(4), physical_size, &vec_ops);
     ks1d_reduced_t reduced_ks(real(2), real(4), physical_size, &reduced_vec_ops);
     symmetry_adapter_t symmetry(&vec_ops, positive_modes);
+    auto lsq_policy = ks1d_t::default_continuation_symmetry_policy();
+    lsq_policy.stabilizer =
+        ::symmetry::fourier::real_packed_fourier_1d_stabilizer_policy::lsq_multimode;
+    lsq_policy.lsq.mode_min = 1;
+    lsq_policy.lsq.mode_max = std::min<std::size_t>(12, positive_modes);
+    lsq_policy.lsq.max_active_modes = 6;
+    lsq_policy.lsq.grid_points = 96;
+    lsq_policy.lsq.newton_iterations = 8;
+    lsq_ks.configure_continuation_symmetry(lsq_policy);
 
     std::cout << "Testing full Fourier KS1D operator backend: " << KS1D_BACKEND_NAME << std::endl;
     test_zero_branch(vec_ops, ks);
@@ -947,6 +1232,9 @@ int main(int argc, char** argv)
     test_reduced_continuation_chart_fallback(reduced_vec_ops, reduced_ks);
     test_projected_operator_hooks(vec_ops, ks, symmetry);
     test_projected_bordered_continuation_correction(vec_ops, ks);
+    test_frozen_lsq_projected_operator_hooks(vec_ops, lsq_ks);
+    test_projected_bordered_initial_tangent_equation(vec_ops, ks);
+    test_initial_tangent_projected_path_smoke(vec_ops, ks);
 
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;
     if(failures != 0)

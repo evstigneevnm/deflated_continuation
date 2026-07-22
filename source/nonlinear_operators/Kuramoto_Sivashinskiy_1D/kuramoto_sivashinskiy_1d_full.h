@@ -35,6 +35,7 @@ public:
     using complex_vector_type = scfd::arrays::array<complex_type, memory_type>;
     using symmetry_adapter_type = symmetry::fourier::real_packed_fourier_slice_1d_adapter<VectorOperations>;
     using slice_data_type       = typename symmetry_adapter_type::slice_data_type;
+    using symmetry_policy_type  = typename symmetry_adapter_type::policy_type;
 
     kuramoto_sivashinskiy_1d_full(
         const T &a_val_, const T &b_val_, std::size_t physical_size_, VectorOperations *vec_ops_
@@ -53,7 +54,7 @@ public:
         {
             throw std::runtime_error( "kuramoto_sivashinskiy_1d_full vector size must be 2*(physical_size/2 - 1)." );
         }
-        symmetry_adapter.set_relative_active_mode_tolerance( default_relative_active_mode_tolerance() );
+        symmetry_adapter.configure( default_continuation_symmetry_policy() );
         common_constructor_operation();
     }
 
@@ -126,12 +127,24 @@ public:
         return T( 1.0e-5 );
     }
 
-    template <class SymmetryAdapter>
-    void configure_continuation_symmetry_adapter( SymmetryAdapter &adapter ) const
+    static symmetry_policy_type default_continuation_symmetry_policy()
     {
-        adapter.set_relative_active_mode_tolerance( default_relative_active_mode_tolerance() );
-        adapter.set_continuation_mode_switch_ratio( T( 0.25 ) );
-        adapter.set_tangent_continuity_weight( T( 0.25 ) );
+        symmetry_policy_type policy;
+        policy.relative_active_mode_tolerance = default_relative_active_mode_tolerance();
+        policy.continuation_mode_switch_ratio = T( 0.25 );
+        policy.tangent_continuity_weight = T( 0.25 );
+        policy.tangent_backward_penalty = T( 4 );
+        return policy;
+    }
+
+    void configure_continuation_symmetry( const symmetry_policy_type &policy )
+    {
+        symmetry_adapter.configure( policy );
+    }
+
+    const symmetry_policy_type &continuation_symmetry_configuration() const
+    {
+        return symmetry_adapter.configuration();
     }
 
     template <class FiniteActionRegistry>
@@ -165,7 +178,7 @@ public:
 
     void set_projected_linearization_point( const T_vec &u_0_, const T lambda_0_ )
     {
-        symmetry_adapter.stabilize_closest_to_reference( u_0_, u_0_, projected_state );
+        symmetry_adapter.freeze_linearization_chart( u_0_, projected_state );
         set_linearization_point( projected_state, lambda_0_ );
     }
 
@@ -217,7 +230,14 @@ public:
 
     void projected_F( const T_vec &u, const T lambda, T_vec &v )
     {
-        symmetry_adapter.stabilize_closest_to_reference( u, u, projected_state );
+        symmetry_adapter.freeze_linearization_chart( u, projected_state );
+        F( projected_state, lambda, projected_residual );
+        symmetry_adapter.project_tangent( projected_state, projected_residual, v );
+    }
+
+    void projected_F_in_frozen_chart( const T_vec &u, const T lambda, T_vec &v )
+    {
+        symmetry_adapter.evaluate_frozen_linearization_chart( u, projected_state );
         F( projected_state, lambda, projected_residual );
         symmetry_adapter.project_tangent( projected_state, projected_residual, v );
     }
@@ -294,6 +314,28 @@ public:
         symmetry_adapter.stabilize_closest_to_reference( x, x, x );
     }
 
+    void prepare_continuation_seed( const T_vec &source, T_vec &destination )
+    {
+        symmetry_adapter.prepare_continuation_seed( source, destination );
+    }
+
+    void accept_continuation_step(
+        T_vec &state,
+        const T &,
+        T_vec &tangent,
+        T &tangent_lambda )
+    {
+        symmetry_adapter.accept_continuation_step( state, tangent );
+        const T tangent_norm = vec_ops->norm_rank1( tangent, tangent_lambda );
+        if ( !( tangent_norm > T( 0 ) ) )
+        {
+            throw std::runtime_error(
+                "kuramoto_sivashinskiy_1d_full: accepted continuation tangent is degenerate" );
+        }
+        vec_ops->scale( T( 1 ) / tangent_norm, tangent );
+        tangent_lambda /= tangent_norm;
+    }
+
     void begin_continuation_chart( const T_vec &x_0_, const T &lambda_0_, const T_vec &x_0_s_, const T & )
     {
         (void)lambda_0_;
@@ -307,6 +349,11 @@ public:
     {
         symmetry_adapter.stabilize_continuation_chart( x_0_, x_0_s_, x_predictor, x_trial );
         lambda_trial = lambda_predictor;
+    }
+
+    void restore_continuation_chart( const T_vec &, const T &, const T_vec &, const T & )
+    {
+        symmetry_adapter.restore_continuation_chart();
     }
 
     void stabilize_corrector_trial( const T_vec &reference, const T &, T_vec &trial, T & )
@@ -326,7 +373,19 @@ public:
 
     void stabilize_tangent_for_arclength( const T_vec &, const T_vec &tangent, T_vec &destination )
     {
-        symmetry_adapter.stabilizer_differential_from_last( tangent, destination );
+        symmetry_adapter.continuation_stabilizer_differential_from_last( tangent, destination );
+    }
+
+    symmetry::continuation::isotropy_transition_result<T>
+    detect_continuation_isotropy_transition(
+        const T_vec &previous,
+        const T_vec &candidate,
+        const symmetry::continuation::isotropy_transition_policy<T> &policy )
+    {
+        return symmetry_adapter.detect_continuation_isotropy_transition(
+            previous,
+            candidate,
+            policy );
     }
 
     const slice_data_type &last_slice_data() const
@@ -338,14 +397,17 @@ public:
     void log_projection_diagnostics( Log *log, const char *context ) const
     {
         const auto &data = symmetry_adapter.last_slice_data();
+        const auto &chart_state = symmetry_adapter.continuation_chart_state();
         log->info_f(
             "%s: Fourier slice diagnostics: active = %i, mode = %lu, residual_group_order = %lu, shift = %le, "
-            "selected_abs = %le, selected_real_on_slice = %le, slice_matrix = %le, discrete_action = %i",
+            "selected_abs = %le, selected_real_on_slice = %le, slice_matrix = %le, "
+            "chart_initialized = %i, chart_generation = %lu",
             context, data.active() ? 1 : 0, static_cast<unsigned long>( data.mode ),
             static_cast<unsigned long>( data.residual_group_order() ), static_cast<double>( data.shift ),
             static_cast<double>( data.selected_abs ), static_cast<double>( data.selected_real_on_slice ),
             static_cast<double>( data.slice_matrix ),
-            static_cast<int>( symmetry_adapter.last_discrete_action() )
+            chart_state.initialized ? 1 : 0,
+            static_cast<unsigned long>( chart_state.generation )
         );
     }
 

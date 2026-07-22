@@ -6,8 +6,12 @@
 #include <cmath>
 #include <common/scalar_math.h>
 #include <continuation/chart_helpers.h>
-#include <continuation/predictor_chart_validation.h>
+#include <continuation/continuation_step_state.h>
+#include <continuation/corrector_retry_policy.h>
+#include <continuation/predictor_chart_diagnostics.h>
+#include <continuation/predictor_chart_probe.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
+#include <numerical_algos/detail/str_source_helper.h>
 /**
   continuation of a single solution forward or backward on a single step
   execute SOLVE method to continue solution in one step
@@ -37,39 +41,95 @@ public:
         vec_ops->init_vector(x_p); vec_ops->start_use_vector(x_p);
         vec_ops->init_vector(x1_l); vec_ops->start_use_vector(x1_l);
         vec_ops->init_vector(dx10);  vec_ops->start_use_vector(dx10);
+        if constexpr(chart::has_isotropy_transition<NonlinearOperator, T_vec, T>::value)
+        {
+            vec_ops->init_vector(x_isotropy_event);
+            vec_ops->start_use_vector(x_isotropy_event);
+        }
     }
 
     ~advance_solution()
     {
-        vec_ops->stop_use_vector(x_p); vec_ops->free_vector(x_p);
-        vec_ops->stop_use_vector(x1_l); vec_ops->free_vector(x1_l);
+        if constexpr(chart::has_isotropy_transition<NonlinearOperator, T_vec, T>::value)
+        {
+            vec_ops->stop_use_vector(x_isotropy_event);
+            vec_ops->free_vector(x_isotropy_event);
+        }
         vec_ops->stop_use_vector(dx10); vec_ops->free_vector(dx10);
+        vec_ops->stop_use_vector(x1_l); vec_ops->free_vector(x1_l);
+        vec_ops->stop_use_vector(x_p); vec_ops->free_vector(x_p);
     }
     
 
     void reset() //can be used to set everything in default state
     {
-        predictor->reset_all(); 
+        predictor->reset_all();
+        last_isotropy_transition_ = {};
+    }
+
+    void set_verbose(const bool value)
+    {
+        verbose = value;
+        set_predictor_verbose(predictor, value, 0);
+    }
+
+    void set_predictor_chart_policy(const predictor_chart_policy<T>& policy)
+    {
+        validate_predictor_chart_policy(policy);
+        chart_policy = policy;
+    }
+
+    void set_isotropy_transition_policy(
+        const symmetry::continuation::isotropy_transition_policy<T>& policy)
+    {
+        policy.validate();
+        isotropy_policy = policy;
+    }
+
+    bool has_isotropy_transition() const
+    {
+        return last_isotropy_transition_.detected;
+    }
+
+    const symmetry::continuation::isotropy_transition_result<T>&
+    last_isotropy_transition() const
+    {
+        return last_isotropy_transition_;
+    }
+
+    step_retry_result reduce_next_step(const T factor)
+    {
+        return predictor->reduce_next_step(factor);
     }
 
     bool solve(NonlinearOperator* nonlin_op, const T_vec& x0, const T& lambda0, const T_vec& x0_s, const T& lambda0_s, T_vec& x1, T& lambda1, T_vec& x1_s, T& lambda1_s)
     {
+        last_isotropy_transition_ = {};
         bool converged = false;
         bool failed = false;
-        bool any_failed_attempts = false;
+        bool terminal_isotropy_transition = false;
+        continuation_step_attempt_state<T> attempt;
+        isotropy_refinement_bracket<T> isotropy_bracket;
         T lambda_p;
-        log->info("continuation::advance_solution::starting point:");
-        log->info_f("   ||x0|| = %le, lambda0 = %le, ||x0_s|| = %le, lambda0_s = %le", (double)vec_ops->norm(x0), (double)lambda0, (double)vec_ops->norm(x0_s), (double)lambda0_s);
+        predictor_chart_policy<T> effective_chart_policy = chart_policy;
+        if constexpr(!chart::has_continuation_chart<NonlinearOperator, T_vec, T>::value)
+        {
+            effective_chart_policy.enabled = false;
+        }
+        if(verbose)
+        {
+            log->info("continuation::advance_solution::starting point:");
+            log->info_f("   ||x0|| = %le, lambda0 = %le, ||x0_s|| = %le, lambda0_s = %le", (double)vec_ops->norm(x0), (double)lambda0, (double)vec_ops->norm(x0_s), (double)lambda0_s);
+        }
         chart::begin_continuation_chart(vec_ops, log, nonlin_op, x0, lambda0, x0_s, lambda0_s);
-        chart::log_continuation_chart(log, nonlin_op, "continuation::advance_solution::begin_chart");
+        if(verbose)
+        {
+            chart::log_continuation_chart(log, nonlin_op, "continuation::advance_solution::begin_chart");
+        }
         predictor->reset_tangent_space(x0, lambda0, x0_s, lambda0_s);
         while((!converged)&&(!failed))
         {
             predictor->apply(x_p, lambda_p, x1, lambda1);
-            vec_ops->assign_mul(T(1), x_p, T(-1), x0, dx10);
-            const T raw_x_progress = vec_ops->scalar_prod(dx10, x0_s);
-            const T raw_lambda_progress = (lambda_p - lambda0)*lambda0_s;
-            const T raw_tangent_progress = raw_x_progress + raw_lambda_progress;
             chart::stabilize_predictor_for_continuation(
                 vec_ops,
                 log,
@@ -85,34 +145,102 @@ public:
             T ds_l = predictor->get_ds();
             T ds_max = predictor->get_ds_max();
             T tangent_norm = vec_ops->norm_rank1(x0_s, lambda0_s);
-            vec_ops->assign_mul(T(1), x1, T(-1), x_p, dx10);
-            const T predictor_chart_displacement = vec_ops->norm_l2(dx10);
-            vec_ops->assign_mul(T(1), x1, T(-1), x0, dx10);
-            const T charted_x_progress = vec_ops->scalar_prod(dx10, x0_s);
-            const T charted_lambda_progress = (lambda1 - lambda0)*lambda0_s;
-            const T charted_tangent_progress = charted_x_progress + charted_lambda_progress;
-            const auto predictor_validation = validate_predictor_chart(
+            const auto predictor_probe = evaluate_predictor_chart(
+                vec_ops,
+                x0,
+                lambda0,
+                x0_s,
+                lambda0_s,
+                x_p,
+                lambda_p,
+                x1,
+                lambda1,
+                dx10,
                 ds_l,
-                raw_tangent_progress,
-                charted_tangent_progress,
-                predictor_chart_displacement);
-            log->info_f("continuation::predict: dS = %le, max dS = %le, tangent norm = %le, ||x_p|| = %le, lambda_p = %le, ||x1|| = %le, lambda1 = %le, ||x1 - x_p|| = %le", (double)ds_l, (double)ds_max, (double)tangent_norm, (double)vec_ops->norm(x_p), (double)lambda_p, (double)vec_ops->norm(x1), (double)lambda1, (double)predictor_chart_displacement);
-            log->info_f(
-                "continuation::predict: tangent progress diagnostics: raw = %le (x = %le, lambda = %le), charted = %le (x = %le, lambda = %le), charted/raw = %le",
-                (double)raw_tangent_progress,
-                (double)raw_x_progress,
-                (double)raw_lambda_progress,
-                (double)charted_tangent_progress,
-                (double)charted_x_progress,
-                (double)charted_lambda_progress,
-                (double)(raw_tangent_progress == T(0) ? T(0) : charted_tangent_progress/raw_tangent_progress));
-            log_predictor_validation_warnings(
+                effective_chart_policy);
+            const auto& predictor_validation = predictor_probe.validation;
+            if(verbose)
+            {
+                log->info_f("continuation::predict: dS = %le, max dS = %le, tangent norm = %le, ||x_p|| = %le, lambda_p = %le, ||x1|| = %le, lambda1 = %le, ||x1 - x_p|| = %le", (double)ds_l, (double)ds_max, (double)tangent_norm, (double)vec_ops->norm(x_p), (double)lambda_p, (double)vec_ops->norm(x1), (double)lambda1, (double)predictor_probe.chart_displacement);
+                log->info_f(
+                    "continuation::predict: tangent progress diagnostics: raw = %le (x = %le, lambda = %le), charted = %le (x = %le, lambda = %le), charted/raw = %le",
+                    (double)predictor_probe.raw_tangent_progress,
+                    (double)predictor_probe.raw_x_progress,
+                    (double)predictor_probe.raw_lambda_progress,
+                    (double)predictor_probe.charted_tangent_progress,
+                    (double)predictor_probe.charted_x_progress,
+                    (double)predictor_probe.charted_lambda_progress,
+                    (double)(predictor_probe.raw_tangent_progress == T(0) ? T(0) : predictor_probe.charted_tangent_progress/predictor_probe.raw_tangent_progress));
+            }
+            log_predictor_chart_validation_warnings(
+                log,
                 ds_l,
-                raw_tangent_progress,
-                charted_tangent_progress,
-                predictor_chart_displacement,
+                predictor_probe.raw_tangent_progress,
+                predictor_probe.charted_tangent_progress,
+                predictor_probe.chart_displacement,
                 predictor_validation);
-            chart::log_continuation_chart(log, nonlin_op, "continuation::advance_solution::predictor");
+            if(verbose)
+            {
+                chart::log_continuation_chart(log, nonlin_op, "continuation::advance_solution::predictor");
+            }
+            if(predictor_validation.decision == predictor_chart_decision::reject_tangent)
+            {
+                if(isotropy_bracket.active())
+                {
+                    terminal_isotropy_transition = true;
+                    converged = true;
+                    break;
+                }
+                throw std::runtime_error(
+                    "continuation::advance_solution: predictor validation rejected the current tangent");
+            }
+            if(predictor_validation.decision == predictor_chart_decision::reject_chart)
+            {
+                if(attempt.chart_retries >= chart_policy.maximum_retries)
+                {
+                    if(isotropy_bracket.active())
+                    {
+                        terminal_isotropy_transition = true;
+                        converged = true;
+                        break;
+                    }
+                    failed = true;
+                    attempt.failure_reason = "predictor chart validation exhausted its retry budget";
+                    break;
+                }
+                chart::restore_continuation_chart(
+                    vec_ops,
+                    log,
+                    nonlin_op,
+                    x0,
+                    lambda0,
+                    x0_s,
+                    lambda0_s);
+                const auto retry_result =
+                    predictor->retry_after_chart_rejection(chart_policy.step_reduction_factor);
+                ++attempt.chart_retries;
+                attempt.any_chart_retries = true;
+                if(retry_result != step_retry_result::retry)
+                {
+                    if(isotropy_bracket.active())
+                    {
+                        terminal_isotropy_transition = true;
+                        converged = true;
+                        break;
+                    }
+                    failed = true;
+                    attempt.failure_reason = retry_result == step_retry_result::retry_limit
+                        ? "continuation retry limit reached after chart rejection"
+                        : "minimum continuation step reached after chart rejection";
+                    break;
+                }
+                log->warning_f(
+                    "continuation::advance_solution: rejected charted predictor; retry %u of %u with dS = %le.",
+                    attempt.chart_retries,
+                    chart_policy.maximum_retries,
+                    (double)predictor->get_ds());
+                continue;
+            }
             if(continuation_type == 'S')
             {
                 sys_op->set_tangent_space((T_vec&)x0, (T&)lambda0, (T_vec&)x0_s, (T&)lambda0_s, ds_l, continuation_type, nonlin_op);
@@ -128,20 +256,118 @@ public:
             converged = newton_extended->solve(nonlin_op, x1, lambda1);
             if(!converged)
             {
-                log->info("continuation::advance_solution failed to converged. Modifiying dS.");
-                failed = predictor->decrease_ds_adaptive();
-
-                any_failed_attempts = true;
+                if(verbose)
+                {
+                    log->info("continuation::advance_solution failed to converge; reducing dS.");
+                }
+                chart::restore_continuation_chart(
+                    vec_ops,
+                    log,
+                    nonlin_op,
+                    x0,
+                    lambda0,
+                    x0_s,
+                    lambda0_s);
+                const auto retry_result = predictor->retry_after_failure();
+                attempt.any_corrector_retries = true;
+                if(retry_result != step_retry_result::retry)
+                {
+                    if(isotropy_bracket.active())
+                    {
+                        terminal_isotropy_transition = true;
+                        converged = true;
+                        break;
+                    }
+                    failed = true;
+                    attempt.failure_reason = retry_result == step_retry_result::retry_limit
+                        ? "continuation corrector retry limit reached"
+                        : "minimum continuation step reached after corrector failure";
+                }
             }
             else
             {
-                if(any_failed_attempts)
-                    log->info("continuation::advance_solution converged with corrector failed attempts.");
-                else
-                    log->info("continuation::advance_solution converged without corrector failed attempts.");
+                if(verbose)
+                {
+                    if(attempt.any_corrector_retries)
+                        log->info("continuation::advance_solution converged after corrector retries.");
+                    else
+                        log->info("continuation::advance_solution converged on the first corrector attempt.");
+                }
+            }
+            if(converged && isotropy_policy.enabled &&
+               chart::has_isotropy_transition<NonlinearOperator, T_vec, T>::value)
+            {
+                auto transition = chart::detect_isotropy_transition(
+                    nonlin_op,
+                    x0,
+                    x1,
+                    isotropy_policy);
+                if(transition.detected)
+                {
+                    if(isotropy_bracket.latch_event(predictor->get_ds(), lambda1))
+                    {
+                        vec_ops->assign(x1, x_isotropy_event);
+                        last_isotropy_transition_ = transition;
+                    }
+                    if(isotropy_policy.verbose)
+                    {
+                        log->warning_f(
+                            "continuation::advance_solution: corrected trial increases isotropy C_%lu -> C_%lu; transverse ratio changed from %le to %le at lambda = %le, dS = %le.",
+                            static_cast<unsigned long>(transition.previous_order),
+                            static_cast<unsigned long>(transition.candidate_order),
+                            double(transition.previous_transverse_ratio),
+                            double(transition.candidate_transverse_ratio),
+                            double(lambda1),
+                            double(predictor->get_ds()));
+                    }
+                }
+                else if(isotropy_bracket.active())
+                {
+                    isotropy_bracket.observe_non_event(predictor->get_ds());
+                }
+
+                if(isotropy_bracket.active())
+                {
+                    chart::restore_continuation_chart(
+                        vec_ops,
+                        log,
+                        nonlin_op,
+                        x0,
+                        lambda0,
+                        x0_s,
+                        lambda0_s);
+
+                    T next_step = T(0);
+                    if(isotropy_bracket.next_step(isotropy_policy, next_step))
+                    {
+                        const auto retry_result = predictor->retry_at_step(next_step);
+                        if(retry_result == step_retry_result::retry)
+                        {
+                            attempt.any_isotropy_retries = true;
+                            converged = false;
+                            if(isotropy_policy.verbose)
+                            {
+                                log->warning_f(
+                                    "continuation::advance_solution: refining latched isotropy transition, attempt %u of %u in dS bracket [%le, %le], trial dS = %le.",
+                                    isotropy_bracket.refinements(),
+                                    isotropy_policy.maximum_refinements,
+                                    double(isotropy_bracket.non_event_step()),
+                                    double(isotropy_bracket.event_step()),
+                                    double(next_step));
+                            }
+                            continue;
+                        }
+                    }
+
+                    vec_ops->assign(x_isotropy_event, x1);
+                    lambda1 = isotropy_bracket.event_lambda();
+                    last_isotropy_transition_.refinements = isotropy_bracket.refinements();
+                    terminal_isotropy_transition = true;
+                    break;
+                }
             }
         }
-        if(converged)
+        if(converged && verbose)
         {
             log->info("continuation::advance_solution::corrector Newton step norms:");
             for(auto& x: *newton_extended->get_convergence_strategy_handle()->get_norms_history_handle())
@@ -152,7 +378,18 @@ public:
         }
         if(failed)
         {
-            throw std::runtime_error(std::string("continuation::advance_solution (corrector) " __FILE__ " " __STR(__LINE__) " failed to converge.") );
+            throw std::runtime_error(
+                std::string("continuation::advance_solution (corrector) " __FILE__ " " __STR(__LINE__) " failed: ") +
+                (attempt.failure_reason.empty() ? "unknown retry failure" : attempt.failure_reason));
+        }
+        if(terminal_isotropy_transition)
+        {
+            last_isotropy_transition_.refinements = isotropy_bracket.refinements();
+            vec_ops->assign(x_isotropy_event, x1);
+            lambda1 = isotropy_bracket.event_lambda();
+            vec_ops->assign(x0_s, x1_s);
+            lambda1_s = lambda0_s;
+            return true;
         }
         bool tangent_obtained = false;
 
@@ -160,13 +397,16 @@ public:
         {
             T arclength_res = sys_op->arclength_residual(x1, lambda1);
             T tangent_norm = vec_ops->norm_rank1(x0_s, lambda0_s);
-            log->info_f("continuation::advance_solution::corrected state: dS = %le, tangent norm = %le, arclength residual = %le", (double)predictor->get_ds(), (double)tangent_norm, (double)arclength_res);
+            if(verbose)
+            {
+                log->info_f("continuation::advance_solution::corrected state: dS = %le, tangent norm = %le, arclength residual = %le", (double)predictor->get_ds(), (double)tangent_norm, (double)arclength_res);
+            }
             tangent_obtained = sys_op->update_tangent_space(nonlin_op, x1, lambda1, x1_s, lambda1_s);
         }
         if((converged)&&(!tangent_obtained))
         {
             // throw std::runtime_error(std::string("advance_solution::advance_solution (tangent) " __FILE__ " " __STR(__LINE__) " linear system failed to converge.") );
-            log->info("continuation::advance_solution::tangent system failed to converge. Nearing singularity with dim(ker(J))>1. Using FD estimaiton.");  
+            log->warning("continuation::advance_solution::tangent system failed to converge; using a finite-difference estimate.");
             T ds = predictor->get_ds();
             T d_ds = T(10.0*std::sqrt(2.0)*1.0e-6);
             //T ds_p = ds + d_ds;
@@ -200,7 +440,10 @@ public:
                 T norm = vec_ops->norm_rank1(x1_s, lambda1_s);
                 lambda1_s/=norm;
                 vec_ops->scale(T(1)/norm, x1_s);
-                log->info_f("continuation::advance_solution::||(x_s, l_s)|| = %le", (double)(lambda1_s*lambda1_s + vec_ops->scalar_prod(x1_s, x1_s)) );
+                if(verbose)
+                {
+                    log->info_f("continuation::advance_solution::||(x_s, l_s)|| = %le", (double)(lambda1_s*lambda1_s + vec_ops->scalar_prod(x1_s, x1_s)) );
+                }
 
                 tangent_obtained = true;
             }
@@ -208,7 +451,10 @@ public:
             {
                 
                 log->warning("continuation::advance_solution::newton_extended solver failed for additional point in tangent");
-                log->info("continuation::advance_solution using Newton-Raphson estimation.");
+                if(verbose)
+                {
+                    log->info("continuation::advance_solution using Newton-Raphson estimation.");
+                }
                 T x_norm = vec_ops->norm(x1);
                 T sign = (lambda1 - lambda0)/common::scalar_math::abs(lambda1 - lambda0);
                 T d_lambda = sign*T(1.0)/x_norm;
@@ -233,8 +479,11 @@ public:
                     T ds_l = vec_ops->norm_rank1(x1_s, lambda1_s); 
                     lambda1_s/=ds_l;
                     vec_ops->scale(T(1.0)/ds_l, x1_s);
-                    log->info_f("continuation::advance_solution: estimated local ds = %le", (double) ds_l);
-                    log->info("continuation::advance_solution: Newton-Raphson estimate ends successfully.");
+                    if(verbose)
+                    {
+                        log->info_f("continuation::advance_solution: estimated local ds = %le", (double) ds_l);
+                        log->info("continuation::advance_solution: Newton-Raphson estimate ends successfully.");
+                    }
                     tangent_obtained = true;
                 }
 
@@ -244,70 +493,56 @@ public:
             nonlinear_operators::detail::project_current_tangent(vec_ops, nonlin_op, x1_s, x1_s);
             
         }
-        if(any_failed_attempts)
-        {   
-            log->info("continuation::advance_solution: failed corrector attempts detected; reseting predictor steps.");
-            predictor->reset_all();
-
-        }
-        else
+        if(converged && tangent_obtained)
         {
-            log->info("continuation::advance_solution: no failed corrector steps detected, attempting to increase dS.");
-            predictor->increase_ds();
-
+            chart::accept_continuation_step(
+                vec_ops,
+                log,
+                nonlin_op,
+                x1,
+                lambda1,
+                x1_s,
+                lambda1_s);
+            if(verbose)
+            {
+                chart::log_continuation_chart(
+                    log,
+                    nonlin_op,
+                    "continuation::advance_solution::accepted_chart_transition");
+            }
+        }
+        const bool recovered = attempt.recovered();
+        predictor->accept_step(recovered);
+        if(verbose)
+        {
+            if(attempt.any_chart_retries)
+            {
+                log->info_f(
+                    "continuation::advance_solution: accepted predictor after %u chart retries at dS = %le.",
+                    attempt.chart_retries,
+                    (double)predictor->get_ds());
+            }
+            if(recovered)
+            {
+                log->info_f(
+                    "continuation::advance_solution: preserving recovered dS = %le for the next step.",
+                    (double)predictor->get_ds());
+            }
         }
         return tangent_obtained;
     }
 
 
 private:
-    void log_predictor_validation_warnings(
-        const T& ds_l,
-        const T& raw_tangent_progress,
-        const T& charted_tangent_progress,
-        const T& predictor_chart_displacement,
-        const predictor_chart_validation_result<T>& validation) const
+    template<class Predictor>
+    static auto set_predictor_verbose(Predictor* predictor_, const bool value, int)
+        -> decltype(predictor_->set_verbose(value), void())
     {
-        if(validation.raw_non_positive)
-        {
-            log->warning_f(
-                "continuation::predict: validation warning: raw predictor progress is non-positive: raw = %le, ds = %le.",
-                (double)raw_tangent_progress,
-                (double)ds_l);
-        }
-        if(validation.charted_non_positive)
-        {
-            log->warning_f(
-                "continuation::predict: validation warning: charted predictor progress is non-positive: raw = %le, charted = %le, chart displacement = %le.",
-                (double)raw_tangent_progress,
-                (double)charted_tangent_progress,
-                (double)predictor_chart_displacement);
-        }
-        else if(validation.charted_weak_warning)
-        {
-            log->warning_f(
-                "continuation::predict: validation warning: charted predictor progress is weak: raw = %le, charted = %le, charted/raw-scale = %le.",
-                (double)raw_tangent_progress,
-                (double)charted_tangent_progress,
-                (double)validation.progress_ratio);
-        }
+        predictor_->set_verbose(value);
+    }
 
-        if(validation.progress_jump_warning)
-        {
-            log->warning_f(
-                "continuation::predict: validation warning: charted predictor progress changed too much: raw = %le, charted = %le, charted/raw-scale = %le.",
-                (double)raw_tangent_progress,
-                (double)charted_tangent_progress,
-                (double)validation.progress_ratio);
-        }
-        if(validation.displacement_warning)
-        {
-            log->warning_f(
-                "continuation::predict: validation warning: chart displacement is large relative to ds: ||x1 - x_p|| = %le, ds = %le, ratio = %le.",
-                (double)predictor_chart_displacement,
-                (double)(validation.displacement_ratio > T(0) ? predictor_chart_displacement/validation.displacement_ratio : T(0)),
-                (double)validation.displacement_ratio);
-        }
+    static void set_predictor_verbose(...)
+    {
     }
 
     VectorOperations* vec_ops;
@@ -316,9 +551,13 @@ private:
     NewtonMethod* newton;
     Predictoror* predictor;
     ConvergenceNewtonExtended* convergence_newton_extended;
-    T_vec x_p, x1_l, dx10;
+    T_vec x_p, x1_l, dx10, x_isotropy_event;
     Loggin* log;
     char continuation_type;
+    predictor_chart_policy<T> chart_policy;
+    symmetry::continuation::isotropy_transition_policy<T> isotropy_policy;
+    symmetry::continuation::isotropy_transition_result<T> last_isotropy_transition_;
+    bool verbose = true;
 
 };
 

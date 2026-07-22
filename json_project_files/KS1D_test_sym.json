@@ -1,6 +1,6 @@
 {
     "gpu_pci_id": -1,
-    "path_to_project": "./KS1D_test_sym/",
+    "path_to_project": "./build/KS1D_test_sym/",
     "use_high_precision_reduction": true,
     "bifurcaiton_diagram_file_name": "bifurcation_diagram.dat",
     "stability_diagram_file_name": "stability_diagram.dat",
@@ -83,6 +83,12 @@
             "signature_tolerance": 1.0e-6,
             "state_tolerance": 1.0e-8,
             "minimum_step_fraction_from_start": 1.0e-3,
+            "detect_forward_approach": false,
+            "forward_refinement_step_factor": 0.25,
+            "maximum_forward_refinements": 8,
+            "minimum_forward_refinements_for_verification": 3,
+            "maximum_verified_forward_steps_ahead": 0.1,
+            "maximum_verified_forward_distance_step_ratio": 0.3,
             "verbose": true
         },
         "self_intersection_policy": {
@@ -93,6 +99,19 @@
             "minimum_step_fraction_from_start": 1.0e-3,
             "minimum_index_gap": 50,
             "verbose": true
+        },
+        "corrector_retry_policy": {
+            "maximum_retries": 8,
+            "failure_reduction_factor": 0.5,
+            "minimum_step_size": 1.0e-8,
+            "minimum_step_ratio": 1.0e-6,
+            "successes_before_growth": 5,
+            "success_growth_factor": 1.25
+        },
+        "progress_monitor_policy": {
+            "enabled": true,
+            "window_size": 25,
+            "minimum_window_progress_ratio": 0.01
         },
         "linear_solver_extended": {
             "maximum_iterations": 150,
@@ -118,8 +137,8 @@
             "newton_wight_threshold": 1.0e-8
         },
         "newton_deflation": {
-            "maximum_iterations": 100,
-            "update_wight_maximum": 1.0,
+            "maximum_iterations": 500,
+            "update_wight_maximum": 0.5,
             "save_norms_history": false,
             "verbose": false,
             "tolerance": 1.0e-8
@@ -153,7 +172,7 @@
     },
     "nonlinear_operator": {
         "discrete_problem_dimensions": [
-            64
+            128
         ],
         "problem_real_parameters_vector": [
             2.0,

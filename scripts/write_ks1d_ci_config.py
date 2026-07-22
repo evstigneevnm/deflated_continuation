@@ -106,7 +106,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("project_dir", help="Root project directory used by the solver.")
     parser.add_argument(
         "--base-config",
-        default="json_project_files/KS1D_sym_test.json",
+        default="json_project_files/KS1D_test_sym.json",
         help="Base KS1D JSON file.",
     )
     parser.add_argument("--grid-size", type=int, default=32)

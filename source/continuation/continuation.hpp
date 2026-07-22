@@ -10,14 +10,21 @@
 */
 
 #include <functional>
+#include <sstream>
 #include <string>
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
 #include <continuation/predictor_adaptive.h>
 #include <continuation/system_operator_continuation.h>
 #include <continuation/advance_solution.h>
+#include <continuation/chart_helpers.h>
 #include <continuation/initial_tangent.h>
 #include <continuation/convergence_strategy.h>
+#include <continuation/continuation_endpoint_state.h>
+#include <continuation/pending_branch_event.h>
+#include <continuation/progress_monitor.h>
+#include <continuation/semicurve_tangent_cache.h>
+#include <containers/branch_intersection.h>
 #include <containers/curve_endpoint_reason.h>
 
 
@@ -35,6 +42,47 @@ auto start_new_curve_segment_if_available(Curve* curve) -> decltype(curve->start
 }
 
 inline void start_new_curve_segment_if_available(...)
+{
+}
+
+template<class Object>
+auto set_verbose_if_available(Object* object, const bool value, int)
+    -> decltype(object->set_verbose(value), void())
+{
+    object->set_verbose(value);
+}
+
+inline void set_verbose_if_available(...)
+{
+}
+
+template<class Curve, class Event>
+auto record_symmetry_intersection_if_available(Curve* curve, const Event& event, int)
+    -> decltype(curve->record_symmetry_intersection(event), void())
+{
+    curve->record_symmetry_intersection(event);
+}
+
+template<class Curve, class Event>
+auto record_symmetry_intersection_if_available(Curve* curve, const Event& event, long)
+    -> decltype(
+        curve->record_symmetry_intersection(
+            event.previous_order,
+            event.candidate_order,
+            event.previous_transverse_ratio,
+            event.candidate_transverse_ratio,
+            event.refinements),
+        void())
+{
+    curve->record_symmetry_intersection(
+        event.previous_order,
+        event.candidate_order,
+        event.previous_transverse_ratio,
+        event.candidate_transverse_ratio,
+        event.refinements);
+}
+
+inline void record_symmetry_intersection_if_available(...)
 {
 }
 
@@ -59,13 +107,17 @@ private:
         const T_vec& x_right,
         T& effective_lambda,
         T_vec& effective_x)> knot_relocator_t;
-    typedef std::function<bool(
+    typedef std::function<container::branch_intersection_detection(
         const T& lambda_left,
         const T_vec& x_left,
         const T& lambda_right,
         const T_vec& x_right,
         T& hit_lambda,
         T_vec& hit_x,
+        int& hit_curve_number,
+        uint64_t& hit_segment_id,
+        T& hit_forward_steps_ahead,
+        T& hit_endpoint_distance_step_ratio,
         std::string& reason)> branch_intersection_checker_t;
     typedef std::function<bool(
         Curve* curve,
@@ -124,6 +176,8 @@ private:
         LinearSolver
         > tangent_0_cont_t;
 
+    using seed_tangent_cache_t = semicurve_tangent_cache<VectorOperations>;
+
 
 
 
@@ -136,7 +190,8 @@ public:
     knots(knots_),
     SM(SM_),
     newton(newton_),
-    lin_op(lin_op_)
+    lin_op(lin_op_),
+    seed_tangent_cache(vec_ops_)
     {
         predict = new predictor_cont_t(vec_ops, log);
         system_operator_cont = new system_operator_cont_t(vec_ops, log, lin_op, SM);
@@ -166,12 +221,46 @@ public:
         max_S = max_S_;
         initial_direciton = initial_direciton_;
         predict->set_steps(ds_0_, ds_max_, step_ds_m_, step_ds_p_, attempts_0_);
+        accepted_progress_monitor.configure(progress_policy, ds_0_);
         
+    }
+
+    void set_steps(
+        const unsigned int max_S_,
+        const T ds_0_,
+        const T ds_max_,
+        const int initial_direciton_,
+        const corrector_retry_policy<T>& retry_policy)
+    {
+        max_S = max_S_;
+        initial_direciton = initial_direciton_;
+        predict->set_steps(ds_0_, ds_max_, retry_policy);
+        accepted_progress_monitor.configure(progress_policy, ds_0_);
+    }
+
+    void set_progress_monitor_policy(const progress_monitor_policy<T>& policy)
+    {
+        progress_policy = policy;
+        accepted_progress_monitor.configure(progress_policy, predict->get_initial_ds());
+    }
+
+    void set_predictor_chart_policy(const predictor_chart_policy<T>& policy)
+    {
+        init_tangent->set_predictor_chart_policy(policy);
+        continuation_step->set_predictor_chart_policy(policy);
+    }
+
+    void set_isotropy_transition_policy(
+        const symmetry::continuation::isotropy_transition_policy<T>& policy)
+    {
+        continuation_step->set_isotropy_transition_policy(policy);
     }
 
     void set_newton(T tolerance_, unsigned int maximum_iterations_, T relax_tolerance_factor_, int relax_tolerance_steps_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true, unsigned int stagnation_max_p = 10, T maximum_norm_increase_p = 0.1, T newton_wight_threshold_p = 1.0e-12)
     {
         conv_newton_cont->set_convergence_constants(tolerance_, maximum_iterations_, relax_tolerance_factor_, relax_tolerance_steps_, newton_wight_, store_norms_history_,  verbose_, stagnation_max_p, maximum_norm_increase_p, newton_wight_threshold_p);
+        continuation_step->set_verbose(verbose_);
+        detail::set_verbose_if_available(system_operator_cont, verbose_, 0);
         epsilon = T(100.0)*tolerance_; //tolerance to check distance between vectors in curves.
     }
 
@@ -200,6 +289,44 @@ public:
         branch_intersection_checker = std::move(checker_);
     }
 
+    void set_branch_intersection_refinement(
+        const T step_factor,
+        const unsigned int maximum_refinements,
+        const unsigned int minimum_refinements_for_verification,
+        const T maximum_verified_steps_ahead,
+        const T maximum_verified_distance_step_ratio)
+    {
+        if(step_factor <= T(0) || step_factor >= T(1))
+        {
+            throw std::invalid_argument(
+                "branch intersection refinement step factor must be in (0,1)");
+        }
+        if(maximum_refinements == 0)
+        {
+            throw std::invalid_argument(
+                "branch intersection maximum refinements must be positive");
+        }
+        if(minimum_refinements_for_verification == 0 ||
+           minimum_refinements_for_verification > maximum_refinements)
+        {
+            throw std::invalid_argument(
+                "branch intersection minimum verification refinements must be positive and not exceed the refinement limit");
+        }
+        if(maximum_verified_steps_ahead <= T(0) ||
+           maximum_verified_distance_step_ratio <= T(0))
+        {
+            throw std::invalid_argument(
+                "branch intersection verification thresholds must be positive");
+        }
+        branch_refinement_step_factor = step_factor;
+        maximum_branch_refinements = maximum_refinements;
+        minimum_branch_refinements_for_verification =
+            minimum_refinements_for_verification;
+        maximum_verified_branch_steps_ahead = maximum_verified_steps_ahead;
+        maximum_verified_branch_distance_step_ratio =
+            maximum_verified_distance_step_ratio;
+    }
+
     void set_self_intersection_checker(self_intersection_checker_t checker_)
     {
         self_intersection_checker = std::move(checker_);
@@ -220,25 +347,35 @@ public:
         direction = initial_direciton;
         fail_flag = false;
         hard_failure = false;
-        incomplete_curve = false;
-        pending_endpoint_reason = endpoint_reason_t::none;
+        endpoint_state.reset_curve();
+        branch_event.clear();
         just_interpolated = false;
         continue_next_step = true;
         
         //make a copy here? or just use the provided reference
         //x0 = x0_, lambda0 = lambda0_;
-        vec_ops->assign(x0_, x0);
+        chart::prepare_continuation_seed(
+            vec_ops,
+            log,
+            nonlin_op,
+            x0_,
+            x_start);
+        vec_ops->assign(x_start, x0);
         lambda0 = lambda0_;
         lambda_start = lambda0_;
-        //let's use a copy for start values since we need those to check returning value anyway
-        
-        vec_ops->assign(x0_, x_start);
+        seed_tangent_cache.clear();
         
         break_semicurve = 0;
 
         while (break_semicurve < 2)
         {
             continue_next_step = true;
+            chart::prepare_continuation_seed(
+                vec_ops,
+                log,
+                nonlin_op,
+                x_start,
+                x0);
             detail::start_new_curve_segment_if_available(bif_diag);
             start_semicurve();
             change_direction(); //if we reached the origin, then this is irrelevant. Else, change direction and do it again
@@ -251,7 +388,7 @@ public:
             }
         }
         bif_diag->print_curve();
-        return !hard_failure && !incomplete_curve;
+        return !hard_failure && !endpoint_state.incomplete();
     }
 
 
@@ -274,6 +411,7 @@ protected: //changed to protected for inheritance
     advance_step_cont_t* continuation_step;
     tangent_0_cont_t* init_tangent;
     Curve* bif_diag;
+    seed_tangent_cache_t seed_tangent_cache;
 
     int direction = -1;
     int initial_direciton = 1;
@@ -291,14 +429,13 @@ protected: //changed to protected for inheritance
     T lambda_start; T_vec x_start;
     T lambda0, lambda0_s, lambda1, lambda1_s;
     T lambda_min, lambda_max;
-    T_vec x0, x0_s, x1, x1_back, x1_s, x_check, x_output, x_relocated_knot, x_branch_intersection;
+    T_vec x0, x0_s, x1, x1_back, x1_s, x_check, x_output, x_relocated_knot, x_branch_intersection, x_pending_branch_event;
     char break_semicurve = 0;
     bool fail_flag = false;
     bool hard_failure = false;
     bool continue_next_step = true;
     bool just_interpolated = false;
-    bool incomplete_curve = false;
-    endpoint_reason_t pending_endpoint_reason = endpoint_reason_t::none;
+    continuation_endpoint_state endpoint_state;
     bool allow_knot_interpolation_failure = false;
     bool last_failed_knot_interpolation = false;
     T last_failed_requested_knot = T(0);
@@ -307,11 +444,19 @@ protected: //changed to protected for inheritance
     knot_resolver_t knot_resolver;
     knot_relocator_t knot_relocator;
     branch_intersection_checker_t branch_intersection_checker;
+    T branch_refinement_step_factor = T(0.25);
+    unsigned int maximum_branch_refinements = 8;
+    unsigned int minimum_branch_refinements_for_verification = 3;
+    T maximum_verified_branch_steps_ahead = T(0.1);
+    T maximum_verified_branch_distance_step_ratio = T(0.3);
+    pending_branch_event<T> branch_event;
     self_intersection_checker_t self_intersection_checker;
+    progress_monitor_policy<T> progress_policy;
+    progress_monitor<T> accepted_progress_monitor;
 
     void set_pending_endpoint_reason(endpoint_reason_t reason)
     {
-        pending_endpoint_reason = reason;
+        endpoint_state.observe(reason);
     }
 
     void mark_last_curve_point(endpoint_reason_t reason)
@@ -322,7 +467,7 @@ protected: //changed to protected for inheritance
         }
         if(container::is_incomplete_endpoint(reason))
         {
-            incomplete_curve = true;
+            endpoint_state.mark_incomplete();
         }
     }
 
@@ -336,7 +481,7 @@ protected: //changed to protected for inheritance
             force_store || container::is_terminal_endpoint(endpoint_reason);
         if(container::is_incomplete_endpoint(endpoint_reason))
         {
-            incomplete_curve = true;
+            endpoint_state.mark_incomplete();
         }
         if(solution_postprocessor)
         {
@@ -364,9 +509,11 @@ private:
         vec_ops->init_vector(x1_back); vec_ops->start_use_vector(x1_back);
         vec_ops->init_vector(x_relocated_knot); vec_ops->start_use_vector(x_relocated_knot);
         vec_ops->init_vector(x_branch_intersection); vec_ops->start_use_vector(x_branch_intersection);
+        vec_ops->init_vector(x_pending_branch_event); vec_ops->start_use_vector(x_pending_branch_event);
     }
     void unset_all_vectors()
     {
+        vec_ops->stop_use_vector(x_pending_branch_event); vec_ops->free_vector(x_pending_branch_event);
         vec_ops->stop_use_vector(x_branch_intersection); vec_ops->free_vector(x_branch_intersection);
         vec_ops->stop_use_vector(x_output); vec_ops->free_vector(x_output);
         vec_ops->stop_use_vector(x_check); vec_ops->free_vector(x_check);
@@ -494,6 +641,10 @@ private:
 
     void check_returning()
     {
+        vec_ops->assign(x1, x1_back);
+        const T lambda1_before_check = lambda1;
+        const endpoint_reason_t endpoint_reason_before_check =
+            endpoint_state.pending_reason();
         bools2 returned = check_intersection(lambda_start);
         std::string bool1_l = (returned.first?"true":"false");
         std::string bool2_l = (returned.second?"true":"false");
@@ -517,6 +668,12 @@ private:
                 continue_next_step = false;
 
             }
+        }
+        else
+        {
+            vec_ops->assign(x1_back, x1);
+            lambda1 = lambda1_before_check;
+            endpoint_state.replace_pending(endpoint_reason_before_check);
         }
     }
 
@@ -634,6 +791,50 @@ private:
         return true;
     }
 
+    void obtain_seed_tangent()
+    {
+        if(seed_tangent_cache.valid())
+        {
+            const int cached_direction = seed_tangent_cache.stored_direction();
+            seed_tangent_cache.restore(direction, x0_s, lambda0_s);
+            const bool same_direction = direction == cached_direction;
+            log->info_f(
+                "continuation::start_semicurve: reused cached seed tangent: current direction = %i, cached direction = %i, sign flip = %i, lambda_s = %le.",
+                direction,
+                cached_direction,
+                same_direction ? 0 : 1,
+                double(lambda0_s));
+            if(init_tangent->validate_tangent_candidate(
+                   nonlin_op,
+                   x0,
+                   lambda0,
+                   x0_s,
+                   lambda0_s,
+                   predict->get_initial_ds(),
+                   "cached sign-adjusted seed tangent"))
+            {
+                return;
+            }
+            log->warning(
+                "continuation::start_semicurve: cached sign-adjusted seed tangent failed chart validation; recomputing it.");
+            seed_tangent_cache.clear();
+        }
+
+        init_tangent->execute(
+            nonlin_op,
+            T(direction),
+            x0,
+            lambda0,
+            x0_s,
+            lambda0_s,
+            predict->get_initial_ds());
+        seed_tangent_cache.store(x0_s, lambda0_s, direction);
+        log->info_f(
+            "continuation::start_semicurve: cached seed tangent for direction = %i, lambda_s = %le.",
+            direction,
+            double(lambda0_s));
+    }
+
 
     void start_semicurve()
     {
@@ -641,7 +842,8 @@ private:
         try
         {
             log->info_f("continuation::start_semicurve: starting semicurve with direction = %i", direction);
-            init_tangent->execute(nonlin_op, T(direction), x0, lambda0, x0_s, lambda0_s);
+            branch_event.clear();
+            obtain_seed_tangent();
         }
         catch(const std::exception& e)
         {
@@ -650,84 +852,103 @@ private:
             break_semicurve++;
             fail_flag = true;
             hard_failure = true;
-            incomplete_curve = true;
+            endpoint_state.mark_incomplete();
         }
         if(!fail_flag)
         {        
             add_solution_to_curve(lambda0, x0, true); //add initial knot, force save data!
             continuation_step->reset(); //resets all data for initial continuation stepping
+            accepted_progress_monitor.reset();
             unsigned int s;
             for(s=0;s<max_S;s++)
             {
-                pending_endpoint_reason = endpoint_reason_t::none;
+                endpoint_state.reset_step();
                 try
                 {
                     continuation_step->solve(nonlin_op, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
                     bool did_knot_interpolation = false;
-                    if((s>1)&&(!just_interpolated))
+                    const bool isotropy_transition_found =
+                        continuation_step->has_isotropy_transition();
+                    if(isotropy_transition_found)
                     {
-                        check_interval();
-                        if(continue_next_step)
+                        const auto& event = continuation_step->last_isotropy_transition();
+                        log->warning_f(
+                            "continuation::start_semicurve: stopping at an isotropy transition C_%lu -> C_%lu at lambda = %le after %u refinements; transverse ratio changed from %le to %le.",
+                            static_cast<unsigned long>(event.previous_order),
+                            static_cast<unsigned long>(event.candidate_order),
+                            double(lambda1),
+                            event.refinements,
+                            double(event.previous_transverse_ratio),
+                            double(event.candidate_transverse_ratio));
+                        continue_next_step = false;
+                        break_semicurve++;
+                        set_pending_endpoint_reason(
+                            endpoint_reason_t::symmetry_intersection);
+                    }
+                    if(continue_next_step)
+                    {
+                        vec_ops->assign_mul(T(1), x1, T(-1), x0, x_check);
+                        const T accepted_progress =
+                            vec_ops->norm_rank1(x_check, lambda1-lambda0);
+                        if(accepted_progress_monitor.observe(accepted_progress))
                         {
-                            check_returning();
-                        }
-                        if(continue_next_step)
-                        {
-                            //save for restoring if interpolation fails!
-                            bool fail_flag_b4_interpolation = fail_flag;
-                            vec_ops->assign(x1, x1_back);
-                            T lambda1_back = lambda1;
-
-                            last_failed_knot_interpolation = false;
-                            did_knot_interpolation = interpolate_all_knots();
-                            //if fail flag after the interpolation, restore (x1, lambda1) and continue?
-                            if((fail_flag)&&(!fail_flag_b4_interpolation))
-                            {
-                                vec_ops->assign(x1_back, x1);
-                                lambda1 = lambda1_back;
-                                did_knot_interpolation = false;
-                                if(try_relocate_failed_knot(lambda1_back))
-                                {
-                                    did_knot_interpolation = true;
-                                }
-                                else if(allow_knot_interpolation_failure)
-                                {
-                                    fail_flag = false;
-                                    last_failed_knot_interpolation = false;
-                                    log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and continuing because policy allows it. May cause problems during deflation!");
-                                }
-                                else
-                                {
-                                    log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and stopping this curve.");
-                                    continue_next_step = false;
-                                    break_semicurve++;
-                                    hard_failure = true;
-                                    incomplete_curve = true;
-                                    mark_last_curve_point(endpoint_reason_t::knot_interpolation_failure);
-                                    break;
-                                }
-                            }
+                            log->warning_f(
+                                "continuation::start_semicurve: no accepted-state progress over %u steps; accumulated progress = %le. Stopping semicurve.",
+                                progress_policy.window_size,
+                                double(accepted_progress_monitor.accumulated_progress()));
+                            add_solution_to_curve(
+                                lambda1,
+                                x1,
+                                true,
+                                endpoint_reason_t::no_progress);
+                            continue_next_step = false;
+                            break_semicurve++;
+                            endpoint_state.mark_incomplete();
+                            break;
                         }
                     }
-                    else
-                    {
-                        just_interpolated = false;
-                    }
-                    bool branch_intersection_found = false;
+                    auto branch_detection = container::branch_intersection_detection::none;
                     if(continue_next_step && branch_intersection_checker)
                     {
                         T hit_lambda = lambda1;
+                        int hit_curve_number = -1;
+                        uint64_t hit_segment_id = 0;
+                        T hit_forward_steps_ahead = T(0);
+                        T hit_endpoint_distance_step_ratio = T(0);
                         std::string hit_reason;
-                        branch_intersection_found = branch_intersection_checker(
+                        branch_detection = branch_intersection_checker(
                             lambda0,
                             x0,
                             lambda1,
                             x1,
                             hit_lambda,
                             x_branch_intersection,
+                            hit_curve_number,
+                            hit_segment_id,
+                            hit_forward_steps_ahead,
+                            hit_endpoint_distance_step_ratio,
                             hit_reason);
-                        if(branch_intersection_found)
+                        if(branch_detection == container::branch_intersection_detection::verified)
                         {
+                            const T corrected_hit_lambda = hit_lambda;
+                            if(branch_event.matches(
+                                   hit_curve_number,
+                                   hit_segment_id))
+                            {
+                                hit_lambda = branch_event.lambda();
+                                vec_ops->assign(
+                                    x_pending_branch_event,
+                                    x_branch_intersection);
+                                std::ostringstream verified_reason;
+                                verified_reason
+                                    << "verified branch encounter with curve "
+                                    << hit_curve_number
+                                    << " near predicted lambda = " << hit_lambda
+                                    << " after a corrected state reached that branch at lambda = "
+                                    << corrected_hit_lambda;
+                                hit_reason = verified_reason.str();
+                            }
+                            branch_event.clear();
                             lambda1 = hit_lambda;
                             vec_ops->assign(x_branch_intersection, x1);
                             did_knot_interpolation = true;
@@ -745,6 +966,80 @@ private:
                                 "continuation::start_semicurve: stopped semicurve at lambda = %le due to %s.",
                                 double(lambda1),
                                 hit_reason.empty() ? "known branch intersection" : hit_reason.c_str());
+                        }
+                        else if(branch_detection == container::branch_intersection_detection::forward_approach)
+                        {
+                            branch_event.update(
+                                hit_lambda,
+                                hit_curve_number,
+                                hit_segment_id);
+                            vec_ops->assign(
+                                x_branch_intersection,
+                                x_pending_branch_event);
+                            branch_event.increment_refinements();
+                            const bool event_localized =
+                                container::forward_branch_event_is_localized(
+                                    branch_event.refinements(),
+                                    hit_forward_steps_ahead,
+                                    hit_endpoint_distance_step_ratio,
+                                    minimum_branch_refinements_for_verification,
+                                    maximum_verified_branch_steps_ahead,
+                                    maximum_verified_branch_distance_step_ratio);
+                            if(event_localized)
+                            {
+                                lambda1 = branch_event.lambda();
+                                vec_ops->assign(x_pending_branch_event, x1);
+                                did_knot_interpolation = true;
+                                continue_next_step = false;
+                                break_semicurve++;
+                                set_pending_endpoint_reason(endpoint_reason_t::known_branch);
+                                log->warning_f(
+                                    "continuation::start_semicurve: localized branch encounter with curve %i at lambda = %le after %u refinements (estimated steps ahead = %le, distance/step = %le); stopping before the singular corrector can switch branches.",
+                                    hit_curve_number,
+                                    double(lambda1),
+                                    branch_event.refinements(),
+                                    double(hit_forward_steps_ahead),
+                                    double(hit_endpoint_distance_step_ratio));
+                                branch_event.clear();
+                            }
+                            auto reduction = step_retry_result::retry;
+                            if(continue_next_step &&
+                               branch_event.refinements() < maximum_branch_refinements)
+                            {
+                                reduction = continuation_step->reduce_next_step(
+                                    branch_refinement_step_factor);
+                            }
+                            if(continue_next_step &&
+                               (branch_event.refinements() >= maximum_branch_refinements ||
+                               reduction != step_retry_result::retry)
+                              )
+                            {
+                                continue_next_step = false;
+                                break_semicurve++;
+                                endpoint_state.mark_incomplete();
+                                set_pending_endpoint_reason(
+                                    endpoint_reason_t::unresolved_branch_intersection);
+                                log->warning_f(
+                                    "continuation::start_semicurve: could not verify a predicted branch intersection after %u refinements; stopping at lambda = %le without inserting a known-branch state.",
+                                    branch_event.refinements(),
+                                    double(lambda1));
+                            }
+                            else if(continue_next_step)
+                            {
+                                log->warning_f(
+                                    "continuation::start_semicurve: possible branch encounter near lambda = %le is not yet verified; refinement %u of %u will continue with a smaller dS. %s",
+                                    double(hit_lambda),
+                                    branch_event.refinements(),
+                                    maximum_branch_refinements,
+                                    hit_reason.c_str());
+                            }
+                        }
+                        else
+                        {
+                            if(branch_event.active())
+                            {
+                                branch_event.note_miss(2);
+                            }
                         }
                     }
                     bool self_intersection_found = false;
@@ -775,9 +1070,72 @@ private:
                                 hit_reason.empty() ? "curve-local self intersection" : hit_reason.c_str());
                         }
                     }
+                    if((s>1)&&(!just_interpolated))
+                    {
+                        if(continue_next_step)
+                        {
+                            check_interval();
+                        }
+                        if(continue_next_step && !branch_event.active())
+                        {
+                            check_returning();
+                        }
+                        if(continue_next_step && !branch_event.active())
+                        {
+                            //save for restoring if interpolation fails!
+                            bool fail_flag_b4_interpolation = fail_flag;
+                            vec_ops->assign(x1, x1_back);
+                            T lambda1_back = lambda1;
+
+                            last_failed_knot_interpolation = false;
+                            did_knot_interpolation = interpolate_all_knots();
+                            //if fail flag after the interpolation, restore (x1, lambda1) and continue?
+                            if((fail_flag)&&(!fail_flag_b4_interpolation))
+                            {
+                                vec_ops->assign(x1_back, x1);
+                                lambda1 = lambda1_back;
+                                did_knot_interpolation = false;
+                                if(try_relocate_failed_knot(lambda1_back))
+                                {
+                                    did_knot_interpolation = true;
+                                }
+                                else if(allow_knot_interpolation_failure)
+                                {
+                                    fail_flag = false;
+                                    last_failed_knot_interpolation = false;
+                                    log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and continuing because policy allows it. May cause problems during deflation!");
+                                }
+                                else
+                                {
+                                    log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and stopping this curve.");
+                                    continue_next_step = false;
+                                    break_semicurve++;
+                                    hard_failure = true;
+                                    endpoint_state.mark_incomplete();
+                                    mark_last_curve_point(endpoint_reason_t::knot_interpolation_failure);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        just_interpolated = false;
+                    }
                     //if try blocks passes, THIS is executed:
-                    add_solution_to_curve(lambda1, x1, did_knot_interpolation, pending_endpoint_reason);
-                    pending_endpoint_reason = endpoint_reason_t::none;
+                    add_solution_to_curve(
+                        lambda1,
+                        x1,
+                        did_knot_interpolation,
+                        endpoint_state.pending_reason());
+                    if(isotropy_transition_found)
+                    {
+                        detail::record_symmetry_intersection_if_available(
+                            bif_diag,
+                            continuation_step->last_isotropy_transition(),
+                            0);
+                    }
+                    endpoint_state.reset_step();
                     
                     vec_ops->assign(x1, x0);
                     vec_ops->assign(x1_s, x0_s);
@@ -790,7 +1148,7 @@ private:
                     break_semicurve++;
                     fail_flag = true; 
                     hard_failure = true;
-                    incomplete_curve = true;
+                    endpoint_state.mark_incomplete();
                     mark_last_curve_point(endpoint_reason_t::hard_failure);
                     continue_next_step = false;                   
                 }
@@ -805,7 +1163,7 @@ private:
                 log->warning_f("continuation::start_semicurve: reached maximum steps = %i", s);
                 continue_next_step = false;
                 break_semicurve++;
-                incomplete_curve = true;
+                endpoint_state.mark_incomplete();
                 mark_last_curve_point(endpoint_reason_t::max_steps);
             }
 

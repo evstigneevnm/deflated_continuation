@@ -17,15 +17,9 @@
 #include <vector>
 #include <limits>
 #include <memory>
+#include <filesystem>
 #include <sstream>
 #include <type_traits>
-//boost serializatoin
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
-// #include <boost/archive/binary_oarchive.hpp>
-// #include <boost/archive/binary_iarchive.hpp>
-
-
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 #include <numerical_algos/newton_solvers/newton_solver.h>
 
@@ -35,6 +29,9 @@
 #include <containers/curve_helper_container.h>
 #include <containers/bifurcation_diagram_curve.h>
 #include <containers/bifurcation_diagram.h>
+#include <containers/bifurcation_diagram/diagram_archive.h>
+#include <containers/bifurcation_diagram/symmetry_event_registry_sync.h>
+#include <containers/symmetry_event_registry.h>
 
 #include <continuation/continuation.hpp>
 #include <continuation/continuation_analytical.hpp> // inherited from continuation to put a nontrivial analytical solution on the curve, if needed.
@@ -42,88 +39,20 @@
 #include <deflation/solution_storage.h>
 #include <deflation/deflation.hpp>
 
+#include <main/deflation_continuation/solver_bundle.h>
+#include <main/deflation_continuation/parameter_application.h>
+#include <main/deflation_continuation/rejected_candidate_cache.h>
+#include <main/deflation_continuation/exact_solution_registry.h>
+#include <main/deflation_continuation/knot_relocation_controller.h>
+#include <main/deflation_continuation/analytical_branch_executor.h>
+#include <main/deflation_continuation/knot_executor.h>
+
 
 
 namespace main_classes{
 
 namespace detail
 {
-
-template<class...>
-using void_t = void;
-
-template<class NonlinearOperations, class Scalar, class Vector, class = void>
-struct has_exact_solution : std::false_type {};
-
-template<class NonlinearOperations, class Scalar, class Vector>
-struct has_exact_solution<
-    NonlinearOperations,
-    Scalar,
-    Vector,
-    void_t<decltype(std::declval<NonlinearOperations&>().exact_solution(std::declval<const Scalar&>(), std::declval<Vector&>()))>>
-    : std::true_type {};
-
-template<class NonlinearOperations, class Scalar, class Vector, class = void>
-struct has_indexed_exact_solution : std::false_type {};
-
-template<class NonlinearOperations, class Scalar, class Vector>
-struct has_indexed_exact_solution<
-    NonlinearOperations,
-    Scalar,
-    Vector,
-    void_t<decltype(std::declval<NonlinearOperations&>().exact_solution(
-        std::declval<std::size_t>(),
-        std::declval<const Scalar&>(),
-        std::declval<Vector&>()))>>
-    : std::true_type {};
-
-template<class NonlinearOperations, class = void>
-struct has_exact_solution_count : std::false_type {};
-
-template<class NonlinearOperations>
-struct has_exact_solution_count<
-    NonlinearOperations,
-    void_t<decltype(std::declval<NonlinearOperations&>().exact_solution_count())>>
-    : std::true_type {};
-
-template<class NonlinearOperations, class = void>
-struct has_exact_solution_name : std::false_type {};
-
-template<class NonlinearOperations>
-struct has_exact_solution_name<
-    NonlinearOperations,
-    void_t<decltype(std::declval<NonlinearOperations&>().exact_solution_name(std::declval<std::size_t>()))>>
-    : std::true_type {};
-
-template<class Solver>
-auto set_use_precond_resid_if_available(Solver* solver, int value) -> decltype(solver->set_use_precond_resid(value), void())
-{
-    solver->set_use_precond_resid(value);
-}
-
-inline void set_use_precond_resid_if_available(...)
-{
-}
-
-template<class Solver>
-auto set_resid_recalc_freq_if_available(Solver* solver, int value) -> decltype(solver->set_resid_recalc_freq(value), void())
-{
-    solver->set_resid_recalc_freq(value);
-}
-
-inline void set_resid_recalc_freq_if_available(...)
-{
-}
-
-template<class Solver>
-auto set_basis_size_if_available(Solver* solver, int value) -> decltype(solver->set_basis_size(value), void())
-{
-    solver->set_basis_size(value);
-}
-
-inline void set_basis_size_if_available(...)
-{
-}
 
 template<class SolutionStorage, class Vector>
 auto stabilize_solution_if_available(SolutionStorage* storage, Vector& x) -> decltype(storage->stabilize_in_place(x), void())
@@ -145,16 +74,6 @@ auto set_solution_postprocessor_if_available(Continuation* continuation, Solutio
 }
 
 inline void set_solution_postprocessor_if_available(...)
-{
-}
-
-template<class Continuation>
-auto set_allow_knot_interpolation_failure_if_available(Continuation* continuation, bool value) -> decltype(continuation->set_allow_knot_interpolation_failure(value), void())
-{
-    continuation->set_allow_knot_interpolation_failure(value);
-}
-
-inline void set_allow_knot_interpolation_failure_if_available(...)
 {
 }
 
@@ -203,9 +122,6 @@ private:
     typedef typename VectorOperations::scalar_type  T;
     typedef typename VectorOperations::vector_type  T_vec;
     typedef Monitor monitor_t;
-
-    typedef typename boost::archive::text_oarchive data_output;
-    typedef typename boost::archive::text_iarchive data_input;
 
     //general linear solver used in continuation and deflation
     typedef numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
@@ -304,84 +220,64 @@ private:
         sol_storage_def_t
         > deflate_t;
 
-    typedef container::intersection_status intersection_status_t;
-
-    class rejected_candidate_cache
+    struct solver_bundle_types
     {
-    public:
-        explicit rejected_candidate_cache(VectorOperations* vec_ops_):
-            vec_ops(vec_ops_)
-        {
-            vec_ops->init_vector(diff);
-            vec_ops->start_use_vector(diff);
-        }
-
-        ~rejected_candidate_cache()
-        {
-            clear();
-            vec_ops->stop_use_vector(diff);
-            vec_ops->free_vector(diff);
-        }
-
-        void clear()
-        {
-            for(auto& x: rejected_vectors)
-            {
-                vec_ops->stop_use_vector(x);
-                vec_ops->free_vector(x);
-            }
-            rejected_vectors.clear();
-            lambdas.clear();
-        }
-
-        void add(const T& lambda, const T_vec& x)
-        {
-            T_vec x_copy;
-            vec_ops->init_vector(x_copy);
-            vec_ops->start_use_vector(x_copy);
-            vec_ops->assign(x, x_copy);
-            rejected_vectors.push_back(std::move(x_copy));
-            lambdas.push_back(lambda);
-        }
-
-        bool nearest_distance(const T& lambda, const T_vec& x, T& distance)
-        {
-            bool found = false;
-            distance = std::numeric_limits<T>::infinity();
-            for(std::size_t i = 0; i < rejected_vectors.size(); ++i)
-            {
-                if(!same_lambda(lambda, lambdas[i]))
-                {
-                    continue;
-                }
-                vec_ops->assign_mul(T(1), x, T(-1), rejected_vectors[i], diff);
-                const T current_distance = vec_ops->norm_l2(diff);
-                if(current_distance < distance)
-                {
-                    distance = current_distance;
-                    found = true;
-                }
-            }
-            return found;
-        }
-
-    private:
-        static bool same_lambda(const T& a, const T& b)
-        {
-            const T scale = std::max<T>(T(1), std::max<T>(scalar_abs(a), scalar_abs(b)));
-            return scalar_abs(a - b) <= T(64)*std::numeric_limits<T>::epsilon()*scale;
-        }
-
-        static T scalar_abs(const T& value)
-        {
-            return value < T(0) ? -value : value;
-        }
-
-        VectorOperations* vec_ops;
-        std::vector<T_vec> rejected_vectors;
-        std::vector<T> lambdas;
-        T_vec diff;
+        using vector_operations_type = VectorOperations;
+        using vector_file_operations_type = VectorFileOperations;
+        using log_type = Log;
+        using nonlinear_operations_type = NonlinearOperations;
+        using linear_operator_type = LinearOperator;
+        using preconditioner_type = Preconditioner;
+        using linear_system_type = sherman_morrison_linear_system_solve_t;
+        using convergence_type = convergence_newton_t;
+        using system_operator_type = system_operator_t;
+        using newton_type = newton_t;
+        using knots_type = knots_t;
+        using solution_storage_type = sol_storage_def_t;
+        using continuation_type = continuate_t;
+        using analytical_continuation_type = continuate_analytical_t;
+        using diagram_type = bif_diag_t;
+        using deflation_type = deflate_t;
     };
+    typedef deflation_continuation_detail::solver_bundle<
+        solver_bundle_types> solver_bundle_t;
+
+    typedef container::intersection_status intersection_status_t;
+    typedef container::symmetry_event_registry<T> symmetry_event_registry_t;
+    typedef container::symmetry_event_registry_sync<
+        VectorOperations,
+        VectorFileOperations,
+        Log> symmetry_event_registry_sync_t;
+    typedef deflation_continuation_detail::exact_solution_registry<
+        NonlinearOperations,
+        T,
+        T_vec> exact_solution_registry_t;
+    typedef deflation_continuation_detail::analytical_branch_executor<
+        VectorOperations,
+        Log,
+        exact_solution_registry_t,
+        continuate_analytical_t,
+        bif_diag_t,
+        bif_diag_curve_t> analytical_branch_executor_t;
+    typedef std::decay_t<decltype(
+        std::declval<Parameters&>()
+            .deflation_continuation
+            .restart_policy
+            .knot_relocation)> knot_relocation_settings_t;
+    typedef deflation_continuation_detail::knot_relocation_controller<
+        T,
+        intersection_status_t,
+        knot_relocation_settings_t,
+        Log> knot_relocation_controller_t;
+    typedef deflation_continuation_detail::knot_executor_callbacks<
+        T,
+        T_vec,
+        intersection_status_t> knot_executor_callbacks_t;
+    typedef deflation_continuation_detail::knot_executor<
+        VectorOperations,
+        knots_t,
+        Log,
+        intersection_status_t> knot_executor_t;
 
     class branch_distance_workspace
     {
@@ -426,18 +322,6 @@ private:
         T_vec diff;
     };
 
-    static bool same_parameter_value(const T& a, const T& b)
-    {
-        const T scale = std::max<T>(T(1), std::max<T>(scalar_abs(a), scalar_abs(b)));
-        return scalar_abs(a - b) <= T(64)*std::numeric_limits<T>::epsilon()*scale;
-    }
-
-    static T scalar_abs(const T& value)
-    {
-        return value < T(0) ? -value : value;
-    }
-
-
 public:
     deflation_continuation(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, Log* log_linsolver_, NonlinearOperations* nonlin_op_, Parameters* parameters_, sol_storage_def_t* sol_storage_external_ = nullptr):
     vec_ops(vec_ops_),
@@ -445,9 +329,7 @@ public:
     log(log_),
     nonlin_op(nonlin_op_),
     log_linsolver(log_linsolver_),
-    parameters(parameters_),
-    sol_storage_def(sol_storage_external_),
-    owns_solution_storage(sol_storage_external_ == nullptr)
+    parameters(parameters_)
     {
         
         //add '/' to the end of the project dir, if needed
@@ -459,43 +341,45 @@ public:
             project_dir += '/';
 
 
-        lin_op = new LinearOperator(nonlin_op);
-        precond = new Preconditioner(nonlin_op);
-        SM = new sherman_morrison_linear_system_solve_t(precond, vec_ops, log_linsolver);
-        conv_newton = new convergence_newton_t(vec_ops, log);
-        system_operator = new system_operator_t(vec_ops, lin_op, SM);
-        newton = new newton_t(vec_ops, system_operator, conv_newton);
-        knots = new knots_t();
-        continuate = new continuate_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
-        continuate_analytical = new continuate_analytical_t(vec_ops, file_ops, log, nonlin_op, lin_op, knots, SM, newton);
-        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files);
-        if(sol_storage_def == nullptr)
-        {
-            sol_storage_def = new sol_storage_def_t(vec_ops, 50, vec_ops->get_l2_size(), 2.0, log );  //T(1.0) is a norm_wight! Used as sqrt(N) for L2 norm. Use it again? Check this!!!
-        }
+        solver_bundle = std::make_unique<solver_bundle_t>(
+            vec_ops,
+            file_ops,
+            log,
+            log_linsolver,
+            nonlin_op,
+            project_dir,
+            skip_files,
+            sol_storage_external_);
+        lin_op = solver_bundle->linear_operator();
+        precond = solver_bundle->preconditioner();
+        SM = solver_bundle->linear_system();
+        conv_newton = solver_bundle->convergence();
+        system_operator = solver_bundle->system_operator();
+        newton = solver_bundle->newton();
+        knots = solver_bundle->knots();
+        sol_storage_def = solver_bundle->solution_storage();
+        continuate = solver_bundle->continuation();
+        continuate_analytical = solver_bundle->analytical_continuation();
+        bif_diag = solver_bundle->diagram();
+        deflate = solver_bundle->deflation();
+        exact_solutions = std::make_unique<exact_solution_registry_t>(nonlin_op);
+        analytical_branches = std::make_unique<analytical_branch_executor_t>(
+            vec_ops,
+            log,
+            exact_solutions.get(),
+            continuate_analytical,
+            bif_diag);
+        symmetry_event_registry = std::make_unique<symmetry_event_registry_t>(
+            std::filesystem::path(project_dir)/"symmetry_event_registry.json");
+        symmetry_event_registry_sync =
+            std::make_unique<symmetry_event_registry_sync_t>(
+                vec_ops,
+                file_ops,
+                log);
         detail::set_solution_postprocessor_if_available(continuate, sol_storage_def, static_cast<T_vec*>(nullptr));
         detail::set_solution_postprocessor_if_available(continuate_analytical, sol_storage_def, static_cast<T_vec*>(nullptr));
-        deflate = new deflate_t(vec_ops, file_ops, log, nonlin_op, lin_op, SM, sol_storage_def);
     }
-    ~deflation_continuation()
-    {
-        
-        delete deflate;
-        if(owns_solution_storage)
-        {
-            delete sol_storage_def;
-        }
-        delete bif_diag;
-        delete continuate;
-        delete continuate_analytical;
-        delete knots;
-        delete newton;
-        delete system_operator;
-        delete conv_newton;
-        delete SM;
-        delete precond;
-        delete lin_op;
-    }
+    ~deflation_continuation() = default;
 
 
 
@@ -511,117 +395,50 @@ public:
         set_deflation_knots();
         set_branch_intersection_policy();
         set_self_intersection_policy();
+        set_isotropy_transition_policy();
     }
 
     void set_linsolver()
 /*T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true*/
     {
-        //setup linear system:
-        mon_orig = &SM->get_linsolver_handle_original()->monitor();
-        T lin_solver_tol = parameters->nonlinear_operator.linear_solver.lin_solver_tol;
-        unsigned int lin_solver_max_it = parameters->nonlinear_operator.linear_solver.lin_solver_max_it;
-        bool save_convergence_history_ = parameters->nonlinear_operator.linear_solver.save_convergence_history;
-        bool divide_out_norms_by_rel_base_ = parameters->nonlinear_operator.linear_solver.divide_out_norms_by_rel_base;
-        bool verbose_ = parameters->nonlinear_operator.linear_solver.verbose;
-        int use_precond_resid = parameters->nonlinear_operator.linear_solver.use_precond_resid;
-        int resid_recalc_freq = parameters->nonlinear_operator.linear_solver.resid_recalc_freq;
-        int basis_sz = parameters->nonlinear_operator.linear_solver.basis_size;
-
-        mon_orig->init(lin_solver_tol, T(0), lin_solver_max_it);
-        mon_orig->set_save_convergence_history(save_convergence_history_);
-        mon_orig->set_divide_out_norms_by_rel_base(divide_out_norms_by_rel_base_);
-        mon_orig->set_verbose(verbose_);
-        mon_orig->out_min_resid_norm();
-//
-        if(use_precond_resid >= 0)
-            detail::set_use_precond_resid_if_available(SM->get_linsolver_handle_original(), use_precond_resid);
-        if(resid_recalc_freq >= 0)
-            detail::set_resid_recalc_freq_if_available(SM->get_linsolver_handle_original(), resid_recalc_freq);
-        if(basis_sz > 0)
-            detail::set_basis_size_if_available(SM->get_linsolver_handle_original(), basis_sz);
-            // SM->get_linsolver_handle_original()->set_restarts(basis_sz);  
-//
+        mon_orig = deflation_continuation_detail::configure_linear_solver<T>(
+            SM->get_linsolver_handle_original(),
+            parameters->nonlinear_operator.linear_solver);
     }
     void set_extended_linsolver()
 /*T lin_solver_tol, unsigned int lin_solver_max_it, bool is_small_alpha = false, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true
 */    
     {
-        mon = &SM->get_linsolver_handle()->monitor();
-        T lin_solver_tol = parameters->deflation_continuation.linear_solver_extended.lin_solver_tol;
-        unsigned int lin_solver_max_it = parameters->deflation_continuation.linear_solver_extended.lin_solver_max_it;
-        bool save_convergence_history_ = parameters->deflation_continuation.linear_solver_extended.save_convergence_history;
-        bool divide_out_norms_by_rel_base_ = parameters->deflation_continuation.linear_solver_extended.divide_out_norms_by_rel_base;
-        bool verbose_ = parameters->deflation_continuation.linear_solver_extended.verbose;
-        int use_precond_resid = parameters->deflation_continuation.linear_solver_extended.use_precond_resid;
-        int resid_recalc_freq = parameters->deflation_continuation.linear_solver_extended.resid_recalc_freq;
-        int basis_sz = parameters->deflation_continuation.linear_solver_extended.basis_size;
-        bool is_small_alpha = parameters->deflation_continuation.linear_solver_extended.is_small_alpha;
-
-        mon->init(lin_solver_tol, T(0), lin_solver_max_it);
-        mon->set_save_convergence_history(save_convergence_history_);
-        mon->set_divide_out_norms_by_rel_base(divide_out_norms_by_rel_base_);
-        mon->set_verbose(verbose_);
-        mon->out_min_resid_norm();
-//
-        if(use_precond_resid >= 0)
-            detail::set_use_precond_resid_if_available(SM->get_linsolver_handle(), use_precond_resid);
-        if(resid_recalc_freq >= 0)
-            detail::set_resid_recalc_freq_if_available(SM->get_linsolver_handle(), resid_recalc_freq);
-        if(basis_sz > 0)
-           detail::set_basis_size_if_available(SM->get_linsolver_handle(), basis_sz);
-            // SM->get_linsolver_handle()->set_restarts(basis_sz); 
-//
-        SM->is_small_alpha(is_small_alpha);        
+        const auto& linear_solver_parameters =
+            parameters->deflation_continuation.linear_solver_extended;
+        mon = deflation_continuation_detail::configure_linear_solver<T>(
+            SM->get_linsolver_handle(),
+            linear_solver_parameters);
+        SM->is_small_alpha(linear_solver_parameters.is_small_alpha);
     }
     void set_newton()
     /*T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true*/
     {
-        T tolerance_ = parameters->nonlinear_operator.newton.tolerance;
-        unsigned int maximum_iterations_ = parameters->nonlinear_operator.newton.newton_max_it;
-        T newton_wight_ = parameters->nonlinear_operator.newton.newton_wight;
-
-        bool store_norms_history_ = parameters->nonlinear_operator.newton.store_norms_history;
-        bool verbose_ = parameters->nonlinear_operator.newton.verbose;
-
-        conv_newton->set_convergence_constants(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_,  verbose_);
+        deflation_continuation_detail::configure_newton_convergence(
+            conv_newton,
+            parameters->nonlinear_operator.newton);
     }
 
     void set_newton_continuation()
 /*T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.8), bool store_norms_history_ = false, bool verbose_ = true*/    
     {
-        T tolerance_ = parameters->deflation_continuation.newton_extended_continuation.tolerance;
-        unsigned int maximum_iterations_ = parameters->deflation_continuation.newton_extended_continuation.newton_max_it;
-        T newton_wight_ = parameters->deflation_continuation.newton_extended_continuation.newton_wight;
-
-        bool store_norms_history_ = parameters->deflation_continuation.newton_extended_continuation.store_norms_history;
-        bool verbose_ = parameters->deflation_continuation.newton_extended_continuation.verbose;
-
-        T relax_tolerance_factor_ =  parameters->deflation_continuation.newton_extended_continuation.relax_tolerance_factor;
-
-        int relax_tolerance_steps_ = parameters->deflation_continuation.newton_extended_continuation.relax_tolerance_steps;
-
-        auto stagnation_max_l = parameters->deflation_continuation.newton_extended_continuation.stagnation_max;
-        auto maximum_norm_increase_l = parameters->deflation_continuation.newton_extended_continuation.maximum_norm_increase;
-        auto newton_wight_threshold_l = parameters->deflation_continuation.newton_extended_continuation.newton_wight_threshold;
-        continuate->set_newton(tolerance_, maximum_iterations_, relax_tolerance_factor_, relax_tolerance_steps_, newton_wight_, store_norms_history_, verbose_, stagnation_max_l, maximum_norm_increase_l, newton_wight_threshold_l);
-        detail::set_allow_knot_interpolation_failure_if_available(
+        deflation_continuation_detail::configure_continuation_newton(
             continuate,
+            parameters->deflation_continuation.newton_extended_continuation,
             parameters->deflation_continuation.restart_policy.allow_knot_interpolation_failure);
-
     }
 
     void set_newton_deflation()
 /*T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true*/    
     {
-        
-        T tolerance_ = parameters->deflation_continuation.newton_extended_deflation.tolerance;
-        unsigned int maximum_iterations_ = parameters->deflation_continuation.newton_extended_deflation.newton_max_it;
-        T newton_wight_ = parameters->deflation_continuation.newton_extended_deflation.newton_wight;
-
-        bool store_norms_history_ = parameters->deflation_continuation.newton_extended_deflation.store_norms_history;
-        bool verbose_ = parameters->deflation_continuation.newton_extended_deflation.verbose;
-        deflate->set_newton(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_, verbose_);
-
+        deflation_continuation_detail::configure_deflation_newton(
+            deflate,
+            parameters->deflation_continuation.newton_extended_deflation);
     }
 
     void set_steps()
@@ -632,15 +449,25 @@ public:
         T ds_0_ = parameters->deflation_continuation.step_size;
         T ds_max_ = parameters->deflation_continuation.max_step_size;
         int initial_direciton_ = parameters->deflation_continuation.initial_direciton;
-        T step_ds_m_ = parameters->deflation_continuation.step_ds_m;
-        T step_ds_p_ = parameters->deflation_continuation.step_ds_p;
-        unsigned int attempts_0_ = parameters->deflation_continuation.continuation_fail_attempts;
         unsigned int deflation_attempts_ = parameters->deflation_continuation.deflation_attempts;
 
 
         deflate->set_max_retries(deflation_attempts_);
-        continuate->set_steps(max_S_, ds_0_, ds_max_, initial_direciton_, step_ds_m_, step_ds_p_, attempts_0_);
-        continuate_analytical->set_steps(max_S_, ds_0_, ds_max_, initial_direciton_, step_ds_m_, step_ds_p_, attempts_0_);
+        const auto retry_policy =
+            deflation_continuation_detail::make_corrector_retry_policy<T>(
+                parameters->deflation_continuation.corrector_retry_policy);
+        continuate->set_steps(max_S_, ds_0_, ds_max_, initial_direciton_, retry_policy);
+        continuate_analytical->set_steps(max_S_, ds_0_, ds_max_, initial_direciton_, retry_policy);
+
+        const auto progress_policy =
+            deflation_continuation_detail::make_progress_monitor_policy<T>(
+                parameters->deflation_continuation.progress_monitor_policy);
+        continuate->set_progress_monitor_policy(progress_policy);
+        const auto chart_policy =
+            deflation_continuation_detail::make_predictor_chart_policy<T>(
+                parameters->deflation_continuation.predictor_chart_policy);
+        continuate->set_predictor_chart_policy(chart_policy);
+        continuate_analytical->set_predictor_chart_policy(chart_policy);
     }
 
     void set_deflation_knots()
@@ -651,14 +478,22 @@ public:
 
     void set_branch_intersection_policy()
     {
-        container::branch_intersection_policy<T> policy;
-        const auto& params = parameters->deflation_continuation.branch_intersection_policy;
-        policy.enabled = params.enabled;
-        policy.signature_norm_index = params.signature_norm_index;
-        policy.signature_tolerance = params.signature_tolerance;
-        policy.state_tolerance = params.state_tolerance;
-        policy.minimum_step_fraction_from_start = params.minimum_step_fraction_from_start;
-        policy.verbose = params.verbose;
+        const auto policy =
+            deflation_continuation_detail::make_branch_intersection_policy<T>(
+                parameters->deflation_continuation.branch_intersection_policy);
+
+        continuate->set_branch_intersection_refinement(
+            policy.forward_refinement_step_factor,
+            policy.maximum_forward_refinements,
+            policy.minimum_forward_refinements_for_verification,
+            policy.maximum_verified_forward_steps_ahead,
+            policy.maximum_verified_forward_distance_step_ratio);
+        continuate_analytical->set_branch_intersection_refinement(
+            policy.forward_refinement_step_factor,
+            policy.maximum_forward_refinements,
+            policy.minimum_forward_refinements_for_verification,
+            policy.maximum_verified_forward_steps_ahead,
+            policy.maximum_verified_forward_distance_step_ratio);
 
         if(!policy.enabled)
         {
@@ -676,7 +511,11 @@ public:
                 const T_vec& x_right,
                 T& hit_lambda,
                 T_vec& hit_x,
-                std::string& reason) -> bool
+                int& hit_curve_number,
+                uint64_t& hit_segment_id,
+                T& hit_forward_steps_ahead,
+                T& hit_endpoint_distance_step_ratio,
+                std::string& reason) -> container::branch_intersection_detection
             {
                 container::branch_intersection_result<T> result;
                 auto distance =
@@ -695,27 +534,62 @@ public:
                     distance);
                 if(!found)
                 {
-                    return false;
+                    return container::branch_intersection_detection::none;
                 }
 
                 hit_lambda = result.lambda;
+                hit_curve_number = result.curve_number;
+                hit_segment_id = result.segment_id;
+                hit_forward_steps_ahead = result.forward_steps_ahead;
+                hit_endpoint_distance_step_ratio =
+                    result.endpoint_distance_step_ratio;
                 std::ostringstream stream;
-                stream << "known branch intersection with curve " << result.curve_number
-                       << ", segment " << result.segment_id
-                       << ", state distance = " << result.state_distance
-                       << ", tolerance = " << result.state_tolerance;
+                if(result.forward_approach)
+                {
+                    stream << "predicted known branch encounter with curve "
+                           << result.curve_number
+                           << ", segment " << result.segment_id
+                           << ", current state distance = " << result.state_distance
+                           << ", distance/step = "
+                           << result.endpoint_distance_step_ratio
+                           << ", estimated steps ahead = "
+                           << result.forward_steps_ahead;
+                }
+                else
+                {
+                    stream << "known branch intersection with curve " << result.curve_number
+                           << ", segment " << result.segment_id
+                           << ", state distance = " << result.state_distance
+                           << ", tolerance = " << result.state_tolerance;
+                }
                 reason = stream.str();
                 if(policy.verbose)
                 {
-                    log->info_f(
-                        "MAIN:deflation_continuation: branch intersection detected at lambda = %le: curve = %i, segment = %llu, state distance = %le, tolerance = %le.",
-                        double(result.lambda),
-                        result.curve_number,
-                        static_cast<unsigned long long>(result.segment_id),
-                        double(result.state_distance),
-                        double(result.state_tolerance));
+                    if(result.forward_approach)
+                    {
+                        log->info_f(
+                            "MAIN:deflation_continuation: forward branch encounter predicted at lambda = %le: curve = %i, segment = %llu, current state distance = %le, distance/step = %le, estimated steps ahead = %le.",
+                            double(result.lambda),
+                            result.curve_number,
+                            static_cast<unsigned long long>(result.segment_id),
+                            double(result.state_distance),
+                            double(result.endpoint_distance_step_ratio),
+                            double(result.forward_steps_ahead));
+                    }
+                    else
+                    {
+                        log->info_f(
+                            "MAIN:deflation_continuation: branch intersection detected at lambda = %le: curve = %i, segment = %llu, state distance = %le, tolerance = %le.",
+                            double(result.lambda),
+                            result.curve_number,
+                            static_cast<unsigned long long>(result.segment_id),
+                            double(result.state_distance),
+                            double(result.state_tolerance));
+                    }
                 }
-                return true;
+                return result.forward_approach
+                    ? container::branch_intersection_detection::forward_approach
+                    : container::branch_intersection_detection::verified;
             };
 
         continuate->set_branch_intersection_checker(checker);
@@ -724,15 +598,9 @@ public:
 
     void set_self_intersection_policy()
     {
-        container::self_intersection_policy<T> policy;
-        const auto& params = parameters->deflation_continuation.self_intersection_policy;
-        policy.enabled = params.enabled;
-        policy.signature_norm_index = params.signature_norm_index;
-        policy.signature_tolerance = params.signature_tolerance;
-        policy.state_tolerance = params.state_tolerance;
-        policy.minimum_step_fraction_from_start = params.minimum_step_fraction_from_start;
-        policy.minimum_index_gap = params.minimum_index_gap;
-        policy.verbose = params.verbose;
+        const auto policy =
+            deflation_continuation_detail::make_self_intersection_policy<T>(
+                parameters->deflation_continuation.self_intersection_policy);
 
         if(!policy.enabled)
         {
@@ -808,6 +676,14 @@ public:
         continuate_analytical->set_self_intersection_checker(checker);
     }
 
+    void set_isotropy_transition_policy()
+    {
+        const auto policy =
+            deflation_continuation_detail::make_isotropy_transition_policy<T>(
+                parameters->deflation_continuation.isotropy_transition_policy);
+        continuate->set_isotropy_transition_policy(policy);
+    }
+
     void use_analytical_solution(bool analytical_solution_ = false)
     {
         analytical_solution = analytical_solution_;
@@ -823,104 +699,36 @@ public:
         detail::stabilize_solution_if_available(sol_storage_def, x0_stabilized);
         bif_diag->init_new_curve();
         bif_diag->get_current_ref(bdf);
-        const bool old_suppress_analytical_branch_endpoint = suppress_analytical_branch_endpoint;
-        suppress_analytical_branch_endpoint = true;
-        try
-        {
-            continuate->continuate_curve(bdf, x0_stabilized, lambda0_);
-        }
-        catch(...)
-        {
-            suppress_analytical_branch_endpoint = old_suppress_analytical_branch_endpoint;
-            throw;
-        }
-        suppress_analytical_branch_endpoint = old_suppress_analytical_branch_endpoint;
+        continuate->continuate_curve(bdf, x0_stabilized, lambda0_);
         bif_diag->close_curve();
+        if(!bif_diag->commit_current_curve_symmetry_events())
+        {
+            throw std::runtime_error(
+                "MAIN:deflation_continuation: failed to commit symmetry events for an accepted seed curve");
+        }
+        synchronize_symmetry_event_registry();
         vec_ops->stop_use_vector(x0_stabilized);
         vec_ops->free_vector(x0_stabilized);
     }
 
-    bool build_analytical_solution_curve_if_available(const std::string& file_name_, bool file_exists)
+    bool build_analytical_solution_curve_if_available(
+        const std::string& file_name,
+        const bool file_exists)
     {
-        if(file_exists)
-        {
-            return false;
-        }
-        if(!analytical_solution_policy_enabled())
-        {
-            return false;
-        }
-
-        const std::size_t count = exact_solution_count();
-        if(count == 0)
-        {
-            log->warning("MAIN:deflation_continuation: analytical branch requested, but nonlinear operator has no compatible exact solution registry; skipping analytical branch.");
-            return false;
-        }
-
-        bool any_success = false;
-        const auto branches = selected_analytical_solution_branches(count);
-        for(const auto branch_id: branches)
-        {
-            any_success = build_analytical_solution_curve(file_name_, branch_id) || any_success;
-        }
-        continuate_analytical->clear_exact_solution_provider();
-        return any_success;
-    }
-
-    bool build_analytical_solution_curve(const std::string& file_name_, const std::size_t branch_id)
-    {
-        const T lambda = knots->get_value();
-        T_vec x_exact;
-        vec_ops->init_vector(x_exact);
-        vec_ops->start_use_vector(x_exact);
-
-        if(!evaluate_exact_solution(branch_id, lambda, x_exact))
-        {
-            log->warning_f(
-                "MAIN:deflation_continuation: analytical branch %llu is not defined at initial lambda = %le; skipping it.",
-                static_cast<unsigned long long>(branch_id),
-                double(lambda));
-            vec_ops->stop_use_vector(x_exact);
-            vec_ops->free_vector(x_exact);
-            return false;
-        }
-
-        log->info_f(
-            "MAIN:deflation_continuation: building analytical branch %llu (%s) as an ordinary curve...",
-            static_cast<unsigned long long>(branch_id),
-            exact_solution_name(branch_id).c_str());
-
-        detail::stabilize_solution_if_available(sol_storage_def, x_exact);
-        continuate_analytical->set_exact_solution_provider(
-            [this, branch_id](const T& current_lambda, T_vec& current_x) -> bool
+        return analytical_branches->build_if_available(
+            file_exists,
+            analytical_solution_policy_enabled(),
+            parameters->deflation_continuation.analytical_solution_branches,
+            knots->get_value(),
+            parameters->deflation_continuation.restart_policy.allow_failed_continuation_curve_save,
+            [this](T_vec& value)
             {
-                return evaluate_exact_solution(branch_id, current_lambda, current_x);
+                detail::stabilize_solution_if_available(sol_storage_def, value);
+            },
+            [this, &file_name]()
+            {
+                save_data(file_name);
             });
-
-        bif_diag_curve_t* bdf;
-        bif_diag->init_new_curve();
-        bif_diag->get_current_ref(bdf);
-        const bool analytical_success = continuate_analytical->continuate_curve(bdf, x_exact, lambda);
-        bif_diag->close_curve();
-        if(analytical_success || parameters->deflation_continuation.restart_policy.allow_failed_continuation_curve_save)
-        {
-            save_data(file_name_);
-        }
-        else
-        {
-            log->warning_f(
-                "MAIN:deflation_continuation: analytical branch %llu continuation failed; discarding curve according to restart policy.",
-                static_cast<unsigned long long>(branch_id));
-            bif_diag->discard_current_curve();
-        }
-
-        vec_ops->stop_use_vector(x_exact);
-        vec_ops->free_vector(x_exact);
-        log->info_f(
-            "MAIN:deflation_continuation: analytical branch %llu construction finished.",
-            static_cast<unsigned long long>(branch_id));
-        return analytical_success;
     }
 
     bool analytical_solution_policy_enabled() const
@@ -928,192 +736,106 @@ public:
         return analytical_solution || parameters->deflation_continuation.add_analytical_solution_to_diagram;
     }
 
-    std::size_t exact_solution_count()
-    {
-        return exact_solution_count_impl(
-            std::integral_constant<bool, detail::has_exact_solution_count<NonlinearOperations>::value>(),
-            std::integral_constant<bool, detail::has_exact_solution<NonlinearOperations, T, T_vec>::value>());
-    }
-
-    std::size_t exact_solution_count_impl(std::true_type, std::true_type)
-    {
-        return static_cast<std::size_t>(nonlin_op->exact_solution_count());
-    }
-
-    std::size_t exact_solution_count_impl(std::true_type, std::false_type)
-    {
-        return static_cast<std::size_t>(nonlin_op->exact_solution_count());
-    }
-
-    std::size_t exact_solution_count_impl(std::false_type, std::true_type)
-    {
-        return 1;
-    }
-
-    std::size_t exact_solution_count_impl(std::false_type, std::false_type)
-    {
-        return 0;
-    }
-
-    std::vector<std::size_t> selected_analytical_solution_branches(const std::size_t count)
-    {
-        std::vector<std::size_t> branches;
-        const auto& requested = parameters->deflation_continuation.analytical_solution_branches;
-        if(requested.empty())
-        {
-            branches.reserve(count);
-            for(std::size_t branch_id = 0; branch_id < count; ++branch_id)
-            {
-                branches.push_back(branch_id);
-            }
-            return branches;
-        }
-
-        branches.reserve(requested.size());
-        for(const auto branch_id: requested)
-        {
-            if(static_cast<std::size_t>(branch_id) >= count)
-            {
-                log->warning_f(
-                    "MAIN:deflation_continuation: requested analytical branch %u is outside available branch count %llu; skipping it.",
-                    branch_id,
-                    static_cast<unsigned long long>(count));
-                continue;
-            }
-            branches.push_back(static_cast<std::size_t>(branch_id));
-        }
-        return branches;
-    }
-
-    bool evaluate_exact_solution(const std::size_t branch_id, const T& lambda, T_vec& x)
-    {
-        if(branch_id >= exact_solution_count())
-        {
-            return false;
-        }
-        return evaluate_exact_solution_impl(
-            branch_id,
-            lambda,
-            x,
-            std::integral_constant<bool, detail::has_indexed_exact_solution<NonlinearOperations, T, T_vec>::value>(),
-            std::integral_constant<bool, detail::has_exact_solution<NonlinearOperations, T, T_vec>::value>());
-    }
-
-    bool evaluate_exact_solution_impl(
-        const std::size_t branch_id,
-        const T& lambda,
-        T_vec& x,
-        std::true_type,
-        std::true_type)
-    {
-        return static_cast<bool>(nonlin_op->exact_solution(branch_id, lambda, x));
-    }
-
-    bool evaluate_exact_solution_impl(
-        const std::size_t branch_id,
-        const T& lambda,
-        T_vec& x,
-        std::true_type,
-        std::false_type)
-    {
-        return static_cast<bool>(nonlin_op->exact_solution(branch_id, lambda, x));
-    }
-
-    bool evaluate_exact_solution_impl(
-        const std::size_t branch_id,
-        const T& lambda,
-        T_vec& x,
-        std::false_type,
-        std::true_type)
-    {
-        if(branch_id != 0)
-        {
-            return false;
-        }
-        nonlin_op->exact_solution(lambda, x);
-        return true;
-    }
-
-    bool evaluate_exact_solution_impl(
-        const std::size_t,
-        const T&,
-        T_vec&,
-        std::false_type,
-        std::false_type)
-    {
-        return false;
-    }
-
-    std::string exact_solution_name(const std::size_t branch_id)
-    {
-        return exact_solution_name_impl(
-            branch_id,
-            std::integral_constant<bool, detail::has_exact_solution_name<NonlinearOperations>::value>());
-    }
-
-    std::string exact_solution_name_impl(const std::size_t branch_id, std::true_type)
-    {
-        return nonlin_op->exact_solution_name(branch_id);
-    }
-
-    std::string exact_solution_name_impl(const std::size_t branch_id, std::false_type)
-    {
-        std::ostringstream stream;
-        stream << "exact_solution_" << branch_id;
-        return stream.str();
-    }
-
-
     bool load_data(const std::string& file_name_ = {})
     {
-        bool file_exists = false;
-        if(!file_name_.empty())
+        if(file_name_.empty())
         {
-            std::ifstream load_file( (project_dir + file_name_).c_str() );
-            if(load_file.good())
-            {
-                log->info_f("MAIN:deflation_continuation: reading data for the bifurcaiton diagram from %s ...", (project_dir + file_name_).c_str() );
-                data_input ia(load_file);
-                try
-                {
-                    ia >> (*bif_diag);
-                    bif_diag->reset_curve_output_directories();
-                }
-                catch(const boost::archive::archive_exception& e)
-                {
-                    log->error_f("MAIN:deflation_continuation: reading boost serialization failed: %s", e.what() );
-                }
-                load_file.close();
-                log->info_f("MAIN:deflation_continuation: read data for the bifurcaiton diagram from %s", (project_dir + file_name_).c_str() );
-                file_exists = true;
-            }
-            else
-            {
-                log->warning_f("MAIN:deflation_continuation: failed to load saved data for the bifurcaiton diagram %s", (project_dir + file_name_).c_str() );
-                file_exists = false;
-            }
+            return false;
         }
-        return file_exists;
+
+        const std::string path = project_dir + file_name_;
+        log->info_f(
+            "MAIN:deflation_continuation: reading data for the bifurcaiton diagram from %s ...",
+            path.c_str());
+        const auto result = container::load_diagram_archive(path, *bif_diag);
+        if(result.succeeded())
+        {
+            bif_diag->reset_curve_output_directories();
+            synchronize_symmetry_event_registry();
+            log->info_f(
+                "MAIN:deflation_continuation: read data for the bifurcaiton diagram from %s",
+                path.c_str());
+            return true;
+        }
+
+        if(result.status == container::diagram_archive_status::missing)
+        {
+            log->warning_f(
+                "MAIN:deflation_continuation: failed to load saved data for the bifurcaiton diagram %s",
+                path.c_str());
+        }
+        else
+        {
+            log->error_f(
+                "MAIN:deflation_continuation: reading bifurcation diagram archive %s failed: %s",
+                path.c_str(),
+                result.message.c_str());
+        }
+        return false;
     }
 
     void save_data(const std::string& file_name_ = {})
     {
-        if(!file_name_.empty())
+        if(file_name_.empty())
         {
-            log->info_f("MAIN:deflation_continuation: saving data for the bifurcaiton diagram in %s ...", (project_dir + file_name_).c_str() );
-            std::ofstream save_file( (project_dir + file_name_).c_str() );
-            data_output oa(save_file);
-            try
+            return;
+        }
+
+        synchronize_symmetry_event_registry();
+        const std::string path = project_dir + file_name_;
+        log->info_f(
+            "MAIN:deflation_continuation: saving data for the bifurcaiton diagram in %s ...",
+            path.c_str());
+        const auto result = container::save_diagram_archive(path, *bif_diag);
+        if(!result.succeeded())
+        {
+            log->error_f(
+                "MAIN:deflation_continuation: writing bifurcation diagram archive %s failed: %s",
+                path.c_str(),
+                result.message.c_str());
+            return;
+        }
+        log->info_f(
+            "MAIN:deflation_continuation: saved data for the bifurcaiton diagram in %s",
+            path.c_str());
+    }
+
+    void synchronize_symmetry_event_registry()
+    {
+        if(symmetry_event_registry == nullptr ||
+           symmetry_event_registry_sync == nullptr ||
+           bif_diag == nullptr)
+        {
+            return;
+        }
+
+        const auto records = bif_diag->symmetry_event_records();
+        const auto& policy =
+            parameters->deflation_continuation.isotropy_transition_policy;
+        const auto result = symmetry_event_registry_sync->synchronize(
+            *symmetry_event_registry,
+            records,
+            std::filesystem::path(project_dir),
+            policy.registry_lambda_tolerance,
+            policy.registry_state_tolerance,
+            [this](T_vec& value)
             {
-                oa << (*bif_diag);
-            }
-            catch(const boost::archive::archive_exception& e)
-            {
-                log->error_f("MAIN:deflation_continuation: writing boost serialization failed: %s", e.what() );
-            }
-            save_file.close();
-            log->info_f("MAIN:deflation_continuation: saved data for the bifurcaiton diagram in %s", (project_dir + file_name_).c_str() );
-        }        
+                detail::stabilize_solution_if_available(sol_storage_def, value);
+            });
+
+        if(result.attempted && !result.saved)
+        {
+            log->warning(
+                "MAIN:deflation_continuation: failed to save symmetry_event_registry.json");
+            return;
+        }
+        if(result.registry_loaded && result.previous_event_count != result.event_count)
+        {
+            log->warning_f(
+                "MAIN:deflation_continuation: rebuilt symmetry event registry changed node count from %lu to %lu.",
+                static_cast<unsigned long>(result.previous_event_count),
+                static_cast<unsigned long>(result.event_count));
+        }
     }
 
     void edit()
@@ -1161,509 +883,218 @@ public:
         return bif_diag->find_intersection(lambda, sol_storage_def);
     }
 
-    std::string knot_registry_file_name() const
-    {
-        const auto& file_name = parameters->deflation_continuation.restart_policy.knot_relocation.registry_file;
-        if(file_name.empty())
-        {
-            return {};
-        }
-        if(!file_name.empty() && file_name.front() == '/')
-        {
-            return file_name;
-        }
-        return project_dir + file_name;
-    }
-
-    std::pair<T, T> relocation_bounds(const T& requested_lambda) const
-    {
-        std::vector<T> values;
-        values.reserve(parameters->deflation_continuation.deflation_knots.size());
-        for(const auto& value: parameters->deflation_continuation.deflation_knots)
-        {
-            values.push_back(static_cast<T>(value));
-        }
-        if(values.empty())
-        {
-            return {requested_lambda, requested_lambda};
-        }
-        std::sort(values.begin(), values.end());
-        values.erase(std::unique(values.begin(), values.end()), values.end());
-        if(values.size() == 1)
-        {
-            return {values.front(), values.front()};
-        }
-
-        auto same_lambda = [](const T& a, const T& b)
-        {
-            const auto scalar_abs = [](const T& value)
-            {
-                return value < T(0) ? -value : value;
-            };
-            const T scale = std::max<T>(T(1), std::max<T>(scalar_abs(a), scalar_abs(b)));
-            return scalar_abs(a - b) <= T(64)*std::numeric_limits<T>::epsilon()*scale;
-        };
-
-        for(std::size_t i = 0; i < values.size(); ++i)
-        {
-            if(same_lambda(values[i], requested_lambda))
-            {
-                const T lower = (i == 0) ? values[i] : values[i - 1];
-                const T upper = (i + 1 >= values.size()) ? values[i] : values[i + 1];
-                return {lower, upper};
-            }
-        }
-
-        auto upper_it = std::upper_bound(values.begin(), values.end(), requested_lambda);
-        if(upper_it == values.begin())
-        {
-            return {values.front(), values.front()};
-        }
-        if(upper_it == values.end())
-        {
-            return {values.back(), values.back()};
-        }
-        return {*(upper_it - 1), *upper_it};
-    }
-
-    bool candidate_inside_bounds(const T& candidate, const std::pair<T, T>& bounds) const
-    {
-        return candidate > bounds.first && candidate < bounds.second;
-    }
-
-    T relocation_candidate(const T& requested_lambda, const unsigned int candidate_index) const
-    {
-        const auto& settings = parameters->deflation_continuation.restart_policy.knot_relocation;
-        const unsigned int radius_count = std::max(1u, (settings.candidate_count + 1u)/2u);
-        const unsigned int radius_index = candidate_index/2u;
-        const T alpha = radius_count == 1u
-            ? T(0)
-            : static_cast<T>(radius_index)/static_cast<T>(radius_count - 1u);
-        const T radius = settings.min_shift_abs + alpha*(settings.max_shift_abs - settings.min_shift_abs);
-        const bool positive_slot = (candidate_index%2u) == 0u;
-        const T sign = (positive_slot == settings.prefer_positive_shift) ? T(1) : T(-1);
-        return requested_lambda + sign*radius;
-    }
-
-    bool acceptable_relocated_intersection(
-        const intersection_status_t& status,
-        const unsigned int required_intersections) const
-    {
-        if(!status.ok())
-        {
-            return false;
-        }
-        if(parameters->deflation_continuation.restart_policy.knot_relocation.require_all_intersections &&
-           status.added < required_intersections)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    bool relocate_knot(
-        const T& requested_lambda,
-        const intersection_status_t& failed_status,
-        knot_registry_t& registry,
-        T& effective_lambda,
-        intersection_status_t& effective_status)
-    {
-        const auto& settings = parameters->deflation_continuation.restart_policy.knot_relocation;
-        if(!settings.enabled || settings.candidate_count == 0)
-        {
-            return false;
-        }
-
-        const unsigned int required_intersections =
-            failed_status.added + failed_status.failed + failed_status.missing_data + failed_status.skipped_incomplete;
-        const auto bounds = relocation_bounds(requested_lambda);
-        for(unsigned int candidate_index = 0; candidate_index < settings.candidate_count; ++candidate_index)
-        {
-            const T candidate = relocation_candidate(requested_lambda, candidate_index);
-            if(!candidate_inside_bounds(candidate, bounds))
-            {
-                continue;
-            }
-            const auto status = rebuild_intersections_at_lambda(candidate);
-            if(acceptable_relocated_intersection(status, required_intersections))
-            {
-                effective_lambda = candidate;
-                effective_status = status;
-                registry.set(
-                    requested_lambda,
-                    effective_lambda,
-                    "intersection_newton_failed_at_requested_knot",
-                    effective_status);
-                if(settings.save_registry)
-                {
-                    registry.save();
-                }
-                log->warning_f(
-                    "MAIN:deflation_continuation: relocated requested knot %le to non-singular knot %le after restart intersection failure; added = %u, skipped_discontinuous = %u, skipped_incomplete = %u.",
-                    double(requested_lambda),
-                    double(effective_lambda),
-                    effective_status.added,
-                    effective_status.skipped_discontinuous,
-                    effective_status.skipped_incomplete);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    bool candidate_inside_active_interval(
-        const T& candidate,
-        const T& lambda_left,
-        const T& lambda_right) const
-    {
-        const T lower = std::min(lambda_left, lambda_right);
-        const T upper = std::max(lambda_left, lambda_right);
-        return candidate > lower && candidate < upper;
-    }
-
-    bool relocate_active_continuation_knot(
-        const T& requested_lambda,
-        const T& lambda_left,
-        const T_vec& x_left,
-        const T& lambda_right,
-        const T_vec& x_right,
-        knot_registry_t& registry,
-        T& effective_lambda,
-        T_vec& effective_x)
-    {
-        const auto& settings = parameters->deflation_continuation.restart_policy.knot_relocation;
-        if(!settings.enabled || settings.candidate_count == 0)
-        {
-            return false;
-        }
-        if(lambda_right == lambda_left)
-        {
-            return false;
-        }
-
-        const auto bounds = relocation_bounds(requested_lambda);
-        for(unsigned int candidate_index = 0; candidate_index < settings.candidate_count; ++candidate_index)
-        {
-            const T candidate = relocation_candidate(requested_lambda, candidate_index);
-            if(!candidate_inside_bounds(candidate, bounds) ||
-               !candidate_inside_active_interval(candidate, lambda_left, lambda_right))
-            {
-                continue;
-            }
-
-            const T w = (candidate - lambda_left)/(lambda_right - lambda_left);
-            vec_ops->assign_mul(T(1) - w, x_left, w, x_right, effective_x);
-            detail::stabilize_solution_if_available(sol_storage_def, effective_x);
-
-            const bool converged = newton->solve(nonlin_op, effective_x, candidate);
-            if(!converged)
-            {
-                log->info_f(
-                    "MAIN:deflation_continuation: active knot relocation candidate %le for requested knot %le failed Newton interpolation.",
-                    double(candidate),
-                    double(requested_lambda));
-                continue;
-            }
-
-            detail::stabilize_solution_if_available(sol_storage_def, effective_x);
-            effective_lambda = candidate;
-
-            intersection_status_t status;
-            status.added = 1;
-            registry.set(
-                requested_lambda,
-                effective_lambda,
-                "active_continuation_interpolation_failed_at_requested_knot",
-                status);
-            if(settings.save_registry)
-            {
-                registry.save();
-            }
-
-            log->warning_f(
-                "MAIN:deflation_continuation: shifted active continuation knot %le to validated non-singular knot %le after interpolation Newton failure.",
-                double(requested_lambda),
-                double(effective_lambda));
-            return true;
-        }
-
-        log->warning_f(
-            "MAIN:deflation_continuation: active continuation knot relocation failed for requested knot %le inside step [%le, %le].",
-            double(requested_lambda),
-            double(lambda_left),
-            double(lambda_right));
-        return false;
-    }
-
-
     void execute()
     {
-        std::string file_name = parameters->bifurcaiton_diagram_file_name;
-        //Algorithm pseudocode:
-        //
-        //Set second knot value: knots.next()
-        //while(true)
-        //{
-        //  knot_value = knot.get_value()
-        //  perform deflation until a new solutoin is found
-        //  if the solution is found:
-        //    create a new curve and continuate it until it is finished
-        //    add interseciton of the curve with the current knot value to the deflator: deflation_container.push_back()
-        //  else 
-        //    if(!knot.next())
-        //      break
-        //    else
-        //      deflation_container.clear()
-        //}
-        //
+        const std::string file_name =
+            parameters->bifurcaiton_diagram_file_name;
+        knot_relocation_controller_t knot_relocation(
+            parameters->deflation_continuation.restart_policy.knot_relocation,
+            parameters->deflation_continuation.deflation_knots,
+            project_dir,
+            log);
+        knot_registry_t knot_registry(knot_relocation.registry_file_name());
 
-        bool file_exists = load_data(file_name);
-        knot_registry_t knot_registry(knot_registry_file_name());
-        auto knot_resolver = [&knot_registry](const T& requested_lambda, T& effective_lambda) -> bool
-        {
-            typename knot_registry_t::entry registry_entry;
-            if(knot_registry.find(requested_lambda, registry_entry))
+        auto knot_resolver =
+            [&knot_registry](
+                const T& requested_parameter,
+                T& effective_parameter) -> bool
             {
-                effective_lambda = registry_entry.effective;
-                return true;
-            }
-            effective_lambda = requested_lambda;
-            return false;
-        };
+                typename knot_registry_t::entry entry;
+                if(knot_registry.find(requested_parameter, entry))
+                {
+                    effective_parameter = entry.effective;
+                    return true;
+                }
+                effective_parameter = requested_parameter;
+                return false;
+            };
         auto active_knot_relocator =
-            [this, &knot_registry](
-                const T& requested_lambda,
-                const T& lambda_left,
-                const T_vec& x_left,
-                const T& lambda_right,
-                const T_vec& x_right,
-                T& effective_lambda,
-                T_vec& effective_x) -> bool
+            [this, &knot_registry, &knot_relocation](
+                const T& requested_parameter,
+                const T& parameter_left,
+                const T_vec& value_left,
+                const T& parameter_right,
+                const T_vec& value_right,
+                T& effective_parameter,
+                T_vec& effective_value) -> bool
             {
-                return relocate_active_continuation_knot(
-                    requested_lambda,
-                    lambda_left,
-                    x_left,
-                    lambda_right,
-                    x_right,
+                return knot_relocation.relocate_active_intersection(
+                    requested_parameter,
+                    parameter_left,
+                    value_left,
+                    parameter_right,
+                    value_right,
                     knot_registry,
-                    effective_lambda,
-                    effective_x);
+                    effective_parameter,
+                    effective_value,
+                    [this](
+                        const T& candidate,
+                        const T& interpolation_left,
+                        const T_vec& left,
+                        const T& interpolation_right,
+                        const T_vec& right,
+                        T_vec& output) -> bool
+                    {
+                        const T weight =
+                            (candidate - interpolation_left)/
+                            (interpolation_right - interpolation_left);
+                        vec_ops->assign_mul(
+                            T(1) - weight,
+                            left,
+                            weight,
+                            right,
+                            output);
+                        detail::stabilize_solution_if_available(
+                            sol_storage_def,
+                            output);
+                        if(!newton->solve(nonlin_op, output, candidate))
+                        {
+                            return false;
+                        }
+                        detail::stabilize_solution_if_available(
+                            sol_storage_def,
+                            output);
+                        return true;
+                    });
             };
         detail::set_knot_resolver_if_available(continuate, knot_resolver);
-        detail::set_knot_relocator_if_available(continuate, active_knot_relocator);
-        detail::set_knot_resolver_if_available(continuate_analytical, knot_resolver);
-        detail::set_knot_relocator_if_available(continuate_analytical, active_knot_relocator);
+        detail::set_knot_relocator_if_available(
+            continuate,
+            active_knot_relocator);
+        detail::set_knot_resolver_if_available(
+            continuate_analytical,
+            knot_resolver);
+        detail::set_knot_relocator_if_available(
+            continuate_analytical,
+            active_knot_relocator);
 
-        // force file printing skip after serialization
-        // unless it is done, the skip data is taken from the serialization class from file!
-        bif_diag->set_skip_output(skip_files);
-
-
-        T_vec x_deflation; //pointer to the found deflated solution
-        bool is_there_a_next_knot = knots->next();
-
-        if(is_there_a_next_knot)
+        bif_diag_curve_t* active_curve = nullptr;
+        knot_executor_callbacks_t callbacks;
+        callbacks.load_archive = [this, &file_name]()
         {
-            build_analytical_solution_curve_if_available(file_name, file_exists);
-        }
-        //
-
-        int number_of_solutions = 0;
-        rejected_candidate_cache rejected_candidates(vec_ops);
-        T rejected_cache_lambda = T(0);
-        bool rejected_cache_active = false;
-        unsigned int failed_continuations_at_knot = 0;
-        while(is_there_a_next_knot)
+            return load_data(file_name);
+        };
+        callbacks.build_analytical_branches =
+            [this, &file_name](const bool archive_exists)
+            {
+                build_analytical_solution_curve_if_available(
+                    file_name,
+                    archive_exists);
+            };
+        callbacks.restore_output_settings = [this]()
         {
-            
-            const T requested_lambda = knots->get_value();
-            T lambda = requested_lambda;
-            if(parameters->deflation_continuation.restart_policy.knot_relocation.enabled)
+            bif_diag->set_skip_output(skip_files);
+        };
+        callbacks.current_curve_count = [this]()
+        {
+            return bif_diag->current_curve();
+        };
+        callbacks.resolve_parameter = knot_resolver;
+        callbacks.relocation_registry_file = [&knot_relocation]()
+        {
+            return knot_relocation.registry_file_name();
+        };
+        callbacks.rebuild_intersections = [this](const T& parameter)
+        {
+            return rebuild_intersections_at_lambda(parameter);
+        };
+        callbacks.relocate_intersection =
+            [this, &knot_registry, &knot_relocation](
+                const T& requested_parameter,
+                const intersection_status_t& failed_status,
+                T& effective_parameter,
+                intersection_status_t& effective_status)
             {
-                typename knot_registry_t::entry registry_entry;
-                if(knot_registry.find(requested_lambda, registry_entry))
-                {
-                    lambda = registry_entry.effective;
-                    log->warning_f(
-                        "MAIN:deflation_continuation: requested knot %le is mapped to validated non-singular knot %le from %s.",
-                        double(requested_lambda),
-                        double(lambda),
-                        knot_registry_file_name().c_str());
-                }
-            }
-            log->info_f("MAIN:deflation_continuation: currently having %i curves.", bif_diag->current_curve() );
-            
-            auto intersection_status = rebuild_intersections_at_lambda(lambda);
-            const bool relocation_needed =
-                !intersection_status.ok() &&
-                parameters->deflation_continuation.restart_policy.knot_relocation.enabled;
-            if(relocation_needed)
-            {
-                T relocated_lambda = lambda;
-                intersection_status_t relocated_status;
-                if(relocate_knot(requested_lambda, intersection_status, knot_registry, relocated_lambda, relocated_status))
-                {
-                    lambda = relocated_lambda;
-                    intersection_status = relocated_status;
-                }
-                else
-                {
-                    intersection_status = rebuild_intersections_at_lambda(lambda);
-                }
-            }
-            const bool intersections_incomplete = !intersection_status.ok();
-            if(intersections_incomplete && !parameters->deflation_continuation.restart_policy.allow_incomplete_restart_intersections)
-            {
-                log->warning_f(
-                    "MAIN:deflation_continuation: skipping deflation at requested lambda = %lf, effective lambda = %lf because restart intersections are incomplete: added = %u, failed = %u, missing_data = %u, skipped_discontinuous = %u, skipped_incomplete = %u.",
-                    double(requested_lambda),
-                    double(lambda),
-                    intersection_status.added,
-                    intersection_status.failed,
-                    intersection_status.missing_data,
-                    intersection_status.skipped_discontinuous,
-                    intersection_status.skipped_incomplete);
-                is_there_a_next_knot = knots->next();
-                continue;
-            }
-            if(intersections_incomplete)
-            {
-                log->warning_f(
-                    "MAIN:deflation_continuation: continuing with incomplete restart intersections at requested lambda = %lf, effective lambda = %lf because policy allows it: added = %u, failed = %u, missing_data = %u, skipped_discontinuous = %u, skipped_incomplete = %u.",
-                    double(requested_lambda),
-                    double(lambda),
-                    intersection_status.added,
-                    intersection_status.failed,
-                    intersection_status.missing_data,
-                    intersection_status.skipped_discontinuous,
-                    intersection_status.skipped_incomplete);
-            }
-
-            if(!rejected_cache_active || !same_parameter_value(lambda, rejected_cache_lambda))
-            {
-                rejected_candidates.clear();
-                rejected_cache_lambda = lambda;
-                rejected_cache_active = true;
-                failed_continuations_at_knot = 0;
-            }
-
-            const unsigned int max_failed_continuations =
-                parameters->deflation_continuation.restart_policy.max_failed_continuations_per_knot;
-            if(max_failed_continuations > 0 &&
-               failed_continuations_at_knot >= max_failed_continuations)
-            {
-                log->warning_f(
-                    "MAIN:deflation_continuation: skipping requested lambda = %lf, effective lambda = %lf after %u failed continuation attempts at this knot.",
-                    double(requested_lambda),
-                    double(lambda),
-                    failed_continuations_at_knot);
-                is_there_a_next_knot = knots->next();
-                continue;
-            }
-
-            bool is_new_solution = false;
-            bool candidate_duplicate = false;
-            unsigned int duplicate_retry = 0;
-            const unsigned int duplicate_retry_max =
-                parameters->deflation_continuation.restart_policy.duplicate_after_deflation_retries;
-            do
-            {
-                candidate_duplicate = false;
-                is_new_solution = deflate->find_solution(lambda);
-                if(is_new_solution)
-                {
-                    deflate->get_solution_ref(x_deflation);
-                    detail::stabilize_solution_if_available(sol_storage_def, x_deflation);
-                    T nearest_rejected_distance = std::numeric_limits<T>::infinity();
-                    const bool rejected_distance_available =
-                        rejected_candidates.nearest_distance(lambda, x_deflation, nearest_rejected_distance);
-                    if(rejected_distance_available &&
-                       nearest_rejected_distance <= parameters->deflation_continuation.restart_policy.failed_continuation_rejection_tolerance)
+                return knot_relocation.relocate_restart_intersection(
+                    requested_parameter,
+                    failed_status,
+                    knot_registry,
+                    effective_parameter,
+                    effective_status,
+                    [this](const T& candidate)
                     {
-                        candidate_duplicate = true;
-                        is_new_solution = false;
-                        log->warning_f(
-                            "MAIN:deflation_continuation: deflated Newton returned a candidate rejected after failed continuation at lambda = %lf with stabilized distance = %le and tolerance = %le.",
-                            double(lambda),
-                            double(nearest_rejected_distance),
-                            double(parameters->deflation_continuation.restart_policy.failed_continuation_rejection_tolerance));
-                    }
-                    if(!candidate_duplicate && parameters->deflation_continuation.restart_policy.check_duplicate_after_deflation)
-                    {
-                        T nearest_distance = std::numeric_limits<T>::infinity();
-                        const bool distance_available =
-                            detail::nearest_stabilized_distance_if_available(sol_storage_def, x_deflation, nearest_distance);
-                        if(distance_available &&
-                           nearest_distance <= parameters->deflation_continuation.restart_policy.duplicate_after_deflation_tolerance)
-                        {
-                            candidate_duplicate = true;
-                            is_new_solution = false;
-                            log->warning_f(
-                                "MAIN:deflation_continuation: deflated Newton returned a duplicate solution at lambda = %lf with stabilized distance = %le and tolerance = %le.",
-                                double(lambda),
-                                double(nearest_distance),
-                                double(parameters->deflation_continuation.restart_policy.duplicate_after_deflation_tolerance));
-                        }
-                    }
-                }
-                duplicate_retry++;
-            }
-            while(candidate_duplicate && duplicate_retry <= duplicate_retry_max);
-
-            if(is_new_solution)
+                        return rebuild_intersections_at_lambda(candidate);
+                    });
+            };
+        callbacks.find_deflated_solution = [this](const T& parameter)
+        {
+            return deflate->find_solution(parameter);
+        };
+        callbacks.get_deflated_solution = [this](T_vec& value)
+        {
+            deflate->get_solution_ref(value);
+        };
+        callbacks.stabilize = [this](T_vec& value)
+        {
+            detail::stabilize_solution_if_available(sol_storage_def, value);
+        };
+        callbacks.nearest_known_distance =
+            [this](T_vec& value, T& distance)
             {
-                number_of_solutions++;
-                log->info_f("MAIN:deflation_continuation: found %i solutions for lambda = %lf.", number_of_solutions, double(lambda) );
-                
-                bif_diag_curve_t* bdf;
-                
+                return detail::nearest_stabilized_distance_if_available(
+                    sol_storage_def,
+                    value,
+                    distance);
+            };
+        callbacks.continue_candidate =
+            [this, &active_curve](T_vec& value, const T& parameter)
+            {
                 bif_diag->init_new_curve();
-                bif_diag->get_current_ref(bdf);
-                //std::cin.get(); 
-                const bool continuation_success = continuate->continuate_curve(bdf, x_deflation, lambda);
+                bif_diag->get_current_ref(active_curve);
+                const bool success = continuate->continuate_curve(
+                    active_curve,
+                    value,
+                    parameter);
                 bif_diag->close_curve();
-                //std::cin.get(); 
-                if(continuation_success || parameters->deflation_continuation.restart_policy.allow_failed_continuation_curve_save)
-                {
-                    save_data(file_name);
-                    bdf->find_intersection(lambda, sol_storage_def);
-                }
-                else
-                {
-                    log->warning_f(
-                        "MAIN:deflation_continuation: continuation of a new curve at lambda = %lf failed; discarding curve according to restart policy.",
-                        double(lambda));
-                    bif_diag->discard_current_curve();
-                    rejected_candidates.add(lambda, x_deflation);
-                    failed_continuations_at_knot++;
-                    log->warning_f(
-                        "MAIN:deflation_continuation: stored failed-continuation candidate rejection %u/%u at lambda = %lf.",
-                        failed_continuations_at_knot,
-                        max_failed_continuations,
-                        double(lambda));
-                    save_data(file_name);
-                    if(max_failed_continuations > 0 &&
-                       failed_continuations_at_knot >= max_failed_continuations)
-                    {
-                        log->warning_f(
-                            "MAIN:deflation_continuation: reached max_failed_continuations_per_knot = %u at requested lambda = %lf, effective lambda = %lf; advancing to the next knot.",
-                            max_failed_continuations,
-                            double(requested_lambda),
-                            double(lambda));
-                        is_there_a_next_knot = knots->next();
-                    }
-                }
-                
-            }
-            else
+                return success;
+            };
+        callbacks.accept_candidate =
+            [this, &file_name, &active_curve](const T& parameter)
             {
-                is_there_a_next_knot = knots->next();
-            }
-        }
+                if(!bif_diag->commit_current_curve_symmetry_events())
+                {
+                    throw std::runtime_error(
+                        "MAIN:deflation_continuation: failed to commit symmetry events for an accepted curve");
+                }
+                save_data(file_name);
+                active_curve->find_intersection(parameter, sol_storage_def);
+            };
+        callbacks.discard_candidate = [this]()
+        {
+            bif_diag->discard_current_curve();
+        };
+        callbacks.save_archive = [this, &file_name]()
+        {
+            save_data(file_name);
+        };
+
+        const auto& restart =
+            parameters->deflation_continuation.restart_policy;
+        deflation_continuation_detail::knot_execution_policy<T> policy;
+        policy.relocation_enabled = knot_relocation.enabled();
+        policy.allow_incomplete_restart_intersections =
+            restart.allow_incomplete_restart_intersections;
+        policy.allow_failed_continuation_curve_save =
+            restart.allow_failed_continuation_curve_save;
+        policy.max_failed_continuations_per_knot =
+            restart.max_failed_continuations_per_knot;
+        policy.failed_continuation_rejection_tolerance =
+            restart.failed_continuation_rejection_tolerance;
+        policy.check_duplicate_after_deflation =
+            restart.check_duplicate_after_deflation;
+        policy.duplicate_after_deflation_tolerance =
+            restart.duplicate_after_deflation_tolerance;
+        policy.duplicate_after_deflation_retries =
+            restart.duplicate_after_deflation_retries;
+
+        knot_executor_t executor(
+            vec_ops,
+            knots,
+            log,
+            policy,
+            std::move(callbacks));
+        executor.execute();
     }
-
-
 
 private:
 //  references to the external classes:
@@ -1689,8 +1120,11 @@ private:
     continuate_analytical_t* continuate_analytical;
     deflate_t* deflate;
     sol_storage_def_t* sol_storage_def = nullptr;
-    bool owns_solution_storage = true;
-    bool suppress_analytical_branch_endpoint = false;
+    std::unique_ptr<solver_bundle_t> solver_bundle;
+    std::unique_ptr<exact_solution_registry_t> exact_solutions;
+    std::unique_ptr<analytical_branch_executor_t> analytical_branches;
+    std::unique_ptr<symmetry_event_registry_t> symmetry_event_registry;
+    std::unique_ptr<symmetry_event_registry_sync_t> symmetry_event_registry_sync;
     std::string project_dir;
     bool analytical_solution = false;
     unsigned int skip_files;

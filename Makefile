@@ -102,9 +102,11 @@ CPU_VECTOR_OPS_VAR_PREC_HEADERS = source/common/cpu_vector_operations_var_prec.h
 COMMON_FILE_OPS_HEADERS = source/common/file_operations.h source/common/cpu_file_operations.h source/common/cpu_matrix_file_operations.h source/common/gpu_file_operations.h source/common/gpu_matrix_file_operations.h source/common/NMFD-operations/nmfd/operations/io/file_operations.h source/common/NMFD-operations/nmfd/operations/io/vector_file_operations.h source/common/NMFD-operations/nmfd/operations/io/matrix_file_operations.h
 SMALL_DENSE_LINALG_HEADERS = source/common/NMFD-operations/nmfd/operations/linalg/small_dense.h
 COMPLEX_TRAITS_HEADERS = source/common/scfd_backend_ext/complex.h
-CONTINUATION_CHART_HEADERS = source/continuation/chart_helpers.h source/continuation/predictor_chart_validation.h
+CONTINUATION_SYMMETRY_HEADERS = source/symmetry/translation/orbit_type.h source/symmetry/continuation/continuation_chart_state.h source/symmetry/continuation/geometry_traits.h source/symmetry/continuation/identity_continuation_chart.h source/symmetry/continuation/isotropy_transition.h source/symmetry/continuation/local_representative_policy.h
+CONTINUATION_CHART_HEADERS = source/continuation/chart_helpers.h source/continuation/predictor_chart_validation.h source/continuation/predictor_chart_probe.h source/continuation/predictor_chart_diagnostics.h source/continuation/corrector_retry_policy.h source/continuation/progress_monitor.h source/continuation/continuation_step_state.h source/continuation/continuation_endpoint_state.h source/continuation/pending_branch_event.h source/continuation/initial_tangent_candidates.h source/continuation/initial_tangent_chart_validator.h source/continuation/initial_tangent_secant_builder.h source/continuation/semicurve_tangent_cache.h $(CONTINUATION_SYMMETRY_HEADERS)
+SYMMETRY_LINEARIZATION_HEADERS = source/symmetry/linearization/projected_linear_operator.h source/symmetry/linearization/projected_preconditioner.h
 SYMMETRY_CORE_HEADERS = source/symmetry/slice_data.h source/symmetry/slice_projector.h source/symmetry/quotient_classifier.h source/symmetry/stabilized_storage.h source/symmetry/finite_action_registry.h source/symmetry/finite_quotient_adapter.h
-SYMMETRY_FOURIER_HEADERS = source/symmetry/fourier/mode_descriptor.h source/symmetry/fourier/mode_access.h source/symmetry/fourier/phase_conditions.h source/symmetry/fourier/translation_generators.h source/symmetry/fourier/fourier_slice_1d.h source/symmetry/fourier/fourier_slice_differential_1d.h source/symmetry/fourier/lsq_phase_solver_1d.h source/symmetry/fourier/fourier_slice.h source/symmetry/fourier/real_packed_fourier_slice_1d_adapter.h source/symmetry/fourier/real_packed_fourier_actions_1d.h $(SYMMETRY_CORE_HEADERS) $(COMPLEX_TRAITS_HEADERS) $(SMALL_DENSE_LINALG_HEADERS)
+SYMMETRY_FOURIER_HEADERS = $(CONTINUATION_SYMMETRY_HEADERS) source/symmetry/fourier/mode_descriptor.h source/symmetry/fourier/mode_access.h source/symmetry/fourier/phase_conditions.h source/symmetry/fourier/translation_generators.h source/symmetry/fourier/fourier_spectrum_ops.h source/symmetry/fourier/fourier_isotropy_1d.h source/symmetry/fourier/fourier_slice_1d.h source/symmetry/fourier/fourier_slice_differential_1d.h source/symmetry/fourier/lsq_phase_solver_1d.h source/symmetry/fourier/lsq_fourier_slice_1d_policy.h source/symmetry/fourier/lsq_fourier_slice_1d_strategy.h source/symmetry/fourier/frozen_fourier_chart_1d.h source/symmetry/fourier/fourier_slice.h source/symmetry/fourier/real_packed_fourier_codec_1d.h source/symmetry/fourier/real_packed_fourier_slice_1d_policy.h source/symmetry/fourier/real_packed_fourier_slice_1d_policy_json.h source/symmetry/fourier/real_packed_fourier_slice_1d_adapter.h source/symmetry/fourier/real_packed_fourier_actions_1d.h $(SYMMETRY_CORE_HEADERS) $(COMPLEX_TRAITS_HEADERS) $(SMALL_DENSE_LINALG_HEADERS)
 DEFLATION_SYMMETRY_HEADERS = source/deflation/symmetry_solution_storage.h $(SYMMETRY_FOURIER_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 FFT_FACADE_HEADERS = source/external_libraries/fft_facade.h source/external_libraries/fft_facade_fftw.h source/external_libraries/fft_facade_cufft.h source/external_libraries/fftw_wrap.h source/external_libraries/cufft_wrap.h
 VISUALIZATION_HEADERS = source/visualization/bd_curve_file_reader.h source/visualization/physical_solution_writer.h source/visualization/bd_prepare_visualization.hpp
@@ -112,7 +114,7 @@ CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/non
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h
 STAR_SHAPED_MODEL_HEADERS = source/models/star_shaped/star_shaped_backend_typedefs.h source/nonlinear_operators/star_shaped/star_shaped.h source/nonlinear_operators/star_shaped/convergence_strategy.h source/nonlinear_operators/star_shaped/linear_operator_star_shaped.h source/nonlinear_operators/star_shaped/preconditioner_star_shaped.h source/nonlinear_operators/star_shaped/system_operator.h
 KS1D_MODEL_HEADERS = source/models/KS_1D/KS1D_backend_typedefs.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/linear_operator_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/preconditioner_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/system_operator.h
-KS1D_FULL_MODEL_HEADERS = $(KS1D_MODEL_HEADERS) source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/projected_linear_operator_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/projected_preconditioner_KS_1D.h source/nonlinear_operators/projected_system_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/projected_system_operator_continuation.h $(CONTINUATION_CHART_HEADERS) $(DEFLATION_SYMMETRY_HEADERS)
+KS1D_FULL_MODEL_HEADERS = $(KS1D_MODEL_HEADERS) source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h $(SYMMETRY_LINEARIZATION_HEADERS) source/nonlinear_operators/projected_system_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/projected_system_operator_continuation.h $(CONTINUATION_CHART_HEADERS) $(DEFLATION_SYMMETRY_HEADERS)
 
 LCUDA = -L$(CUDA_ROOT_PATH)/lib64
 LBOOST = -L$(BOOST_ROOT_PATH)/lib
@@ -171,6 +173,69 @@ test_continuation_chart_helpers.bin: source/continuation/tests/test_chart_helper
 test_predictor_chart_validation.bin: source/continuation/tests/test_predictor_chart_validation.cpp $(CONTINUATION_CHART_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/continuation/tests/test_predictor_chart_validation.cpp -o $(BUILD_DIR)/test_predictor_chart_validation.bin 2>$(RESULTS)
 
+test_predictor_chart_probe.bin: source/continuation/tests/test_predictor_chart_probe.cpp $(CONTINUATION_CHART_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/continuation/tests/test_predictor_chart_probe.cpp -o $(BUILD_DIR)/test_predictor_chart_probe.bin 2>$(RESULTS)
+
+test_advance_solution_chart_retry.bin: source/continuation/tests/test_advance_solution_chart_retry.cpp source/continuation/advance_solution.h source/continuation/predictor_adaptive.h $(CONTINUATION_CHART_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/continuation/tests/test_advance_solution_chart_retry.cpp -o $(BUILD_DIR)/test_advance_solution_chart_retry.bin 2>$(RESULTS)
+
+test_continuation_retry_progress.bin: source/continuation/tests/test_retry_and_progress_policy.cpp source/continuation/corrector_retry_policy.h source/continuation/predictor_adaptive.h source/continuation/progress_monitor.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/continuation/tests/test_retry_and_progress_policy.cpp -o $(BUILD_DIR)/test_continuation_retry_progress.bin 2>$(RESULTS)
+
+test_initial_tangent_components.bin: source/continuation/tests/test_initial_tangent_components.cpp source/continuation/initial_tangent_candidates.h source/continuation/initial_tangent_chart_validator.h source/continuation/initial_tangent_secant_builder.h source/continuation/semicurve_tangent_cache.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/continuation/tests/test_initial_tangent_components.cpp -o $(BUILD_DIR)/test_initial_tangent_components.bin 2>$(RESULTS)
+
+test_continuation_event_state.bin: source/continuation/tests/test_continuation_event_state.cpp source/continuation/continuation_endpoint_state.h source/continuation/pending_branch_event.h source/containers/curve_endpoint_reason.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/continuation/tests/test_continuation_event_state.cpp -o $(BUILD_DIR)/test_continuation_event_state.bin 2>$(RESULTS)
+
+test_branch_intersection_policy.bin: source/containers/tests/test_branch_intersection_policy.cpp source/containers/branch_intersection.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_branch_intersection_policy.cpp -o $(BUILD_DIR)/test_branch_intersection_policy.bin 2>$(RESULTS)
+
+test_symmetry_event_persistence.bin: source/containers/tests/test_symmetry_event_persistence.cpp source/containers/symmetry_event_record.h source/containers/symmetry_event_journal.h source/containers/symmetry_event_registry.h source/symmetry/translation/orbit_type.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_symmetry_event_persistence.cpp -o $(BUILD_DIR)/test_symmetry_event_persistence.bin 2>$(RESULTS)
+
+test_parameters_json.bin: source/main/tests/test_parameters_json.cpp source/main/parameters.hpp
+	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_parameters_json.cpp -o $(BUILD_DIR)/test_parameters_json.bin 2>$(RESULTS)
+
+test_solver_bundle.bin: source/main/tests/test_solver_bundle.cpp source/main/deflation_continuation/solver_bundle.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_solver_bundle.cpp -o $(BUILD_DIR)/test_solver_bundle.bin 2>$(RESULTS)
+
+test_parameter_application.bin: source/main/tests/test_parameter_application.cpp source/main/deflation_continuation/parameter_application.h source/main/parameters.hpp
+	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_parameter_application.cpp -o $(BUILD_DIR)/test_parameter_application.bin 2>$(RESULTS)
+
+test_rejected_candidate_cache.bin: source/main/tests/test_rejected_candidate_cache.cpp source/main/deflation_continuation/rejected_candidate_cache.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_rejected_candidate_cache.cpp -o $(BUILD_DIR)/test_rejected_candidate_cache.bin 2>$(RESULTS)
+
+test_exact_solution_registry.bin: source/main/tests/test_exact_solution_registry.cpp source/main/deflation_continuation/exact_solution_registry.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_exact_solution_registry.cpp -o $(BUILD_DIR)/test_exact_solution_registry.bin 2>$(RESULTS)
+
+test_knot_relocation_controller.bin: source/main/tests/test_knot_relocation_controller.cpp source/main/deflation_continuation/knot_relocation_controller.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_knot_relocation_controller.cpp -o $(BUILD_DIR)/test_knot_relocation_controller.bin 2>$(RESULTS)
+
+test_analytical_branch_executor.bin: source/main/tests/test_analytical_branch_executor.cpp source/main/deflation_continuation/analytical_branch_executor.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_analytical_branch_executor.cpp -o $(BUILD_DIR)/test_analytical_branch_executor.bin 2>$(RESULTS)
+
+test_knot_executor.bin: source/main/tests/test_knot_executor.cpp source/main/deflation_continuation/knot_executor.h source/main/deflation_continuation/rejected_candidate_cache.h source/containers/knots.hpp
+	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_knot_executor.cpp -o $(BUILD_DIR)/test_knot_executor.bin 2>$(RESULTS)
+
+test_curve_metadata_io.bin: source/containers/tests/test_curve_metadata_io.cpp source/containers/bifurcation_diagram/curve_point.h source/containers/bifurcation_diagram/curve_metadata_io.h source/containers/curve_endpoint_reason.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_curve_metadata_io.cpp -o $(BUILD_DIR)/test_curve_metadata_io.bin 2>$(RESULTS)
+
+test_curve_vector_store.bin: source/containers/tests/test_curve_vector_store.cpp source/containers/bifurcation_diagram/curve_vector_store.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_curve_vector_store.cpp -o $(BUILD_DIR)/test_curve_vector_store.bin 2>$(RESULTS)
+
+test_curve_interpolator.bin: source/containers/tests/test_curve_interpolator.cpp source/containers/bifurcation_diagram/curve_interpolator.h source/containers/bifurcation_diagram/curve_point.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_curve_interpolator.cpp -o $(BUILD_DIR)/test_curve_interpolator.bin 2>$(RESULTS)
+
+test_curve_intersection_search.bin: source/containers/tests/test_curve_intersection_search.cpp source/containers/bifurcation_diagram/curve_intersection_search.h source/containers/bifurcation_diagram/curve_point.h source/containers/branch_intersection.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_curve_intersection_search.cpp -o $(BUILD_DIR)/test_curve_intersection_search.bin 2>$(RESULTS)
+
+test_diagram_archive.bin: source/containers/tests/test_diagram_archive.cpp source/containers/bifurcation_diagram/diagram_archive.h
+	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) source/containers/tests/test_diagram_archive.cpp $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/test_diagram_archive.bin 2>$(RESULTS)
+
+test_symmetry_event_registry_sync.bin: source/containers/tests/test_symmetry_event_registry_sync.cpp source/containers/bifurcation_diagram/symmetry_event_registry_sync.h source/containers/symmetry_event_registry.h source/containers/symmetry_event_record.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_symmetry_event_registry_sync.cpp -o $(BUILD_DIR)/test_symmetry_event_registry_sync.bin 2>$(RESULTS)
+
 test_fourier_mode_primitives.bin: source/symmetry/tests/test_fourier_mode_primitives.cpp $(SYMMETRY_FOURIER_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_mode_primitives.cpp -o $(BUILD_DIR)/test_fourier_mode_primitives.bin 2>$(RESULTS)
 
@@ -183,8 +248,14 @@ test_fourier_slice_1d.bin: source/symmetry/tests/test_fourier_slice_1d.cpp $(SYM
 test_real_packed_fourier_canonical_adapter.bin: source/symmetry/tests/test_real_packed_fourier_canonical_adapter.cpp $(SYMMETRY_FOURIER_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_real_packed_fourier_canonical_adapter.cpp $(OPENMP) -o $(BUILD_DIR)/test_real_packed_fourier_canonical_adapter.bin 2>$(RESULTS)
 
+test_fourier_isotropy_transition.bin: source/symmetry/tests/test_fourier_isotropy_transition.cpp $(SYMMETRY_FOURIER_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_isotropy_transition.cpp $(OPENMP) -o $(BUILD_DIR)/test_fourier_isotropy_transition.bin 2>$(RESULTS)
+
 test_fourier_slice_differential_1d.bin: source/symmetry/tests/test_fourier_slice_differential_1d.cpp $(SYMMETRY_FOURIER_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_slice_differential_1d.cpp -o $(BUILD_DIR)/test_fourier_slice_differential_1d.bin 2>$(RESULTS)
+
+test_frozen_fourier_chart_1d.bin: source/symmetry/tests/test_frozen_fourier_chart_1d.cpp $(SYMMETRY_FOURIER_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_frozen_fourier_chart_1d.cpp -o $(BUILD_DIR)/test_frozen_fourier_chart_1d.bin 2>$(RESULTS)
 
 test_stabilized_storage.bin: source/symmetry/tests/test_stabilized_storage.cpp $(SYMMETRY_CORE_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_stabilized_storage.cpp -o $(BUILD_DIR)/test_stabilized_storage.bin 2>$(RESULTS)
