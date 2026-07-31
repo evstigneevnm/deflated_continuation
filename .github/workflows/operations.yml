@@ -219,7 +219,7 @@ jobs:
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
             echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
             sudo apt-get update
-            sudo apt-get install -y --no-install-recommends build-essential make python3 libopenblas-dev
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev libopenblas-dev
           fi
       - name: Build and test Matrix Market foundation
         run: |
