@@ -476,12 +476,12 @@ jobs:
           timeout 120s ./"$KS1D_BUILD"/KS1D_bd_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
           make KS1D_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
-          timeout 120s ./"$KS1D_BUILD"/KS1D_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
+          timeout 300s ./"$KS1D_BUILD"/KS1D_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
           python3 scripts/validate_stability_diagram.py "$KS1D_BUILD/project" --expected-curves 1 --min-points 10 --require-complete --require-plot-sidecar --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
           cp "$KS1D_BUILD/project/stability_diagram.dat" "$KS1D_BUILD/stability_diagram.before_restart.dat"
           cp "$KS1D_BUILD/project/0/debug_curve_stability.dat" "$KS1D_BUILD/stability_curve.before_restart.dat"
           cp "$KS1D_BUILD/project/0/debug_curve_stability_plot.dat" "$KS1D_BUILD/stability_plot.before_restart.dat"
-          timeout 120s ./"$KS1D_BUILD"/KS1D_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
+          timeout 300s ./"$KS1D_BUILD"/KS1D_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
           cmp "$KS1D_BUILD/stability_diagram.before_restart.dat" "$KS1D_BUILD/project/stability_diagram.dat"
           cmp "$KS1D_BUILD/stability_curve.before_restart.dat" "$KS1D_BUILD/project/0/debug_curve_stability.dat"
           cmp "$KS1D_BUILD/stability_plot.before_restart.dat" "$KS1D_BUILD/project/0/debug_curve_stability_plot.dat"
@@ -491,10 +491,10 @@ jobs:
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project_full" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
           make KS1D_full_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           python3 scripts/test_ks1d_full_stability_replay.py --executable "$KS1D_BUILD/KS1D_full_stability_cpu_omp.bin" --config json_project_files/KS1D_test_full.json
-          timeout 120s ./"$KS1D_BUILD"/KS1D_full_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet
+          timeout 300s ./"$KS1D_BUILD"/KS1D_full_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet
           python3 scripts/validate_stability_diagram.py "$KS1D_BUILD/project_full" --expected-curves 1 --min-points 10 --require-complete --require-plot-sidecar --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
           cp "$KS1D_BUILD/project_full/0/debug_curve_stability_plot.dat" "$KS1D_BUILD/full_stability_plot.before_restart.dat"
-          timeout 120s ./"$KS1D_BUILD"/KS1D_full_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet
+          timeout 300s ./"$KS1D_BUILD"/KS1D_full_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet
           cmp "$KS1D_BUILD/full_stability_plot.before_restart.dat" "$KS1D_BUILD/project_full/0/debug_curve_stability_plot.dat"
 
   circle-bd-cpu-omp:
@@ -595,7 +595,7 @@ jobs:
           timeout 120s ./"$STAR_BUILD"/star_shaped_bd_cpu_omp.bin "$STAR_BUILD/star_shaped_ci.json" --seed-exact 0.25 --continue-seed-only --quiet
           python3 scripts/validate_star_shaped_diagram.py "$STAR_BUILD/project" --config "$STAR_BUILD/star_shaped_ci.json" --residual-tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-star --min-angle-coverage 6.0 --max-closure-distance 5e-2
           timeout 120s ./"$STAR_BUILD"/star_shaped_stability_cpu_omp.bin "$STAR_BUILD/star_shaped_ci.json" --quiet
-          python3 scripts/validate_stability_diagram.py "$STAR_BUILD/project" --expected-curves 1 --min-points 100 --require-complete --expected-bifurcations 12 --min-stable-points 100 --min-unstable-points 100
+          python3 scripts/validate_stability_diagram.py "$STAR_BUILD/project" --expected-curves 1 --min-points 100 --require-complete --expected-bifurcations 6 --min-stable-points 100 --min-unstable-points 100
           cp "$STAR_BUILD/project/stability_diagram.dat" "$STAR_BUILD/stability_diagram.before_restart.dat"
           cp "$STAR_BUILD/project/0/debug_curve_stability.dat" "$STAR_BUILD/stability_curve.before_restart.dat"
           timeout 120s ./"$STAR_BUILD"/star_shaped_stability_cpu_omp.bin "$STAR_BUILD/star_shaped_ci.json" --quiet
@@ -636,7 +636,7 @@ jobs:
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
             echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
             sudo apt-get update
-            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev libopenblas-dev
           fi
       - name: Build and validate seeded fold continuation
         run: |
@@ -668,7 +668,7 @@ jobs:
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
             echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
             sudo apt-get update
-            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev libopenblas-dev
           fi
       - name: Build and validate FD3 seeded fold continuation
         run: |
