@@ -1,218 +1,757 @@
 #ifndef __STABILITY_STABILITY_ANALYSIS_HPP__
 #define __STABILITY_STABILITY_ANALYSIS_HPP__
 
-#include <stdexcept>
-#include <vector>
-#include <string>
-#include <iostream>
-#include <fstream>
 #include <algorithm>
+#include <cstddef>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <stability/analysis/eigensolver_adapter.h>
+#include <stability/analysis/initial_vector_policy.h>
+#include <stability/analysis/spectrum_classifier.h>
+#include <stability/analysis/stability_evaluator.h>
+#include <stability/analysis/stability_transition_refiner.h>
 
 namespace stability
 {
 
-
 /**
- * @brief      This is a general class for the stability analysis.
+ * Bifurcation-diagram stability facade.
  *
- * @tparam     VectorOperations           { N-sized vector operations }
- * @tparam     NonlinearOperations        { General nonlinear operator }
- * @tparam     Log                        { Log class }
- * @tparam     Newton                     { Newton method for the nonlinear operator }
- * @tparam     LinearOperators            { Class that contains all Linear Operators that are called from the eigensolver, including those that are used with transformations  }
- * @tparam     EigenSolver                { description }
+ * The eigensolver is injected through the structured adapter interface:
+ * execute(initial_vector) -> eigensolver_result. This keeps spectrum
+ * transformations, complex arithmetic, and solver ownership outside the
+ * nonlinear operator and outside the bifurcation-diagram driver.
  */
-template<class VectorOperations, class NonlinearOperations, class Log, class Newton, class EigenSolver>
+template<
+    class VectorOperations,
+    class NonlinearOperations,
+    class Log,
+    class Newton,
+    class EigensolverAdapter,
+    class LinearizationProvider = NonlinearOperations>
 class stability_analysis
 {
-
 public:
-    typedef typename VectorOperations::scalar_type T;
-    typedef typename VectorOperations::vector_type T_vec;
-    using eigs_t = typename EigenSolver::eigs_t;
+    using T = typename VectorOperations::scalar_type;
+    using T_vec = typename VectorOperations::vector_type;
+    using eigensolver_adapter_type = EigensolverAdapter;
+    using linearization_provider_type = LinearizationProvider;
+    using analysis_result_type =
+        analysis::stability_point_result<T>;
+    using transition_result_type =
+        analysis::stability_transition_result<T>;
+    using classifier_options_type =
+        analysis::spectrum_classifier_options<T>;
+
 private:
-    using eig_t = typename eigs_t::value_type;
-
-// remove all spesific eigensolver shit out of here.
-// we only use eigensolver as an abstract method that returns the set of eigenvalues
-// The eigensolver class is passed as the template parameter.
-// It should contain the methods:
-// void set_linear_operator_stable_eigenvalues_halfplane(int)
-// std::vector< std::complex<T> > execute()
-// 
+    using classifier_type =
+        analysis::spectrum_classifier<T>;
+    using initial_vector_policy_type =
+        analysis::nonlinear_operator_random_initial_vector<
+            NonlinearOperations>;
+    using evaluator_type =
+        analysis::stability_evaluator<
+            VectorOperations,
+            linearization_provider_type,
+            eigensolver_adapter_type,
+            classifier_type,
+            initial_vector_policy_type>;
+    using transition_refiner_type =
+        analysis::stability_transition_refiner<
+            VectorOperations,
+            NonlinearOperations,
+            Newton,
+            evaluator_type>;
 
 public:
-    stability_analysis(VectorOperations* vec_ops_, Log* log_, NonlinearOperations* nonlin_op_, Newton* newton_, EigenSolver* eig_solver_):
-    vec_ops(vec_ops_),
-    log(log_),
-    nonlin_op(nonlin_op_),
-    newton(newton_),
-    eig_solver(eig_solver_)
+    stability_analysis(
+        VectorOperations* vec_ops,
+        Log* log,
+        NonlinearOperations* nonlin_op,
+        Newton* newton,
+        eigensolver_adapter_type* eigensolver_adapter,
+        linearization_provider_type* linearization_provider = nullptr)
+        : vec_ops_(vec_ops),
+          log_(log),
+          nonlin_op_(nonlin_op),
+          newton_(newton),
+          eigensolver_adapter_(eigensolver_adapter),
+          linearization_provider_(
+              resolve_linearization_provider(
+                  nonlin_op,
+                  linearization_provider)),
+          initial_vector_policy_(nonlin_op),
+          evaluator_(
+              vec_ops,
+              linearization_provider_,
+              eigensolver_adapter_,
+              classifier_type{},
+              initial_vector_policy_),
+          transition_refiner_(
+              vec_ops,
+              nonlin_op,
+              newton,
+              &evaluator_)
     {
-        vec_ops->init_vector(x_p1); vec_ops->start_use_vector(x_p1);
-        vec_ops->init_vector(x_p2); vec_ops->start_use_vector(x_p2);
-        vec_ops->init_vector(f_0); vec_ops->start_use_vector(f_0);
-
+        if(vec_ops_ == nullptr)
+            throw std::invalid_argument(
+                "stability_analysis: vector operations are null");
+        if(log_ == nullptr)
+            throw std::invalid_argument(
+                "stability_analysis: log is null");
+        if(nonlin_op_ == nullptr)
+            throw std::invalid_argument(
+                "stability_analysis: nonlinear operator is null");
+        if(newton_ == nullptr)
+            throw std::invalid_argument(
+                "stability_analysis: Newton solver is null");
+        if(eigensolver_adapter_ == nullptr)
+            throw std::invalid_argument(
+                "stability_analysis: eigensolver adapter is null");
     }
-    ~stability_analysis()
+
+    void set_linear_operator_stable_eigenvalues_halfplane(T sign)
     {
-        vec_ops->stop_use_vector(x_p1); vec_ops->free_vector(x_p1);
-        vec_ops->stop_use_vector(x_p2); vec_ops->free_vector(x_p2); 
-        vec_ops->stop_use_vector(f_0); vec_ops->free_vector(f_0);        
+        classifier_options_type options =
+            evaluator_.classifier().options();
+        options.stable = sign < T(0)
+            ? analysis::stable_halfplane::left
+            : analysis::stable_halfplane::right;
+        evaluator_.classifier().set_options(options);
     }
 
-    void set_linear_operator_stable_eigenvalues_halfplane(const T sign_)
+    void set_classifier_options(
+        const classifier_options_type& options)
     {
-        eig_solver->set_linear_operator_stable_eigenvalues_halfplane(sign_);
-    }   
-    
-    std::pair<int, int> execute(const T_vec& u0_in, const T lambda)
+        evaluator_.classifier().set_options(options);
+    }
+
+    const classifier_options_type& classifier_options() const
     {
-        nonlin_op->set_linearization_point(u0_in, lambda);
+        return evaluator_.classifier().options();
+    }
 
-        nonlin_op->randomize_vector(f_0);
+    void set_classification_retry_count(std::size_t retry_count)
+    {
+        evaluator_.set_classification_retry_count(retry_count);
+    }
 
-        eigs_t eigs = eig_solver->execute(f_0);
+    std::size_t classification_retry_count() const
+    {
+        return evaluator_.classification_retry_count();
+    }
 
+    void set_classification_confirmation_count(
+        std::size_t confirmation_count)
+    {
+        evaluator_.set_classification_confirmation_count(
+            confirmation_count);
+    }
 
-        //std::ofstream myfile;
-        //myfile.open ("eigs.dat");
-        //myfile << re << " " << im << std::endl;
-        //myfile.close();
-        
-        int dim_real = count_real(eigs);
-        int dim_complex = count_complex(eigs);
+    std::size_t classification_confirmation_count() const
+    {
+        return evaluator_.classification_confirmation_count();
+    }
 
-        for(auto &x: eigs)
+    void set_transition_refinement_uses_fixed_parameter_newton(
+        bool value)
+    {
+        transition_options_.
+            correct_with_fixed_parameter_newton = value;
+    }
+
+    bool transition_refinement_uses_fixed_parameter_newton() const
+    {
+        return transition_options_.
+            correct_with_fixed_parameter_newton;
+    }
+
+    void set_transition_refinement_maximum_iterations(
+        unsigned int value)
+    {
+        if(value == 0)
+            throw std::invalid_argument(
+                "stability_analysis: transition refinement requires "
+                "at least one iteration");
+        transition_options_.maximum_iterations = value;
+    }
+
+    unsigned int transition_refinement_maximum_iterations() const
+    {
+        return transition_options_.maximum_iterations;
+    }
+
+    void set_transition_refinement_parameter_tolerance(T value)
+    {
+        if(value < T(0))
+            throw std::invalid_argument(
+                "stability_analysis: transition parameter tolerance "
+                "must be non-negative");
+        transition_options_.parameter_tolerance = value;
+    }
+
+    T transition_refinement_parameter_tolerance() const
+    {
+        return transition_options_.parameter_tolerance;
+    }
+
+    void set_transition_refinement_maximum_subdivisions(
+        unsigned int value)
+    {
+        if(value == 0)
+            throw std::invalid_argument(
+                "stability_analysis: transition sequence requires at "
+                "least one subdivision level");
+        transition_maximum_subdivisions_ = value;
+    }
+
+    unsigned int transition_refinement_maximum_subdivisions() const
+    {
+        return transition_maximum_subdivisions_;
+    }
+
+    template<class Aligner>
+    void set_transition_state_aligner(Aligner* aligner)
+    {
+        transition_refiner_.set_transition_state_aligner(
+            aligner);
+    }
+
+    void reset_transition_state_aligner()
+    {
+        transition_refiner_.reset_transition_state_aligner();
+    }
+
+    analysis_result_type analyze(
+        const T_vec& state,
+        T parameter)
+    {
+        analysis_result_type result =
+            evaluator_.analyze(state, parameter);
+        log_result(parameter, result);
+        return result;
+    }
+
+    analysis_result_type analyze_confirmed(
+        const T_vec& state,
+        T parameter)
+    {
+        analysis_result_type result =
+            evaluator_.analyze_confirmed(state, parameter);
+        if(result.succeeded())
         {
-            T re = x.real();
-            T im = x.imag();
-            // if(re>=0.0)
-            {
-                if(im>=0.0)
-                    log->info_f("   %.3lf+%.3lfi", double(re), double(im));
-                else
-                    log->info_f("   %.3lf%.3lfi", double(re), double(im));
-            }
-
-        }
-       
-        log->info_f("stability.execute: unstable manifold dimentsion at lambda = %lf: real = %i, complex = %i", double(lambda), dim_real, dim_complex);
-
-        std::pair<int, int> unstable_dim = std::make_pair(dim_real, dim_complex);
-        return(unstable_dim);
-    }
-
-
-
-    void bisect_bifurcation_point_known(const T_vec x_1, const T lambda_1, std::pair<int, int> dim1, const T_vec x_2, const T lambda_2, std::pair<int, int> dim2, T_vec& x_p, T& lambda_p, unsigned int max_bisect_iterations = 15)
-    {
-        int iter = 0;
-        T lambda_a = lambda_1;
-        T lambda_b = lambda_2;
-        vec_ops->assign(x_1, x_p1);
-        vec_ops->assign(x_2, x_p2);
-        while(iter<max_bisect_iterations)
-        {
-            lambda_p = lambda_a + T(0.5)*(lambda_b-lambda_a);
-            linear_interp_solution(x_p1, x_p2, x_p); //initial guess for x_p
-
-            bool converged = newton->solve(nonlin_op, x_p, lambda_p);
-            if(!converged)
-            {
-                // vec_ops_l->assign(x_p1, x_p);
-                // vec_ops_l->add_mul(T(0.333), x_p2, x_p);
-                // newton->solve(nonlin_op, x_p, lambda_a);
-
-                // vec_ops_l->assign_scalar(T(0.0), x_p);
-                throw std::runtime_error(std::string("stability.bisect_bifurcation_point_known: Newton method failed to converge.") );
-            }
-            std::pair<int, int> dim_p = execute(x_p, lambda_p);
-            if(dim_p == dim2)
-            {
-                lambda_b = lambda_p;
-                vec_ops->assign(x_p, x_p2);
-            }
-            else if(dim_p == dim1)
-            {
-                lambda_a = lambda_p;
-                vec_ops->assign(x_p, x_p1);                    
-            }
-            else
-            {
-                //assume that a new point with dim_p!=dim2 and dim1 is a new dim2 point. This way we can isolate a prticular point if there are more than one bifurcaiton points in the parameter segement.
-                dim2 = dim_p;
-                lambda_b = lambda_p;
-                vec_ops->assign(x_p, x_p2);                    
-            }
-            iter++;
-            log->info_f("stability.bisect_bifurcaiton_point: bisected to lambda = %lf, dim(U) = (%i,%i), iteration = %i", lambda_p, dim_p.first, dim_p.second, iter);  
-        }        
-
-    }
-
-    void bisect_bifurcaiton_point(const T_vec& x_1, const T& lambda_1, const T_vec& x_2, const T& lambda_2, T_vec& x_p, T& lambda_p, unsigned int max_bisect_iterations = 15)
-    {
-        std::pair<int, int> dim1 = execute(x_1, lambda_1);
-        std::pair<int, int> dim2 = execute(x_2, lambda_2);
-        if(dim1 == dim2)
-        {
-            log->info_f("stability.bisect_bifurcaiton_point: at %lf dum(U) = (%i,%i), at %lf dim(U) = (%i,%i)", lambda_1, dim1.first, dim1.second, lambda_2, dim2.first, dim2.second);  
-            log->info("Nothing to do. Output is not set.");
+            log_->info_f(
+                "stability transition confirmation at lambda = %lf: "
+                "dim(U) = (%i,%i), attempts = %zu",
+                double(parameter),
+                result.unstable.real,
+                result.unstable.complex_pairs,
+                result.classification_attempts);
         }
         else
         {
-            bisect_bifurcation_point_known(x_1, lambda_1, dim1, x_2, lambda_2, dim2, x_p, lambda_p, max_bisect_iterations);
+            log_->warning_f(
+                "stability transition confirmation failed at lambda "
+                "= %lf: %s",
+                double(parameter),
+                result.diagnostic.c_str());
+        }
+        return result;
+    }
+
+    transition_result_type refine_transition(
+        const T_vec& state_1,
+        T parameter_1,
+        const T_vec& state_2,
+        T parameter_2,
+        T_vec& refined_state,
+        unsigned int maximum_iterations = 0)
+    {
+        const analysis_result_type result_1 =
+            analyze(state_1, parameter_1);
+        const analysis_result_type result_2 =
+            analyze(state_2, parameter_2);
+
+        typename transition_refiner_type::options_type options =
+            transition_options_;
+        if(maximum_iterations != 0)
+            options.maximum_iterations = maximum_iterations;
+        return transition_refiner_.refine(
+            state_1,
+            parameter_1,
+            result_1,
+            state_2,
+            parameter_2,
+            result_2,
+            refined_state,
+            options);
+    }
+
+    transition_result_type refine_transition_confirmed(
+        const T_vec& state_1,
+        T parameter_1,
+        const T_vec& state_2,
+        T parameter_2,
+        T_vec& refined_state,
+        unsigned int maximum_iterations = 0)
+    {
+        const analysis_result_type result_1 =
+            analyze_confirmed(state_1, parameter_1);
+        const analysis_result_type result_2 =
+            analyze_confirmed(state_2, parameter_2);
+        ensure_classified(
+            result_1,
+            "stability_analysis::refine_transition_confirmed");
+        ensure_classified(
+            result_2,
+            "stability_analysis::refine_transition_confirmed");
+
+        typename transition_refiner_type::options_type options =
+            transition_options_;
+        options.confirm_stability_classification = true;
+        if(maximum_iterations != 0)
+            options.maximum_iterations = maximum_iterations;
+        return transition_refiner_.refine(
+            state_1,
+            parameter_1,
+            result_1,
+            state_2,
+            parameter_2,
+            result_2,
+            refined_state,
+            options);
+    }
+
+    std::pair<int, int> execute(
+        const T_vec& state,
+        T parameter)
+    {
+        const analysis_result_type result =
+            analyze(state, parameter);
+        ensure_classified(result, "stability_analysis::execute");
+        return result.unstable_dimension_pair();
+    }
+
+    transition_result_type bisect_bifurcation_point_known(
+        const T_vec& state_1,
+        T parameter_1,
+        std::pair<int, int> dimension_1,
+        const T_vec& state_2,
+        T parameter_2,
+        std::pair<int, int> dimension_2,
+        T_vec& refined_state,
+        T& refined_parameter,
+        unsigned int maximum_iterations = 0)
+    {
+        const analysis_result_type result_1 =
+            endpoint_result(dimension_1);
+        const analysis_result_type result_2 =
+            endpoint_result(dimension_2);
+
+        typename transition_refiner_type::options_type options =
+            transition_options_;
+        if(maximum_iterations != 0)
+            options.maximum_iterations = maximum_iterations;
+        const auto transition = transition_refiner_.refine(
+            state_1,
+            parameter_1,
+            result_1,
+            state_2,
+            parameter_2,
+            result_2,
+            refined_state,
+            options);
+        refined_parameter = transition.parameter;
+        ensure_refined(
+            transition,
+            "stability_analysis::bisect_bifurcation_point_known");
+
+        log_->info_f(
+            "stability transition refined to lambda = %lf, "
+            "dim(U): before = (%i,%i), after = (%i,%i), "
+            "iterations = %i, consistency restarts = %i",
+            double(refined_parameter),
+            transition.before_stability.unstable.real,
+            transition.before_stability.unstable.complex_pairs,
+            transition.after_stability.unstable.real,
+            transition.after_stability.unstable.complex_pairs,
+            int(transition.iterations),
+            int(transition.consistency_restarts));
+        return transition;
+    }
+
+    template<class EventCallback>
+    std::size_t refine_transition_sequence_known(
+        const T_vec& state_1,
+        T parameter_1,
+        std::pair<int, int> dimension_1,
+        const T_vec& state_2,
+        T parameter_2,
+        std::pair<int, int> dimension_2,
+        EventCallback&& on_event)
+    {
+        const analysis_result_type result_1 =
+            endpoint_result(dimension_1);
+        const analysis_result_type result_2 =
+            endpoint_result(dimension_2);
+        auto callback = std::forward<EventCallback>(on_event);
+        return refine_transition_sequence(
+            state_1,
+            parameter_1,
+            result_1,
+            state_2,
+            parameter_2,
+            result_2,
+            callback,
+            0,
+            transition_options_);
+    }
+
+    template<class EventCallback>
+    std::size_t refine_transition_sequence_confirmed(
+        const T_vec& state_1,
+        T parameter_1,
+        const analysis_result_type& result_1,
+        const T_vec& state_2,
+        T parameter_2,
+        const analysis_result_type& result_2,
+        EventCallback&& on_event)
+    {
+        ensure_classified(
+            result_1,
+            "stability_analysis::"
+            "refine_transition_sequence_confirmed");
+        ensure_classified(
+            result_2,
+            "stability_analysis::"
+            "refine_transition_sequence_confirmed");
+        auto callback = std::forward<EventCallback>(on_event);
+        typename transition_refiner_type::options_type options =
+            transition_options_;
+        options.confirm_stability_classification = true;
+        return refine_transition_sequence(
+            state_1,
+            parameter_1,
+            result_1,
+            state_2,
+            parameter_2,
+            result_2,
+            callback,
+            0,
+            options);
+    }
+
+    void bisect_bifurcaiton_point(
+        const T_vec& state_1,
+        const T& parameter_1,
+        const T_vec& state_2,
+        const T& parameter_2,
+        T_vec& refined_state,
+        T& refined_parameter,
+        unsigned int maximum_iterations = 0)
+    {
+        const analysis_result_type result_1 =
+            analyze(state_1, parameter_1);
+        const analysis_result_type result_2 =
+            analyze(state_2, parameter_2);
+        ensure_classified(
+            result_1,
+            "stability_analysis::bisect_bifurcaiton_point");
+        ensure_classified(
+            result_2,
+            "stability_analysis::bisect_bifurcaiton_point");
+
+        if(
+            result_1.unstable.real_subspace_dimension() ==
+            result_2.unstable.real_subspace_dimension())
+        {
+            log_->info_f(
+                "stability transition is absent: at %lf dim(U) = "
+                "(%i,%i), at %lf dim(U) = (%i,%i); both real "
+                "unstable-subspace dimensions are %i",
+                double(parameter_1),
+                result_1.unstable.real,
+                result_1.unstable.complex_pairs,
+                double(parameter_2),
+                result_2.unstable.real,
+                result_2.unstable.complex_pairs,
+                result_1.unstable.real_subspace_dimension());
+            return;
         }
 
+        bisect_bifurcation_point_known(
+            state_1,
+            parameter_1,
+            result_1.unstable_dimension_pair(),
+            state_2,
+            parameter_2,
+            result_2.unstable_dimension_pair(),
+            refined_state,
+            refined_parameter,
+            maximum_iterations);
     }
-
 
 private:
-    //passed:
-    Log* log;
-    VectorOperations* vec_ops;
-    NonlinearOperations* nonlin_op;
-    Newton* newton;
-    EigenSolver* eig_solver;
-//  created_locally:
+    VectorOperations* vec_ops_;
+    Log* log_;
+    NonlinearOperations* nonlin_op_;
+    Newton* newton_;
+    eigensolver_adapter_type* eigensolver_adapter_;
+    linearization_provider_type* linearization_provider_;
+    initial_vector_policy_type initial_vector_policy_;
+    evaluator_type evaluator_;
+    transition_refiner_type transition_refiner_;
+    typename transition_refiner_type::options_type
+        transition_options_;
+    unsigned int transition_maximum_subdivisions_ = 8;
 
-
-    size_t small_rows;
-    size_t small_cols;
-
-    T_vec x_p1;
-    T_vec x_p2;
-    T_vec f_0;
-
-    template<class T>
-    void delete_if_not_null(T* ptr)
+    static linearization_provider_type*
+    resolve_linearization_provider(
+        NonlinearOperations* nonlinear_operations,
+        linearization_provider_type* linearization_provider)
     {
-        if(ptr!=nullptr)
-            delete ptr;
+        if(linearization_provider != nullptr)
+            return linearization_provider;
+        if constexpr(
+            std::is_same<
+                linearization_provider_type,
+                NonlinearOperations>::value)
+        {
+            return nonlinear_operations;
+        }
+        throw std::invalid_argument(
+            "stability_analysis: custom linearization provider is null");
     }
 
-    int count_real(const eigs_t& elems) 
+    static analysis_result_type endpoint_result(
+        std::pair<int, int> dimension)
     {
-        int reals_only = std::count_if(elems.begin(), elems.end(), [](eig_t c){return (c.real() > 0)&&(std::abs(c.imag())<1.0e-7);});
-        return(reals_only);
-    }   
-    int count_complex(const eigs_t& elems) 
-    {
-        int complex_only = std::count_if(elems.begin(), elems.end(), [](eig_t c){return (std::abs(c.imag() )>=1.0e-6)&&(c.real() > 0); });
-        return(complex_only/2);
-    } 
-
-    void linear_interp_solution(const T_vec& x1, const T_vec& x2, T_vec& x_r)
-    {
-        //calc: z := mul_x*x + mul_y*y
-        vec_ops->assign_mul(T(0.5), x1, T(0.5), x2, x_r);
-
+        analysis_result_type result;
+        result.eigensolver_status =
+            eigensolvers::eigensolver_status::success;
+        result.classification_status =
+            analysis::spectrum_classification_status::complete;
+        result.unstable.real = dimension.first;
+        result.unstable.complex_pairs = dimension.second;
+        return result;
     }
 
+    static void ensure_classified(
+        const analysis_result_type& result,
+        const char* context)
+    {
+        if(result.succeeded())
+            return;
+        throw std::runtime_error(
+            std::string(context) + ": " +
+            (result.diagnostic.empty()
+                 ? analysis::spectrum_classification_status_name(
+                       result.classification_status)
+                 : result.diagnostic));
+    }
 
+    template<class TransitionResult>
+    static void ensure_refined(
+        const TransitionResult& result,
+        const char* context)
+    {
+        if(result.succeeded())
+            return;
+        throw std::runtime_error(
+            std::string(context) + ": " +
+            (result.diagnostic.empty()
+                 ? analysis::stability_transition_status_name(
+                       result.status)
+                 : result.diagnostic));
+    }
+
+    template<class EventCallback>
+    std::size_t refine_transition_sequence(
+        const T_vec& lower_state,
+        T lower_parameter,
+        const analysis_result_type& lower_stability,
+        const T_vec& upper_state,
+        T upper_parameter,
+        const analysis_result_type& upper_stability,
+        EventCallback& on_event,
+        unsigned int subdivision_depth,
+        const typename transition_refiner_type::options_type& options)
+    {
+        const int lower_dimension =
+            lower_stability.unstable.real_subspace_dimension();
+        const int upper_dimension =
+            upper_stability.unstable.real_subspace_dimension();
+        if(lower_dimension == upper_dimension)
+            return 0;
+
+        analysis::detail::vector_workspace<VectorOperations>
+            refined_state(vec_ops_);
+        const transition_result_type transition =
+            transition_refiner_.refine(
+                lower_state,
+                lower_parameter,
+                lower_stability,
+                upper_state,
+                upper_parameter,
+                upper_stability,
+                refined_state.get(),
+                options);
+        if(transition.succeeded())
+        {
+            log_transition(transition);
+            on_event(transition, refined_state.get());
+            return 1;
+        }
+
+        if(
+            transition.status !=
+                analysis::stability_transition_status::
+                    unexpected_signature ||
+            !transition.stability.succeeded())
+        {
+            ensure_refined(
+                transition,
+                "stability_analysis::refine_transition_sequence_known");
+        }
+        if(subdivision_depth >= transition_maximum_subdivisions_)
+        {
+            throw std::runtime_error(
+                "stability_analysis::refine_transition_sequence_known: "
+                "maximum transition subdivisions reached after " +
+                transition.diagnostic);
+        }
+
+        const T minimum_parameter =
+            std::min(lower_parameter, upper_parameter);
+        const T maximum_parameter =
+            std::max(lower_parameter, upper_parameter);
+        if(
+            !(transition.parameter > minimum_parameter) ||
+            !(transition.parameter < maximum_parameter))
+        {
+            throw std::runtime_error(
+                "stability_analysis::refine_transition_sequence_known: "
+                "the intermediate transition state does not split the "
+                "parameter interval");
+        }
+
+        const int middle_dimension =
+            transition.stability.unstable.
+                real_subspace_dimension();
+        log_->info_f(
+            "stability transition interval contains multiple events: "
+            "lambda = %.16le has dim(U) = (%i,%i), splitting endpoint "
+            "dimensions %i and %i at subdivision depth %u",
+            double(transition.parameter),
+            transition.stability.unstable.real,
+            transition.stability.unstable.complex_pairs,
+            lower_dimension,
+            upper_dimension,
+            subdivision_depth + 1);
+
+        std::size_t event_count = 0;
+        if(lower_dimension != middle_dimension)
+        {
+            event_count += refine_transition_sequence(
+                lower_state,
+                lower_parameter,
+                lower_stability,
+                refined_state.get(),
+                transition.parameter,
+                transition.stability,
+                on_event,
+                subdivision_depth + 1,
+                options);
+        }
+        if(middle_dimension != upper_dimension)
+        {
+            event_count += refine_transition_sequence(
+                refined_state.get(),
+                transition.parameter,
+                transition.stability,
+                upper_state,
+                upper_parameter,
+                upper_stability,
+                on_event,
+                subdivision_depth + 1,
+                options);
+        }
+        if(event_count == 0)
+        {
+            throw std::runtime_error(
+                "stability_analysis::refine_transition_sequence_known: "
+                "subdivision did not produce a transition bracket");
+        }
+        return event_count;
+    }
+
+    void log_transition(
+        const transition_result_type& transition) const
+    {
+        log_->info_f(
+            "stability transition refined to lambda = %lf, "
+            "dim(U): before = (%i,%i), after = (%i,%i), "
+            "iterations = %i, consistency restarts = %i",
+            double(transition.parameter),
+            transition.before_stability.unstable.real,
+            transition.before_stability.unstable.complex_pairs,
+            transition.after_stability.unstable.real,
+            transition.after_stability.unstable.complex_pairs,
+            int(transition.iterations),
+            int(transition.consistency_restarts));
+    }
+
+    void log_result(
+        T parameter,
+        const analysis_result_type& result) const
+    {
+        if(result.classification_attempts > 1)
+        {
+            log_->info_f(
+                "stability.execute: spectrum classification at lambda "
+                "= %lf required %zu attempts",
+                double(parameter),
+                result.classification_attempts);
+        }
+        for(const auto& estimate : result.eigenpairs)
+        {
+            const T real = estimate.value.real();
+            const T imag = estimate.value.imag();
+            if(imag >= T(0))
+                log_->info_f(
+                    "   %.3lf+%.3lfi",
+                    double(real),
+                    double(imag));
+            else
+                log_->info_f(
+                    "   %.3lf%.3lfi",
+                    double(real),
+                    double(imag));
+        }
+
+        if(result.succeeded())
+        {
+            log_->info_f(
+                "stability.execute: unstable manifold dimension at "
+                "lambda = %lf: real = %i, complex pairs = %i",
+                double(parameter),
+                result.unstable.real,
+                result.unstable.complex_pairs);
+        }
+        else
+        {
+            log_->warning_f(
+                "stability.execute: classification failed at lambda "
+                "= %lf: %s",
+                double(parameter),
+                result.diagnostic.c_str());
+        }
+    }
 };
 
-}
+} // namespace stability
 
-#endif // __STABILITY_STABILITY_HPP__
+#endif

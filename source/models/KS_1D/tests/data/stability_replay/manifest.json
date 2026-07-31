@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "spatial_resolution": 128,
+  "state_size": 126,
+  "states": [
+    {
+      "id": "curve03_state058",
+      "file": "curve03_state058.dat",
+      "source_curve": 3,
+      "source_file_id": 58,
+      "parameter": 16.14704430336377,
+      "unstable": [
+        1,
+        0
+      ]
+    },
+    {
+      "id": "curve03_state059",
+      "file": "curve03_state059.dat",
+      "source_curve": 3,
+      "source_file_id": 59,
+      "parameter": 16.1382753932293,
+      "unstable": [
+        2,
+        0
+      ]
+    },
+    {
+      "id": "curve19_state084",
+      "file": "curve19_state084.dat",
+      "source_curve": 19,
+      "source_file_id": 84,
+      "parameter": 92.04805482360952,
+      "unstable": [
+        3,
+        1
+      ]
+    },
+    {
+      "id": "curve19_state085",
+      "file": "curve19_state085.dat",
+      "source_curve": 19,
+      "source_file_id": 85,
+      "parameter": 92.22706064737537,
+      "unstable": [
+        3,
+        1
+      ]
+    },
+    {
+      "id": "curve19_state086",
+      "file": "curve19_state086.dat",
+      "source_curve": 19,
+      "source_file_id": 86,
+      "parameter": 92.4064694406614,
+      "unstable": [
+        3,
+        1
+      ]
+    },
+    {
+      "id": "curve24_state043",
+      "file": "curve24_state043.dat",
+      "source_curve": 24,
+      "source_file_id": 43,
+      "parameter": 92.85555515765905,
+      "unstable": [
+        2,
+        2
+      ]
+    },
+    {
+      "id": "curve24_state044",
+      "file": "curve24_state044.dat",
+      "source_curve": 24,
+      "source_file_id": 44,
+      "parameter": 92.84977511245386,
+      "unstable": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "curve24_state045",
+      "file": "curve24_state045.dat",
+      "source_curve": 24,
+      "source_file_id": 45,
+      "parameter": 92.84829233816279,
+      "unstable": [
+        1,
+        3
+      ]
+    }
+  ],
+  "transitions": [
+    {
+      "id": "curve03_steady",
+      "first_state": "curve03_state058",
+      "second_state": "curve03_state059",
+      "parameter": 16.139877457763674,
+      "parameter_tolerance": 2.0e-6,
+      "before": [
+        1,
+        0
+      ],
+      "after": [
+        2,
+        0
+      ]
+    },
+    {
+      "id": "curve24_hopf",
+      "first_state": "curve24_state043",
+      "second_state": "curve24_state044",
+      "parameter": 92.85000876149417,
+      "parameter_tolerance": 2.0e-6,
+      "before": [
+        2,
+        2
+      ],
+      "after": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "curve24_steady",
+      "first_state": "curve24_state044",
+      "second_state": "curve24_state045",
+      "parameter": 92.8485297402005,
+      "parameter_tolerance": 2.0e-6,
+      "before": [
+        2,
+        3
+      ],
+      "after": [
+        1,
+        3
+      ]
+    }
+  ]
+}

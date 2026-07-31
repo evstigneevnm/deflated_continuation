@@ -143,7 +143,12 @@ public:
         }
     }
 
-    int current_curve()
+    std::size_t current_curve() const
+    {
+        return curve_container.size();
+    }
+
+    std::size_t curve_count() const
     {
         return curve_container.size();
     }
@@ -207,6 +212,13 @@ public:
         try
         {
             auto &curve = curve_container.at(curve_number_);
+            curve.set_main_refs(
+                vec_ops,
+                file_ops,
+                log,
+                nonlin_op,
+                newton,
+                cont_help);
             return( curve.return_curve_vector() );
         }
         catch(const std::exception& e)
@@ -220,6 +232,25 @@ public:
 
 
     std::pair<bool, bool> get_solutoin_from_curve(int& curve_number_, int& container_index_, T& lambda_p, T_vec& x_p)
+    {
+        typename Curve::values_t point;
+        bool metadata_available = false;
+        return get_solutoin_from_curve(
+            curve_number_,
+            container_index_,
+            lambda_p,
+            x_p,
+            point,
+            metadata_available);
+    }
+
+    std::pair<bool, bool> get_solutoin_from_curve(
+        int& curve_number_,
+        int& container_index_,
+        T& lambda_p,
+        T_vec& x_p,
+        typename Curve::values_t& point,
+        bool& metadata_available)
     {
         if(curve_number_>curve_number)
         {
@@ -235,7 +266,12 @@ public:
                 return std::make_pair(false, false);
             }
             curve.set_main_refs( vec_ops, file_ops, log, nonlin_op, newton, cont_help );
-            bool is_there_a_solution = curve.get_avalible_solution(container_index_, lambda_p, x_p);
+            bool is_there_a_solution = curve.get_avalible_solution(
+                container_index_,
+                lambda_p,
+                x_p,
+                point,
+                metadata_available);
             if(is_there_a_solution)
             {
                 return std::make_pair(true, true);

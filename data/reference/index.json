@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/evstigneevnm/deflated_continuation",
+  "latest": "20260730",
+  "assets": [
+    {
+      "version": "20260730",
+      "release_tag": "reference-data-20260730",
+      "file": "deflated-continuation-reference-data-20260730.tar.xz",
+      "url": "https://github.com/evstigneevnm/deflated_continuation/releases/download/reference-data-20260730/deflated-continuation-reference-data-20260730.tar.xz",
+      "sha256": "80678d5425057b54a5ffb883cbfcb2e94dc01707b3928785623e814a0ec5b08e",
+      "size_bytes": 29618984,
+      "archive_root": "data/reference",
+      "created_on": "2026-07-31",
+      "source_base_commit": "01363d2f8a7c2065dd93772abf390aa60cabf7eb",
+      "datasets": [
+        {
+          "path": "data/reference/KS1D/N64/symmetric",
+          "description": "Primary N=64 symmetric KS1D bifurcation regression"
+        },
+        {
+          "path": "data/reference/KS1D/N64/full",
+          "description": "Primary N=64 full Fourier/SO(2) KS1D regression"
+        },
+        {
+          "path": "data/reference/KS1D/N128/symmetric",
+          "description": "N=128 symmetric KS1D resolution validation"
+        },
+        {
+          "path": "data/reference/KS1D/N128/full",
+          "description": "N=128 full Fourier/SO(2) KS1D resolution validation"
+        },
+        {
+          "path": "data/reference/KS1D/N128/full_stability_20260730",
+          "description": "Accepted 29-curve full KS1D diagram and stability analysis over lambda in [1,110]"
+        },
+        {
+          "path": "data/reference/eigensolvers/baseline_20260725",
+          "description": "Pre-refactoring eigensolver and linear-solver baseline"
+        },
+        {
+          "path": "data/reference/eigensolvers/eigs_paper_stage3_20260725",
+          "description": "Matrix Market and direct Krylov-Schur validation"
+        },
+        {
+          "path": "data/reference/eigensolvers/eigs_paper_stage4_20260725",
+          "description": "Transformed-operator and rotated-spectrum validation"
+        },
+        {
+          "path": "data/reference/eigensolvers/eigs_paper_stage5_20260725",
+          "description": "S80 spectrum, angle-scan, and factorized-recovery validation"
+        }
+      ]
+    }
+  ]
+}

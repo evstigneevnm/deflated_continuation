@@ -2,6 +2,7 @@
 #define __SYSTEM_OPERATOR_DEFLATION_H__
 
 #include <nonlinear_operators/projected_operator_helpers.h>
+#include <numerical_algos/lin_solvers/linear_solve_recovery.h>
 
 namespace deflation
 {
@@ -61,7 +62,33 @@ public:
         sol_storage->calc_distance(x, beta, c); //beta = 1/||x-x0_j||, c = (x-x0_j)
         vec_ops->add_mul_scalar(T(0), T(-beta), b); //b=-F(x,lambda)
         detail::log_deflation_distance(log, "deflation::system_operator", beta);
-        flag_lin_solver = SM_solver->solve(beta, *lin_op, T(1.0), c, f, b, d_x);
+        flag_lin_solver =
+            numerical_algos::lin_solvers::recovery::
+                solve_with_unpreconditioned_retry(
+                    SM_solver,
+                    [this, &d_x]()
+                    {
+                        return SM_solver->solve(
+                            beta,
+                            *lin_op,
+                            T(1.0),
+                            c,
+                            f,
+                            b,
+                            d_x);
+                    },
+                    [this, &d_x]()
+                    {
+                        vec_ops->assign_scalar(T(0), d_x);
+                    },
+                    [this]()
+                    {
+                        if(log)
+                        {
+                            log->warning(
+                                "deflation::system_operator: retrying the same Newton state without preconditioning.");
+                        }
+                    });
         d_lambda = 0;
         return flag_lin_solver;
     }

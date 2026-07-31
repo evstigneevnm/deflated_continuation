@@ -1,7 +1,9 @@
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -17,8 +19,13 @@
 #include <continuation/chart_helpers.h>
 #include <symmetry/linearization/projected_linear_operator.h>
 #include <symmetry/linearization/projected_preconditioner.h>
+#include <symmetry/linearization/projected_stability_linear_operator.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h>
+#include <stability/eigensolvers/transformations/nonlinear_operator_real_affine_inverse_provider.h>
+#include <symmetry/linearization/projected_affine_inverse_provider.h>
+#include <symmetry/linearization/projected_linearization_provider.h>
+#include <symmetry/linearization/projected_stability_gauge.h>
 #include <nonlinear_operators/projected_system_operator.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
@@ -38,6 +45,11 @@ using real_vec = typename vec_ops_real::vector_type;
 using symmetry_adapter_t = symmetry::fourier::real_packed_fourier_slice_1d_adapter<vec_ops_real>;
 using finite_actions_t = symmetry::finite_action_registry<vec_ops_real>;
 using lin_op_t = symmetry::linearization::projected_linear_operator<vec_ops_real, ks1d_t>;
+using stability_lin_op_t =
+    symmetry::linearization::
+        projected_stability_linear_operator<
+            vec_ops_real,
+            ks1d_t>;
 using prec_t = symmetry::linearization::projected_preconditioner<vec_ops_real, ks1d_t, lin_op_t>;
 using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
 using sm_solver_t = numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
@@ -111,6 +123,15 @@ void check_close(T value, T expected, T tol, const std::string& label)
             " err=" + scientific_string(err) +
             " tol=" + scientific_string(tol)
         );
+    }
+}
+
+void check_condition(bool condition, const std::string& label)
+{
+    ++checks;
+    if(!condition)
+    {
+        record_failure(label);
     }
 }
 
@@ -411,6 +432,528 @@ void test_preconditioner_at_zero(vec_ops_real& vec_ops, ks1d_t& ks)
     vec_ops.free_vector(rhs);
     vec_ops.stop_use_vector(zero);
     vec_ops.free_vector(zero);
+}
+
+void test_preconditioner_bypasses_exact_diagonal_pole(
+    vec_ops_real& vec_ops,
+    ks1d_t& ks)
+{
+    real_vec zero;
+    real_vec rhs;
+    vec_ops.init_vector(zero);
+    vec_ops.start_use_vector(zero);
+    vec_ops.init_vector(rhs);
+    vec_ops.start_use_vector(rhs);
+
+    vec_ops.assign_scalar(real(0), zero);
+    set_mode(vec_ops, rhs, 5, real(2.5), real(-0.75));
+    ks.set_linearization_point(zero, real(100));
+    ks.preconditioner_jacobian_u(rhs);
+
+    const auto host_rhs = host_vector(vec_ops, rhs);
+    check_close(
+        host_rhs[8],
+        real(2.5),
+        tolerance<real>(),
+        "full preconditioner keeps real component at an exact diagonal pole");
+    check_close(
+        host_rhs[9],
+        real(-0.75),
+        tolerance<real>(),
+        "full preconditioner keeps imaginary component at an exact diagonal pole");
+
+    vec_ops.stop_use_vector(rhs);
+    vec_ops.free_vector(rhs);
+    vec_ops.stop_use_vector(zero);
+    vec_ops.free_vector(zero);
+}
+
+void test_deterministic_deflation_seed_profiles(
+    vec_ops_real& vec_ops,
+    ks1d_t& ks)
+{
+    real_vec first;
+    real_vec repeated;
+    real_vec different;
+    real_vec difference;
+    vec_ops.init_vectors(
+        first,
+        repeated,
+        different,
+        difference);
+    vec_ops.start_use_vectors(
+        first,
+        repeated,
+        different,
+        difference);
+
+    ks.randomize_vector(first, real(24), std::uint64_t(9));
+    ks.randomize_vector(repeated, real(24), std::uint64_t(9));
+    ks.randomize_vector(different, real(24), std::uint64_t(10));
+    check_vector_close(
+        vec_ops,
+        first,
+        repeated,
+        tolerance<real>(),
+        "deterministic deflation seed is reproducible");
+    vec_ops.assign_mul(
+        real(1),
+        first,
+        real(-1),
+        different,
+        difference);
+    check_condition(
+        vec_ops.norm_l2(difference) > real(1.0e-8),
+        "different deflation seed IDs generate distinct profiles");
+
+    vec_ops.stop_use_vectors(
+        first,
+        repeated,
+        different,
+        difference);
+    vec_ops.free_vectors(
+        first,
+        repeated,
+        different,
+        difference);
+}
+
+void test_affine_preconditioner_at_zero(
+    vec_ops_real& vec_ops,
+    ks1d_t& ks)
+{
+    using provider_type =
+        stability::eigensolvers::transformations::
+            nonlinear_operator_real_affine_inverse_provider<
+                vec_ops_real,
+                ks1d_t>;
+
+    real_vec zero;
+    real_vec right_hand_side;
+    real_vec solution;
+    vec_ops.init_vectors(
+        zero,
+        right_hand_side,
+        solution);
+    vec_ops.start_use_vectors(
+        zero,
+        right_hand_side,
+        solution);
+
+    constexpr std::size_t mode = 4;
+    const std::size_t offset = 2*(mode - 1);
+    const real lambda = real(3.25);
+    const real jacobian_scale = real(0.075);
+    const real identity_shift = real(1.2);
+    std::vector<real> host_right_hand_side(
+        vec_ops.get_default_size(),
+        real(0));
+    host_right_hand_side[offset] = real(2.5);
+    host_right_hand_side[offset + 1] = real(-0.75);
+
+    vec_ops.assign_scalar(real(0), zero);
+    vec_ops.set(
+        host_right_hand_side.data(),
+        right_hand_side,
+        host_right_hand_side.size());
+    ks.set_linearization_point(zero, lambda);
+
+    provider_type provider(vec_ops, ks);
+    check_condition(
+        provider.apply(
+            jacobian_scale,
+            identity_shift,
+            right_hand_side,
+            solution),
+        "full real affine preconditioner provider succeeds");
+    check_condition(
+        provider.apply_calls() == 1 &&
+        provider.failed_applications() == 0,
+        "full real affine preconditioner provider statistics");
+
+    const auto host_solution =
+        host_vector(vec_ops, solution);
+    const real denominator =
+        jacobian_scale*ks.linear_multiplier(mode, lambda) +
+        identity_shift;
+    for(std::size_t index = 0; index < host_solution.size(); ++index)
+    {
+        real expected = real(0);
+        if(index == offset || index == offset + 1)
+        {
+            expected = host_right_hand_side[index]/denominator;
+        }
+        check_close(
+            host_solution[index],
+            expected,
+            tolerance<real>() *
+                (real(1) +
+                 common::scalar_math::abs(expected)),
+            "full real affine preconditioner component " +
+                std::to_string(index));
+    }
+
+    vec_ops.stop_use_vectors(
+        zero,
+        right_hand_side,
+        solution);
+    vec_ops.free_vectors(
+        zero,
+        right_hand_side,
+        solution);
+}
+
+void test_projected_affine_preconditioner_gauge(
+    vec_ops_real& vec_ops,
+    ks1d_t& ks)
+{
+    using provider_type =
+        stability::eigensolvers::transformations::
+            nonlinear_operator_real_affine_inverse_provider<
+                vec_ops_real,
+                ks1d_t>;
+    using projected_provider_type =
+        symmetry::linearization::
+            projected_affine_inverse_provider<
+                vec_ops_real,
+                ks1d_t,
+                provider_type>;
+
+    real_vec state;
+    real_vec direction;
+    real_vec projected;
+    real_vec gauge;
+    real_vec solution;
+    real_vec expected;
+    vec_ops.init_vectors(
+        state,
+        direction,
+        projected,
+        gauge,
+        solution,
+        expected);
+    vec_ops.start_use_vectors(
+        state,
+        direction,
+        projected,
+        gauge,
+        solution,
+        expected);
+
+    fill_test_vectors(vec_ops, state, direction);
+    ks.set_projected_linearization_point(state, real(3.25));
+    ks.project_current_tangent(direction, projected);
+    vec_ops.assign_lin_comb(
+        real(1),
+        direction,
+        real(-1),
+        projected,
+        gauge);
+
+    const real jacobian_scale = real(0.075);
+    const real identity_shift = real(1.2);
+    const real gauge_factor =
+        jacobian_scale + identity_shift;
+    vec_ops.assign_lin_comb(
+        real(1)/gauge_factor,
+        gauge,
+        expected);
+
+    auto provider =
+        std::make_shared<provider_type>(vec_ops, ks);
+    projected_provider_type projected_provider(
+        vec_ops,
+        ks,
+        provider);
+    check_condition(
+        projected_provider.apply(
+            jacobian_scale,
+            identity_shift,
+            gauge,
+            solution),
+        "projected real affine gauge solve succeeds");
+    const real projected_tolerance =
+        real(200)*tolerance<real>();
+    check_vector_close(
+        vec_ops,
+        solution,
+        expected,
+        projected_tolerance *
+            (real(1) + vec_ops.norm_l2(expected)),
+        "projected real affine gauge inverse");
+
+    ks.project_current_tangent(solution, projected);
+    check_close(
+        vec_ops.norm_l2(projected),
+        real(0),
+        projected_tolerance *
+            (real(1) + vec_ops.norm_l2(solution)),
+        "projected real affine gauge remains gauge");
+    check_condition(
+        projected_provider.apply_calls() == 1 &&
+        projected_provider.failed_applications() == 0 &&
+        provider->apply_calls() == 1,
+        "projected real affine provider statistics");
+    check_condition(
+        !projected_provider.apply(
+            real(1),
+            real(-1),
+            gauge,
+            solution),
+        "projected real affine rejects singular gauge factor");
+    check_condition(
+        projected_provider.apply_calls() == 2 &&
+        projected_provider.failed_applications() == 1 &&
+        provider->apply_calls() == 1,
+        "projected real affine failure statistics");
+
+    auto quotient_provider =
+        std::make_shared<provider_type>(vec_ops, ks);
+    projected_provider_type quotient_affine_provider(
+        vec_ops,
+        ks,
+        quotient_provider,
+        real(0));
+    vec_ops.assign_lin_comb(
+        real(1)/identity_shift,
+        gauge,
+        expected);
+    check_condition(
+        quotient_affine_provider.apply(
+            jacobian_scale,
+            identity_shift,
+            gauge,
+            solution),
+        "quotient affine zero-completion gauge solve succeeds");
+    check_vector_close(
+        vec_ops,
+        solution,
+        expected,
+        projected_tolerance *
+            (real(1) + vec_ops.norm_l2(expected)),
+        "quotient affine zero-completion gauge inverse");
+
+    lin_op_t quotient_operator(&ks, real(0));
+    quotient_operator.apply(gauge, solution);
+    check_close(
+        vec_ops.norm_l2(solution),
+        real(0),
+        projected_tolerance *
+            (real(1) + vec_ops.norm_l2(gauge)),
+        "quotient stability operator has neutral gauge completion");
+
+    vec_ops.stop_use_vectors(
+        state,
+        direction,
+        projected,
+        gauge,
+        solution,
+        expected);
+    vec_ops.free_vectors(
+        state,
+        direction,
+        projected,
+        gauge,
+        solution,
+        expected);
+}
+
+void test_projected_stability_gauge()
+{
+    const auto left_stable =
+        symmetry::linearization::
+            make_projected_stability_gauge<real>(
+                real(-2),
+                true,
+                real(3));
+    check_close(
+        left_stable.operator_completion,
+        real(1.5),
+        tolerance<real>(),
+        "left-stable projected gauge operator completion");
+    check_close(
+        real(-2)*left_stable.operator_completion,
+        left_stable.scaled_eigenvalue,
+        tolerance<real>(),
+        "left-stable projected gauge scaled eigenvalue");
+    check_condition(
+        left_stable.scaled_eigenvalue < real(0),
+        "left-stable projected gauge lies in stable half-plane");
+
+    const auto right_stable =
+        symmetry::linearization::
+            make_projected_stability_gauge<real>(
+                real(0.5),
+                false);
+    check_close(
+        right_stable.operator_completion,
+        real(2),
+        tolerance<real>(),
+        "right-stable projected gauge operator completion");
+    check_condition(
+        right_stable.scaled_eigenvalue > real(0),
+        "right-stable projected gauge lies in stable half-plane");
+
+    bool rejected_zero_scale = false;
+    try
+    {
+        (void)symmetry::linearization::
+            make_projected_stability_gauge<real>(
+                real(0),
+                true);
+    }
+    catch(const std::invalid_argument&)
+    {
+        rejected_zero_scale = true;
+    }
+    check_condition(
+        rejected_zero_scale,
+        "projected stability gauge rejects zero scale");
+}
+
+void test_projected_stability_operator(
+    vec_ops_real& vec_ops,
+    ks1d_t& ks)
+{
+    real_vec state;
+    real_vec direction;
+    real_vec projected_direction;
+    real_vec jacobian_image;
+    real_vec expected;
+    real_vec actual;
+    real_vec gauge;
+    vec_ops.init_vectors(
+        state,
+        direction,
+        projected_direction,
+        jacobian_image,
+        expected,
+        actual,
+        gauge);
+    vec_ops.start_use_vectors(
+        state,
+        direction,
+        projected_direction,
+        jacobian_image,
+        expected,
+        actual,
+        gauge);
+
+    fill_test_vectors(vec_ops, state, direction);
+    ks.set_stateless_projected_linearization_point(
+        state,
+        real(4.75));
+    ks.project_current_tangent(
+        direction,
+        projected_direction);
+    ks.jacobian_u(
+        projected_direction,
+        jacobian_image);
+    ks.project_current_tangent(
+        jacobian_image,
+        expected);
+
+    stability_lin_op_t quotient_operator(&ks, real(0));
+    quotient_operator.apply(direction, actual);
+    check_vector_close(
+        vec_ops,
+        actual,
+        expected,
+        real(200)*tolerance<real>()*
+            (real(1) + vec_ops.norm_l2(expected)),
+        "projected stability operator is PJP");
+
+    vec_ops.assign_lin_comb(
+        real(1),
+        direction,
+        real(-1),
+        projected_direction,
+        gauge);
+    vec_ops.add_mul(real(1.5), gauge, expected);
+    stability_lin_op_t completed_operator(&ks, real(1.5));
+    completed_operator.apply(direction, actual);
+    check_vector_close(
+        vec_ops,
+        actual,
+        expected,
+        real(200)*tolerance<real>()*
+            (real(1) + vec_ops.norm_l2(expected)),
+        "projected stability operator gauge completion");
+
+    vec_ops.stop_use_vectors(
+        state,
+        direction,
+        projected_direction,
+        jacobian_image,
+        expected,
+        actual,
+        gauge);
+    vec_ops.free_vectors(
+        state,
+        direction,
+        projected_direction,
+        jacobian_image,
+        expected,
+        actual,
+        gauge);
+}
+
+void test_projected_linearization_provider(
+    vec_ops_real& vec_ops,
+    ks1d_t& ks)
+{
+    using provider_type =
+        symmetry::linearization::
+            projected_linearization_provider<
+                vec_ops_real,
+                ks1d_t>;
+
+    real_vec state;
+    real_vec direction;
+    real_vec provider_result;
+    real_vec direct_result;
+    vec_ops.init_vectors(
+        state,
+        direction,
+        provider_result,
+        direct_result);
+    vec_ops.start_use_vectors(
+        state,
+        direction,
+        provider_result,
+        direct_result);
+
+    fill_test_vectors(vec_ops, state, direction);
+    const real lambda = real(3.25);
+    provider_type provider(ks);
+    provider.set_linearization_point(state, lambda);
+    ks.projected_jacobian_u(direction, provider_result);
+
+    ks.set_stateless_projected_linearization_point(
+        state,
+        lambda);
+    ks.projected_jacobian_u(direction, direct_result);
+    check_vector_close(
+        vec_ops,
+        provider_result,
+        direct_result,
+        real(20)*tolerance<real>()*
+            (real(1) + vec_ops.norm_l2(direct_result)),
+        "projected stability linearization provider");
+    check_condition(
+        &provider.nonlinear_operator() == &ks,
+        "projected stability provider retains nonlinear operator");
+
+    vec_ops.stop_use_vectors(
+        state,
+        direction,
+        provider_result,
+        direct_result);
+    vec_ops.free_vectors(
+        state,
+        direction,
+        provider_result,
+        direct_result);
 }
 
 void test_equivariance(vec_ops_real& vec_ops, ks1d_t& ks, symmetry_adapter_t& symmetry)
@@ -1225,6 +1768,15 @@ int main(int argc, char** argv)
     test_jacobian_u(vec_ops, ks);
     test_jacobian_alpha(vec_ops, ks);
     test_preconditioner_at_zero(vec_ops, ks);
+    test_preconditioner_bypasses_exact_diagonal_pole(vec_ops, ks);
+    test_deterministic_deflation_seed_profiles(vec_ops, ks);
+    test_affine_preconditioner_at_zero(vec_ops, ks);
+    test_projected_affine_preconditioner_gauge(
+        vec_ops,
+        ks);
+    test_projected_stability_gauge();
+    test_projected_stability_operator(vec_ops, ks);
+    test_projected_linearization_provider(vec_ops, ks);
     test_equivariance(vec_ops, ks, symmetry);
     test_finite_action_equivariance(vec_ops, ks);
     test_project_hook(vec_ops, ks, symmetry);

@@ -131,6 +131,13 @@ private:
         return value < T(0) ? -value : value;
     }
 
+    static bool is_legacy_candidate_local_entry(
+        const std::string& reason)
+    {
+        return reason ==
+               "active_continuation_interpolation_failed_at_requested_knot";
+    }
+
     void load()
     {
         entries.clear();
@@ -159,6 +166,10 @@ private:
             parsed.status.missing_data = status.value("missing_data", 0u);
             parsed.status.skipped_discontinuous = status.value("skipped_discontinuous", 0u);
             parsed.status.skipped_incomplete = status.value("skipped_incomplete", 0u);
+            if(is_legacy_candidate_local_entry(parsed.reason))
+            {
+                continue;
+            }
             entries.push_back(parsed);
         }
     }

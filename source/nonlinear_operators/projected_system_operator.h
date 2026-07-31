@@ -2,6 +2,7 @@
 #define __PROJECTED_SYSTEM_OPERATOR_H__
 
 #include <nonlinear_operators/projected_operator_helpers.h>
+#include <numerical_algos/lin_solvers/linear_solve_recovery.h>
 
 namespace nonlinear_operators
 {
@@ -33,7 +34,18 @@ public:
         detail::set_linearization_point(nonlin_op, x, lambda);
         detail::residual_at_linearization(nonlin_op, x, lambda, b);
         vec_ops->add_mul_scalar(T(0), T(-1), b);
-        const bool flag_lin_solver = lin_solver->solve(*lin_op, b, d_x);
+        const bool flag_lin_solver =
+            numerical_algos::lin_solvers::recovery::
+                solve_with_unpreconditioned_retry(
+                    lin_solver,
+                    [this, &d_x]()
+                    {
+                        return lin_solver->solve(*lin_op, b, d_x);
+                    },
+                    [this, &d_x]()
+                    {
+                        vec_ops->assign_scalar(T(0), d_x);
+                    });
         detail::project_current_tangent(vec_ops, nonlin_op, d_x, d_x);
         return flag_lin_solver;
     }

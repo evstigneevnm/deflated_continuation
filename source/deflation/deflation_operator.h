@@ -9,6 +9,7 @@
 *  -- execute all - calls find and store untill all solutions are found.
 */
 #include <exception>
+#include <cstdint>
 #include <vector>
 #include <string>
 #include <fstream>
@@ -16,6 +17,42 @@
 
 namespace deflation
 {
+
+namespace detail
+{
+
+template<class NonlinearOperator, class Vector, class Scalar>
+auto randomize_deflation_seed(
+    NonlinearOperator* nonlinear_operator,
+    Vector& vector,
+    const Scalar parameter,
+    const std::uint64_t seed,
+    int)
+    -> decltype(
+        nonlinear_operator->randomize_vector(
+            vector,
+            parameter,
+            seed),
+        void())
+{
+    nonlinear_operator->randomize_vector(
+        vector,
+        parameter,
+        seed);
+}
+
+template<class NonlinearOperator, class Vector, class Scalar>
+void randomize_deflation_seed(
+    NonlinearOperator* nonlinear_operator,
+    Vector& vector,
+    const Scalar,
+    const std::uint64_t,
+    long)
+{
+    nonlinear_operator->randomize_vector(vector);
+}
+
+} // namespace detail
 
 template<class VectorOperations, class NewtonMethod, class NonlinearOperator, class SolutionStorage, class Logging>
 class deflation_operator
@@ -56,14 +93,44 @@ public:
         sol_ref_ = u_out;
     }
 
+    void set_seed_sequence(const std::uint64_t first_seed)
+    {
+        deterministic_seed_sequence = true;
+        seed_sequence_start = first_seed;
+    }
+
+    void clear_seed_sequence()
+    {
+        deterministic_seed_sequence = false;
+    }
+
+    std::uint64_t attempts_consumed() const
+    {
+        return attempts_consumed_;
+    }
+
     bool find_solution(T lambda_0, NonlinearOperator*& nonlin_op)
     {
         T lambda = lambda_0;
         bool found_solution = false;
         unsigned int retries = 0;
+        attempts_consumed_ = 0;
         while((retries<max_retries)&&(found_solution==false))
         {
-            nonlin_op->randomize_vector(u_in);
+            if(deterministic_seed_sequence)
+            {
+                detail::randomize_deflation_seed(
+                    nonlin_op,
+                    u_in,
+                    lambda_0,
+                    seed_sequence_start + retries,
+                    0);
+            }
+            else
+            {
+                nonlin_op->randomize_vector(u_in);
+            }
+            ++attempts_consumed_;
             // nonlin_op->exact_solution(lambda_0, u_out);
             // vec_ops->add_mul_scalar(0.0, lambda_0, u_in);
             // vec_ops->add_mul(0.1, u_out, u_in);
@@ -156,6 +223,9 @@ private:
     Logging* log;
     std::string norms_file_name_;
     std::vector<std::vector<T>> all_norms;
+    bool deterministic_seed_sequence = false;
+    std::uint64_t seed_sequence_start = 0;
+    std::uint64_t attempts_consumed_ = 0;
 
 
     void write_norm_file()

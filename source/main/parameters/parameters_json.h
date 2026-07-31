@@ -1,6 +1,10 @@
 #ifndef __MAIN_PARAMETERS_JSON_H__
 #define __MAIN_PARAMETERS_JSON_H__
 
+#include <complex>
+#include <stdexcept>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include <contrib/json/nlohmann/json.hpp>
@@ -10,6 +14,272 @@ namespace main_classes
 {
 namespace parameters_json_detail
 {
+
+template<class T>
+std::complex<T> parse_complex_value(
+    const nlohmann::json& json)
+{
+    if(json.is_number())
+        return {json.template get<T>(), T{}};
+    if(json.is_array() && json.size() == 2)
+    {
+        return {
+            json.at(0).template get<T>(),
+            json.at(1).template get<T>()};
+    }
+    if(json.is_object())
+    {
+        return {
+            json.at("real").template get<T>(),
+            json.at("imaginary").template get<T>()};
+    }
+    throw std::invalid_argument(
+        "complex value must be a number, [real, imaginary], "
+        "or an object with real and imaginary fields");
+}
+
+template<class T, class Config>
+void parse_matrix_free_stability_config(
+    const nlohmann::json& json,
+    Config& config)
+{
+    config = {};
+    config.enabled = json.value("enabled", config.enabled);
+    config.linearization_scale = json.value(
+        "linearization_scale",
+        config.linearization_scale);
+
+    const auto transformation =
+        json.value("transformation", nlohmann::json::object());
+    config.transformation.type =
+        stability::analysis::
+            parse_matrix_free_spectral_transformation(
+                transformation.value(
+                    "type",
+                    std::string(
+                        stability::analysis::
+                            matrix_free_spectral_transformation_name(
+                                config.transformation.type))));
+    config.transformation.step = transformation.value(
+        "step",
+        config.transformation.step);
+    config.transformation.repetitions = transformation.value(
+        "repetitions",
+        config.transformation.repetitions);
+    if(transformation.contains("shifts"))
+    {
+        config.transformation.shifts.clear();
+        for(const auto& shift : transformation.at("shifts"))
+        {
+            config.transformation.shifts.push_back(
+                parse_complex_value<T>(shift));
+        }
+    }
+
+    const auto outer =
+        json.value("outer", nlohmann::json::object());
+    config.outer.desired_eigenvalues = outer.value(
+        "desired_eigenvalues",
+        config.outer.desired_eigenvalues);
+    config.outer.krylov_dimension = outer.value(
+        "krylov_dimension",
+        config.outer.krylov_dimension);
+    config.outer.restart_dimension = outer.value(
+        "restart_dimension",
+        config.outer.restart_dimension);
+    config.outer.maximum_restarts = outer.value(
+        "maximum_restarts",
+        config.outer.maximum_restarts);
+    config.outer.absolute_tolerance = outer.value(
+        "absolute_tolerance",
+        config.outer.absolute_tolerance);
+    config.outer.relative_tolerance = outer.value(
+        "relative_tolerance",
+        config.outer.relative_tolerance);
+    config.outer.preserve_conjugate_pairs = outer.value(
+        "preserve_conjugate_pairs",
+        config.outer.preserve_conjugate_pairs);
+    config.outer.orthogonalization = outer.value(
+        "orthogonalization",
+        config.outer.orthogonalization);
+    config.outer.reorthogonalization = outer.value(
+        "reorthogonalization",
+        config.outer.reorthogonalization);
+    config.outer.dgks_eta = outer.value(
+        "dgks_eta",
+        config.outer.dgks_eta);
+    config.outer.breakdown_absolute_tolerance = outer.value(
+        "breakdown_absolute_tolerance",
+        config.outer.breakdown_absolute_tolerance);
+    config.outer.breakdown_relative_tolerance = outer.value(
+        "breakdown_relative_tolerance",
+        config.outer.breakdown_relative_tolerance);
+    config.outer.maximum_orthogonalization_passes = outer.value(
+        "maximum_orthogonalization_passes",
+        config.outer.maximum_orthogonalization_passes);
+
+    const auto recovery =
+        json.value("recovery", nlohmann::json::object());
+    config.recovery.relative_basis_tolerance = recovery.value(
+        "relative_basis_tolerance",
+        config.recovery.relative_basis_tolerance);
+    config.recovery.orthogonalization_passes = recovery.value(
+        "orthogonalization_passes",
+        config.recovery.orthogonalization_passes);
+    config.recovery.absolute_residual_tolerance = recovery.value(
+        "absolute_residual_tolerance",
+        config.recovery.absolute_residual_tolerance);
+    config.recovery.relative_residual_tolerance = recovery.value(
+        "relative_residual_tolerance",
+        config.recovery.relative_residual_tolerance);
+    config.recovery.minimum_converged_eigenpairs = recovery.value(
+        "minimum_converged_eigenpairs",
+        config.recovery.minimum_converged_eigenpairs);
+
+    const auto inner =
+        json.value("inner_solver", nlohmann::json::object());
+    config.inner_solver.basis_size = inner.value(
+        "basis_size",
+        config.inner_solver.basis_size);
+    config.inner_solver.batch_size = inner.value(
+        "batch_size",
+        config.inner_solver.batch_size);
+    const std::string preconditioner_side = inner.value(
+        "preconditioner_side",
+        std::string(1, config.inner_solver.preconditioner_side));
+    if(preconditioner_side.size() != 1)
+    {
+        throw std::invalid_argument(
+            "matrix-free inner preconditioner_side must be one "
+            "character");
+    }
+    config.inner_solver.preconditioner_side =
+        preconditioner_side.front();
+    config.inner_solver.orthogonalization = inner.value(
+        "orthogonalization",
+        config.inner_solver.orthogonalization);
+    config.inner_solver.reorthogonalization = inner.value(
+        "reorthogonalization",
+        config.inner_solver.reorthogonalization);
+    config.inner_solver.dgks_eta = inner.value(
+        "dgks_eta",
+        config.inner_solver.dgks_eta);
+    config.inner_solver.breakdown_relative_tolerance = inner.value(
+        "breakdown_relative_tolerance",
+        config.inner_solver.breakdown_relative_tolerance);
+    config.inner_solver.maximum_orthogonalization_passes = inner.value(
+        "maximum_orthogonalization_passes",
+        config.inner_solver.maximum_orthogonalization_passes);
+    config.inner_solver.restart_on_false_ritz_convergence = inner.value(
+        "restart_on_false_ritz_convergence",
+        config.inner_solver.restart_on_false_ritz_convergence);
+    config.inner_solver.basis_retry_sizes = inner.value(
+        "basis_retry_sizes",
+        config.inner_solver.basis_retry_sizes);
+    config.inner_solver.relative_tolerance = inner.value(
+        "relative_tolerance",
+        config.inner_solver.relative_tolerance);
+    config.inner_solver.absolute_tolerance = inner.value(
+        "absolute_tolerance",
+        config.inner_solver.absolute_tolerance);
+    config.inner_solver.maximum_iterations = inner.value(
+        "maximum_iterations",
+        config.inner_solver.maximum_iterations);
+    config.inner_solver.minimum_iterations = inner.value(
+        "minimum_iterations",
+        config.inner_solver.minimum_iterations);
+    config.inner_solver.save_convergence_history = inner.value(
+        "save_convergence_history",
+        config.inner_solver.save_convergence_history);
+    config.inner_solver.divide_norms_by_relative_base = inner.value(
+        "divide_norms_by_relative_base",
+        config.inner_solver.divide_norms_by_relative_base);
+    config.inner_solver.output_minimum_residual = inner.value(
+        "output_minimum_residual",
+        config.inner_solver.output_minimum_residual);
+    config.inner_solver.verbose = inner.value(
+        "verbose",
+        config.inner_solver.verbose);
+
+    const auto retry =
+        json.value("retry", nlohmann::json::object());
+    config.retry.enabled = retry.value(
+        "enabled",
+        config.retry.enabled);
+    config.retry.maximum_shift_retries = retry.value(
+        "maximum_shift_retries",
+        config.retry.maximum_shift_retries);
+    config.retry.initial_shift_perturbation = retry.value(
+        "initial_shift_perturbation",
+        config.retry.initial_shift_perturbation);
+    config.retry.perturbation_growth = retry.value(
+        "perturbation_growth",
+        config.retry.perturbation_growth);
+    config.retry.preconditioner_pole_absolute_tolerance =
+        retry.value(
+            "preconditioner_pole_absolute_tolerance",
+            config.retry.
+                preconditioner_pole_absolute_tolerance);
+    config.retry.preconditioner_pole_relative_tolerance =
+        retry.value(
+            "preconditioner_pole_relative_tolerance",
+            config.retry.
+                preconditioner_pole_relative_tolerance);
+
+    const auto aggregation =
+        json.value("aggregation", nlohmann::json::object());
+    config.aggregation.absolute_tolerance = aggregation.value(
+        "absolute_tolerance",
+        config.aggregation.absolute_tolerance);
+    config.aggregation.relative_tolerance = aggregation.value(
+        "relative_tolerance",
+        config.aggregation.relative_tolerance);
+    config.aggregation.minimum_successful_scans = aggregation.value(
+        "minimum_successful_scans",
+        config.aggregation.minimum_successful_scans);
+    config.aggregation.minimum_eigenpairs = aggregation.value(
+        "minimum_eigenpairs",
+        config.aggregation.minimum_eigenpairs);
+    config.aggregation.require_all_scans = aggregation.value(
+        "require_all_scans",
+        config.aggregation.require_all_scans);
+    config.aggregation.probe_count = aggregation.value(
+        "probe_count",
+        config.aggregation.probe_count);
+    config.aggregation.require_all_probes = aggregation.value(
+        "require_all_probes",
+        config.aggregation.require_all_probes);
+    config.aggregation.eigenvector_independence_tolerance =
+        aggregation.value(
+            "eigenvector_independence_tolerance",
+            config.aggregation.
+                eigenvector_independence_tolerance);
+    config.aggregation.eigenvector_orthogonalization_passes =
+        aggregation.value(
+            "eigenvector_orthogonalization_passes",
+            config.aggregation.
+                eigenvector_orthogonalization_passes);
+
+    const auto small_system =
+        json.value("small_system", nlohmann::json::object());
+    config.small_system.enabled = small_system.value(
+        "enabled",
+        config.small_system.enabled);
+    config.small_system.maximum_dimension = small_system.value(
+        "maximum_dimension",
+        config.small_system.maximum_dimension);
+    config.small_system.prefer = small_system.value(
+        "prefer",
+        config.small_system.prefer);
+    config.small_system.absolute_residual_tolerance =
+        small_system.value(
+            "absolute_residual_tolerance",
+            config.small_system.absolute_residual_tolerance);
+    config.small_system.relative_residual_tolerance =
+        small_system.value(
+            "relative_residual_tolerance",
+            config.small_system.relative_residual_tolerance);
+}
 
 template<class T, class Params>
 void parse_extended_linear_solver(const nlohmann::json& json, Params& params)
@@ -71,6 +341,33 @@ void parse_knot_relocation(const nlohmann::json& json, Params& params)
     params.prefer_positive_shift = json.value("prefer_positive_shift", params.prefer_positive_shift);
     params.require_all_intersections = json.value("require_all_intersections", params.require_all_intersections);
     params.save_registry = json.value("save_registry", params.save_registry);
+    const auto overrides =
+        json.value("manual_overrides", nlohmann::json::array());
+    for(const auto& item: overrides)
+    {
+        typename Params::manual_override_s parsed;
+        parsed.requested =
+            item.at("requested").template get<T>();
+        parsed.effective =
+            item.at("effective").template get<T>();
+        parsed.reason = item.value(
+            "reason",
+            std::string("manual_non_singular_override"));
+        params.manual_overrides.push_back(std::move(parsed));
+    }
+}
+
+template<class Params>
+void parse_seed_schedule(
+    const nlohmann::json& json,
+    Params& params)
+{
+    params.set_default();
+    params.enabled = json.value("enabled", params.enabled);
+    params.registry_file =
+        json.value("registry_file", params.registry_file);
+    params.save_registry =
+        json.value("save_registry", params.save_registry);
 }
 
 template<class T, class Params>
@@ -94,6 +391,45 @@ void parse_restart_policy(const nlohmann::json& json, Params& params)
     params.failed_continuation_rejection_tolerance = json.value(
         "failed_continuation_rejection_tolerance", params.failed_continuation_rejection_tolerance);
     parse_knot_relocation<T>(json.value("knot_relocation", nlohmann::json::object()), params.knot_relocation);
+    parse_seed_schedule(
+        json.value("seed_schedule", nlohmann::json::object()),
+        params.seed_schedule);
+}
+
+template<class T, class Params>
+void parse_continuation_parameter_bounds(
+    const nlohmann::json& json,
+    Params& params)
+{
+    params.set_default();
+    if(json.empty())
+    {
+        return;
+    }
+    params.enabled = json.value("enabled", true);
+    params.minimum =
+        json.at("minimum").template get<T>();
+    params.maximum =
+        json.at("maximum").template get<T>();
+    params.resolve_with_knot_registry = json.value(
+        "resolve_with_knot_registry",
+        params.resolve_with_knot_registry);
+    if(params.enabled && !(params.minimum < params.maximum))
+    {
+        throw std::invalid_argument(
+            "continuation_parameter_bounds requires minimum < maximum");
+    }
+}
+
+template<class Params>
+void parse_boundary_refinement_policy(
+    const nlohmann::json& json,
+    Params& params)
+{
+    params.set_default();
+    params.preserve_last_converged_point = json.value(
+        "preserve_last_converged_point",
+        params.preserve_last_converged_point);
 }
 
 template<class T, class Params>
@@ -222,6 +558,16 @@ void parse_deflation_continuation(
     params.analytical_solution_branches = json.value(
         "analytical_solution_branches", std::vector<unsigned int>());
 
+    parse_continuation_parameter_bounds<T>(
+        json.value(
+            "continuation_parameter_bounds",
+            nlohmann::json::object()),
+        params.continuation_parameter_bounds);
+    parse_boundary_refinement_policy(
+        json.value(
+            "boundary_refinement_policy",
+            nlohmann::json::object()),
+        params.boundary_refinement_policy);
     parse_restart_policy<T>(json.value("restart_policy", nlohmann::json::object()), params.restart_policy);
     parse_branch_intersection_policy<T>(
         json.value("branch_intersection_policy", nlohmann::json::object()),
@@ -260,12 +606,57 @@ void parse_stability_continuation(
     const nlohmann::json& json,
     typename parameters<T>::stability_continuation_s& params)
 {
+    params.set_default();
     params.linear_operator_stable_eigenvalues_left_halfplane =
         json.at("left_halfplane_stable_eigenvalues").template get<bool>();
     params.Krylov_subspace = json.at("Krylov_subspace_dimension").template get<unsigned int>();
     params.desired_spectrum = json.at("desired_spectrum").template get<unsigned int>();
     params.Cayley_transform_sigma_mu =
         json.at("Cayley_transform_sigma_mu").template get<std::vector<T>>();
+    params.stability_boundary_tolerance = json.value(
+        "stability_boundary_tolerance",
+        params.stability_boundary_tolerance);
+    params.real_eigenvalue_tolerance = json.value(
+        "real_eigenvalue_tolerance",
+        params.real_eigenvalue_tolerance);
+    params.conjugate_pair_tolerance = json.value(
+        "conjugate_pair_tolerance",
+        params.conjugate_pair_tolerance);
+    params.require_converged_eigenpairs = json.value(
+        "require_converged_eigenpairs",
+        params.require_converged_eigenpairs);
+    params.require_nonempty_spectrum = json.value(
+        "require_nonempty_spectrum",
+        params.require_nonempty_spectrum);
+    params.require_complete_scan_coverage = json.value(
+        "require_complete_scan_coverage",
+        params.require_complete_scan_coverage);
+    params.spectrum_classification_retries = json.value(
+        "spectrum_classification_retries",
+        params.spectrum_classification_retries);
+    params.transition_classification_confirmations = json.value(
+        "transition_classification_confirmations",
+        params.transition_classification_confirmations);
+    params.correct_stability_transitions_with_newton = json.value(
+        "correct_stability_transitions_with_newton",
+        params.correct_stability_transitions_with_newton);
+    params.transition_refinement_maximum_iterations = json.value(
+        "transition_refinement_maximum_iterations",
+        params.transition_refinement_maximum_iterations);
+    params.transition_refinement_maximum_subdivisions = json.value(
+        "transition_refinement_maximum_subdivisions",
+        params.transition_refinement_maximum_subdivisions);
+    params.transition_refinement_parameter_tolerance = json.value(
+        "transition_refinement_parameter_tolerance",
+        params.transition_refinement_parameter_tolerance);
+    params.symmetry_endpoint_guard_source_points = json.value(
+        "symmetry_endpoint_guard_source_points",
+        params.symmetry_endpoint_guard_source_points);
+    parse_matrix_free_stability_config<T>(
+        json.value(
+            "matrix_free_eigensolver",
+            nlohmann::json::object()),
+        params.matrix_free_eigensolver);
     parse_linear_solver<T>(json.at("linear_solver"), params.linear_solver);
     parse_newton<T>(json.at("newton"), params.newton);
 }

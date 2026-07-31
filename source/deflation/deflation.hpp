@@ -89,6 +89,21 @@ public:
         deflation_op->set_max_retries(max_retries_);
     }
 
+    void set_seed_sequence(const std::uint64_t first_seed)
+    {
+        deflation_op->set_seed_sequence(first_seed);
+    }
+
+    void clear_seed_sequence()
+    {
+        deflation_op->clear_seed_sequence();
+    }
+
+    std::uint64_t attempts_consumed() const
+    {
+        return deflation_op->attempts_consumed();
+    }
+
 
     bool find_solution(const T& lambda_l)
     {

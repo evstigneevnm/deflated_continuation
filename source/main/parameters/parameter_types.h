@@ -14,6 +14,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <stability/analysis/matrix_free_stability_config.h>
+
 namespace main_classes
 {
 
@@ -130,6 +132,13 @@ struct parameters
         {
             struct knot_relocation_s
             {
+                struct manual_override_s
+                {
+                    T requested;
+                    T effective;
+                    std::string reason;
+                };
+
                 bool enabled;
                 std::string registry_file;
                 T min_shift_abs;
@@ -138,6 +147,7 @@ struct parameters
                 bool prefer_positive_shift;
                 bool require_all_intersections;
                 bool save_registry;
+                std::vector<manual_override_s> manual_overrides;
 
                 void set_default()
                 {
@@ -149,6 +159,7 @@ struct parameters
                     prefer_positive_shift = true;
                     require_all_intersections = true;
                     save_registry = true;
+                    manual_overrides.clear();
                 }
 
                 void plot_all()
@@ -161,6 +172,39 @@ struct parameters
                     std::cout << "||  |  |==prefer_positive_shift: " << prefer_positive_shift << std::endl;
                     std::cout << "||  |  |==require_all_intersections: " << require_all_intersections << std::endl;
                     std::cout << "||  |  |==save_registry: " << save_registry << std::endl;
+                    std::cout << "||  |  |==manual_overrides: ";
+                    for(const auto& item: manual_overrides)
+                    {
+                        std::cout
+                            << item.requested << "->"
+                            << item.effective << " ";
+                    }
+                    std::cout << std::endl;
+                }
+            };
+
+            struct seed_schedule_s
+            {
+                bool enabled;
+                std::string registry_file;
+                bool save_registry;
+
+                void set_default()
+                {
+                    enabled = false;
+                    registry_file =
+                        "deflation_seed_registry.json";
+                    save_registry = true;
+                }
+
+                void plot_all()
+                {
+                    std::cout << "||  |  |==enabled: "
+                              << enabled << std::endl;
+                    std::cout << "||  |  |==registry_file: "
+                              << registry_file << std::endl;
+                    std::cout << "||  |  |==save_registry: "
+                              << save_registry << std::endl;
                 }
             };
 
@@ -173,6 +217,7 @@ struct parameters
             unsigned int max_failed_continuations_per_knot;
             T failed_continuation_rejection_tolerance;
             knot_relocation_s knot_relocation;
+            seed_schedule_s seed_schedule;
 
             void set_default()
             {
@@ -185,6 +230,7 @@ struct parameters
                 max_failed_continuations_per_knot = 3;
                 failed_continuation_rejection_tolerance = T(1.0e-8);
                 knot_relocation.set_default();
+                seed_schedule.set_default();
             }
 
             void plot_all()
@@ -199,6 +245,52 @@ struct parameters
                 std::cout << "||  |==failed_continuation_rejection_tolerance: " << failed_continuation_rejection_tolerance << std::endl;
                 std::cout << "||  |==knot_relocation: " << std::endl;
                 knot_relocation.plot_all();
+                std::cout << "||  |==seed_schedule: " << std::endl;
+                seed_schedule.plot_all();
+            }
+        };
+
+        struct continuation_parameter_bounds_s
+        {
+            bool enabled;
+            T minimum;
+            T maximum;
+            bool resolve_with_knot_registry;
+
+            void set_default()
+            {
+                enabled = false;
+                minimum = T(0);
+                maximum = T(0);
+                resolve_with_knot_registry = true;
+            }
+
+            void plot_all()
+            {
+                std::cout << "||  |==enabled: " << enabled << std::endl;
+                if(enabled)
+                {
+                    std::cout << "||  |==minimum: " << minimum << std::endl;
+                    std::cout << "||  |==maximum: " << maximum << std::endl;
+                }
+                std::cout << "||  |==resolve_with_knot_registry: "
+                          << resolve_with_knot_registry << std::endl;
+            }
+        };
+
+        struct boundary_refinement_policy_s
+        {
+            bool preserve_last_converged_point;
+
+            void set_default()
+            {
+                preserve_last_converged_point = true;
+            }
+
+            void plot_all()
+            {
+                std::cout << "||  |==preserve_last_converged_point: "
+                          << preserve_last_converged_point << std::endl;
             }
         };
 
@@ -438,6 +530,8 @@ struct parameters
         bool           add_analytical_solution_to_diagram;
         std::vector<unsigned int> analytical_solution_branches;
 
+        continuation_parameter_bounds_s continuation_parameter_bounds;
+        boundary_refinement_policy_s    boundary_refinement_policy;
         restart_policy_s                 restart_policy;
         branch_intersection_policy_s     branch_intersection_policy;
         self_intersection_policy_s       self_intersection_policy;
@@ -463,6 +557,8 @@ struct parameters
             deflation_knots            = { 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0 };
             add_analytical_solution_to_diagram = false;
             analytical_solution_branches = {};
+            continuation_parameter_bounds.set_default();
+            boundary_refinement_policy.set_default();
             restart_policy.set_default();
             branch_intersection_policy.set_default();
             self_intersection_policy.set_default();
@@ -501,6 +597,10 @@ struct parameters
                     std::cout << x << " ";
             }
             std::cout << std::endl;
+            std::cout << "||==continuation_parameter_bounds: " << std::endl;
+            continuation_parameter_bounds.plot_all();
+            std::cout << "||==boundary_refinement_policy: " << std::endl;
+            boundary_refinement_policy.plot_all();
             std::cout << "||==restart_policy: " << std::endl;
             restart_policy.plot_all();
             std::cout << "||==branch_intersection_policy: " << std::endl;
@@ -596,6 +696,21 @@ struct parameters
         unsigned int    Krylov_subspace;
         unsigned int    desired_spectrum;
         std::vector<T>  Cayley_transform_sigma_mu;
+        T               stability_boundary_tolerance;
+        T               real_eigenvalue_tolerance;
+        T               conjugate_pair_tolerance;
+        bool            require_converged_eigenpairs;
+        bool            require_nonempty_spectrum;
+        bool            require_complete_scan_coverage;
+        unsigned int    spectrum_classification_retries;
+        unsigned int    transition_classification_confirmations;
+        bool            correct_stability_transitions_with_newton;
+        unsigned int    transition_refinement_maximum_iterations;
+        unsigned int    transition_refinement_maximum_subdivisions;
+        T               transition_refinement_parameter_tolerance;
+        unsigned int    symmetry_endpoint_guard_source_points;
+        stability::analysis::matrix_free_stability_config<T>
+                        matrix_free_eigensolver;
         linear_solver_s linear_solver;
         newton_s        newton;
 
@@ -604,6 +719,20 @@ struct parameters
             linear_operator_stable_eigenvalues_left_halfplane = true;
             Krylov_subspace                                   = 25;
             desired_spectrum                                  = 5;
+            stability_boundary_tolerance                       = T(1.0e-7);
+            real_eigenvalue_tolerance                          = T(1.0e-7);
+            conjugate_pair_tolerance                           = T(1.0e-6);
+            require_converged_eigenpairs                       = true;
+            require_nonempty_spectrum                          = true;
+            require_complete_scan_coverage                     = true;
+            spectrum_classification_retries                    = 2;
+            transition_classification_confirmations            = 2;
+            correct_stability_transitions_with_newton          = false;
+            transition_refinement_maximum_iterations           = 20;
+            transition_refinement_maximum_subdivisions          = 8;
+            transition_refinement_parameter_tolerance          = T(0);
+            symmetry_endpoint_guard_source_points               = 0;
+            matrix_free_eigensolver                            = {};
             linear_solver.set_default();
             newton.set_default();
         }
@@ -619,6 +748,128 @@ struct parameters
                 std::cout << x_ << " ";
             }
             std::cout << std::endl;
+            std::cout << "||==stability_boundary_tolerance: "
+                      << stability_boundary_tolerance << std::endl;
+            std::cout << "||==real_eigenvalue_tolerance: "
+                      << real_eigenvalue_tolerance << std::endl;
+            std::cout << "||==conjugate_pair_tolerance: "
+                      << conjugate_pair_tolerance << std::endl;
+            std::cout << "||==require_converged_eigenpairs: "
+                      << require_converged_eigenpairs << std::endl;
+            std::cout << "||==require_nonempty_spectrum: "
+                      << require_nonempty_spectrum << std::endl;
+            std::cout << "||==require_complete_scan_coverage: "
+                      << require_complete_scan_coverage << std::endl;
+            std::cout << "||==spectrum_classification_retries: "
+                      << spectrum_classification_retries << std::endl;
+            std::cout << "||==transition_classification_confirmations: "
+                      << transition_classification_confirmations
+                      << std::endl;
+            std::cout << "||==correct_stability_transitions_with_newton: "
+                      << correct_stability_transitions_with_newton
+                      << std::endl;
+            std::cout << "||==transition_refinement_maximum_iterations: "
+                      << transition_refinement_maximum_iterations
+                      << std::endl;
+            std::cout << "||==transition_refinement_maximum_subdivisions: "
+                      << transition_refinement_maximum_subdivisions
+                      << std::endl;
+            std::cout << "||==transition_refinement_parameter_tolerance: "
+                      << transition_refinement_parameter_tolerance
+                      << std::endl;
+            std::cout << "||==symmetry_endpoint_guard_source_points: "
+                      << symmetry_endpoint_guard_source_points
+                      << std::endl;
+            std::cout << "||==matrix_free_eigensolver: "
+                      << (matrix_free_eigensolver.enabled
+                              ? "enabled"
+                              : "disabled")
+                      << std::endl;
+            if(matrix_free_eigensolver.enabled)
+            {
+                const auto& config = matrix_free_eigensolver;
+                std::cout
+                    << "||  |==linearization_scale: "
+                    << config.linearization_scale
+                    << std::endl;
+                std::cout
+                    << "||  |==transformation: "
+                    << stability::analysis::
+                           matrix_free_spectral_transformation_name(
+                               config.transformation.type)
+                    << std::endl;
+                std::cout
+                    << "||  |==shifts:";
+                for(const auto& shift :
+                    config.transformation.shifts)
+                {
+                    std::cout
+                        << " (" << shift.real()
+                        << "," << shift.imag() << ")";
+                }
+                std::cout << std::endl;
+                std::cout
+                    << "||  |==desired_eigenvalues: "
+                    << config.outer.desired_eigenvalues
+                    << std::endl;
+                std::cout
+                    << "||  |==krylov_dimension: "
+                    << config.outer.krylov_dimension
+                    << std::endl;
+                std::cout
+                    << "||  |==inner_basis_size: "
+                    << config.inner_solver.basis_size
+                    << std::endl;
+                std::cout
+                    << "||  |==inner_preconditioner_side: "
+                    << config.inner_solver.preconditioner_side
+                    << std::endl;
+                std::cout
+                    << "||  |==inner_basis_retry_sizes:";
+                for(const auto basis_size :
+                    config.inner_solver.basis_retry_sizes)
+                {
+                    std::cout << " " << basis_size;
+                }
+                std::cout << std::endl;
+                std::cout
+                    << "||  |==scan_retry: "
+                    << (config.retry.enabled
+                            ? "enabled"
+                            : "disabled")
+                    << ", maximum_shift_retries = "
+                    << config.retry.maximum_shift_retries
+                    << ", initial_shift_perturbation = "
+                    << config.retry.initial_shift_perturbation
+                    << std::endl;
+                std::cout
+                    << "||  |==preconditioner_pole_tolerances: "
+                    << config.retry.
+                           preconditioner_pole_absolute_tolerance
+                    << " "
+                    << config.retry.
+                           preconditioner_pole_relative_tolerance
+                    << std::endl;
+                std::cout
+                    << "||  |==multiplicity_probe_count: "
+                    << config.aggregation.probe_count
+                    << std::endl;
+                std::cout
+                    << "||  |==small_system: "
+                    << (config.small_system.enabled
+                            ? "enabled"
+                            : "disabled")
+                    << ", maximum_dimension = "
+                    << config.small_system.maximum_dimension
+                    << ", prefer = "
+                    << config.small_system.prefer
+                    << std::endl;
+                std::cout
+                    << "||  |==eigenvector_independence_tolerance: "
+                    << config.aggregation.
+                           eigenvector_independence_tolerance
+                    << std::endl;
+            }
             std::cout << "||==linear_solver: " << std::endl;
             linear_solver.plot_all();
             std::cout << "||==newton: " << std::endl;

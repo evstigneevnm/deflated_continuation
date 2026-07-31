@@ -157,6 +157,21 @@ public:
     {
     }
 
+    void preconditioner_jacobian_affine_u(
+        T_vec& rhs_to_solution,
+        const T jacobian_scale,
+        const T identity_shift) const
+    {
+        const auto u0p = access_type::data(u_0);
+        auto xp = access_type::data(rhs_to_solution);
+        access_type::for_each([=] __DEVICE_TAG__ (ordinal_type)
+        {
+            xp[0] /=
+                jacobian_scale*T(2)*u0p[0] +
+                identity_shift;
+        }, ordinal_type(1));
+    }
+
     void physical_solution(T_vec&, T_vec&)
     {
     }

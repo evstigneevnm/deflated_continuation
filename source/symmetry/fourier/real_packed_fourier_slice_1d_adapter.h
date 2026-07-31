@@ -399,12 +399,109 @@ public:
         spectrum_to_vector(stabilized_spectrum, destination);
     }
 
+    void align_orbit_closest_to_reference(
+        const vector_type& reference,
+        const vector_type& source,
+        vector_type& destination)
+    {
+        check_vector_size(reference);
+        check_vector_size(source);
+        check_vector_size(destination);
+
+        vector_to_spectrum(source, spectrum);
+        vector_to_spectrum(reference, reference_spectrum);
+
+        const scalar_type threshold = std::max(
+            active_mode_threshold(spectrum),
+            active_mode_threshold(reference_spectrum));
+        std::vector<std::size_t> common_active_modes;
+        common_active_modes.reserve(positive_modes_);
+        for(std::size_t mode = 1; mode <= positive_modes_; ++mode)
+        {
+            if(
+                std::abs(spectrum[mode]) > threshold &&
+                std::abs(reference_spectrum[mode]) > threshold)
+            {
+                common_active_modes.push_back(mode);
+            }
+        }
+
+        last_data = slice_data_type();
+        last_data.group_dimension = 1;
+        last_data.tolerance = threshold;
+        if(common_active_modes.empty())
+        {
+            best_spectrum = spectrum;
+            last_data_uses_lsq = false;
+        }
+        else
+        {
+            using relative_phase_solver_type =
+                lsq_phase_solver_1d<complex_type>;
+            relative_phase_solver_type relative_phase_solver;
+            const auto& lsq_options = lsq_strategy.options();
+            const std::size_t grid_points = std::max<std::size_t>(
+                lsq_options.grid_points,
+                8*positive_modes_);
+            const auto relative_phase =
+                relative_phase_solver.solve_fixed_modes(
+                    spectrum,
+                    reference_spectrum,
+                    common_active_modes,
+                    grid_points,
+                    lsq_options.newton_iterations);
+
+            slice.apply_shift(
+                spectrum.data(),
+                best_spectrum.data(),
+                best_spectrum.size(),
+                relative_phase.shift);
+            last_data.active_rank = 1;
+            last_data.active_modes =
+                relative_phase.active_modes;
+            last_data.mode =
+                relative_phase.active_modes.front();
+            last_data.residual_group_order_value =
+                relative_phase.residual_group_order;
+            last_data.shift = relative_phase.shift;
+            last_data.set_shift(0, relative_phase.shift);
+            last_data.lsq_objective =
+                relative_phase.objective;
+            last_data.slice_matrix =
+                relative_phase.slice_matrix;
+            for(const auto mode: relative_phase.active_modes)
+            {
+                last_data.selected_abs =
+                    std::max<scalar_type>(
+                        last_data.selected_abs,
+                        std::abs(spectrum[mode]));
+            }
+            last_data_uses_lsq = true;
+        }
+
+        stabilized_spectrum = best_spectrum;
+        spectrum_to_vector(stabilized_spectrum, destination);
+    }
+
     void freeze_linearization_chart(const vector_type& source, vector_type& destination)
+    {
+        freeze_newton_linearization_chart(source, destination);
+    }
+
+    // Newton and deflation must use the chart carried by the current
+    // semicurve. Without an active semicurve, preserve the historical
+    // first-active-mode selection used by the accepted KS1D runs.
+    void freeze_newton_linearization_chart(
+        const vector_type& source,
+        vector_type& destination)
     {
         check_vector_size(source);
         check_vector_size(destination);
         vector_to_spectrum(source, spectrum);
-        if(stabilizer_policy == real_packed_fourier_1d_stabilizer_policy::lsq_multimode)
+        if(
+            stabilizer_policy ==
+            real_packed_fourier_1d_stabilizer_policy::
+                lsq_multimode)
         {
             frozen_linearization_chart.freeze_lsq(
                 spectrum,
@@ -419,12 +516,19 @@ public:
                     ? continuation_state.data.mode
                     : std::size_t(0));
         }
-        frozen_linearization_evaluation = frozen_linearization_chart.evaluate(spectrum);
-        stabilized_spectrum = frozen_linearization_evaluation.state_on_slice;
-        last_data = frozen_linearization_evaluation.data;
-        last_data_uses_lsq = frozen_linearization_evaluation.uses_lsq;
-        linearization_chart_frozen = true;
-        spectrum_to_vector(stabilized_spectrum, destination);
+        finish_loaded_linearization_chart(destination);
+    }
+
+    // Pointwise analyses must not depend on the chart selected for a
+    // previously visited state. Use the strongest available slice matrix.
+    void freeze_stateless_linearization_chart(
+        const vector_type& source,
+        vector_type& destination)
+    {
+        check_vector_size(source);
+        check_vector_size(destination);
+        vector_to_spectrum(source, spectrum);
+        freeze_stateless_loaded_linearization_chart(destination);
     }
 
     bool has_frozen_linearization_chart() const
@@ -827,6 +931,48 @@ public:
     }
 
 private:
+    void freeze_stateless_loaded_linearization_chart(
+        vector_type& destination)
+    {
+        if(
+            stabilizer_policy ==
+            real_packed_fourier_1d_stabilizer_policy::
+                lsq_multimode)
+        {
+            frozen_linearization_chart.freeze_lsq(
+                spectrum,
+                lsq_strategy.options(),
+                active_mode_threshold(spectrum));
+        }
+        else
+        {
+            const slice_data_type conditioned_data =
+                choose_continuation_slice_data(
+                    spectrum,
+                    std::size_t(0));
+            frozen_linearization_chart.freeze_single_mode(
+                spectrum,
+                conditioned_data.mode);
+        }
+        finish_loaded_linearization_chart(destination);
+    }
+
+    void finish_loaded_linearization_chart(
+        vector_type& destination)
+    {
+        frozen_linearization_evaluation =
+            frozen_linearization_chart.evaluate(spectrum);
+        stabilized_spectrum =
+            frozen_linearization_evaluation.state_on_slice;
+        last_data = frozen_linearization_evaluation.data;
+        last_data_uses_lsq =
+            frozen_linearization_evaluation.uses_lsq;
+        linearization_chart_frozen = true;
+        spectrum_to_vector(
+            stabilized_spectrum,
+            destination);
+    }
+
     struct continuation_representative_candidate
     {
         slice_data_type data;

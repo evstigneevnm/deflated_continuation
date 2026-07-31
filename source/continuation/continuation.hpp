@@ -9,9 +9,11 @@
 *
 */
 
+#include <algorithm>
 #include <functional>
 #include <sstream>
 #include <string>
+#include <vector>
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
 #include <continuation/predictor_adaptive.h>
@@ -21,6 +23,7 @@
 #include <continuation/initial_tangent.h>
 #include <continuation/convergence_strategy.h>
 #include <continuation/continuation_endpoint_state.h>
+#include <continuation/observational_knot_sample.h>
 #include <continuation/pending_branch_event.h>
 #include <continuation/progress_monitor.h>
 #include <continuation/semicurve_tangent_cache.h>
@@ -284,6 +287,31 @@ public:
         allow_knot_interpolation_failure = allow_;
     }
 
+    void set_parameter_bounds(
+        const T minimum,
+        const T maximum)
+    {
+        if(!(minimum < maximum))
+        {
+            throw std::invalid_argument(
+                "continuation::set_parameter_bounds requires minimum < maximum");
+        }
+        configured_lambda_min = minimum;
+        configured_lambda_max = maximum;
+        parameter_bounds_set = true;
+    }
+
+    void clear_parameter_bounds()
+    {
+        parameter_bounds_set = false;
+    }
+
+    void set_preserve_last_converged_boundary_point(
+        const bool preserve)
+    {
+        preserve_last_converged_boundary_point = preserve;
+    }
+
     void set_branch_intersection_checker(branch_intersection_checker_t checker_)
     {
         branch_intersection_checker = std::move(checker_);
@@ -335,8 +363,14 @@ public:
 
     void update_knots()
     {
+        if(parameter_bounds_set)
+        {
+            lambda_min = configured_lambda_min;
+            lambda_max = configured_lambda_max;
+            return;
+        }
         lambda_min = knots->get_min_value();
-        lambda_max = knots->get_max_value();  
+        lambda_max = knots->get_max_value();
         
     }
 
@@ -429,7 +463,9 @@ protected: //changed to protected for inheritance
     T lambda_start; T_vec x_start;
     T lambda0, lambda0_s, lambda1, lambda1_s;
     T lambda_min, lambda_max;
-    T_vec x0, x0_s, x1, x1_back, x1_s, x_check, x_output, x_relocated_knot, x_branch_intersection, x_pending_branch_event;
+    T configured_lambda_min = T(0);
+    T configured_lambda_max = T(0);
+    T_vec x0, x0_s, x1, x1_back, x1_s, x_check, x_output, x_knot_sample, x_branch_intersection, x_pending_branch_event;
     char break_semicurve = 0;
     bool fail_flag = false;
     bool hard_failure = false;
@@ -437,9 +473,8 @@ protected: //changed to protected for inheritance
     bool just_interpolated = false;
     continuation_endpoint_state endpoint_state;
     bool allow_knot_interpolation_failure = false;
-    bool last_failed_knot_interpolation = false;
-    T last_failed_requested_knot = T(0);
-    T last_failed_effective_knot = T(0);
+    bool parameter_bounds_set = false;
+    bool preserve_last_converged_boundary_point = true;
     std::function<void(T_vec&)> solution_postprocessor;
     knot_resolver_t knot_resolver;
     knot_relocator_t knot_relocator;
@@ -507,7 +542,7 @@ private:
         vec_ops->init_vector(x1_s); vec_ops->start_use_vector(x1_s);
         vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
         vec_ops->init_vector(x1_back); vec_ops->start_use_vector(x1_back);
-        vec_ops->init_vector(x_relocated_knot); vec_ops->start_use_vector(x_relocated_knot);
+        vec_ops->init_vector(x_knot_sample); vec_ops->start_use_vector(x_knot_sample);
         vec_ops->init_vector(x_branch_intersection); vec_ops->start_use_vector(x_branch_intersection);
         vec_ops->init_vector(x_pending_branch_event); vec_ops->start_use_vector(x_pending_branch_event);
     }
@@ -523,7 +558,7 @@ private:
         vec_ops->stop_use_vector(x1_s); vec_ops->free_vector(x1_s);
         vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
         vec_ops->stop_use_vector(x1_back); vec_ops->free_vector(x1_back);
-        vec_ops->stop_use_vector(x_relocated_knot); vec_ops->free_vector(x_relocated_knot);
+        vec_ops->stop_use_vector(x_knot_sample); vec_ops->free_vector(x_knot_sample);
     }
 
 
@@ -580,9 +615,6 @@ private:
             if(!ret)
             {
                 log->warning_f("continuation::check_intersection::interpolate_solutions: returned failed for lambda_star = %le, lambda_0 = %le, lambda_1 = %le", lambda_star, lambda0, lambda1);
-                last_failed_knot_interpolation = true;
-                last_failed_requested_knot = lambda_star;
-                last_failed_effective_knot = lambda_star;
                 fail_flag = true;
                 set_pending_endpoint_reason(endpoint_reason_t::knot_interpolation_failure);
                 return(bools2(true, true));
@@ -684,18 +716,30 @@ private:
 
         if(lambda1 < lambda_min)
         {
-            intersect_min = check_intersection(lambda_min, endpoint_reason_t::boundary_min);
+            intersect_min = check_boundary_intersection(
+                lambda_min,
+                endpoint_reason_t::boundary_min,
+                endpoint_reason_t::boundary_min_approximate);
         }
         else if(lambda1 > lambda_max)
         {
-            intersect_max = check_intersection(lambda_max, endpoint_reason_t::boundary_max);
+            intersect_max = check_boundary_intersection(
+                lambda_max,
+                endpoint_reason_t::boundary_max,
+                endpoint_reason_t::boundary_max_approximate);
         }
         else
         {
-            intersect_min = check_intersection(lambda_min, endpoint_reason_t::boundary_min);
+            intersect_min = check_boundary_intersection(
+                lambda_min,
+                endpoint_reason_t::boundary_min,
+                endpoint_reason_t::boundary_min_approximate);
             if(!intersect_min.first)
             {
-                intersect_max = check_intersection(lambda_max, endpoint_reason_t::boundary_max);
+                intersect_max = check_boundary_intersection(
+                    lambda_max,
+                    endpoint_reason_t::boundary_max,
+                    endpoint_reason_t::boundary_max_approximate);
             }
         }
 
@@ -721,74 +765,220 @@ private:
 
     }
 
-    bool interpolate_all_knots()
+    bools2 check_boundary_intersection(
+        const T lambda_boundary,
+        const endpoint_reason_t exact_reason,
+        const endpoint_reason_t approximate_reason)
     {
-        bool res = false;
-        for(auto &x: *knots)
+        const bool bracketed =
+            (lambda_boundary - lambda1)*
+            (lambda_boundary - lambda0) <= T(0);
+        const bool already_outside =
+            exact_reason == endpoint_reason_t::boundary_max
+                ? lambda1 > lambda_boundary
+                : lambda1 < lambda_boundary;
+        if(!bracketed && !already_outside)
         {
-            const T requested_lambda = x;
-            T effective_lambda = requested_lambda;
+            return bools2(false, false);
+        }
+
+        vec_ops->assign(x1, x1_back);
+        const T converged_lambda = lambda1;
+        if(bracketed &&
+           interpolate_solutions(
+               lambda_boundary,
+               lambda0,
+               x0,
+               lambda1,
+               x1))
+        {
+            set_pending_endpoint_reason(exact_reason);
+            return bools2(true, false);
+        }
+
+        vec_ops->assign(x1_back, x1);
+        lambda1 = converged_lambda;
+        if(preserve_last_converged_boundary_point)
+        {
+            fail_flag = false;
+            set_pending_endpoint_reason(approximate_reason);
+            log->warning_f(
+                "continuation::check_interval: exact boundary refinement at lambda = %le failed; preserving the converged point at lambda = %le and marking an approximate boundary endpoint.",
+                double(lambda_boundary),
+                double(lambda1));
+            return bools2(true, false);
+        }
+
+        fail_flag = true;
+        set_pending_endpoint_reason(
+            endpoint_reason_t::knot_interpolation_failure);
+        log->warning_f(
+            "continuation::check_interval: exact boundary refinement at lambda = %le failed and approximate endpoints are disabled.",
+            double(lambda_boundary));
+        return bools2(true, true);
+    }
+
+    bool interpolate_knot_sample(
+        const T& lambda_sample,
+        const T& lambda_left,
+        const T_vec& value_left,
+        const T& lambda_right,
+        const T_vec& value_right,
+        T_vec& sample)
+    {
+        if(lambda_right == lambda_left)
+        {
+            return false;
+        }
+
+        const T weight =
+            (lambda_sample - lambda_left)/
+            (lambda_right - lambda_left);
+        vec_ops->assign_mul(
+            T(1) - weight,
+            value_left,
+            weight,
+            value_right,
+            sample);
+        const bool converged = get_solution(lambda_sample, sample);
+        if(!converged)
+        {
+            log->warning_f(
+                "continuation::interpolate_knot_sample: observational Newton correction failed at lambda = %le inside accepted step [%le, %le].",
+                double(lambda_sample),
+                double(lambda_left),
+                double(lambda_right));
+        }
+        return converged;
+    }
+
+    void sample_intersected_knots(
+        bool& force_accepted_point)
+    {
+        struct knot_candidate
+        {
+            T requested;
+            T attempted;
+            T progress;
+        };
+
+        if(lambda1 == lambda0)
+        {
+            return;
+        }
+
+        std::vector<knot_candidate> candidates;
+        for(const auto& knot: *knots)
+        {
+            const T requested = knot;
+            T attempted = requested;
             if(knot_resolver)
             {
-                knot_resolver(requested_lambda, effective_lambda);
+                knot_resolver(requested, attempted);
+            }
+            if(!parameter_is_bracketed(attempted, lambda0, lambda1))
+            {
+                continue;
+            }
+            candidates.push_back(
+                knot_candidate{
+                    requested,
+                    attempted,
+                    (attempted - lambda0)/(lambda1 - lambda0)});
+        }
+        std::sort(
+            candidates.begin(),
+            candidates.end(),
+            [](const knot_candidate& left, const knot_candidate& right)
+            {
+                return left.progress < right.progress;
+            });
+
+        for(const auto& candidate: candidates)
+        {
+            const auto result = sample_knot_observationally(
+                candidate.requested,
+                candidate.attempted,
+                lambda0,
+                x0,
+                lambda1,
+                x1,
+                x_knot_sample,
+                [this](
+                    const T& parameter,
+                    const T& parameter_left,
+                    const T_vec& value_left,
+                    const T& parameter_right,
+                    const T_vec& value_right,
+                    T_vec& sample)
+                {
+                    return interpolate_knot_sample(
+                        parameter,
+                        parameter_left,
+                        value_left,
+                        parameter_right,
+                        value_right,
+                        sample);
+                },
+                [this](
+                    const T& requested,
+                    const T& parameter_left,
+                    const T_vec& value_left,
+                    const T& parameter_right,
+                    const T_vec& value_right,
+                    T& effective,
+                    T_vec& sample)
+                {
+                    return knot_relocator &&
+                           knot_relocator(
+                               requested,
+                               parameter_left,
+                               value_left,
+                               parameter_right,
+                               value_right,
+                               effective,
+                               sample);
+                });
+
+            if(!result.sampled())
+            {
+                if(allow_knot_interpolation_failure)
+                {
+                    log->warning_f(
+                        "continuation::start_semicurve: observational sample for requested knot %le failed at effective knot %le; the accepted continuation state is unchanged and sampling is skipped by policy.",
+                        double(result.requested_parameter),
+                        double(result.attempted_parameter));
+                    continue;
+                }
+
+                force_accepted_point = true;
+                log->warning_f(
+                    "continuation::start_semicurve: observational sample for requested knot %le failed at effective knot %le; preserving the curve and force-storing the accepted endpoint at lambda = %le as the nearest available observation.",
+                    double(result.requested_parameter),
+                    double(result.attempted_parameter),
+                    double(lambda1));
+                continue;
             }
 
-            bools2 res_l = check_intersection(effective_lambda);
-            if(!fail_flag)
+            add_solution_to_curve(
+                result.sampled_parameter,
+                x_knot_sample,
+                true);
+            if(result.relocated())
             {
-                if(res_l.first)
-                {
-                    just_interpolated = true;
-                    res = res_l.first;
-                    break;
-                }
+                log->warning_f(
+                    "continuation::start_semicurve: stored an observational sample for requested knot %le after local relocation from effective knot %le to lambda = %le; accepted state, tangent, and chart remain unchanged.",
+                    double(result.requested_parameter),
+                    double(result.attempted_parameter),
+                    double(result.sampled_parameter));
             }
             else
             {
-                if(last_failed_knot_interpolation)
-                {
-                    last_failed_requested_knot = requested_lambda;
-                    last_failed_effective_knot = effective_lambda;
-                }
-                res = false;
-                break;                
+                log->info_f(
+                    "continuation::start_semicurve: stored an observational knot sample at lambda = %le without promoting it to the continuation base.",
+                    double(result.sampled_parameter));
             }
         }
-        return res;
-    }
-
-    bool try_relocate_failed_knot(const T& lambda1_original)
-    {
-        if(!last_failed_knot_interpolation || !knot_relocator)
-        {
-            return false;
-        }
-
-        T effective_lambda = last_failed_requested_knot;
-        const bool relocated = knot_relocator(
-            last_failed_requested_knot,
-            lambda0,
-            x0,
-            lambda1_original,
-            x1_back,
-            effective_lambda,
-            x_relocated_knot);
-        if(!relocated)
-        {
-            return false;
-        }
-
-        vec_ops->assign(x_relocated_knot, x1);
-        lambda1 = effective_lambda;
-        fail_flag = false;
-        just_interpolated = true;
-        last_failed_knot_interpolation = false;
-        log->warning_f(
-            "continuation::start_semicurve: shifted failed active knot interpolation from requested lambda = %le, effective lambda = %le to validated lambda = %le.",
-            double(last_failed_requested_knot),
-            double(last_failed_effective_knot),
-            double(lambda1));
-        return true;
     }
 
     void obtain_seed_tangent()
@@ -1082,40 +1272,8 @@ private:
                         }
                         if(continue_next_step && !branch_event.active())
                         {
-                            //save for restoring if interpolation fails!
-                            bool fail_flag_b4_interpolation = fail_flag;
-                            vec_ops->assign(x1, x1_back);
-                            T lambda1_back = lambda1;
-
-                            last_failed_knot_interpolation = false;
-                            did_knot_interpolation = interpolate_all_knots();
-                            //if fail flag after the interpolation, restore (x1, lambda1) and continue?
-                            if((fail_flag)&&(!fail_flag_b4_interpolation))
-                            {
-                                vec_ops->assign(x1_back, x1);
-                                lambda1 = lambda1_back;
-                                did_knot_interpolation = false;
-                                if(try_relocate_failed_knot(lambda1_back))
-                                {
-                                    did_knot_interpolation = true;
-                                }
-                                else if(allow_knot_interpolation_failure)
-                                {
-                                    fail_flag = false;
-                                    last_failed_knot_interpolation = false;
-                                    log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and continuing because policy allows it. May cause problems during deflation!");
-                                }
-                                else
-                                {
-                                    log->warning("continuation::start_semicurve did_knot_interpolation failed, restoring state and stopping this curve.");
-                                    continue_next_step = false;
-                                    break_semicurve++;
-                                    hard_failure = true;
-                                    endpoint_state.mark_incomplete();
-                                    mark_last_curve_point(endpoint_reason_t::knot_interpolation_failure);
-                                    break;
-                                }
-                            }
+                            sample_intersected_knots(
+                                did_knot_interpolation);
                         }
                     }
                     else

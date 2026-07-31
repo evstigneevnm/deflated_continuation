@@ -333,22 +333,113 @@ public:
 
     void solve_jacobian_system(T_vec& rhs_to_solution) const
     {
+        preconditioner_jacobian_affine_u(
+            rhs_to_solution,
+            T(1),
+            T(0));
+    }
+
+    void preconditioner_jacobian_affine_u(
+        T_vec& rhs_to_solution,
+        const T jacobian_scale,
+        const T identity_shift) const
+    {
         auto xp = access_type::data(rhs_to_solution);
         const T lambda = lambda_0;
         const T b = b_val;
-        const T eps = T(128)*std::numeric_limits<T>::epsilon();
+        const T pole_relative_tolerance =
+            std::sqrt(std::numeric_limits<T>::epsilon());
         access_type::for_each([=] __DEVICE_TAG__ (ordinal_type i)
         {
             const T k = static_cast<T>(i + 1);
             const T k2 = k*k;
-            T diag = lambda*(-k2) + b*k2*k2;
+            const T linear_term =
+                jacobian_scale*lambda*(-k2);
+            const T biharmonic_term =
+                jacobian_scale*b*k2*k2;
+            const T diag =
+                linear_term + biharmonic_term + identity_shift;
             const T abs_diag = diag < T(0) ? -diag : diag;
-            if(abs_diag < eps)
+            const T abs_linear =
+                linear_term < T(0) ? -linear_term : linear_term;
+            const T abs_biharmonic =
+                biharmonic_term < T(0)
+                    ? -biharmonic_term
+                    : biharmonic_term;
+            const T abs_shift =
+                identity_shift < T(0)
+                    ? -identity_shift
+                    : identity_shift;
+            const T diagonal_scale =
+                abs_linear + abs_biharmonic + abs_shift;
+            const T pole_threshold =
+                pole_relative_tolerance*
+                (diagonal_scale > T(1) ? diagonal_scale : T(1));
+            if(abs_diag > pole_threshold)
             {
-                diag = diag < T(0) ? -eps : eps;
+                xp[i] /= diag;
             }
-            xp[i] /= diag;
         }, static_cast<ordinal_type>(mode_count_));
+    }
+
+    std::pair<T, T>
+    preconditioner_jacobian_affine_diagonal_range(
+        const T jacobian_scale,
+        const T identity_shift) const
+    {
+        T minimum = std::numeric_limits<T>::infinity();
+        T maximum = T(0);
+        for(std::size_t mode = 1;
+            mode <= mode_count_;
+            ++mode)
+        {
+            const T k = static_cast<T>(mode);
+            const T k2 = k*k;
+            const T diagonal =
+                jacobian_scale*
+                    (lambda_0*(-k2) + b_val*k2*k2) +
+                identity_shift;
+            const T absolute =
+                diagonal < T(0) ? -diagonal : diagonal;
+            minimum = std::min(minimum, absolute);
+            maximum = std::max(maximum, absolute);
+        }
+        return {minimum, maximum};
+    }
+
+    T preconditioner_jacobian_affine_min_relative_diagonal(
+        const T jacobian_scale,
+        const T identity_shift) const
+    {
+        T minimum = std::numeric_limits<T>::infinity();
+        for(std::size_t mode = 1;
+            mode <= mode_count_;
+            ++mode)
+        {
+            const T k = static_cast<T>(mode);
+            const T k2 = k*k;
+            const T jacobian_diagonal =
+                jacobian_scale*
+                    (lambda_0*(-k2) + b_val*k2*k2);
+            const T diagonal =
+                jacobian_diagonal + identity_shift;
+            const T absolute =
+                diagonal < T(0) ? -diagonal : diagonal;
+            const T jacobian_absolute =
+                jacobian_diagonal < T(0)
+                ? -jacobian_diagonal
+                : jacobian_diagonal;
+            const T shift_absolute =
+                identity_shift < T(0)
+                ? -identity_shift
+                : identity_shift;
+            const T scale =
+                jacobian_absolute + shift_absolute;
+            minimum = std::min(
+                minimum,
+                scale > T(0) ? absolute/scale : absolute);
+        }
+        return minimum;
     }
 
     void physical_solution(T_vec& u_in, T_vec& u_out)

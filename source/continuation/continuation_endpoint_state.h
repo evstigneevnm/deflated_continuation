@@ -16,6 +16,8 @@ inline unsigned int endpoint_reason_priority(
         return 0;
     case reason_t::boundary_min:
     case reason_t::boundary_max:
+    case reason_t::boundary_min_approximate:
+    case reason_t::boundary_max_approximate:
     case reason_t::closed_return:
     case reason_t::self_intersection:
         return 10;

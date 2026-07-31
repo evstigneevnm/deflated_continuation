@@ -1,0 +1,4 @@
+# Preserve third-party Matrix Market inputs byte-for-byte. Their upstream
+# comments contain aligned trailing spaces which are not project formatting
+# errors.
+data/external/suitesparse/**/*.mtx -whitespace

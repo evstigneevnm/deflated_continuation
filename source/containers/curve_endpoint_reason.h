@@ -11,6 +11,8 @@ enum class curve_endpoint_reason
     none,
     boundary_min,
     boundary_max,
+    boundary_min_approximate,
+    boundary_max_approximate,
     known_branch,
     analytical_branch,
     symmetry_intersection,
@@ -33,6 +35,10 @@ inline const char* to_string(curve_endpoint_reason reason)
         return "boundary_min";
     case curve_endpoint_reason::boundary_max:
         return "boundary_max";
+    case curve_endpoint_reason::boundary_min_approximate:
+        return "boundary_min_approximate";
+    case curve_endpoint_reason::boundary_max_approximate:
+        return "boundary_max_approximate";
     case curve_endpoint_reason::known_branch:
         return "known_branch";
     case curve_endpoint_reason::analytical_branch:
@@ -63,6 +69,10 @@ inline curve_endpoint_reason curve_endpoint_reason_from_string(const std::string
         return curve_endpoint_reason::boundary_min;
     if(value == "boundary_max")
         return curve_endpoint_reason::boundary_max;
+    if(value == "boundary_min_approximate")
+        return curve_endpoint_reason::boundary_min_approximate;
+    if(value == "boundary_max_approximate")
+        return curve_endpoint_reason::boundary_max_approximate;
     if(value == "known_branch")
         return curve_endpoint_reason::known_branch;
     if(value == "analytical_branch")
@@ -98,6 +108,16 @@ inline bool is_incomplete_endpoint(curve_endpoint_reason reason)
 inline bool is_terminal_endpoint(curve_endpoint_reason reason)
 {
     return reason != curve_endpoint_reason::none;
+}
+
+inline bool is_stability_refinement_barrier(
+    curve_endpoint_reason reason)
+{
+    return reason == curve_endpoint_reason::known_branch ||
+           reason == curve_endpoint_reason::analytical_branch ||
+           reason == curve_endpoint_reason::symmetry_intersection ||
+           reason == curve_endpoint_reason::closed_return ||
+           reason == curve_endpoint_reason::self_intersection;
 }
 
 } // namespace container

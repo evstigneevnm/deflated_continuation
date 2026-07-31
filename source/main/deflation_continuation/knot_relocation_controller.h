@@ -174,14 +174,13 @@ public:
         return false;
     }
 
-    template<class Vector, class Registry, class Interpolate>
+    template<class Vector, class Interpolate>
     bool relocate_active_intersection(
         const Scalar& requested_parameter,
         const Scalar& parameter_left,
         const Vector& value_left,
         const Scalar& parameter_right,
         const Vector& value_right,
-        Registry& registry,
         Scalar& effective_parameter,
         Vector& effective_value,
         Interpolate&& interpolate) const
@@ -225,21 +224,10 @@ public:
             }
 
             effective_parameter = candidate_parameter;
-            IntersectionStatus status;
-            status.added = 1;
-            registry.set(
-                requested_parameter,
-                effective_parameter,
-                "active_continuation_interpolation_failed_at_requested_knot",
-                status);
-            if(settings_.save_registry)
-            {
-                registry.save();
-            }
             if(log_ != nullptr)
             {
                 log_->warning_f(
-                    "MAIN:deflation_continuation: shifted active continuation knot %le to validated non-singular knot %le after interpolation Newton failure.",
+                    "MAIN:deflation_continuation: locally shifted active continuation sample %le to validated non-singular parameter %le after interpolation Newton failure; this candidate-local relocation is not persisted.",
                     double(requested_parameter),
                     double(effective_parameter));
             }

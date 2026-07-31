@@ -177,6 +177,7 @@ private:
         mutable scalar_type beta;
         mutable bool small_alpha = false;
         mutable bool use_small_alpha = false;
+        mutable bool bypass = false;
 
         Preconditioner_SM(const vector_operations_type *vector_operations_)
         {
@@ -220,8 +221,16 @@ private:
         {
             inherited_preconditioner = inherited_preconditioner_;
         }
+        void set_bypass(const bool value) const
+        {
+            bypass = value;
+        }
         void apply(vector_type& x)const
         {
+            if(bypass)
+            {
+                return;
+            }
             if(small_alpha)
             {
                 inherited_preconditioner->apply(x);
@@ -274,6 +283,7 @@ public:
         
         linear_solver.set_preconditioner(&prec);
         prec.set_inherited_preconditioner(prec_);
+        inherited_preconditioner = prec_;
         //sets preconditioner for the progonal linear solver
         
         linear_solver_original.set_preconditioner(prec_);
@@ -297,6 +307,19 @@ public:
     {
         oper.use_small_alpha = use_small_alpha_;
         prec.use_small_alpha = use_small_alpha_;
+    }
+
+    void set_preconditioner_bypass(const bool value)
+    {
+        preconditioner_bypass = value;
+        prec.set_bypass(value);
+        linear_solver_original.set_preconditioner(
+            value ? nullptr : inherited_preconditioner);
+    }
+
+    bool preconditioner_bypass_enabled() const
+    {
+        return preconditioner_bypass;
     }
 
     //solves full extended system with rank 1 update
@@ -344,6 +367,8 @@ private:
 
     LinearOperator_SM_t oper;
     Preconditioner_SM_t prec;
+    Preconditioner* inherited_preconditioner = nullptr;
+    bool preconditioner_bypass = false;
 
 
 };

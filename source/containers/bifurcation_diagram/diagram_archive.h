@@ -18,7 +18,8 @@ enum class diagram_archive_status
     success,
     missing,
     open_failed,
-    archive_failed
+    archive_failed,
+    commit_failed
 };
 
 struct diagram_archive_result
@@ -70,21 +71,35 @@ diagram_archive_result save_diagram_archive(
     const std::string& file_name,
     const Diagram& diagram)
 {
-    std::ofstream output(file_name);
+    const std::filesystem::path destination(file_name);
+    const std::filesystem::path temporary(
+        destination.string() + ".tmp");
+    const auto remove_temporary = [&temporary]()
+    {
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
+    };
+
+    remove_temporary();
+    std::ofstream output(temporary);
     if(!output)
     {
         return {
             diagram_archive_status::open_failed,
-            "unable to open archive for writing"};
+            "unable to open temporary archive for writing"};
     }
 
     try
     {
-        boost::archive::text_oarchive archive(output);
-        archive << diagram;
+        {
+            boost::archive::text_oarchive archive(output);
+            archive << diagram;
+        }
         output.flush();
+        output.close();
         if(!output)
         {
+            remove_temporary();
             return {
                 diagram_archive_status::open_failed,
                 "archive write did not complete"};
@@ -92,12 +107,27 @@ diagram_archive_result save_diagram_archive(
     }
     catch(const boost::archive::archive_exception& error)
     {
+        output.close();
+        remove_temporary();
         return {diagram_archive_status::archive_failed, error.what()};
     }
     catch(const std::exception& error)
     {
+        output.close();
+        remove_temporary();
         return {diagram_archive_status::archive_failed, error.what()};
     }
+
+    std::error_code error;
+    std::filesystem::rename(temporary, destination, error);
+    if(error)
+    {
+        remove_temporary();
+        return {
+            diagram_archive_status::commit_failed,
+            "unable to replace archive: " + error.message()};
+    }
+
     return {diagram_archive_status::success, {}};
 }
 

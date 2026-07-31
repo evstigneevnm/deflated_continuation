@@ -22,6 +22,7 @@ public:
     using continuous_adapter_type = ContinuousAdapter;
     using finite_action_registry_type = finite_action_registry<VectorOperations>;
     using scalar_type = typename VectorOperations::scalar_type;
+    using norm_type = typename VectorOperations::norm_type;
     using vector_type = typename VectorOperations::vector_type;
 
     finite_quotient_adapter(
@@ -53,14 +54,18 @@ public:
         vec_ops->init_vector(candidate);
         vec_ops->init_vector(best);
         vec_ops->init_vector(action_gradient);
+        vec_ops->init_vector(distance);
         vec_ops->start_use_vector(action_source);
         vec_ops->start_use_vector(candidate);
         vec_ops->start_use_vector(best);
         vec_ops->start_use_vector(action_gradient);
+        vec_ops->start_use_vector(distance);
     }
 
     ~finite_quotient_adapter()
     {
+        vec_ops->stop_use_vector(distance);
+        vec_ops->free_vector(distance);
         vec_ops->stop_use_vector(action_gradient);
         vec_ops->free_vector(action_gradient);
         vec_ops->stop_use_vector(best);
@@ -102,6 +107,49 @@ public:
         finite_actions->apply(selected_action, source, action_source);
         continuous_adapter->stabilize_canonical(action_source, destination);
         last_action_index_ = selected_action;
+    }
+
+    void stabilize_closest_to_reference(
+        const vector_type& reference,
+        const vector_type& source,
+        vector_type& destination)
+    {
+        bool have_best = false;
+        norm_type best_distance = norm_type{};
+        std::size_t best_index = 0;
+
+        for(std::size_t action_index = 0;
+            action_index < finite_actions->size();
+            ++action_index)
+        {
+            finite_actions->apply(
+                action_index,
+                source,
+                action_source);
+            continuous_adapter->align_orbit_closest_to_reference(
+                reference,
+                action_source,
+                candidate);
+            vec_ops->assign_mul(
+                scalar_type(1),
+                candidate,
+                scalar_type(-1),
+                reference,
+                distance);
+            const norm_type candidate_distance =
+                vec_ops->norm_l2(distance);
+
+            if(!have_best || candidate_distance < best_distance)
+            {
+                have_best = true;
+                best_distance = candidate_distance;
+                best_index = action_index;
+                vec_ops->assign(candidate, best);
+            }
+        }
+
+        vec_ops->assign(best, destination);
+        last_action_index_ = best_index;
     }
 
     void pullback_distance_gradient(
@@ -211,6 +259,7 @@ private:
     vector_type candidate;
     vector_type best;
     vector_type action_gradient;
+    vector_type distance;
     std::size_t last_action_index_ = 0;
 };
 

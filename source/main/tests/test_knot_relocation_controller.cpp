@@ -142,7 +142,6 @@ int main()
             std::vector<double>{5.0},
             7.0,
             std::vector<double>{7.0},
-            active_registry,
             effective,
             effective_value,
             [](double candidate, double, const std::vector<double>&, double,
@@ -154,6 +153,9 @@ int main()
         require(active_relocated, "active relocation");
         require(close_value(effective, 6.1), "active effective knot");
         require(effective_value == std::vector<double>({6.1}), "active interpolated value");
+        require(
+            !active_registry.set_called && !active_registry.save_called,
+            "active relocation is candidate-local and not persisted");
     }
     catch(const std::exception& error)
     {

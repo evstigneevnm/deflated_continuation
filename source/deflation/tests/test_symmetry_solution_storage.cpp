@@ -167,6 +167,25 @@ int main()
     require_true("negative-reflection action is registered", reflection_index >= 0);
     finite_actions.apply(static_cast<std::size_t>(reflection_index), x, query);
     adapter.apply_shift(query, shifted, 0.41);
+    quotient_adapter.stabilize_closest_to_reference(
+        x,
+        shifted,
+        stabilized);
+    vec_ops.assign_mul(
+        real(1),
+        stabilized,
+        real(-1),
+        x,
+        c);
+    require_close(
+        "closest finite-quotient representative",
+        vec_ops.norm_l2(c),
+        0.0,
+        1e-10);
+    require_true(
+        "closest finite-quotient representative selects reflection",
+        quotient_adapter.last_action_name() ==
+            "real_packed_negative_reflection");
     storage.push_back(x);
     storage.push_back(shifted);
     require_true("negative-reflection shifted copy is skipped", storage.get_size() == 1);

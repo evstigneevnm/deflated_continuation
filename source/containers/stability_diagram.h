@@ -15,6 +15,9 @@
 #include <filesystem>
 #include <system_error>
 #include <cstdint>
+#include <iomanip>
+#include <limits>
+#include <utility>
 //using boost for serialization
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
@@ -49,6 +52,23 @@ private:
 
 };
 
+template<class T>
+struct stability_plot_record
+{
+    uint64_t source_point_index = 0;
+    T lambda = T{};
+    std::string point_type;
+    int unstable_dim_R = 0;
+    int unstable_dim_C = 0;
+    int before_dim_R = 0;
+    int before_dim_C = 0;
+    int after_dim_R = 0;
+    int after_dim_C = 0;
+    std::string event_type = "none";
+    uint64_t event_id = 0;
+    std::vector<T> norms;
+};
+
 
 
 template<class VectorOperations, class VectorFileOperations, class Log>
@@ -63,9 +83,12 @@ public:
     typedef record_stability<T> stability_point_type;
 private:
     typedef std::vector<stability_point_type> curve_t;
+    typedef stability_plot_record<T> stability_plot_point_type;
+    typedef std::vector<stability_plot_point_type> plot_curve_t;
 
     
     curve_t curve;
+    plot_curve_t plot_curve;
     std::vector<curve_t> container_curves;
 
     
@@ -74,6 +97,7 @@ private:
     std::string project_dir;
     std::string curve_path;
     bool curve_opened = false;
+    std::vector<std::filesystem::path> pending_files;
 
 
 public:
@@ -169,13 +193,131 @@ public:
         }
         ensure_curve_directory_exists();
         curve.clear();
+        plot_curve.clear();
+        pending_files.clear();
         curve_opened = true;
 
     }
 
-    void add(T lambda_, int unstable_dim_R_, int unstable_dim_C_, T_vec x_data = nullptr)
+    void add(
+        T lambda_,
+        int unstable_dim_R_,
+        int unstable_dim_C_)
     {
-        
+        add_record(
+            lambda_,
+            unstable_dim_R_,
+            unstable_dim_C_,
+            nullptr);
+    }
+
+    void add(
+        T lambda_,
+        int unstable_dim_R_,
+        int unstable_dim_C_,
+        const T_vec& x_data)
+    {
+        add_record(
+            lambda_,
+            unstable_dim_R_,
+            unstable_dim_C_,
+            &x_data);
+    }
+
+    void add_with_plot_data(
+        T lambda_,
+        int unstable_dim_R_,
+        int unstable_dim_C_,
+        uint64_t source_point_index_,
+        const std::vector<T>& norms_,
+        std::pair<int, int> before_dimension_,
+        std::pair<int, int> after_dimension_)
+    {
+        const stability_point_type& point = add_record(
+            lambda_,
+            unstable_dim_R_,
+            unstable_dim_C_,
+            nullptr);
+        add_plot_record(
+            point,
+            source_point_index_,
+            norms_,
+            before_dimension_,
+            after_dimension_);
+    }
+
+    void add_with_plot_data(
+        T lambda_,
+        int unstable_dim_R_,
+        int unstable_dim_C_,
+        uint64_t source_point_index_,
+        const std::vector<T>& norms_,
+        std::pair<int, int> before_dimension_,
+        std::pair<int, int> after_dimension_,
+        const T_vec& x_data)
+    {
+        const stability_point_type& point = add_record(
+            lambda_,
+            unstable_dim_R_,
+            unstable_dim_C_,
+            &x_data);
+        add_plot_record(
+            point,
+            source_point_index_,
+            norms_,
+            before_dimension_,
+            after_dimension_);
+    }
+
+    bool update_regular_point_dimension(
+        uint64_t source_point_index,
+        std::pair<int, int> dimension)
+    {
+        if(curve.size() != plot_curve.size())
+        {
+            throw std::runtime_error(
+                "stability_diagram: stability and plot curve sizes "
+                "do not match");
+        }
+        for(std::size_t offset = 0;
+            offset < plot_curve.size();
+            ++offset)
+        {
+            const std::size_t index =
+                plot_curve.size() - offset - 1;
+            auto& plot_point = plot_curve[index];
+            auto& point = curve[index];
+            if(
+                plot_point.source_point_index != source_point_index ||
+                plot_point.event_type != "none" ||
+                point.is_data_avaliable)
+                continue;
+
+            point.unstable_dim_R = dimension.first;
+            point.unstable_dim_C = dimension.second;
+            point.point_type =
+                dimension.first + dimension.second == 0
+                ? "stable"
+                : "unstable";
+            plot_point.point_type = point.point_type;
+            plot_point.unstable_dim_R = dimension.first;
+            plot_point.unstable_dim_C = dimension.second;
+            plot_point.before_dim_R = dimension.first;
+            plot_point.before_dim_C = dimension.second;
+            plot_point.after_dim_R = dimension.first;
+            plot_point.after_dim_C = dimension.second;
+            return true;
+        }
+        return false;
+    }
+
+private:
+    const stability_point_type& add_record(
+        T lambda_,
+        int unstable_dim_R_,
+        int unstable_dim_C_,
+        const T_vec* x_data)
+    {
         if(curve_opened)
         {
             bool is_data_avaliable = false;
@@ -184,7 +326,8 @@ public:
                 is_data_avaliable = true;
                 id_file_name++;
                 std::string f_name = curve_path.c_str()+std::string("/") + std::string("s") + std::to_string(id_file_name);
-                vec_file_ops->write_vector(f_name, x_data);
+                vec_file_ops->write_vector(f_name, *x_data);
+                pending_files.emplace_back(f_name);
                 log->info_f("saved file: %s", f_name.c_str());
 
             }
@@ -214,6 +357,7 @@ public:
             rec.unstable_dim_C = unstable_dim_C_;
 
             curve.push_back(rec);
+            return curve.back();
         }
         else
         {
@@ -221,32 +365,120 @@ public:
         }
     }
 
+    static std::string classify_event(
+        const stability_point_type& point,
+        std::pair<int, int> before_dimension,
+        std::pair<int, int> after_dimension)
+    {
+        if(point.point_type != "bifurcation")
+            return "none";
+
+        const int real_change =
+            after_dimension.first - before_dimension.first;
+        const int complex_change =
+            after_dimension.second - before_dimension.second;
+        if(real_change != 0 && complex_change == 0)
+            return "steady";
+        if(real_change == 0 && complex_change != 0)
+            return "hopf";
+        return "multiple";
+    }
+
+    void add_plot_record(
+        const stability_point_type& point,
+        uint64_t source_point_index,
+        const std::vector<T>& norms,
+        std::pair<int, int> before_dimension,
+        std::pair<int, int> after_dimension)
+    {
+        stability_plot_point_type record;
+        record.source_point_index = source_point_index;
+        record.lambda = point.lambda;
+        record.point_type = point.point_type;
+        record.unstable_dim_R = point.unstable_dim_R;
+        record.unstable_dim_C = point.unstable_dim_C;
+        record.before_dim_R = before_dimension.first;
+        record.before_dim_C = before_dimension.second;
+        record.after_dim_R = after_dimension.first;
+        record.after_dim_C = after_dimension.second;
+        record.event_type = classify_event(
+            point,
+            before_dimension,
+            after_dimension);
+        record.event_id = point.id_file_name;
+        record.norms = norms;
+        plot_curve.push_back(std::move(record));
+    }
+
+public:
     void close_curve()
     {
+        if(!curve_opened)
+        {
+            throw std::runtime_error(
+                "stability_diagram: trying to close a closed curve");
+        }
         id_file_name = 0;
         print_curve();
         curve_opened = false;
         container_curves.push_back(curve);
-        
+        curve.clear();
+        plot_curve.clear();
+        pending_files.clear();
+    }
+
+    void abandon_curve()
+    {
+        for(const auto& file : pending_files)
+        {
+            std::error_code error;
+            std::filesystem::remove(file, error);
+            if(error)
+            {
+                log->warning_f(
+                    "stability_diagram: failed to remove aborted "
+                    "curve file %s: %s",
+                    file.string().c_str(),
+                    error.message().c_str());
+            }
+        }
+        id_file_name = 0;
+        curve.clear();
+        plot_curve.clear();
+        pending_files.clear();
+        curve_opened = false;
     }
     
-    int current_curve()
+    std::size_t current_curve() const
     {
         return container_curves.size();
     }
 
+    std::size_t curve_count() const
+    {
+        return container_curves.size();
+    }
+
+    bool is_curve_open() const
+    {
+        return curve_opened;
+    }
+
     void pop_back_curve()
     {
-        if(container_curves.size() > 0)
+        if(!container_curves.empty())
         {
             container_curves.pop_back();
-            current_curve_number--;
+            current_curve_number =
+                static_cast<int>(container_curves.size());
         }
     }
     void print_curves_status()
     {
         
-        std::cout << "container::stability_diagram current curve number = " << current_curve_number << std::endl;
+        std::cout
+            << "container::stability_diagram completed curves = "
+            << container_curves.size() << std::endl;
         int cn_ = 0;
         for(auto &x: container_curves)
         {   
@@ -257,11 +489,12 @@ public:
     }
 
     //makes a copy of a vector
-    std::vector<stability_point_type> get_curve_points_vector(int curve_number_)
+    std::vector<stability_point_type> get_curve_points_vector(
+        int curve_number_) const
     {
         try
         {
-            auto &curve = container_curves.at(curve_number_);
+            const auto& curve = container_curves.at(curve_number_);
             return( curve );
         }
         catch(const std::exception& e)
@@ -291,26 +524,148 @@ private:
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
-        ar & container_curves;        
-        ar & current_curve_number;  //a curve number should be serialized!!!
         ar & container_curves;
     }
 
 
     void print_curve()
     {
-        std::string f_name = curve_path + std::string("/") + std::string("debug_curve_stability.dat");
-        std::ofstream f(f_name.c_str(), std::ofstream::out);
-        for(auto &x: curve)
+        print_legacy_curve();
+        print_plot_curve();
+
+        log->info_f(
+            "container::stability_diagram(%i): printed final stability "
+            "curve data.",
+            current_curve_number);
+    }
+
+    void print_legacy_curve()
+    {
+        const std::filesystem::path file_name =
+            std::filesystem::path(curve_path) /
+            "debug_curve_stability.dat";
+        const std::filesystem::path temporary(
+            file_name.string() + ".tmp");
+        std::error_code error;
+        std::filesystem::remove(temporary, error);
+
+        std::ofstream output(temporary, std::ofstream::out);
+        if(!output)
         {
-            f << x.lambda << " ";
-            f << x.point_type << " ";
-            f << x.unstable_dim_R << " ";
-            f << x.unstable_dim_C << " ";
-            f << x.id_file_name << std::endl;
+            throw std::runtime_error(
+                "stability_diagram: failed to open temporary curve file: " +
+                temporary.string());
         }
-        f.close();
-        log->info_f("container::stability_diagram(%i): printed final stability curve data.", current_curve_number); 
+
+        for(const auto& point : curve)
+        {
+            output << point.lambda << " ";
+            output << point.point_type << " ";
+            output << point.unstable_dim_R << " ";
+            output << point.unstable_dim_C << " ";
+            output << point.id_file_name << '\n';
+        }
+        output.flush();
+        output.close();
+        if(!output)
+        {
+            std::filesystem::remove(temporary, error);
+            throw std::runtime_error(
+                "stability_diagram: curve output did not complete: " +
+                temporary.string());
+        }
+
+        error.clear();
+        std::filesystem::rename(temporary, file_name, error);
+        if(error)
+        {
+            std::error_code ignored;
+            std::filesystem::remove(temporary, ignored);
+            throw std::runtime_error(
+                "stability_diagram: failed to replace curve file '" +
+                file_name.string() + "': " + error.message());
+        }
+    }
+
+    void print_plot_curve()
+    {
+        const std::filesystem::path file_name =
+            std::filesystem::path(curve_path) /
+            "debug_curve_stability_plot.dat";
+        if(plot_curve.empty())
+        {
+            std::error_code error;
+            std::filesystem::remove(file_name, error);
+            if(error)
+            {
+                throw std::runtime_error(
+                    "stability_diagram: failed to remove stale plot "
+                    "sidecar '" + file_name.string() + "': " +
+                    error.message());
+            }
+            return;
+        }
+
+        const std::filesystem::path temporary(
+            file_name.string() + ".tmp");
+        std::error_code error;
+        std::filesystem::remove(temporary, error);
+
+        std::ofstream output(temporary, std::ofstream::out);
+        if(!output)
+        {
+            throw std::runtime_error(
+                "stability_diagram: failed to open temporary plot "
+                "sidecar: " + temporary.string());
+        }
+
+        output
+            << "# stability_plot_v1\n"
+            << "# source_index lambda point_type unstable_real "
+               "unstable_complex_pairs before_real "
+               "before_complex_pairs after_real after_complex_pairs "
+               "event_type event_id norm_count norms...\n";
+        output << std::setprecision(
+            std::numeric_limits<T>::max_digits10);
+        for(const auto& point : plot_curve)
+        {
+            output
+                << point.source_point_index << ' '
+                << point.lambda << ' '
+                << point.point_type << ' '
+                << point.unstable_dim_R << ' '
+                << point.unstable_dim_C << ' '
+                << point.before_dim_R << ' '
+                << point.before_dim_C << ' '
+                << point.after_dim_R << ' '
+                << point.after_dim_C << ' '
+                << point.event_type << ' '
+                << point.event_id << ' '
+                << point.norms.size();
+            for(const T norm : point.norms)
+                output << ' ' << norm;
+            output << '\n';
+        }
+        output.flush();
+        output.close();
+        if(!output)
+        {
+            std::filesystem::remove(temporary, error);
+            throw std::runtime_error(
+                "stability_diagram: plot sidecar output did not "
+                "complete: " + temporary.string());
+        }
+
+        error.clear();
+        std::filesystem::rename(temporary, file_name, error);
+        if(error)
+        {
+            std::error_code ignored;
+            std::filesystem::remove(temporary, ignored);
+            throw std::runtime_error(
+                "stability_diagram: failed to replace plot sidecar '" +
+                file_name.string() + "': " + error.message());
+        }
     }
 
 

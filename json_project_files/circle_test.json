@@ -61,10 +61,20 @@
         "left_halfplane_stable_eigenvalues": true,
         "Krylov_subspace_dimension": 80,
         "desired_spectrum": 10,
+        "correct_stability_transitions_with_newton": false,
+        "transition_refinement_maximum_iterations": 20,
+        "transition_refinement_maximum_subdivisions": 8,
+        "transition_refinement_parameter_tolerance": 1.0e-8,
+        "spectrum_classification_retries": 2,
+        "transition_classification_confirmations": 2,
         "Cayley_transform_sigma_mu": [
             12.0,
             -12.0
         ],
+        "matrix_free_eigensolver": {
+            "enabled": true,
+            "linearization_scale": -1.0
+        },
         "linear_solver": {
             "maximum_iterations": 2000,
             "use_preconditioned_residual": 1,

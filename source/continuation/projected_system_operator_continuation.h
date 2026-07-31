@@ -6,6 +6,7 @@
 
 #include <continuation/chart_helpers.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
+#include <numerical_algos/lin_solvers/linear_solve_recovery.h>
 
 namespace continuation
 {
@@ -134,7 +135,32 @@ public:
         T tolerance_local = T(1.0e-5)*vec_ops->get_l2_size();
         SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(tolerance_local);
         SM_solver->get_linsolver_handle()->monitor().set_temp_max_iterations(1000);
-        const bool flag_lin_solver = SM_solver->solve((*lin_op), x_0_s_chart, Jlambda, alpha, f, beta, x_1_s, lambda_1_s);
+        const bool flag_lin_solver =
+            numerical_algos::lin_solvers::recovery::
+                solve_with_unpreconditioned_retry(
+                    SM_solver,
+                    [this, &x_1_s, &lambda_1_s, alpha, beta]()
+                    {
+                        return SM_solver->solve(
+                            *lin_op,
+                            x_0_s_chart,
+                            Jlambda,
+                            alpha,
+                            f,
+                            beta,
+                            x_1_s,
+                            lambda_1_s);
+                    },
+                    [this, &x_1_s, &lambda_1_s]()
+                    {
+                        vec_ops->assign_scalar(T(0), x_1_s);
+                        lambda_1_s = T(0);
+                    },
+                    [this]()
+                    {
+                        log->warning(
+                            "continuation::projected_system_operator: tangent solve failed; retrying without preconditioning.");
+                    });
 
         T minimum_resid = SM_solver->get_linsolver_handle()->monitor().resid_norm_out();
         int iters_performed = SM_solver->get_linsolver_handle()->monitor().iters_performed();
@@ -182,7 +208,32 @@ public:
 
         vec_ops->assign_scalar(T(0), d_x);
         d_lambda = T(0);
-        const bool flag_lin_solver = SM_solver->solve((*lin_op), x_0_s_chart, Jlambda, alpha, f, beta, d_x, d_lambda);
+        const bool flag_lin_solver =
+            numerical_algos::lin_solvers::recovery::
+                solve_with_unpreconditioned_retry(
+                    SM_solver,
+                    [this, &d_x, &d_lambda, alpha, beta]()
+                    {
+                        return SM_solver->solve(
+                            *lin_op,
+                            x_0_s_chart,
+                            Jlambda,
+                            alpha,
+                            f,
+                            beta,
+                            d_x,
+                            d_lambda);
+                    },
+                    [this, &d_x, &d_lambda]()
+                    {
+                        vec_ops->assign_scalar(T(0), d_x);
+                        d_lambda = T(0);
+                    },
+                    [this]()
+                    {
+                        log->warning(
+                            "continuation::projected_system_operator: corrector solve failed; retrying the same Newton state without preconditioning.");
+                    });
         const T projected_arclength_residual = vec_ops->scalar_prod(x_0_s_chart, d_x) + alpha*d_lambda - beta;
         if(verbose)
         {

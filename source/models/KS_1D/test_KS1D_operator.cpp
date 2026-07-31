@@ -11,6 +11,7 @@
 #endif
 
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h>
+#include <stability/eigensolvers/transformations/nonlinear_operator_real_affine_inverse_provider.h>
 #include <symmetry/finite_action_registry.h>
 #include <symmetry/fourier/real_packed_fourier_actions_1d.h>
 
@@ -328,6 +329,121 @@ void test_preconditioner_at_zero(vec_ops_real& vec_ops, ks1d_t& ks)
     vec_ops.free_vector(zero);
 }
 
+void test_preconditioner_bypasses_exact_diagonal_pole(
+    vec_ops_real& vec_ops,
+    ks1d_t& ks)
+{
+    real_vec zero;
+    real_vec rhs;
+    vec_ops.init_vector(zero);
+    vec_ops.start_use_vector(zero);
+    vec_ops.init_vector(rhs);
+    vec_ops.start_use_vector(rhs);
+
+    vec_ops.assign_scalar(real(0), zero);
+    set_mode(vec_ops, rhs, 5, real(2.5));
+    ks.set_linearization_point(zero, real(100));
+    ks.preconditioner_jacobian_u(rhs);
+
+    const auto host_rhs =
+        host_vector(vec_ops, rhs, vec_ops.get_default_size());
+    check_close(
+        host_rhs[4],
+        real(2.5),
+        tolerance<real>(),
+        "preconditioner keeps component at an exact diagonal pole");
+
+    vec_ops.stop_use_vector(rhs);
+    vec_ops.free_vector(rhs);
+    vec_ops.stop_use_vector(zero);
+    vec_ops.free_vector(zero);
+}
+
+void test_affine_preconditioner_at_zero(
+    vec_ops_real& vec_ops,
+    ks1d_t& ks)
+{
+    using provider_type =
+        stability::eigensolvers::transformations::
+            nonlinear_operator_real_affine_inverse_provider<
+                vec_ops_real,
+                ks1d_t>;
+
+    real_vec zero;
+    real_vec right_hand_side;
+    real_vec solution;
+    vec_ops.init_vectors(
+        zero,
+        right_hand_side,
+        solution);
+    vec_ops.start_use_vectors(
+        zero,
+        right_hand_side,
+        solution);
+
+    constexpr std::size_t mode = 4;
+    const real lambda = real(3.25);
+    const real jacobian_scale = real(0.075);
+    const real identity_shift = real(1.2);
+    const real right_hand_side_value = real(2.5);
+
+    vec_ops.assign_scalar(real(0), zero);
+    set_mode(
+        vec_ops,
+        right_hand_side,
+        mode,
+        right_hand_side_value);
+    ks.set_linearization_point(zero, lambda);
+
+    provider_type provider(vec_ops, ks);
+    check_condition(
+        provider.apply(
+            jacobian_scale,
+            identity_shift,
+            right_hand_side,
+            solution),
+        "real affine preconditioner provider succeeds");
+    check_condition(
+        provider.apply_calls() == 1 &&
+        provider.failed_applications() == 0,
+        "real affine preconditioner provider statistics");
+
+    const auto host_solution = host_vector(
+        vec_ops,
+        solution,
+        vec_ops.get_default_size());
+    const real expected =
+        right_hand_side_value /
+        (
+            jacobian_scale *
+                ks.linear_multiplier(mode, lambda) +
+            identity_shift);
+    for(std::size_t index = 0;
+        index < host_solution.size();
+        ++index)
+    {
+        const real expected_value =
+            index + 1 == mode ? expected : real(0);
+        check_close(
+            host_solution[index],
+            expected_value,
+            tolerance<real>() *
+                (real(1) +
+                 common::scalar_math::abs(expected_value)),
+            "real affine preconditioner mode " +
+                std::to_string(index + 1));
+    }
+
+    vec_ops.stop_use_vectors(
+        zero,
+        right_hand_side,
+        solution);
+    vec_ops.free_vectors(
+        zero,
+        right_hand_side,
+        solution);
+}
+
 void test_half_period_shift_equivariance(vec_ops_real& vec_ops, ks1d_t& ks)
 {
     finite_actions_t finite_actions(&vec_ops);
@@ -406,6 +522,8 @@ int main(int argc, char** argv)
     test_jacobian_u(vec_ops, ks);
     test_jacobian_alpha(vec_ops, ks);
     test_preconditioner_at_zero(vec_ops, ks);
+    test_preconditioner_bypasses_exact_diagonal_pole(vec_ops, ks);
+    test_affine_preconditioner_at_zero(vec_ops, ks);
     test_half_period_shift_equivariance(vec_ops, ks);
 
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;

@@ -6,6 +6,7 @@
 #include <string>
 #include <stdexcept>
 
+#include <numerical_algos/lin_solvers/linear_solve_recovery.h>
 
 namespace continuation
 {
@@ -113,7 +114,32 @@ public:
             T tolerance_local = T(1.0e-5)*vec_ops->get_l2_size();
             SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(tolerance_local);
             SM_solver->get_linsolver_handle()->monitor().set_temp_max_iterations(1000);
-            flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, x_1_s, lambda_1_s);
+            flag_lin_solver =
+                numerical_algos::lin_solvers::recovery::
+                    solve_with_unpreconditioned_retry(
+                        SM_solver,
+                        [this, &x_1_s, &lambda_1_s, alpha, beta]()
+                        {
+                            return SM_solver->solve(
+                                *lin_op,
+                                x_0_s,
+                                Jlambda,
+                                alpha,
+                                f,
+                                beta,
+                                x_1_s,
+                                lambda_1_s);
+                        },
+                        [this, &x_1_s, &lambda_1_s]()
+                        {
+                            vec_ops->assign_scalar(T(0), x_1_s);
+                            lambda_1_s = T(0);
+                        },
+                        [this]()
+                        {
+                            log->warning(
+                                "continuation::system_operator: tangent solve failed; retrying without preconditioning.");
+                        });
             if constexpr(NonlinearOperator::is_periodic_orbit_reprojected::value)
             {
                 nonlin_op->reproject(x_1_s);
@@ -195,7 +221,32 @@ public:
             // auto N = vec_ops->get_vector_size();
             // double N_ = 1.0*N;
             // vec_ops->scale(1.0/N_, x_0_s);
-            flag_lin_solver = SM_solver->solve((*lin_op), x_0_s, Jlambda, alpha, f, beta, d_x, d_lambda);
+            flag_lin_solver =
+                numerical_algos::lin_solvers::recovery::
+                    solve_with_unpreconditioned_retry(
+                        SM_solver,
+                        [this, &d_x, &d_lambda, alpha, beta]()
+                        {
+                            return SM_solver->solve(
+                                *lin_op,
+                                x_0_s,
+                                Jlambda,
+                                alpha,
+                                f,
+                                beta,
+                                d_x,
+                                d_lambda);
+                        },
+                        [this, &d_x, &d_lambda]()
+                        {
+                            vec_ops->assign_scalar(T(0), d_x);
+                            d_lambda = T(0);
+                        },
+                        [this]()
+                        {
+                            log->warning(
+                                "continuation::system_operator: corrector solve failed; retrying the same Newton state without preconditioning.");
+                        });
             if constexpr(NonlinearOperator::is_periodic_orbit_reprojected::value)
             {
                 nonlin_op->reproject(d_x);

@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -178,7 +179,19 @@ public:
 
     void set_projected_linearization_point( const T_vec &u_0_, const T lambda_0_ )
     {
-        symmetry_adapter.freeze_linearization_chart( u_0_, projected_state );
+        symmetry_adapter.freeze_newton_linearization_chart(
+            u_0_,
+            projected_state );
+        set_linearization_point( projected_state, lambda_0_ );
+    }
+
+    void set_stateless_projected_linearization_point(
+        const T_vec &u_0_,
+        const T lambda_0_ )
+    {
+        symmetry_adapter.freeze_stateless_linearization_chart(
+            u_0_,
+            projected_state );
         set_linearization_point( projected_state, lambda_0_ );
     }
 
@@ -230,7 +243,9 @@ public:
 
     void projected_F( const T_vec &u, const T lambda, T_vec &v )
     {
-        symmetry_adapter.freeze_linearization_chart( u, projected_state );
+        symmetry_adapter.freeze_newton_linearization_chart(
+            u,
+            projected_state );
         F( projected_state, lambda, projected_residual );
         symmetry_adapter.project_tangent( projected_state, projected_residual, v );
     }
@@ -271,26 +286,121 @@ public:
 
     void solve_jacobian_system( T_vec &rhs_to_solution ) const
     {
+        preconditioner_jacobian_affine_u(
+            rhs_to_solution,
+            T( 1 ),
+            T( 0 )
+        );
+    }
+
+    void preconditioner_jacobian_affine_u(
+        T_vec &rhs_to_solution,
+        const T jacobian_scale,
+        const T identity_shift
+    ) const
+    {
         auto    xp     = access_type::data( rhs_to_solution );
         const T lambda = lambda_0;
         const T b      = b_val;
-        const T eps    = T( 128 ) * std::numeric_limits<T>::epsilon();
+        const T pole_relative_tolerance =
+            std::sqrt( std::numeric_limits<T>::epsilon() );
         access_type::for_each(
             [=] __DEVICE_TAG__( ordinal_type i ) {
                 const T k        = static_cast<T>( i + 1 );
                 const T k2       = k * k;
-                T       diag     = lambda * ( -k2 ) + b * k2 * k2;
+                const T linear_term =
+                    jacobian_scale * lambda * ( -k2 );
+                const T biharmonic_term =
+                    jacobian_scale * b * k2 * k2;
+                const T diag =
+                    linear_term + biharmonic_term + identity_shift;
                 const T abs_diag = diag < T( 0 ) ? -diag : diag;
-                if ( abs_diag < eps )
-                {
-                    diag = diag < T( 0 ) ? -eps : eps;
-                }
+                const T abs_linear =
+                    linear_term < T( 0 ) ? -linear_term : linear_term;
+                const T abs_biharmonic =
+                    biharmonic_term < T( 0 )
+                        ? -biharmonic_term
+                        : biharmonic_term;
+                const T abs_shift =
+                    identity_shift < T( 0 )
+                        ? -identity_shift
+                        : identity_shift;
+                const T diagonal_scale =
+                    abs_linear + abs_biharmonic + abs_shift;
+                const T pole_threshold =
+                    pole_relative_tolerance *
+                    ( diagonal_scale > T( 1 )
+                        ? diagonal_scale
+                        : T( 1 ) );
                 const std::size_t offset = 2 * static_cast<std::size_t>( i );
-                xp[offset] /= diag;
-                xp[offset + 1] /= diag;
+                if ( abs_diag > pole_threshold )
+                {
+                    xp[offset] /= diag;
+                    xp[offset + 1] /= diag;
+                }
             },
             static_cast<ordinal_type>( mode_count_ )
         );
+    }
+
+    std::pair<T, T>
+    preconditioner_jacobian_affine_diagonal_range(
+        const T jacobian_scale,
+        const T identity_shift) const
+    {
+        T minimum = std::numeric_limits<T>::infinity();
+        T maximum = T(0);
+        for(std::size_t mode = 1;
+            mode <= mode_count_;
+            ++mode)
+        {
+            const T k = static_cast<T>(mode);
+            const T k2 = k*k;
+            const T diagonal =
+                jacobian_scale*
+                    (lambda_0*(-k2) + b_val*k2*k2) +
+                identity_shift;
+            const T absolute =
+                diagonal < T(0) ? -diagonal : diagonal;
+            minimum = std::min(minimum, absolute);
+            maximum = std::max(maximum, absolute);
+        }
+        return {minimum, maximum};
+    }
+
+    T preconditioner_jacobian_affine_min_relative_diagonal(
+        const T jacobian_scale,
+        const T identity_shift) const
+    {
+        T minimum = std::numeric_limits<T>::infinity();
+        for(std::size_t mode = 1;
+            mode <= mode_count_;
+            ++mode)
+        {
+            const T k = static_cast<T>(mode);
+            const T k2 = k*k;
+            const T jacobian_diagonal =
+                jacobian_scale*
+                    (lambda_0*(-k2) + b_val*k2*k2);
+            const T diagonal =
+                jacobian_diagonal + identity_shift;
+            const T absolute =
+                diagonal < T(0) ? -diagonal : diagonal;
+            const T jacobian_absolute =
+                jacobian_diagonal < T(0)
+                ? -jacobian_diagonal
+                : jacobian_diagonal;
+            const T shift_absolute =
+                identity_shift < T(0)
+                ? -identity_shift
+                : identity_shift;
+            const T scale =
+                jacobian_absolute + shift_absolute;
+            minimum = std::min(
+                minimum,
+                scale > T(0) ? absolute/scale : absolute);
+        }
+        return minimum;
     }
 
     void physical_solution( T_vec &u_in, T_vec &u_out )
@@ -474,20 +584,27 @@ public:
 
     void randomize_vector( T_vec &u_out )
     {
-        std::vector<T>     host_values( state_size_, T( 0 ) );
-        const unsigned int profile_id = random_profile_counter++ % 8;
-        const T            amplitude  = T( 0.02 ) + T( 0.01 ) * static_cast<T>( profile_id % 8 );
-        for ( std::size_t mode = 1; mode <= mode_count_; ++mode )
-        {
-            const T           k                = static_cast<T>( mode );
-            const T           sign_re          = ( ( mode + profile_id ) % 2 == 0 ) ? T( 1 ) : T( -1 );
-            const T           sign_im          = ( ( mode + profile_id ) % 3 == 0 ) ? T( 1 ) : T( -1 );
-            const std::size_t offset           = 2 * ( mode - 1 );
-            const T           high_mode_filter = ( mode <= 4 ) ? T( 1 ) : T( 0.05 );
-            host_values[offset]                = sign_re * high_mode_filter * amplitude / ( k * k );
-            host_values[offset + 1]            = sign_im * high_mode_filter * amplitude / ( k * ( k + T( 1 ) ) );
-        }
-        vec_ops->set( host_values.data(), u_out, state_size_ );
+        fill_random_profile(
+            u_out,
+            random_profile_counter++,
+            std::uint64_t( 0 ) );
+    }
+
+    void randomize_vector(
+        T_vec &u_out,
+        const T parameter,
+        const std::uint64_t seed_id )
+    {
+        const long long scaled_parameter =
+            static_cast<long long>(
+                std::llround(
+                    static_cast<long double>( parameter ) *
+                    1000000.0L ) );
+        fill_random_profile(
+            u_out,
+            seed_id,
+            static_cast<std::uint64_t>(
+                scaled_parameter ) );
     }
 
     const VectorOperations *get_vec_ops_ref() const
@@ -501,6 +618,63 @@ public:
     }
 
 private:
+    static std::uint64_t mix_seed( std::uint64_t value )
+    {
+        value += 0x9e3779b97f4a7c15ULL;
+        value =
+            ( value ^ ( value >> 30 ) ) *
+            0xbf58476d1ce4e5b9ULL;
+        value =
+            ( value ^ ( value >> 27 ) ) *
+            0x94d049bb133111ebULL;
+        return value ^ ( value >> 31 );
+    }
+
+    void fill_random_profile(
+        T_vec &u_out,
+        const std::uint64_t seed_id,
+        const std::uint64_t parameter_key )
+    {
+        std::vector<T>     host_values( state_size_, T( 0 ) );
+        const std::uint64_t profile_id = seed_id;
+        const bool legacy_profile = profile_id < 8;
+        const T amplitude = legacy_profile
+            ? T( 0.02 ) +
+                T( 0.01 ) *
+                    static_cast<T>( profile_id )
+            : T( 0.02 ) +
+                T( 0.005 ) *
+                    static_cast<T>( profile_id % 24 );
+        for ( std::size_t mode = 1; mode <= mode_count_; ++mode )
+        {
+            const T           k                = static_cast<T>( mode );
+            const std::uint64_t mixed =
+                mix_seed(
+                    profile_id ^
+                    parameter_key ^
+                    ( std::uint64_t( mode ) *
+                      0x9e3779b97f4a7c15ULL ) );
+            const T sign_re = legacy_profile
+                ? ( ( mode + profile_id ) % 2 == 0
+                    ? T( 1 )
+                    : T( -1 ) )
+                : ( ( mixed & 1ULL ) != 0
+                    ? T( 1 )
+                    : T( -1 ) );
+            const T sign_im = legacy_profile
+                ? ( ( mode + profile_id ) % 3 == 0
+                    ? T( 1 )
+                    : T( -1 ) )
+                : ( ( mixed & 2ULL ) != 0
+                    ? T( 1 )
+                    : T( -1 ) );
+            const std::size_t offset           = 2 * ( mode - 1 );
+            const T           high_mode_filter = ( mode <= 4 ) ? T( 1 ) : T( 0.05 );
+            host_values[offset]                = sign_re * high_mode_filter * amplitude / ( k * k );
+            host_values[offset + 1]            = sign_im * high_mode_filter * amplitude / ( k * ( k + T( 1 ) ) );
+        }
+        vec_ops->set( host_values.data(), u_out, state_size_ );
+    }
     VectorOperations     *vec_ops;
     std::size_t           physical_size_;
     std::size_t           complex_size_;

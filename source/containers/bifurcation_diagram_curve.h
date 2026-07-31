@@ -561,7 +561,25 @@ public:
     //returned 'true' means that the pair is found, 'false' - that there are no more pairs
     bool get_avalible_solution(int& container_index, T& lambda_p, T_vec& x_p)
     {
+        values_t point;
+        bool metadata_available = false;
+        return get_avalible_solution(
+            container_index,
+            lambda_p,
+            x_p,
+            point,
+            metadata_available);
+    }
+
+    bool get_avalible_solution(
+        int& container_index,
+        T& lambda_p,
+        T_vec& x_p,
+        values_t& point,
+        bool& metadata_available)
+    {
         int N = container.size();
+        metadata_available = segment_metadata_available;
         if(container_index<N)
         {
             bool solution_found = false;
@@ -575,6 +593,7 @@ public:
                     std::string f_name = full_path+std::string("/")+std::to_string(local_id);
                     vector_store.read(full_path, local_id, x_p);
                     lambda_p = p_j.lambda;
+                    point = p_j;
                     solution_found = true;
                     log->info_f("bifurcation_diagram_curve::get_avalible_solution: got solution from %s", f_name.c_str());
                     break;

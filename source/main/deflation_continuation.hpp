@@ -25,6 +25,7 @@
 
 #include <containers/knots.hpp>
 #include <containers/knot_registry.h>
+#include <containers/deflation_seed_registry.h>
 #include <containers/branch_intersection.h>
 #include <containers/curve_helper_container.h>
 #include <containers/bifurcation_diagram_curve.h>
@@ -157,6 +158,8 @@ private:
     
     typedef container::knots<T> knots_t;
     typedef container::knot_registry<T> knot_registry_t;
+    typedef container::deflation_seed_registry<T>
+        deflation_seed_registry_t;
 
     typedef container::curve_helper_container<VectorOperations> container_helper_t;
 
@@ -393,6 +396,8 @@ public:
         set_newton_deflation();
         set_steps();
         set_deflation_knots();
+        set_configured_continuation_parameter_bounds();
+        set_boundary_refinement_policy();
         set_branch_intersection_policy();
         set_self_intersection_policy();
         set_isotropy_transition_policy();
@@ -474,6 +479,75 @@ public:
 /*std::vector<T> knots_*/    
     {
         knots->add_element(parameters->deflation_continuation.deflation_knots);
+    }
+
+    void set_boundary_refinement_policy()
+    {
+        const bool preserve =
+            parameters->deflation_continuation
+                .boundary_refinement_policy
+                .preserve_last_converged_point;
+        continuate->set_preserve_last_converged_boundary_point(
+            preserve);
+        continuate_analytical->
+            set_preserve_last_converged_boundary_point(
+                preserve);
+    }
+
+    void set_configured_continuation_parameter_bounds()
+    {
+        const auto& configured =
+            parameters->deflation_continuation
+                .continuation_parameter_bounds;
+        T minimum = configured.enabled
+            ? configured.minimum
+            : knots->get_min_value();
+        T maximum = configured.enabled
+            ? configured.maximum
+            : knots->get_max_value();
+
+        if(configured.resolve_with_knot_registry)
+        {
+            const auto scalar_abs =
+                [](const T value)
+                {
+                    return value < T(0) ? -value : value;
+                };
+            const auto& overrides =
+                parameters->deflation_continuation
+                    .restart_policy
+                    .knot_relocation
+                    .manual_overrides;
+            for(const auto& item: overrides)
+            {
+                const T scale = std::max<T>(
+                    T(1),
+                    std::max<T>(
+                        scalar_abs(item.requested),
+                        scalar_abs(minimum)));
+                if(scalar_abs(item.requested - minimum) <=
+                   T(64)*std::numeric_limits<T>::epsilon()*scale)
+                {
+                    minimum = item.effective;
+                }
+
+                const T maximum_scale = std::max<T>(
+                    T(1),
+                    std::max<T>(
+                        scalar_abs(item.requested),
+                        scalar_abs(maximum)));
+                if(scalar_abs(item.requested - maximum) <=
+                   T(64)*std::numeric_limits<T>::epsilon()*
+                       maximum_scale)
+                {
+                    maximum = item.effective;
+                }
+            }
+        }
+        continuate->set_parameter_bounds(minimum, maximum);
+        continuate_analytical->set_parameter_bounds(
+            minimum,
+            maximum);
     }
 
     void set_branch_intersection_policy()
@@ -709,6 +783,7 @@ public:
         synchronize_symmetry_event_registry();
         vec_ops->stop_use_vector(x0_stabilized);
         vec_ops->free_vector(x0_stabilized);
+        save_data(parameters->bifurcaiton_diagram_file_name);
     }
 
     bool build_analytical_solution_curve_if_available(
@@ -893,6 +968,48 @@ public:
             project_dir,
             log);
         knot_registry_t knot_registry(knot_relocation.registry_file_name());
+        const auto& seed_schedule_settings =
+            parameters->deflation_continuation
+                .restart_policy
+                .seed_schedule;
+        std::string seed_registry_file;
+        if(seed_schedule_settings.enabled &&
+           !seed_schedule_settings.registry_file.empty())
+        {
+            seed_registry_file =
+                seed_schedule_settings.registry_file.front() == '/'
+                    ? seed_schedule_settings.registry_file
+                    : project_dir +
+                        seed_schedule_settings.registry_file;
+        }
+        deflation_seed_registry_t seed_registry(
+            seed_registry_file);
+        const auto& relocation_settings =
+            parameters->deflation_continuation
+                .restart_policy
+                .knot_relocation;
+        bool manual_registry_changed = false;
+        for(const auto& item:
+            relocation_settings.manual_overrides)
+        {
+            intersection_status_t status;
+            knot_registry.set(
+                item.requested,
+                item.effective,
+                item.reason,
+                status);
+            manual_registry_changed = true;
+            log->warning_f(
+                "MAIN:deflation_continuation: configured manual non-singular knot override %le -> %le (%s).",
+                double(item.requested),
+                double(item.effective),
+                item.reason.c_str());
+        }
+        if(manual_registry_changed &&
+           relocation_settings.save_registry)
+        {
+            knot_registry.save();
+        }
 
         auto knot_resolver =
             [&knot_registry](
@@ -908,8 +1025,61 @@ public:
                 effective_parameter = requested_parameter;
                 return false;
             };
+
+        const auto& configured_bounds =
+            parameters->deflation_continuation
+                .continuation_parameter_bounds;
+        T continuation_minimum =
+            configured_bounds.enabled
+                ? configured_bounds.minimum
+                : knots->get_min_value();
+        T continuation_maximum =
+            configured_bounds.enabled
+                ? configured_bounds.maximum
+                : knots->get_max_value();
+        if(configured_bounds.resolve_with_knot_registry)
+        {
+            T resolved = continuation_minimum;
+            if(knot_registry.resolve(
+                   continuation_minimum,
+                   resolved))
+            {
+                log->warning_f(
+                    "MAIN:deflation_continuation: continuation lower bound %le is overridden by knot registry value %le.",
+                    double(continuation_minimum),
+                    double(resolved));
+                continuation_minimum = resolved;
+            }
+            resolved = continuation_maximum;
+            if(knot_registry.resolve(
+                   continuation_maximum,
+                   resolved))
+            {
+                log->warning_f(
+                    "MAIN:deflation_continuation: continuation upper bound %le is overridden by knot registry value %le.",
+                    double(continuation_maximum),
+                    double(resolved));
+                continuation_maximum = resolved;
+            }
+        }
+        if(!(continuation_minimum < continuation_maximum))
+        {
+            throw std::runtime_error(
+                "MAIN:deflation_continuation: effective continuation parameter bounds are invalid");
+        }
+        continuate->set_parameter_bounds(
+            continuation_minimum,
+            continuation_maximum);
+        continuate_analytical->set_parameter_bounds(
+            continuation_minimum,
+            continuation_maximum);
+        log->info_f(
+            "MAIN:deflation_continuation: effective continuation parameter bounds are [%le, %le].",
+            double(continuation_minimum),
+            double(continuation_maximum));
+
         auto active_knot_relocator =
-            [this, &knot_registry, &knot_relocation](
+            [this, &knot_relocation](
                 const T& requested_parameter,
                 const T& parameter_left,
                 const T_vec& value_left,
@@ -924,7 +1094,6 @@ public:
                     value_left,
                     parameter_right,
                     value_right,
-                    knot_registry,
                     effective_parameter,
                     effective_value,
                     [this](
@@ -1016,9 +1185,37 @@ public:
                         return rebuild_intersections_at_lambda(candidate);
                     });
             };
-        callbacks.find_deflated_solution = [this](const T& parameter)
+        callbacks.find_deflated_solution =
+            [this,
+             &seed_registry,
+             &seed_schedule_settings](
+                const T& parameter)
         {
-            return deflate->find_solution(parameter);
+            if(!seed_schedule_settings.enabled)
+            {
+                return deflate->find_solution(parameter);
+            }
+
+            const std::uint64_t first_seed =
+                seed_registry.next(parameter);
+            deflate->set_seed_sequence(first_seed);
+            const bool result =
+                deflate->find_solution(parameter);
+            const std::uint64_t consumed =
+                deflate->attempts_consumed();
+            deflate->clear_seed_sequence();
+            seed_registry.advance(parameter, consumed);
+            if(seed_schedule_settings.save_registry)
+            {
+                seed_registry.save();
+            }
+            log->info_f(
+                "MAIN:deflation_continuation: consumed deterministic deflation seeds [%llu, %llu) at lambda = %le.",
+                static_cast<unsigned long long>(first_seed),
+                static_cast<unsigned long long>(
+                    first_seed + consumed),
+                double(parameter));
+            return result;
         };
         callbacks.get_deflated_solution = [this](T_vec& value)
         {

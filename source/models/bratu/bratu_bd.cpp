@@ -1,6 +1,4 @@
 #include <cstdlib>
-#include <algorithm>
-#include <cctype>
 #include <iostream>
 #include <stdexcept>
 #include <sstream>
@@ -22,6 +20,7 @@
 #include <numerical_algos/lin_solvers/exact_wrapper.h>
 
 #include "bratu_backend_typedefs.h"
+#include "bratu_model_config.h"
 
 namespace
 {
@@ -31,23 +30,6 @@ void print_usage(const char* executable)
     std::cerr
         << "Usage: " << executable
         << " [path_to_config_file.json] [--seed-exact-theta theta] [--continue-seed-only] [--quiet]\n";
-}
-
-std::string normalize_spatial_discretization_name(std::string name)
-{
-    std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c)
-    {
-        return static_cast<char>(std::tolower(c));
-    });
-    if(name == "finite_difference" || name == "finite-difference" || name == "fd")
-    {
-        return "fd3";
-    }
-    if(name == "cheb" || name == "chebyshev_lobatto" || name == "chebyshev-lobatto")
-    {
-        return "chebyshev";
-    }
-    return name;
 }
 
 template<class T>
@@ -61,50 +43,6 @@ T parse_scalar(const std::string& value, const char* label)
         throw std::runtime_error(std::string("failed to parse ") + label + " from '" + value + "'");
     }
     return result;
-}
-
-template<class Bratu, class Parameters>
-typename Bratu::spatial_discretization spatial_discretization_from_parameters(
-    const Parameters& parameters,
-    const std::string& path_to_config_file)
-{
-    int discretization_id = 0;
-    if(!parameters.nonlinear_operator.problem_int_parameters_vector.empty())
-    {
-        discretization_id = parameters.nonlinear_operator.problem_int_parameters_vector.front();
-    }
-
-    const auto json_config = main_classes::read_json(path_to_config_file);
-    if(json_config.contains("nonlinear_operator"))
-    {
-        const auto& nonlinear_operator = json_config.at("nonlinear_operator");
-        if(nonlinear_operator.contains("spatial_discretization"))
-        {
-            const auto& value = nonlinear_operator.at("spatial_discretization");
-            if(value.is_string())
-            {
-                const std::string name = normalize_spatial_discretization_name(value.get<std::string>());
-                if(name == "chebyshev")
-                {
-                    discretization_id = 0;
-                }
-                else if(name == "fd3")
-                {
-                    discretization_id = 1;
-                }
-                else
-                {
-                    throw std::runtime_error("unknown Bratu spatial_discretization: " + value.get<std::string>());
-                }
-            }
-            else
-            {
-                discretization_id = value.get<int>();
-            }
-        }
-    }
-
-    return Bratu::discretization_from_int(discretization_id);
 }
 
 } // namespace
@@ -189,7 +127,9 @@ int main(int argc, char const* argv[])
     const std::size_t interior_size = parameters.nonlinear_operator.N_size.at(0);
     const bool use_high_precision_reduction = parameters.use_high_precision_reduction;
     const auto spatial_discretization =
-        spatial_discretization_from_parameters<bratu_t>(parameters, path_to_config_file);
+        bratu_model::spatial_discretization_from_parameters<bratu_t>(
+            parameters,
+            path_to_config_file);
 
     vec_ops_real vec_ops_R(interior_size);
     if(use_high_precision_reduction)

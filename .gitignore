@@ -34,5 +34,22 @@
 # Project build directories
 build/
 
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Local editor settings
+.vscode/
+
+# Locally generated run logs
+KS1D_*_out_*.txt
+
+# Reference payloads are distributed as versioned release assets. Keep the
+# asset index and the small CSV required by a source test in Git.
+data/reference/KS1D/
+data/reference/eigensolvers/**
+!data/reference/eigensolvers/baseline_20260725/
+!data/reference/eigensolvers/baseline_20260725/dat_A_lr_reference.csv
+
 # Sublime workspaces
 *.sublime-workspace

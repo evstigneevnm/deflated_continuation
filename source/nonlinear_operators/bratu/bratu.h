@@ -302,6 +302,41 @@ public:
         vec_ops->set(host_rhs_work.data(), rhs_to_solution, interior_size);
     }
 
+    void preconditioner_jacobian_affine_u(
+        T_vec& rhs_to_solution,
+        const T jacobian_scale,
+        const T identity_shift) const
+    {
+        ensure_host_work();
+        vec_ops->get(
+            jacobian_matrix,
+            host_matrix_work.data(),
+            interior_size*interior_size);
+        for(std::size_t row = 0; row < interior_size; ++row)
+        {
+            for(std::size_t col = 0; col < interior_size; ++col)
+            {
+                host_matrix_work[index(
+                    row,
+                    col,
+                    interior_size)] *= jacobian_scale;
+            }
+            host_matrix_work[index(
+                row,
+                row,
+                interior_size)] += identity_shift;
+        }
+        vec_ops->get(
+            rhs_to_solution,
+            host_rhs_work.data(),
+            interior_size);
+        solve_dense_system(host_matrix_work, host_rhs_work);
+        vec_ops->set(
+            host_rhs_work.data(),
+            rhs_to_solution,
+            interior_size);
+    }
+
     void physical_solution(T_vec&, T_vec&)
     {
     }

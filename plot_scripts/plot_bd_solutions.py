@@ -139,6 +139,7 @@ def parse_args() -> argparse.Namespace:
         help="Override the numbered BD point-label font size.",
     )
     bd.add_branch_display_arguments(parser)
+    bd.add_stability_arguments(parser)
     bd.add_font_arguments(parser)
     return parser.parse_args()
 
@@ -321,26 +322,37 @@ def output_for_plot(
     return output.with_name(f"{output.stem}{suffix}{output.suffix}")
 
 
-def plot_bd_base(axis, curves: dict[str, list[list[float]]], norm_index: int, labels: list[str], args: argparse.Namespace):
-    style = bd.line_style(args.style)
-    for branch_index, (branch_name, rows) in enumerate(curves.items()):
-        xs, ys = bd.curve_coordinates(rows, norm_index)
-        if xs:
-            branch_style = dict(style)
-            if args.uniform_branch_color is not None:
-                branch_style["color"] = args.uniform_branch_color
-            axis.plot(xs, ys, label=f"branch {branch_name}", **branch_style)
-            bd.plot_branch_endpoints(axis, xs, ys, args, branch_index == 0)
+def plot_bd_base(
+    axis,
+    curves: dict[str, list[list[float]]],
+    norm_index: int,
+    labels: list[str],
+    args: argparse.Namespace,
+    stability_curves: dict[str, list[bd.StabilityPlotRecord]],
+    stability_mapping,
+):
+    bd.plot_branches_on_axis(
+        axis,
+        curves,
+        norm_index,
+        args,
+        stability_curves,
+        stability_mapping,
+    )
 
     axis.set_xlabel(args.x_label or "lambda")
     axis.set_ylabel(args.y_label or labels[norm_index])
     bd.apply_axis_font_overrides(axis, args)
     axis.grid(True, alpha=0.3)
     if not args.disable_legend:
-        axis.legend(
-            loc="best",
-            fontsize=args.legend_font_size or "small",
-        )
+        handles, legend_labels = axis.get_legend_handles_labels()
+        if handles:
+            axis.legend(
+                handles,
+                legend_labels,
+                loc="best",
+                fontsize=args.legend_font_size or "small",
+            )
 
 
 def inset_position(index: int, count: int, columns: int, width: float, height: float) -> list[float]:
@@ -467,6 +479,8 @@ def render_plot(
     branches: list[int],
     args: argparse.Namespace,
     all_mode: bool,
+    stability_curves: dict[str, list[bd.StabilityPlotRecord]],
+    stability_mapping,
 ) -> Path:
     if args.fit_solutions:
         columns = min(max(args.thumbnail_columns, 1), max(len(records), 1))
@@ -487,7 +501,15 @@ def render_plot(
         figure, axis = plt.subplots(figsize=(11.5, 7.0))
         inset_parent = axis
 
-    plot_bd_base(axis, curves, norm_index, labels, args)
+    plot_bd_base(
+        axis,
+        curves,
+        norm_index,
+        labels,
+        args,
+        stability_curves,
+        stability_mapping,
+    )
     add_solution_insets(figure, axis, inset_parent, records, norm_index, args)
     branch_title = f" branch {branches[0]}" if len(branches) == 1 else ""
     title_options = {}
@@ -498,9 +520,38 @@ def render_plot(
         **title_options,
     )
     if args.fit_solutions:
-        figure.subplots_adjust(left=0.08, right=0.98, bottom=0.06, top=0.94)
+        figure.subplots_adjust(
+            left=0.08,
+            right=(
+                0.90
+                if (
+                    stability_mapping is not None
+                    and stability_mapping["mode"] == "dimension"
+                    and not args.disable_stability_colorbar
+                )
+                else 0.98
+            ),
+            bottom=0.06,
+            top=0.94,
+        )
     else:
-        figure.tight_layout()
+        figure.tight_layout(
+            rect=(
+                (0.0, 0.0, 0.92, 0.96)
+                if (
+                    stability_mapping is not None
+                    and stability_mapping["mode"] == "dimension"
+                    and not args.disable_stability_colorbar
+                )
+                else (0.0, 0.0, 1.0, 0.96)
+            )
+        )
+    bd.add_stability_colorbar(
+        figure,
+        [axis],
+        stability_mapping,
+        args,
+    )
 
     output_path = output_for_plot(project_dir, labels[norm_index], branches, args, all_mode)
     if not args.show:
@@ -559,6 +610,16 @@ def main() -> int:
 
     plt = bd.import_pyplot(args.show)
     bd.apply_font_scale(plt, args.font_scale)
+    stability_curves = bd.load_stability_curves(
+        project_dir,
+        curves,
+        args.disable_stability,
+    )
+    stability_mapping = bd.make_stability_color_mapping(
+        plt,
+        stability_curves,
+        args,
+    )
     wrote_any = False
     for branches in branch_groups:
         records = filter_manifest_records(manifest_records, args, norm_index, branches)
@@ -566,7 +627,20 @@ def main() -> int:
             if all_mode:
                 continue
             raise FileNotFoundError(f"No plottable solution records found in: {manifest}")
-        render_plot(plt, project_dir, manifest, curves, labels, norm_index, records, branches, args, all_mode)
+        render_plot(
+            plt,
+            project_dir,
+            manifest,
+            curves,
+            labels,
+            norm_index,
+            records,
+            branches,
+            args,
+            all_mode,
+            stability_curves,
+            stability_mapping,
+        )
         wrote_any = True
 
     if not wrote_any:

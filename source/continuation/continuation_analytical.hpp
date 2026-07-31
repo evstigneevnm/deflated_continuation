@@ -120,7 +120,8 @@ public:
             }
         }
         parent_t::bif_diag->print_curve();
-        return !parent_t::hard_failure;
+        return !parent_t::hard_failure &&
+               !parent_t::endpoint_state.incomplete();
       
     }
 
@@ -170,27 +171,81 @@ private:
 
         if( (parent_t::lambda_min - parent_t::lambda1)*(parent_t::lambda_min - parent_t::lambda0)<=T(0.0) )
         {
+            parent_t::vec_ops->assign(
+                parent_t::x1,
+                parent_t::x1_back);
+            const T converged_lambda = parent_t::lambda1;
             parent_t::lambda1 = parent_t::lambda_min;
             if(!evaluate_exact_solution(parent_t::lambda1, parent_t::x1))
             {
-                parent_t::break_semicurve++;
-                parent_t::continue_next_step = false;
-                return;
+                parent_t::vec_ops->assign(
+                    parent_t::x1_back,
+                    parent_t::x1);
+                parent_t::lambda1 = converged_lambda;
+                if(parent_t::preserve_last_converged_boundary_point)
+                {
+                    parent_t::set_pending_endpoint_reason(
+                        container::curve_endpoint_reason::
+                            boundary_min_approximate);
+                    intersect_min = true;
+                }
+                else
+                {
+                    parent_t::endpoint_state.mark_incomplete();
+                    parent_t::set_pending_endpoint_reason(
+                        container::curve_endpoint_reason::
+                            knot_interpolation_failure);
+                    parent_t::hard_failure = true;
+                    parent_t::break_semicurve++;
+                    parent_t::continue_next_step = false;
+                    return;
+                }
             }
-            parent_t::set_pending_endpoint_reason(container::curve_endpoint_reason::boundary_min);
-            intersect_min = true;
+            else
+            {
+                parent_t::set_pending_endpoint_reason(
+                    container::curve_endpoint_reason::boundary_min);
+                intersect_min = true;
+            }
         }
         if( (parent_t::lambda_max - parent_t::lambda1)*(parent_t::lambda_max - parent_t::lambda0)<=T(0.0) )
         {
+            parent_t::vec_ops->assign(
+                parent_t::x1,
+                parent_t::x1_back);
+            const T converged_lambda = parent_t::lambda1;
             parent_t::lambda1 = parent_t::lambda_max;
             if(!evaluate_exact_solution(parent_t::lambda1, parent_t::x1))
             {
-                parent_t::break_semicurve++;
-                parent_t::continue_next_step = false;
-                return;
+                parent_t::vec_ops->assign(
+                    parent_t::x1_back,
+                    parent_t::x1);
+                parent_t::lambda1 = converged_lambda;
+                if(parent_t::preserve_last_converged_boundary_point)
+                {
+                    parent_t::set_pending_endpoint_reason(
+                        container::curve_endpoint_reason::
+                            boundary_max_approximate);
+                    intersect_max = true;
+                }
+                else
+                {
+                    parent_t::endpoint_state.mark_incomplete();
+                    parent_t::set_pending_endpoint_reason(
+                        container::curve_endpoint_reason::
+                            knot_interpolation_failure);
+                    parent_t::hard_failure = true;
+                    parent_t::break_semicurve++;
+                    parent_t::continue_next_step = false;
+                    return;
+                }
             }
-            parent_t::set_pending_endpoint_reason(container::curve_endpoint_reason::boundary_max);
-            intersect_max = true;
+            else
+            {
+                parent_t::set_pending_endpoint_reason(
+                    container::curve_endpoint_reason::boundary_max);
+                intersect_max = true;
+            }
         }
 
         if( intersect_min || intersect_max )

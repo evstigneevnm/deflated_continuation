@@ -56,10 +56,79 @@
         "left_halfplane_stable_eigenvalues": true,
         "Krylov_subspace_dimension": 40,
         "desired_spectrum": 8,
+        "correct_stability_transitions_with_newton": false,
+        "transition_refinement_maximum_iterations": 20,
+        "transition_refinement_maximum_subdivisions": 8,
+        "transition_refinement_parameter_tolerance": 1.0e-8,
+        "spectrum_classification_retries": 2,
+        "transition_classification_confirmations": 2,
         "Cayley_transform_sigma_mu": [
             12.0,
             -12.0
         ],
+        "require_complete_scan_coverage": true,
+        "matrix_free_eigensolver": {
+            "enabled": true,
+            "linearization_scale": 1.0,
+            "transformation": {
+                "type": "complex_shift_invert",
+                "shifts": [
+                    [0.25, 0.0]
+                ]
+            },
+            "outer": {
+                "desired_eigenvalues": 6,
+                "krylov_dimension": 16,
+                "restart_dimension": 8,
+                "maximum_restarts": 40,
+                "absolute_tolerance": 1.0e-11,
+                "relative_tolerance": 1.0e-9,
+                "preserve_conjugate_pairs": true,
+                "orthogonalization": "mgs",
+                "reorthogonalization": "dgks",
+                "maximum_orthogonalization_passes": 2
+            },
+            "recovery": {
+                "relative_basis_tolerance": 1.0e-10,
+                "orthogonalization_passes": 2,
+                "absolute_residual_tolerance": 1.0e-9,
+                "relative_residual_tolerance": 1.0e-8,
+                "minimum_converged_eigenpairs": 4
+            },
+            "inner_solver": {
+                "basis_size": 16,
+                "batch_size": 4,
+                "preconditioner_side": "R",
+                "orthogonalization": "mgs",
+                "reorthogonalization": "dgks",
+                "maximum_orthogonalization_passes": 2,
+                "relative_tolerance": 1.0e-11,
+                "absolute_tolerance": 1.0e-13,
+                "maximum_iterations": 80,
+                "save_convergence_history": false,
+                "divide_norms_by_relative_base": false,
+                "verbose": false
+            },
+            "retry": {
+                "enabled": true,
+                "maximum_shift_retries": 2,
+                "initial_shift_perturbation": 0.05,
+                "perturbation_growth": 2.0,
+                "preconditioner_pole_absolute_tolerance": 1.0e-10,
+                "preconditioner_pole_relative_tolerance": 1.0e-2
+            },
+            "aggregation": {
+                "absolute_tolerance": 1.0e-7,
+                "relative_tolerance": 1.0e-6,
+                "minimum_successful_scans": 1,
+                "minimum_eigenpairs": 4,
+                "require_all_scans": true,
+                "probe_count": 1,
+                "require_all_probes": true,
+                "eigenvector_independence_tolerance": 1.0e-6,
+                "eigenvector_orthogonalization_passes": 2
+            }
+        },
         "linear_solver": {
             "maximum_iterations": 100,
             "use_preconditioned_residual": 1,

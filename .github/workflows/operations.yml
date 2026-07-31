@@ -86,6 +86,8 @@ jobs:
           ./"$BUILD_DIR"/initial_tangent_components/test_initial_tangent_components.bin
           make test_continuation_event_state.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/continuation_event_state"
           ./"$BUILD_DIR"/continuation_event_state/test_continuation_event_state.bin
+          make test_observational_knot_sample.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/observational_knot_sample"
+          ./"$BUILD_DIR"/observational_knot_sample/test_observational_knot_sample.bin
           make test_branch_intersection_policy.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/branch_intersection_policy"
           ./"$BUILD_DIR"/branch_intersection_policy/test_branch_intersection_policy.bin
           make test_symmetry_event_persistence.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/symmetry_event_persistence"
@@ -106,6 +108,10 @@ jobs:
           ./"$BUILD_DIR"/analytical_branch_executor/test_analytical_branch_executor.bin
           make test_knot_executor.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/knot_executor"
           ./"$BUILD_DIR"/knot_executor/test_knot_executor.bin
+          make test_deflation_seed_registry.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/deflation_seed_registry"
+          ./"$BUILD_DIR"/deflation_seed_registry/test_deflation_seed_registry.bin
+          make test_linear_solve_recovery.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/linear_solve_recovery"
+          ./"$BUILD_DIR"/linear_solve_recovery/test_linear_solve_recovery.bin
           make test_curve_metadata_io.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/curve_metadata_io"
           ./"$BUILD_DIR"/curve_metadata_io/test_curve_metadata_io.bin
           make test_curve_vector_store.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/curve_vector_store"
@@ -116,6 +122,9 @@ jobs:
           ./"$BUILD_DIR"/curve_intersection_search/test_curve_intersection_search.bin
           make test_diagram_archive.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/diagram_archive"
           ./"$BUILD_DIR"/diagram_archive/test_diagram_archive.bin
+          make test_stability_diagram_archive.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_diagram_archive"
+          ./"$BUILD_DIR"/stability_diagram_archive/test_stability_diagram_archive.bin
+          python3 plot_scripts/tests/test_plot_stability.py
           make test_symmetry_event_registry_sync.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/symmetry_event_registry_sync"
           ./"$BUILD_DIR"/symmetry_event_registry_sync/test_symmetry_event_registry_sync.bin
 
@@ -197,6 +206,130 @@ jobs:
         run: |
           make test_lapack_wrap.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/lapack_wrap"
           ./"$BUILD_DIR"/lapack_wrap/test_lapack_wrap.bin
+
+  eigensolver-foundation-cpu:
+    needs: [scfd-vector-operations-cpu, lapack-wrap-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libopenblas-dev
+          fi
+      - name: Build and test Matrix Market foundation
+        run: |
+          make test_matrix_market.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_matrix_market"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_matrix_market/test_matrix_market.bin
+          make test_matrix_market_report_data_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_report_data"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_report_data/test_matrix_market_report_data_cpu_omp.bin
+      - name: Build and test eigensolver foundation
+        run: |
+          make test_host_small_dense_backend.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_dense"
+          ./"$BUILD_DIR"/eigensolver_dense/test_host_small_dense_backend.bin
+          make test_analytical_eigenproblems.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_analytical"
+          ./"$BUILD_DIR"/eigensolver_analytical/test_analytical_eigenproblems.bin
+          make test_direct_and_dense_eigensolvers_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_direct_dense"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_direct_dense/test_direct_and_dense_eigensolvers_cpu_omp.bin
+          make test_scalar_affine_inverse_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_scalar_affine"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/stability_scalar_affine/test_scalar_affine_inverse_cpu_omp.bin
+          make test_bratu_stability_operators_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_bratu_operators"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/stability_bratu_operators/test_bratu_stability_operators_cpu_omp.bin
+          make test_stability_analysis_pipeline_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_analysis"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/stability_analysis/test_stability_analysis_pipeline_cpu_omp.bin
+          make test_spectrum_scan_aggregator.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_scan_aggregation"
+          ./"$BUILD_DIR"/stability_scan_aggregation/test_spectrum_scan_aggregator.bin
+          make test_eigenvector_rank_aggregator_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_rank_aggregation"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/stability_rank_aggregation/test_eigenvector_rank_aggregator_cpu_omp.bin
+          make test_matrix_free_stability_configuration.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_scan_configuration"
+          ./"$BUILD_DIR"/stability_scan_configuration/test_matrix_free_stability_configuration.bin
+          make test_stability_continuation_interface_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_continuation_interface"
+          ./"$BUILD_DIR"/stability_continuation_interface/test_stability_continuation_interface_cpu.bin
+          make test_shared_arnoldi_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_arnoldi"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_arnoldi/test_shared_arnoldi_cpu_omp.bin
+          make test_inverse_iteration_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_inverse_iteration"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_inverse_iteration/test_inverse_iteration_cpu_omp.bin
+          make test_krylov_schur_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_krylov_schur"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_krylov_schur/test_krylov_schur_cpu_omp.bin
+          make test_projected_spectrum_recovery_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_projected_recovery"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_projected_recovery/test_projected_spectrum_recovery_cpu_omp.bin
+      - name: Build and test transformed eigensolver operators
+        run: |
+          make test_product_vector_space_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_product_space"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_product_space/test_product_vector_space_cpu_omp.bin
+          make test_nmfd_gmres_shared_krylov_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_shared_gmres"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_shared_gmres/test_nmfd_gmres_shared_krylov_cpu_omp.bin
+          make test_transformed_operators_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_transformations"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_transformations/test_transformed_operators_cpu_omp.bin
+          make test_transformed_operators_gmres_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_transformations_gmres"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_transformations_gmres/test_transformed_operators_gmres_cpu_omp.bin
+          make test_factorized_inverse_solver_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_factorized_inverse"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_factorized_inverse/test_factorized_inverse_solver_cpu_omp.bin
+          make test_stability_polynomial_operator_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_stability_polynomial"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_stability_polynomial/test_stability_polynomial_operator_cpu_omp.bin
+          make test_complex_solver_product_adapter_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_complex_adapter"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_complex_adapter/test_complex_solver_product_adapter_cpu_omp.bin
+          make test_complex_affine_transformations_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_complex_affine"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_complex_affine/test_complex_affine_transformations_cpu_omp.bin
+          make test_iterative_factor_solver_bundle_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_factor_bundle"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_factor_bundle/test_iterative_factor_solver_bundle_cpu_omp.bin
+          make test_matrix_free_complexification_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_matrix_free_complex"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_matrix_free_complex/test_matrix_free_complexification_cpu_omp.bin
+          make test_matrix_free_factorized_krylov_schur_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_matrix_free_factorized"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_matrix_free_factorized/test_matrix_free_factorized_krylov_schur_cpu_omp.bin
+      - name: Validate Eigs_Paper Matrix Market cases
+        run: |
+          make test_krylov_schur_rdb450_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_rdb450"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_rdb450/test_krylov_schur_rdb450_cpu_omp.bin
+          make test_transformed_krylov_schur_rdb450_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_rdb450_transformed"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_rdb450_transformed/test_transformed_krylov_schur_rdb450_cpu_omp.bin
+          make characterize_krylov_schur_S80PI_n1_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_S80PI_n1"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_S80PI_n1/characterize_krylov_schur_S80PI_n1_cpu_omp.bin
+
+  eigensolver-foundation-cuda:
+    needs: [eigensolver-foundation-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Build and test CUDA eigensolver foundations when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA eigensolver recovery: nvidia-smi not found"
+            exit 0
+          fi
+          if ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA eigensolver recovery: no usable NVIDIA device was reported"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA eigensolver recovery: nvcc not found"
+            exit 0
+          fi
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libopenblas-dev
+          fi
+          make test_projected_spectrum_recovery_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_projected_recovery_cuda"
+          ./"$BUILD_DIR"/eigensolver_projected_recovery_cuda/test_projected_spectrum_recovery_cuda.bin auto
+          make test_stability_analysis_pipeline_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_analysis_cuda"
+          ./"$BUILD_DIR"/stability_analysis_cuda/test_stability_analysis_pipeline_cuda.bin auto
+          make test_scalar_affine_inverse_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_scalar_affine_cuda"
+          ./"$BUILD_DIR"/stability_scalar_affine_cuda/test_scalar_affine_inverse_cuda.bin auto
+          make test_complex_affine_transformations_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_complex_affine_cuda"
+          ./"$BUILD_DIR"/eigensolver_complex_affine_cuda/test_complex_affine_transformations_cuda.bin auto
+          make test_iterative_factor_solver_bundle_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_factor_bundle_cuda"
+          ./"$BUILD_DIR"/eigensolver_factor_bundle_cuda/test_iterative_factor_solver_bundle_cuda.bin auto
+          make test_matrix_free_complexification_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_matrix_free_complex_cuda"
+          ./"$BUILD_DIR"/eigensolver_matrix_free_complex_cuda/test_matrix_free_complexification_cuda.bin auto
+          make test_matrix_free_factorized_krylov_schur_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_matrix_free_factorized_cuda"
+          ./"$BUILD_DIR"/eigensolver_matrix_free_factorized_cuda/test_matrix_free_factorized_krylov_schur_cuda.bin auto
 
   lapack-wrap-cuda:
     needs: [scfd-vector-operations-cuda, lapack-wrap-cpu]
@@ -315,7 +448,7 @@ jobs:
           ./"$BUILD_DIR"/fft_facade_cufft/test_fft_facade_cufft.bin auto
 
   ks1d-sym-cpu-omp:
-    needs: [scfd-vector-operations-cpu, continuation-core-cpu, fftw-operations-cpu]
+    needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -326,7 +459,7 @@ jobs:
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
             echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
             sudo apt-get update
-            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev libfftw3-dev
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev libfftw3-dev libopenblas-dev
           fi
       - name: Build and validate symmetrized KS1D
         run: |
@@ -336,14 +469,33 @@ jobs:
           ./"$KS1D_BUILD"/test_KS1D_operator_cpu_omp.bin
           make KS1D_full_operator_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_full_operator_cpu_omp.bin
+          make KS1D_stability_scan_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          ./"$KS1D_BUILD"/test_KS1D_stability_scan_cpu_omp.bin
           make KS1D_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
-          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --base-config json_project_files/KS1D_test_sym.json --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
           timeout 120s ./"$KS1D_BUILD"/KS1D_bd_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
+          make KS1D_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          timeout 120s ./"$KS1D_BUILD"/KS1D_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
+          python3 scripts/validate_stability_diagram.py "$KS1D_BUILD/project" --expected-curves 1 --min-points 10 --require-complete --require-plot-sidecar --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
+          cp "$KS1D_BUILD/project/stability_diagram.dat" "$KS1D_BUILD/stability_diagram.before_restart.dat"
+          cp "$KS1D_BUILD/project/0/debug_curve_stability.dat" "$KS1D_BUILD/stability_curve.before_restart.dat"
+          cp "$KS1D_BUILD/project/0/debug_curve_stability_plot.dat" "$KS1D_BUILD/stability_plot.before_restart.dat"
+          timeout 120s ./"$KS1D_BUILD"/KS1D_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
+          cmp "$KS1D_BUILD/stability_diagram.before_restart.dat" "$KS1D_BUILD/project/stability_diagram.dat"
+          cmp "$KS1D_BUILD/stability_curve.before_restart.dat" "$KS1D_BUILD/project/0/debug_curve_stability.dat"
+          cmp "$KS1D_BUILD/stability_plot.before_restart.dat" "$KS1D_BUILD/project/0/debug_curve_stability_plot.dat"
           make KS1D_full_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
-          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --base-config json_project_files/KS1D_test_full.json --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
           timeout 120s ./"$KS1D_BUILD"/KS1D_full_bd_cpu_omp.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project_full" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
+          make KS1D_full_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          python3 scripts/test_ks1d_full_stability_replay.py --executable "$KS1D_BUILD/KS1D_full_stability_cpu_omp.bin" --config json_project_files/KS1D_test_full.json
+          timeout 120s ./"$KS1D_BUILD"/KS1D_full_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet
+          python3 scripts/validate_stability_diagram.py "$KS1D_BUILD/project_full" --expected-curves 1 --min-points 10 --require-complete --require-plot-sidecar --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
+          cp "$KS1D_BUILD/project_full/0/debug_curve_stability_plot.dat" "$KS1D_BUILD/full_stability_plot.before_restart.dat"
+          timeout 120s ./"$KS1D_BUILD"/KS1D_full_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet
+          cmp "$KS1D_BUILD/full_stability_plot.before_restart.dat" "$KS1D_BUILD/project_full/0/debug_curve_stability_plot.dat"
 
   circle-bd-cpu-omp:
     needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
@@ -369,7 +521,7 @@ jobs:
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
 
   circle-bd-full-cpu-omp:
-    needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
+    needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -386,10 +538,17 @@ jobs:
         run: |
           export OMP_NUM_THREADS=8
           CIRCLE_BUILD="$BUILD_DIR/circle_bd_full_cpu_omp"
-          make circle_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double
+          make circle_bd_cpu_omp circle_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double
           python3 scripts/write_circle_ci_config.py "$CIRCLE_BUILD/circle_full_ci.json" "$CIRCLE_BUILD/project" --clean-project --steps 340 --step-size 0.02 --max-step-size 0.04 --deflation-attempts 1 --continuation-fail-attempts 8 --knots -1.05 0.5 1.05
           timeout 120s ./"$CIRCLE_BUILD"/circle_bd_cpu_omp.bin "$CIRCLE_BUILD/circle_full_ci.json" --seed-exact-curve 0.5 -1 --quiet
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-circle --min-angle-coverage 6.0 --max-closure-distance 1e-10
+          timeout 120s ./"$CIRCLE_BUILD"/circle_stability_cpu_omp.bin "$CIRCLE_BUILD/circle_full_ci.json" --quiet
+          python3 scripts/validate_stability_diagram.py "$CIRCLE_BUILD/project" --expected-curves 1 --min-points 100 --require-complete --expected-bifurcations 2 --min-stable-points 20 --min-unstable-points 20 --expected-bifurcation-parameter=-1 --expected-bifurcation-parameter=1 --bifurcation-parameter-tolerance 2e-3
+          cp "$CIRCLE_BUILD/project/stability_diagram.dat" "$CIRCLE_BUILD/stability_diagram.before_restart.dat"
+          cp "$CIRCLE_BUILD/project/0/debug_curve_stability.dat" "$CIRCLE_BUILD/stability_curve.before_restart.dat"
+          timeout 120s ./"$CIRCLE_BUILD"/circle_stability_cpu_omp.bin "$CIRCLE_BUILD/circle_full_ci.json" --quiet
+          cmp "$CIRCLE_BUILD/stability_diagram.before_restart.dat" "$CIRCLE_BUILD/project/stability_diagram.dat"
+          cmp "$CIRCLE_BUILD/stability_curve.before_restart.dat" "$CIRCLE_BUILD/project/0/debug_curve_stability.dat"
 
   circle-bd-var-prec:
     needs: [cpu-vector-operations-var-prec, fftw-operations-cpu, lapack-wrap-cpu]
@@ -414,7 +573,7 @@ jobs:
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
 
   star-shaped-bd-cpu-omp:
-    needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
+    needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -431,10 +590,17 @@ jobs:
         run: |
           export OMP_NUM_THREADS=8
           STAR_BUILD="$BUILD_DIR/star_shaped_bd_cpu_omp"
-          make star_shaped_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$STAR_BUILD" REAL_TYPE=double
+          make star_shaped_bd_cpu_omp star_shaped_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$STAR_BUILD" REAL_TYPE=double
           python3 scripts/write_star_shaped_ci_config.py "$STAR_BUILD/star_shaped_ci.json" "$STAR_BUILD/project" --clean-project --curvature 0.3
           timeout 120s ./"$STAR_BUILD"/star_shaped_bd_cpu_omp.bin "$STAR_BUILD/star_shaped_ci.json" --seed-exact 0.25 --continue-seed-only --quiet
           python3 scripts/validate_star_shaped_diagram.py "$STAR_BUILD/project" --config "$STAR_BUILD/star_shaped_ci.json" --residual-tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-star --min-angle-coverage 6.0 --max-closure-distance 5e-2
+          timeout 120s ./"$STAR_BUILD"/star_shaped_stability_cpu_omp.bin "$STAR_BUILD/star_shaped_ci.json" --quiet
+          python3 scripts/validate_stability_diagram.py "$STAR_BUILD/project" --expected-curves 1 --min-points 100 --require-complete --expected-bifurcations 12 --min-stable-points 100 --min-unstable-points 100
+          cp "$STAR_BUILD/project/stability_diagram.dat" "$STAR_BUILD/stability_diagram.before_restart.dat"
+          cp "$STAR_BUILD/project/0/debug_curve_stability.dat" "$STAR_BUILD/stability_curve.before_restart.dat"
+          timeout 120s ./"$STAR_BUILD"/star_shaped_stability_cpu_omp.bin "$STAR_BUILD/star_shaped_ci.json" --quiet
+          cmp "$STAR_BUILD/stability_diagram.before_restart.dat" "$STAR_BUILD/project/stability_diagram.dat"
+          cmp "$STAR_BUILD/stability_curve.before_restart.dat" "$STAR_BUILD/project/0/debug_curve_stability.dat"
 
   star-shaped-bd-var-prec:
     needs: [cpu-vector-operations-var-prec, fftw-operations-cpu, lapack-wrap-cpu]
@@ -459,7 +625,7 @@ jobs:
           python3 scripts/validate_star_shaped_diagram.py "$STAR_BUILD/project" --config "$STAR_BUILD/star_shaped_ci.json" --residual-tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-star --min-angle-coverage 6.0 --max-closure-distance 5e-2
 
   bratu-bd-cpu-omp:
-    needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
+    needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -476,13 +642,22 @@ jobs:
         run: |
           export OMP_NUM_THREADS=8
           BRATU_BUILD="$BUILD_DIR/bratu_bd_cpu_omp"
-          make bratu_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BRATU_BUILD" REAL_TYPE=double
+          make bratu_bd_cpu_omp bratu_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BRATU_BUILD" REAL_TYPE=double
           python3 scripts/write_bratu_ci_config.py "$BRATU_BUILD/bratu_ci.json" "$BRATU_BUILD/project" --clean-project
           timeout 120s ./"$BRATU_BUILD"/bratu_bd_cpu_omp.bin "$BRATU_BUILD/bratu_ci.json" --seed-exact-theta 1.0 --continue-seed-only --quiet
           python3 scripts/validate_bratu_diagram.py "$BRATU_BUILD/project" --config "$BRATU_BUILD/bratu_ci.json" --residual-tolerance 1e-5 --relation-tolerance 1e-2 --min-points 20 --min-saved-points 20 --expected-curves 1 --require-fold --min-max-u 2.0
+          timeout 120s ./"$BRATU_BUILD"/bratu_stability_cpu_omp.bin "$BRATU_BUILD/bratu_ci.json" --quiet
+          python3 scripts/validate_stability_diagram.py "$BRATU_BUILD/project" --expected-curves 1 --min-points 20 --require-complete --require-plot-sidecar --expected-bifurcations 1 --min-stable-points 20 --min-unstable-points 20 --expected-bifurcation-parameter=3.5138 --bifurcation-parameter-tolerance 2e-2
+          cp "$BRATU_BUILD/project/stability_diagram.dat" "$BRATU_BUILD/stability_diagram.before_restart.dat"
+          cp "$BRATU_BUILD/project/0/debug_curve_stability.dat" "$BRATU_BUILD/stability_curve.before_restart.dat"
+          cp "$BRATU_BUILD/project/0/debug_curve_stability_plot.dat" "$BRATU_BUILD/stability_plot.before_restart.dat"
+          timeout 120s ./"$BRATU_BUILD"/bratu_stability_cpu_omp.bin "$BRATU_BUILD/bratu_ci.json" --quiet
+          cmp "$BRATU_BUILD/stability_diagram.before_restart.dat" "$BRATU_BUILD/project/stability_diagram.dat"
+          cmp "$BRATU_BUILD/stability_curve.before_restart.dat" "$BRATU_BUILD/project/0/debug_curve_stability.dat"
+          cmp "$BRATU_BUILD/stability_plot.before_restart.dat" "$BRATU_BUILD/project/0/debug_curve_stability_plot.dat"
 
   bratu-bd-fd3-cpu-omp:
-    needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
+    needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -499,10 +674,17 @@ jobs:
         run: |
           export OMP_NUM_THREADS=8
           BRATU_BUILD="$BUILD_DIR/bratu_bd_fd3_cpu_omp"
-          make bratu_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BRATU_BUILD" REAL_TYPE=double
+          make bratu_bd_cpu_omp bratu_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BRATU_BUILD" REAL_TYPE=double
           python3 scripts/write_bratu_ci_config.py "$BRATU_BUILD/bratu_ci.json" "$BRATU_BUILD/project" --clean-project --spatial-discretization fd3
           timeout 120s ./"$BRATU_BUILD"/bratu_bd_cpu_omp.bin "$BRATU_BUILD/bratu_ci.json" --seed-exact-theta 1.0 --continue-seed-only --quiet
           python3 scripts/validate_bratu_diagram.py "$BRATU_BUILD/project" --config "$BRATU_BUILD/bratu_ci.json" --residual-tolerance 1e-5 --relation-tolerance 5e-2 --min-points 20 --min-saved-points 20 --expected-curves 1 --require-fold --min-max-u 2.0
+          timeout 120s ./"$BRATU_BUILD"/bratu_stability_cpu_omp.bin "$BRATU_BUILD/bratu_ci.json" --quiet
+          python3 scripts/validate_stability_diagram.py "$BRATU_BUILD/project" --expected-curves 1 --min-points 20 --require-complete --expected-bifurcations 1 --min-stable-points 20 --min-unstable-points 20 --expected-bifurcation-parameter=3.512 --bifurcation-parameter-tolerance 2e-2
+          cp "$BRATU_BUILD/project/stability_diagram.dat" "$BRATU_BUILD/stability_diagram.before_restart.dat"
+          cp "$BRATU_BUILD/project/0/debug_curve_stability.dat" "$BRATU_BUILD/stability_curve.before_restart.dat"
+          timeout 120s ./"$BRATU_BUILD"/bratu_stability_cpu_omp.bin "$BRATU_BUILD/bratu_ci.json" --quiet
+          cmp "$BRATU_BUILD/stability_diagram.before_restart.dat" "$BRATU_BUILD/project/stability_diagram.dat"
+          cmp "$BRATU_BUILD/stability_curve.before_restart.dat" "$BRATU_BUILD/project/0/debug_curve_stability.dat"
 
   bratu-bd-var-prec:
     needs: [cpu-vector-operations-var-prec, fftw-operations-cpu, lapack-wrap-cpu]
@@ -527,7 +709,7 @@ jobs:
           python3 scripts/validate_bratu_diagram.py "$BRATU_BUILD/project" --config "$BRATU_BUILD/bratu_ci.json" --residual-tolerance 1e-5 --relation-tolerance 1e-2 --min-points 20 --min-saved-points 20 --expected-curves 1 --require-fold --min-max-u 2.0
 
   circle-bd-cuda:
-    needs: [scfd-vector-operations-cuda, fft-facade-cuda, lapack-wrap-cuda]
+    needs: [eigensolver-foundation-cuda, fft-facade-cuda, lapack-wrap-cuda]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -548,13 +730,20 @@ jobs:
             exit 0
           fi
           CIRCLE_BUILD="$BUILD_DIR/circle_bd_cuda"
-          make circle_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double
-          python3 scripts/write_circle_ci_config.py "$CIRCLE_BUILD/circle_ci.json" "$CIRCLE_BUILD/project" --clean-project
-          timeout 120s ./"$CIRCLE_BUILD"/circle_bd_cuda.bin "$CIRCLE_BUILD/circle_ci.json" --analytical-solution --quiet
-          python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
+          make circle_bd_cuda circle_stability_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double
+          python3 scripts/write_circle_ci_config.py "$CIRCLE_BUILD/circle_ci.json" "$CIRCLE_BUILD/project" --clean-project --steps 340 --step-size 0.02 --max-step-size 0.04 --deflation-attempts 1 --continuation-fail-attempts 8 --knots -1.05 0.5 1.05
+          timeout 120s ./"$CIRCLE_BUILD"/circle_bd_cuda.bin "$CIRCLE_BUILD/circle_ci.json" --seed-exact-curve 0.5 -1 --quiet
+          python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-circle --min-angle-coverage 6.0 --max-closure-distance 1e-10
+          timeout 120s ./"$CIRCLE_BUILD"/circle_stability_cuda.bin "$CIRCLE_BUILD/circle_ci.json" --quiet
+          python3 scripts/validate_stability_diagram.py "$CIRCLE_BUILD/project" --expected-curves 1 --min-points 100 --require-complete --expected-bifurcations 2 --min-stable-points 20 --min-unstable-points 20 --expected-bifurcation-parameter=-1 --expected-bifurcation-parameter=1 --bifurcation-parameter-tolerance 2e-3
+          cp "$CIRCLE_BUILD/project/stability_diagram.dat" "$CIRCLE_BUILD/stability_diagram.before_restart.dat"
+          cp "$CIRCLE_BUILD/project/0/debug_curve_stability.dat" "$CIRCLE_BUILD/stability_curve.before_restart.dat"
+          timeout 120s ./"$CIRCLE_BUILD"/circle_stability_cuda.bin "$CIRCLE_BUILD/circle_ci.json" --quiet
+          cmp "$CIRCLE_BUILD/stability_diagram.before_restart.dat" "$CIRCLE_BUILD/project/stability_diagram.dat"
+          cmp "$CIRCLE_BUILD/stability_curve.before_restart.dat" "$CIRCLE_BUILD/project/0/debug_curve_stability.dat"
 
   star-shaped-bd-cuda:
-    needs: [scfd-vector-operations-cuda, fft-facade-cuda, lapack-wrap-cuda]
+    needs: [eigensolver-foundation-cuda, fft-facade-cuda, lapack-wrap-cuda]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -575,13 +764,20 @@ jobs:
             exit 0
           fi
           STAR_BUILD="$BUILD_DIR/star_shaped_bd_cuda"
-          make star_shaped_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$STAR_BUILD" REAL_TYPE=double
+          make star_shaped_bd_cuda star_shaped_stability_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$STAR_BUILD" REAL_TYPE=double
           python3 scripts/write_star_shaped_ci_config.py "$STAR_BUILD/star_shaped_ci.json" "$STAR_BUILD/project" --clean-project --curvature 0.3
           timeout 120s ./"$STAR_BUILD"/star_shaped_bd_cuda.bin "$STAR_BUILD/star_shaped_ci.json" --seed-exact 0.25 --continue-seed-only --quiet
           python3 scripts/validate_star_shaped_diagram.py "$STAR_BUILD/project" --config "$STAR_BUILD/star_shaped_ci.json" --residual-tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-star --min-angle-coverage 6.0 --max-closure-distance 5e-2
+          timeout 120s ./"$STAR_BUILD"/star_shaped_stability_cuda.bin "$STAR_BUILD/star_shaped_ci.json" --quiet
+          python3 scripts/validate_stability_diagram.py "$STAR_BUILD/project" --expected-curves 1 --min-points 100 --require-complete --expected-bifurcations 12 --min-stable-points 100 --min-unstable-points 100
+          cp "$STAR_BUILD/project/stability_diagram.dat" "$STAR_BUILD/stability_diagram.before_restart.dat"
+          cp "$STAR_BUILD/project/0/debug_curve_stability.dat" "$STAR_BUILD/stability_curve.before_restart.dat"
+          timeout 120s ./"$STAR_BUILD"/star_shaped_stability_cuda.bin "$STAR_BUILD/star_shaped_ci.json" --quiet
+          cmp "$STAR_BUILD/stability_diagram.before_restart.dat" "$STAR_BUILD/project/stability_diagram.dat"
+          cmp "$STAR_BUILD/stability_curve.before_restart.dat" "$STAR_BUILD/project/0/debug_curve_stability.dat"
 
   ks1d-sym-cuda:
-    needs: [scfd-vector-operations-cuda, fft-facade-cuda]
+    needs: [eigensolver-foundation-cuda, fft-facade-cuda]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -606,14 +802,23 @@ jobs:
           ./"$KS1D_BUILD"/test_KS1D_operator_cuda.bin auto
           make KS1D_full_operator_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_full_operator_cuda.bin auto
+          make KS1D_stability_scan_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          ./"$KS1D_BUILD"/test_KS1D_stability_scan_cuda.bin auto
           make KS1D_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
-          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --base-config json_project_files/KS1D_test_sym.json --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
           timeout 120s ./"$KS1D_BUILD"/KS1D_bd_cuda.bin "$KS1D_BUILD/ks1d_ci.json" --quiet auto
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
+          make KS1D_stability_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          timeout 120s ./"$KS1D_BUILD"/KS1D_stability_cuda.bin "$KS1D_BUILD/ks1d_ci.json" --quiet auto
+          python3 scripts/validate_stability_diagram.py "$KS1D_BUILD/project" --expected-curves 1 --min-points 10 --require-complete --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
           make KS1D_full_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
-          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --base-config json_project_files/KS1D_test_full.json --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
           timeout 120s ./"$KS1D_BUILD"/KS1D_full_bd_cuda.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet auto
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project_full" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
+          make KS1D_full_stability_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          python3 scripts/test_ks1d_full_stability_replay.py --executable "$KS1D_BUILD/KS1D_full_stability_cuda.bin" --config json_project_files/KS1D_test_full.json --device auto
+          timeout 120s ./"$KS1D_BUILD"/KS1D_full_stability_cuda.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet auto
+          python3 scripts/validate_stability_diagram.py "$KS1D_BUILD/project_full" --expected-curves 1 --min-points 10 --require-complete --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
 
   circle-bd-hip:
     needs: [scfd-vector-operations-hip]

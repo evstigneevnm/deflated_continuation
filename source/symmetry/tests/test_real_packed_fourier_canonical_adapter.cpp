@@ -241,6 +241,116 @@ void test_continuation_hysteresis_keeps_usable_current_mode()
     free_bundle(vec_ops, v);
 }
 
+void test_frozen_linearization_chart_preserves_first_active_mode()
+{
+    vec_ops_t vec_ops(8);
+    adapter_t adapter(&vec_ops, 4);
+    adapter.set_relative_active_mode_tolerance(1e-8);
+    adapter.set_continuation_mode_switch_ratio(0.25);
+    vector_bundle v;
+    init_bundle(vec_ops, v);
+
+    set_vector(
+        vec_ops,
+        v.x,
+        {0.0, 0.0, 1.0e-3, 0.0, 0.0, 0.0, 0.0, -82.0});
+    adapter.freeze_linearization_chart(v.x, v.z);
+    require_true(
+        "history-free Newton chart preserves first-active-mode behavior",
+        adapter.last_slice_data().mode == 2);
+
+    adapter.freeze_stateless_linearization_chart(v.x, v.z);
+    require_true(
+        "stateless linearization chart selects best-conditioned mode",
+        adapter.last_slice_data().mode == 4);
+    require_true(
+        "stateless linearization chart has a strong slice matrix",
+        adapter.last_slice_data().slice_matrix > 300.0);
+
+    free_bundle(vec_ops, v);
+}
+
+void test_frozen_linearization_chart_preserves_usable_continuation_mode()
+{
+    vec_ops_t vec_ops(8);
+    adapter_t adapter(&vec_ops, 4);
+    adapter.set_relative_active_mode_tolerance(1e-12);
+    adapter.set_continuation_mode_switch_ratio(0.25);
+    vector_bundle v;
+    init_bundle(vec_ops, v);
+
+    set_vector(
+        vec_ops,
+        v.x,
+        {0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+    set_vector(
+        vec_ops,
+        v.y,
+        {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+    adapter.prepare_continuation_seed(v.x, v.y);
+
+    set_vector(
+        vec_ops,
+        v.x,
+        {0.0, 0.0, 0.6, 0.0, 0.0, 0.0, 1.0, 0.0});
+    adapter.freeze_linearization_chart(v.x, v.z);
+    require_true(
+        "frozen linearization chart preserves a usable continuation mode",
+        adapter.last_slice_data().mode == 2);
+
+    free_bundle(vec_ops, v);
+}
+
+void test_stateless_linearization_chart_ignores_continuation_mode()
+{
+    vec_ops_t vec_ops(8);
+    adapter_t adapter(&vec_ops, 4);
+    adapter.set_relative_active_mode_tolerance(1e-12);
+    adapter.set_continuation_mode_switch_ratio(0.25);
+    vector_bundle v;
+    init_bundle(vec_ops, v);
+
+    set_vector(
+        vec_ops,
+        v.x,
+        {0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+    set_vector(
+        vec_ops,
+        v.y,
+        {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+    adapter.prepare_continuation_seed(v.x, v.y);
+
+    set_vector(
+        vec_ops,
+        v.x,
+        {0.0, 0.0, 0.6, 0.0, 0.0, 0.0, 1.0, 0.0});
+    adapter.freeze_linearization_chart(v.x, v.z);
+    require_true(
+        "history-aware linearization preserves continuation mode",
+        adapter.last_slice_data().mode == 2);
+
+    adapter.freeze_stateless_linearization_chart(v.x, v.z);
+    require_true(
+        "stateless linearization selects best-conditioned mode",
+        adapter.last_slice_data().mode == 4);
+    adapter.freeze_linearization_chart(v.x, v.w);
+    require_true(
+        "stateless analysis does not change the continuation-owned Newton mode",
+        adapter.last_slice_data().mode == 2);
+    adapter.freeze_stateless_linearization_chart(v.x, v.w);
+    require_true(
+        "repeated stateless linearization keeps best-conditioned mode",
+        adapter.last_slice_data().mode == 4);
+    require_vector_close(
+        vec_ops,
+        "stateless linearization representative is history independent",
+        v.w,
+        v.z,
+        1e-12);
+
+    free_bundle(vec_ops, v);
+}
+
 void test_continuation_chart_restore_recovers_anchor_mode()
 {
     vec_ops_t vec_ops(4);
@@ -613,6 +723,9 @@ int main()
     test_relative_active_mode_threshold_skips_tiny_low_mode();
     test_continuation_hysteresis_switches_before_mode_vanishes();
     test_continuation_hysteresis_keeps_usable_current_mode();
+    test_frozen_linearization_chart_preserves_first_active_mode();
+    test_frozen_linearization_chart_preserves_usable_continuation_mode();
+    test_stateless_linearization_chart_ignores_continuation_mode();
     test_continuation_chart_restore_recovers_anchor_mode();
     test_prepared_seed_and_predictor_share_one_chart();
     test_continuation_residual_copy_uses_tangent_direction();
