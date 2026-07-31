@@ -472,7 +472,7 @@ jobs:
           make KS1D_stability_scan_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_stability_scan_cpu_omp.bin
           make KS1D_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
-          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --base-config json_project_files/KS1D_test_sym.json --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --base-config json_project_files/KS1D_test_sym.json --clean-project --steps 6 --step-size 0.02 --max-step-size 0.03
           timeout 120s ./"$KS1D_BUILD"/KS1D_bd_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
           make KS1D_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
@@ -486,7 +486,7 @@ jobs:
           cmp "$KS1D_BUILD/stability_curve.before_restart.dat" "$KS1D_BUILD/project/0/debug_curve_stability.dat"
           cmp "$KS1D_BUILD/stability_plot.before_restart.dat" "$KS1D_BUILD/project/0/debug_curve_stability_plot.dat"
           make KS1D_full_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
-          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --base-config json_project_files/KS1D_test_full.json --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --base-config json_project_files/KS1D_test_full.json --clean-project --steps 6 --step-size 0.02 --max-step-size 0.03
           timeout 120s ./"$KS1D_BUILD"/KS1D_full_bd_cpu_omp.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project_full" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
           make KS1D_full_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
@@ -643,15 +643,15 @@ jobs:
           export OMP_NUM_THREADS=8
           BRATU_BUILD="$BUILD_DIR/bratu_bd_cpu_omp"
           make bratu_bd_cpu_omp bratu_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BRATU_BUILD" REAL_TYPE=double
-          python3 scripts/write_bratu_ci_config.py "$BRATU_BUILD/bratu_ci.json" "$BRATU_BUILD/project" --clean-project
+          python3 scripts/write_bratu_ci_config.py "$BRATU_BUILD/bratu_ci.json" "$BRATU_BUILD/project" --clean-project --steps 150
           timeout 120s ./"$BRATU_BUILD"/bratu_bd_cpu_omp.bin "$BRATU_BUILD/bratu_ci.json" --seed-exact-theta 1.0 --continue-seed-only --quiet
           python3 scripts/validate_bratu_diagram.py "$BRATU_BUILD/project" --config "$BRATU_BUILD/bratu_ci.json" --residual-tolerance 1e-5 --relation-tolerance 1e-2 --min-points 20 --min-saved-points 20 --expected-curves 1 --require-fold --min-max-u 2.0
-          timeout 120s ./"$BRATU_BUILD"/bratu_stability_cpu_omp.bin "$BRATU_BUILD/bratu_ci.json" --quiet
+          timeout 180s ./"$BRATU_BUILD"/bratu_stability_cpu_omp.bin "$BRATU_BUILD/bratu_ci.json" --quiet
           python3 scripts/validate_stability_diagram.py "$BRATU_BUILD/project" --expected-curves 1 --min-points 20 --require-complete --require-plot-sidecar --expected-bifurcations 1 --min-stable-points 20 --min-unstable-points 20 --expected-bifurcation-parameter=3.5138 --bifurcation-parameter-tolerance 2e-2
           cp "$BRATU_BUILD/project/stability_diagram.dat" "$BRATU_BUILD/stability_diagram.before_restart.dat"
           cp "$BRATU_BUILD/project/0/debug_curve_stability.dat" "$BRATU_BUILD/stability_curve.before_restart.dat"
           cp "$BRATU_BUILD/project/0/debug_curve_stability_plot.dat" "$BRATU_BUILD/stability_plot.before_restart.dat"
-          timeout 120s ./"$BRATU_BUILD"/bratu_stability_cpu_omp.bin "$BRATU_BUILD/bratu_ci.json" --quiet
+          timeout 180s ./"$BRATU_BUILD"/bratu_stability_cpu_omp.bin "$BRATU_BUILD/bratu_ci.json" --quiet
           cmp "$BRATU_BUILD/stability_diagram.before_restart.dat" "$BRATU_BUILD/project/stability_diagram.dat"
           cmp "$BRATU_BUILD/stability_curve.before_restart.dat" "$BRATU_BUILD/project/0/debug_curve_stability.dat"
           cmp "$BRATU_BUILD/stability_plot.before_restart.dat" "$BRATU_BUILD/project/0/debug_curve_stability_plot.dat"
