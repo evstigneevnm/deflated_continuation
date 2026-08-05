@@ -208,9 +208,118 @@ struct parameters
                 }
             };
 
+            struct failed_candidate_registry_s
+            {
+                bool enabled;
+                std::string registry_file;
+                std::string state_directory;
+                std::uint64_t policy_generation;
+
+                void set_default()
+                {
+                    enabled = true;
+                    registry_file =
+                        "failed_continuations/registry.json";
+                    state_directory =
+                        "failed_continuations/states";
+                    policy_generation = 1;
+                }
+
+                void plot_all()
+                {
+                    std::cout << "||  |  |==enabled: " << enabled << std::endl;
+                    std::cout << "||  |  |==registry_file: "
+                              << registry_file << std::endl;
+                    std::cout << "||  |  |==state_directory: "
+                              << state_directory << std::endl;
+                    std::cout << "||  |  |==policy_generation: "
+                              << policy_generation << std::endl;
+                }
+            };
+
+            struct recovery_registry_s
+            {
+                bool enabled;
+                std::string registry_file;
+                std::string checkpoint_directory;
+                std::uint64_t policy_generation;
+                bool process_before_deflation;
+
+                void set_default()
+                {
+                    enabled = true;
+                    registry_file =
+                        "continuation_recovery_registry.json";
+                    checkpoint_directory = "recovery_checkpoints";
+                    policy_generation = 1;
+                    process_before_deflation = false;
+                }
+
+                void plot_all()
+                {
+                    std::cout << "||  |  |==enabled: " << enabled << std::endl;
+                    std::cout << "||  |  |==registry_file: "
+                              << registry_file << std::endl;
+                    std::cout << "||  |  |==checkpoint_directory: "
+                              << checkpoint_directory << std::endl;
+                    std::cout << "||  |  |==policy_generation: "
+                              << policy_generation << std::endl;
+                    std::cout << "||  |  |==process_before_deflation: "
+                              << process_before_deflation << std::endl;
+                }
+            };
+
+            struct topology_registry_s
+            {
+                bool enabled;
+                std::string registry_file;
+                std::string endpoint_directory;
+                std::uint64_t policy_generation;
+                T absolute_parameter_tolerance;
+                T relative_parameter_tolerance;
+                T state_tolerance;
+                T minimum_tangent_line_similarity;
+                bool record_transverse_junctions;
+
+                void set_default()
+                {
+                    enabled = true;
+                    registry_file = "branch_topology.json";
+                    endpoint_directory = "branch_topology/endpoints";
+                    policy_generation = 1;
+                    absolute_parameter_tolerance = T(1.0e-7);
+                    relative_parameter_tolerance = T(1.0e-9);
+                    state_tolerance = T(1.0e-8);
+                    minimum_tangent_line_similarity = T(0.9);
+                    record_transverse_junctions = true;
+                }
+
+                void plot_all()
+                {
+                    std::cout << "||  |  |==enabled: " << enabled << std::endl;
+                    std::cout << "||  |  |==registry_file: "
+                              << registry_file << std::endl;
+                    std::cout << "||  |  |==endpoint_directory: "
+                              << endpoint_directory << std::endl;
+                    std::cout << "||  |  |==policy_generation: "
+                              << policy_generation << std::endl;
+                    std::cout << "||  |  |==absolute_parameter_tolerance: "
+                              << absolute_parameter_tolerance << std::endl;
+                    std::cout << "||  |  |==relative_parameter_tolerance: "
+                              << relative_parameter_tolerance << std::endl;
+                    std::cout << "||  |  |==state_tolerance: "
+                              << state_tolerance << std::endl;
+                    std::cout << "||  |  |==minimum_tangent_line_similarity: "
+                              << minimum_tangent_line_similarity << std::endl;
+                    std::cout << "||  |  |==record_transverse_junctions: "
+                              << record_transverse_junctions << std::endl;
+                }
+            };
+
             bool allow_incomplete_restart_intersections;
             bool allow_knot_interpolation_failure;
             bool allow_failed_continuation_curve_save;
+            bool preserve_partial_curves;
             bool check_duplicate_after_deflation;
             unsigned int duplicate_after_deflation_retries;
             T duplicate_after_deflation_tolerance;
@@ -218,12 +327,16 @@ struct parameters
             T failed_continuation_rejection_tolerance;
             knot_relocation_s knot_relocation;
             seed_schedule_s seed_schedule;
+            failed_candidate_registry_s failed_candidate_registry;
+            recovery_registry_s recovery_registry;
+            topology_registry_s topology_registry;
 
             void set_default()
             {
                 allow_incomplete_restart_intersections = false;
                 allow_knot_interpolation_failure = false;
                 allow_failed_continuation_curve_save = false;
+                preserve_partial_curves = true;
                 check_duplicate_after_deflation = true;
                 duplicate_after_deflation_retries = 2;
                 duplicate_after_deflation_tolerance = T(1.0e-8);
@@ -231,6 +344,9 @@ struct parameters
                 failed_continuation_rejection_tolerance = T(1.0e-8);
                 knot_relocation.set_default();
                 seed_schedule.set_default();
+                failed_candidate_registry.set_default();
+                recovery_registry.set_default();
+                topology_registry.set_default();
             }
 
             void plot_all()
@@ -238,6 +354,7 @@ struct parameters
                 std::cout << "||  |==allow_incomplete_restart_intersections: " << allow_incomplete_restart_intersections << std::endl;
                 std::cout << "||  |==allow_knot_interpolation_failure: " << allow_knot_interpolation_failure << std::endl;
                 std::cout << "||  |==allow_failed_continuation_curve_save: " << allow_failed_continuation_curve_save << std::endl;
+                std::cout << "||  |==preserve_partial_curves: " << preserve_partial_curves << std::endl;
                 std::cout << "||  |==check_duplicate_after_deflation: " << check_duplicate_after_deflation << std::endl;
                 std::cout << "||  |==duplicate_after_deflation_retries: " << duplicate_after_deflation_retries << std::endl;
                 std::cout << "||  |==duplicate_after_deflation_tolerance: " << duplicate_after_deflation_tolerance << std::endl;
@@ -247,6 +364,12 @@ struct parameters
                 knot_relocation.plot_all();
                 std::cout << "||  |==seed_schedule: " << std::endl;
                 seed_schedule.plot_all();
+                std::cout << "||  |==failed_candidate_registry: " << std::endl;
+                failed_candidate_registry.plot_all();
+                std::cout << "||  |==recovery_registry: " << std::endl;
+                recovery_registry.plot_all();
+                std::cout << "||  |==topology_registry: " << std::endl;
+                topology_registry.plot_all();
             }
         };
 
@@ -311,6 +434,8 @@ struct parameters
             unsigned int minimum_forward_refinements_for_verification;
             T maximum_verified_forward_steps_ahead;
             T maximum_verified_forward_distance_step_ratio;
+            bool localize_analytical_targets;
+            T analytical_target_parameter_tolerance;
             bool verbose;
 
             void set_default()
@@ -330,6 +455,8 @@ struct parameters
                 minimum_forward_refinements_for_verification = 3;
                 maximum_verified_forward_steps_ahead = T(0.1);
                 maximum_verified_forward_distance_step_ratio = T(0.3);
+                localize_analytical_targets = true;
+                analytical_target_parameter_tolerance = T(1.0e-7);
                 verbose = false;
             }
 
@@ -350,6 +477,8 @@ struct parameters
                 std::cout << "||  |==minimum_forward_refinements_for_verification: " << minimum_forward_refinements_for_verification << std::endl;
                 std::cout << "||  |==maximum_verified_forward_steps_ahead: " << maximum_verified_forward_steps_ahead << std::endl;
                 std::cout << "||  |==maximum_verified_forward_distance_step_ratio: " << maximum_verified_forward_distance_step_ratio << std::endl;
+                std::cout << "||  |==localize_analytical_targets: " << localize_analytical_targets << std::endl;
+                std::cout << "||  |==analytical_target_parameter_tolerance: " << analytical_target_parameter_tolerance << std::endl;
                 std::cout << "||  |==verbose: " << verbose << std::endl;
             }
         };

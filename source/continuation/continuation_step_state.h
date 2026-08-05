@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include <continuation/continuation_result.h>
 #include <symmetry/continuation/isotropy_transition.h>
 
 namespace continuation
@@ -15,6 +16,9 @@ struct continuation_step_attempt_state
     bool any_chart_retries = false;
     bool any_isotropy_retries = false;
     unsigned int chart_retries = 0;
+    continuation_failure_kind failure = continuation_failure_kind::none;
+    T attempted_step = T(0);
+    unsigned int retry_count = 0;
     std::string failure_reason;
 
     bool recovered() const

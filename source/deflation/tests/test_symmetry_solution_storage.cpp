@@ -78,6 +78,10 @@ int main()
     vec_ops_t::vector_type shifted_query;
     vec_ops_t::vector_type history;
     vec_ops_t::vector_type c;
+    vec_ops_t::vector_type tangent;
+    vec_ops_t::vector_type action_tangent;
+    vec_ops_t::vector_type shifted_tangent;
+    vec_ops_t::vector_type aligned_tangent;
     vec_ops.init_vector(x);
     vec_ops.init_vector(shifted);
     vec_ops.init_vector(stabilized);
@@ -85,6 +89,10 @@ int main()
     vec_ops.init_vector(shifted_query);
     vec_ops.init_vector(history);
     vec_ops.init_vector(c);
+    vec_ops.init_vector(tangent);
+    vec_ops.init_vector(action_tangent);
+    vec_ops.init_vector(shifted_tangent);
+    vec_ops.init_vector(aligned_tangent);
     vec_ops.start_use_vector(x);
     vec_ops.start_use_vector(shifted);
     vec_ops.start_use_vector(stabilized);
@@ -92,6 +100,10 @@ int main()
     vec_ops.start_use_vector(shifted_query);
     vec_ops.start_use_vector(history);
     vec_ops.start_use_vector(c);
+    vec_ops.start_use_vector(tangent);
+    vec_ops.start_use_vector(action_tangent);
+    vec_ops.start_use_vector(shifted_tangent);
+    vec_ops.start_use_vector(aligned_tangent);
 
     set_vector(vec_ops, x, {1.0, 0.0, 0.25, 0.5});
     adapter.apply_shift(x, shifted, 0.73);
@@ -190,6 +202,56 @@ int main()
     storage.push_back(shifted);
     require_true("negative-reflection shifted copy is skipped", storage.get_size() == 1);
     require_close("negative-reflection nearest duplicate distance", storage.nearest_stabilized_distance(shifted), 0.0, 1e-10);
+    require_close(
+        "negative-reflection direct orbit distance",
+        storage.canonical_distance(x, shifted),
+        0.0,
+        1e-10);
+
+    set_vector(vec_ops, x, {1.0, 0.0, -0.2, 0.5});
+    finite_actions.apply(
+        static_cast<std::size_t>(reflection_index),
+        x,
+        query);
+    adapter.apply_shift(query, shifted, 0.41);
+    set_vector(vec_ops, tangent, {0.2, 0.0, -0.04, 0.1});
+    finite_actions.apply(
+        static_cast<std::size_t>(reflection_index),
+        tangent,
+        action_tangent);
+    adapter.apply_shift(action_tangent, shifted_tangent, 0.41);
+    storage.align_endpoint_geometry(
+        x,
+        shifted,
+        shifted_tangent,
+        stabilized,
+        aligned_tangent);
+    vec_ops.assign_mul(real(1), stabilized, real(-1), x, c);
+    require_close(
+        "endpoint geometry aligns state",
+        vec_ops.norm_l2(c),
+        0.0,
+        1e-10);
+    vec_ops.assign_mul(
+        real(1),
+        aligned_tangent,
+        real(-1),
+        tangent,
+        c);
+    require_close(
+        "endpoint geometry aligns tangent with the same action",
+        vec_ops.norm_l2(c),
+        0.0,
+        1e-10);
+
+    vec_ops.stop_use_vector(aligned_tangent);
+    vec_ops.free_vector(aligned_tangent);
+    vec_ops.stop_use_vector(shifted_tangent);
+    vec_ops.free_vector(shifted_tangent);
+    vec_ops.stop_use_vector(action_tangent);
+    vec_ops.free_vector(action_tangent);
+    vec_ops.stop_use_vector(tangent);
+    vec_ops.free_vector(tangent);
 
     vec_ops.stop_use_vector(c);
     vec_ops.free_vector(c);

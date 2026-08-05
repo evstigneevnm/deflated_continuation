@@ -1,44 +1,29 @@
-#ifndef __LINEAR_OPERATOR_KS_2D_H__
-#define __LINEAR_OPERATOR_KS_2D_H__
-
-/**
-*   Helper class for iterative linear solver
-*   It is calling a method defined in nonlinear_operator
-*
-*/
-
+#ifndef __LINEAR_OPERATOR_KURAMOTO_SIVASHINSKIY_2D_H__
+#define __LINEAR_OPERATOR_KURAMOTO_SIVASHINSKIY_2D_H__
 
 namespace nonlinear_operators
 {
 
-
-template<class vector_operations, class nonlinear_operator> 
+template<class VectorOperations, class NonlinearOperator>
 class linear_operator_KS_2D
 {
-public:    
-    typedef typename vector_operations::scalar_type  T;
-    typedef typename vector_operations::vector_type  T_vec;
+public:
+    using vector_type = typename VectorOperations::vector_type;
 
-    linear_operator_KS_2D(nonlinear_operator*& nonlin_op_): 
-    nonlin_op(nonlin_op_)
+    explicit linear_operator_KS_2D(NonlinearOperator* nonlinear_operator):
+        nonlinear_operator_(nonlinear_operator)
     {
-
-    }
-    ~linear_operator_KS_2D()
-    {
-
     }
 
-    void apply(const T_vec& x, T_vec& f)const
+    void apply(const vector_type& input, vector_type& output) const
     {
-        nonlin_op->jacobian_u(x, f);
+        nonlinear_operator_->jacobian_u(input, output);
     }
 
 private:
-    nonlinear_operator* nonlin_op;
-
+    NonlinearOperator* nonlinear_operator_;
 };
 
-}
+} // namespace nonlinear_operators
 
 #endif

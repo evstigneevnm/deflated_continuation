@@ -4,12 +4,14 @@
 #include <string>
 #include <stdexcept>
 #include <cmath>
+#include <limits>
 #include <common/scalar_math.h>
 #include <continuation/chart_helpers.h>
 #include <continuation/continuation_step_state.h>
 #include <continuation/corrector_retry_policy.h>
 #include <continuation/predictor_chart_diagnostics.h>
 #include <continuation/predictor_chart_probe.h>
+#include <continuation/tangent_normalization.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
 #include <numerical_algos/detail/str_source_helper.h>
 /**
@@ -97,6 +99,11 @@ public:
         return last_isotropy_transition_;
     }
 
+    const continuation_step_attempt_state<T>& last_attempt_state() const
+    {
+        return last_attempt_state_;
+    }
+
     step_retry_result reduce_next_step(const T factor)
     {
         return predictor->reduce_next_step(factor);
@@ -109,6 +116,7 @@ public:
         bool failed = false;
         bool terminal_isotropy_transition = false;
         continuation_step_attempt_state<T> attempt;
+        last_attempt_state_ = attempt;
         isotropy_refinement_bracket<T> isotropy_bracket;
         T lambda_p;
         predictor_chart_policy<T> effective_chart_policy = chart_policy;
@@ -191,6 +199,12 @@ public:
                     converged = true;
                     break;
                 }
+                attempt.failure = continuation_failure_kind::tangent;
+                attempt.failure_reason =
+                    "predictor validation rejected the current tangent";
+                attempt.attempted_step = predictor->get_ds();
+                attempt.retry_count = predictor_retry_count(predictor, 0);
+                last_attempt_state_ = attempt;
                 throw std::runtime_error(
                     "continuation::advance_solution: predictor validation rejected the current tangent");
             }
@@ -205,6 +219,7 @@ public:
                         break;
                     }
                     failed = true;
+                    attempt.failure = continuation_failure_kind::predictor_chart;
                     attempt.failure_reason = "predictor chart validation exhausted its retry budget";
                     break;
                 }
@@ -229,6 +244,7 @@ public:
                         break;
                     }
                     failed = true;
+                    attempt.failure = continuation_failure_kind::predictor_chart;
                     attempt.failure_reason = retry_result == step_retry_result::retry_limit
                         ? "continuation retry limit reached after chart rejection"
                         : "minimum continuation step reached after chart rejection";
@@ -279,6 +295,9 @@ public:
                         break;
                     }
                     failed = true;
+                    attempt.failure = retry_result == step_retry_result::retry_limit
+                        ? continuation_failure_kind::corrector_retry_limit
+                        : continuation_failure_kind::minimum_step;
                     attempt.failure_reason = retry_result == step_retry_result::retry_limit
                         ? "continuation corrector retry limit reached"
                         : "minimum continuation step reached after corrector failure";
@@ -378,6 +397,9 @@ public:
         }
         if(failed)
         {
+            attempt.attempted_step = predictor->get_ds();
+            attempt.retry_count = predictor_retry_count(predictor, 0);
+            last_attempt_state_ = attempt;
             throw std::runtime_error(
                 std::string("continuation::advance_solution (corrector) " __FILE__ " " __STR(__LINE__) " failed: ") +
                 (attempt.failure_reason.empty() ? "unknown retry failure" : attempt.failure_reason));
@@ -437,27 +459,42 @@ public:
             {
                 lambda1_s = (lambda1 - lambda1_l)/d_ds;
                 vec_ops->assign_mul(T(-1)/d_ds, x1_l, T(1)/d_ds, x1, x1_s);    
-                T norm = vec_ops->norm_rank1(x1_s, lambda1_s);
-                lambda1_s/=norm;
-                vec_ops->scale(T(1)/norm, x1_s);
-                if(verbose)
+                tangent_obtained = normalize_rank1_tangent(
+                    vec_ops,
+                    x1_s,
+                    lambda1_s);
+                if(tangent_obtained && verbose)
                 {
                     log->info_f("continuation::advance_solution::||(x_s, l_s)|| = %le", (double)(lambda1_s*lambda1_s + vec_ops->scalar_prod(x1_s, x1_s)) );
                 }
-
-                tangent_obtained = true;
+                if(!tangent_obtained)
+                {
+                    log->warning(
+                        "continuation::advance_solution: finite-difference tangent was zero or non-finite.");
+                }
             }
-            else
+            if(!tangent_obtained)
             {
                 
-                log->warning("continuation::advance_solution::newton_extended solver failed for additional point in tangent");
+                log->warning("continuation::advance_solution could not produce a usable additional tangent point");
                 if(verbose)
                 {
                     log->info("continuation::advance_solution using Newton-Raphson estimation.");
                 }
-                T x_norm = vec_ops->norm(x1);
-                T sign = (lambda1 - lambda0)/common::scalar_math::abs(lambda1 - lambda0);
-                T d_lambda = sign*T(1.0)/x_norm;
+                const T x_norm = vec_ops->norm(x1);
+                const T delta_lambda = lambda1 - lambda0;
+                T sign = delta_lambda < T(0) ? T(-1) : T(1);
+                if(common::scalar_math::abs(delta_lambda) <=
+                   T(16)*std::numeric_limits<T>::epsilon() && lambda0_s < T(0))
+                {
+                    sign = T(-1);
+                }
+                const T d_lambda_magnitude =
+                    common::scalar_math::isfinite(x_norm) &&
+                    x_norm > T(16)*std::numeric_limits<T>::epsilon()
+                        ? T(1)/x_norm
+                        : T(1.0e-4)*(T(1) + common::scalar_math::abs(lambda1));
+                const T d_lambda = sign*d_lambda_magnitude;
                 lambda1_l = lambda1 + d_lambda;
                 vec_ops->assign(x1, x1_l); //guess for x1 
                 bool converged = newton->solve(nonlin_op, x1_l, lambda1_l);
@@ -469,7 +506,10 @@ public:
                     log->error("continuation::advance_solution: Newton-Raphson failed to converged. Nothing can be done so far, setting estimation equal to the previous step.");
                     vec_ops->assign(x0_s, x1_s);
                     lambda1_s = lambda0_s;
-                    tangent_obtained = true; //????
+                    tangent_obtained = normalize_rank1_tangent(
+                        vec_ops,
+                        x1_s,
+                        lambda1_s);
                 }
                 else
                 {
@@ -477,20 +517,32 @@ public:
                     //x_s = x1 - x;      
                     vec_ops->assign_mul(T(1.0), x1_l, T(-1.0), x1, x1_s);  //x_s = ds*d(x)/ds
                     T ds_l = vec_ops->norm_rank1(x1_s, lambda1_s); 
-                    lambda1_s/=ds_l;
-                    vec_ops->scale(T(1.0)/ds_l, x1_s);
-                    if(verbose)
+                    tangent_obtained = normalize_rank1_tangent(
+                        vec_ops,
+                        x1_s,
+                        lambda1_s);
+                    if(tangent_obtained && verbose)
                     {
                         log->info_f("continuation::advance_solution: estimated local ds = %le", (double) ds_l);
                         log->info("continuation::advance_solution: Newton-Raphson estimate ends successfully.");
                     }
-                    tangent_obtained = true;
                 }
 
 
 
             }
-            nonlinear_operators::detail::project_current_tangent(vec_ops, nonlin_op, x1_s, x1_s);
+            if(tangent_obtained)
+            {
+                nonlinear_operators::detail::project_current_tangent(
+                    vec_ops,
+                    nonlin_op,
+                    x1_s,
+                    x1_s);
+                tangent_obtained = normalize_rank1_tangent(
+                    vec_ops,
+                    x1_s,
+                    lambda1_s);
+            }
             
         }
         if(converged && tangent_obtained)
@@ -512,6 +564,9 @@ public:
             }
         }
         const bool recovered = attempt.recovered();
+        attempt.attempted_step = predictor->get_ds();
+        attempt.retry_count = predictor_retry_count(predictor, 0);
+        last_attempt_state_ = attempt;
         predictor->accept_step(recovered);
         if(verbose)
         {
@@ -535,6 +590,18 @@ public:
 
 private:
     template<class Predictor>
+    static auto predictor_retry_count(Predictor* predictor_, int)
+        -> decltype(predictor_->get_retry_count())
+    {
+        return predictor_->get_retry_count();
+    }
+
+    static unsigned int predictor_retry_count(...)
+    {
+        return 0;
+    }
+
+    template<class Predictor>
     static auto set_predictor_verbose(Predictor* predictor_, const bool value, int)
         -> decltype(predictor_->set_verbose(value), void())
     {
@@ -557,6 +624,7 @@ private:
     predictor_chart_policy<T> chart_policy;
     symmetry::continuation::isotropy_transition_policy<T> isotropy_policy;
     symmetry::continuation::isotropy_transition_result<T> last_isotropy_transition_;
+    continuation_step_attempt_state<T> last_attempt_state_;
     bool verbose = true;
 
 };

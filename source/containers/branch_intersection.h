@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include <string>
 
+#include <containers/bifurcation_diagram/curve_provenance.h>
+
 namespace container
 {
 
@@ -26,6 +28,8 @@ struct branch_intersection_policy
     unsigned int minimum_forward_refinements_for_verification = 3;
     T maximum_verified_forward_steps_ahead = T(0.1);
     T maximum_verified_forward_distance_step_ratio = T(0.3);
+    bool localize_analytical_targets = true;
+    T analytical_target_parameter_tolerance = T(1.0e-7);
     bool verbose = false;
 };
 
@@ -106,6 +110,11 @@ void validate_branch_intersection_policy(const branch_intersection_policy<T>& po
     {
         throw std::invalid_argument(
             "branch intersection verified distance/step ratio must be positive and not exceed the detection ratio");
+    }
+    if(policy.analytical_target_parameter_tolerance <= T(0))
+    {
+        throw std::invalid_argument(
+            "analytical branch target parameter tolerance must be positive");
     }
 }
 
@@ -218,6 +227,7 @@ struct branch_intersection_result
     uint64_t semicurve_id = 0;
     uint64_t lower_point_index = 0;
     uint64_t upper_point_index = 0;
+    curve_provenance target_provenance;
     std::string reason;
 };
 

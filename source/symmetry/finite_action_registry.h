@@ -45,11 +45,15 @@ public:
     void clear()
     {
         actions.clear();
+        definition_fingerprint_.clear();
+        definition_fingerprint_explicit_ = false;
     }
 
     void reset_to_identity()
     {
         actions.clear();
+        definition_fingerprint_ = "identity";
+        definition_fingerprint_explicit_ = false;
         add(
             "identity",
             [this](const vector_type& source, vector_type& destination)
@@ -78,6 +82,38 @@ public:
     std::size_t size() const
     {
         return actions.size();
+    }
+
+    void set_definition_fingerprint(std::string fingerprint)
+    {
+        if(fingerprint.empty())
+        {
+            throw std::invalid_argument(
+                "finite_action_registry definition fingerprint must not be empty");
+        }
+        definition_fingerprint_ = std::move(fingerprint);
+        definition_fingerprint_explicit_ = true;
+    }
+
+    const std::string& definition_fingerprint() const
+    {
+        return definition_fingerprint_;
+    }
+
+    bool has_explicit_definition_fingerprint() const
+    {
+        return definition_fingerprint_explicit_;
+    }
+
+    std::vector<std::string> action_names() const
+    {
+        std::vector<std::string> result;
+        result.reserve(actions.size());
+        for(const auto& action: actions)
+        {
+            result.push_back(action.name);
+        }
+        return result;
     }
 
     const std::string& name(const std::size_t index) const
@@ -120,6 +156,8 @@ private:
 private:
     VectorOperations* vec_ops;
     std::vector<action_entry> actions;
+    std::string definition_fingerprint_ = "identity";
+    bool definition_fingerprint_explicit_ = false;
 };
 
 } // namespace symmetry

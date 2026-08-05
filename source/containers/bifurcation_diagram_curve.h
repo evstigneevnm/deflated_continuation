@@ -25,6 +25,7 @@
 #include <containers/symmetry_event_journal.h>
 #include <containers/bifurcation_diagram/curve_intersection_search.h>
 #include <containers/bifurcation_diagram/curve_point.h>
+#include <containers/bifurcation_diagram/curve_provenance.h>
 #include <containers/bifurcation_diagram/curve_interpolator.h>
 #include <containers/bifurcation_diagram/curve_metadata_io.h>
 #include <containers/bifurcation_diagram/curve_vector_store.h>
@@ -84,6 +85,7 @@ public:
                 &x1);
             refs_set = true;
             load_metadata_if_available();
+            load_provenance_if_available();
             load_symmetry_events_if_available();
         }
     }
@@ -183,6 +185,9 @@ public:
             skip_output = that.skip_output;
             debug_f_name  = std::move(that.debug_f_name);
             metadata_f_name = std::move(that.metadata_f_name);
+            provenance_f_name = std::move(that.provenance_f_name);
+            provenance = std::move(that.provenance);
+            provenance_metadata_available = that.provenance_metadata_available;
             debug_file = std::move(that.debug_file); //std::move(that.debug_file). Move of std::ofstream supported only from C++5.X and above!
             curve_open = that.curve_open;
             refs_set = that.refs_set;
@@ -222,6 +227,7 @@ private:
     unsigned int skip_output;
     std::string debug_f_name;
     std::string metadata_f_name;
+    std::string provenance_f_name;
     std::ofstream debug_file;
     bool refs_set = false;
     uint64_t current_segment_id = 0;
@@ -232,6 +238,8 @@ private:
     vector_store_type vector_store;
     interpolator_type interpolator;
     intersection_search_type intersection_search;
+    curve_provenance provenance;
+    bool provenance_metadata_available = false;
 
     void mark_incomplete_segment(const uint64_t segment_id)
     {
@@ -318,6 +326,32 @@ private:
         segment_metadata_available = result.loaded_any;
     }
 
+    void write_provenance_file()
+    {
+        if(provenance_f_name.empty())
+        {
+            return;
+        }
+        if(!write_curve_provenance(provenance_f_name, provenance) && log != nullptr)
+        {
+            log->warning_f(
+                "container::bifurcation_diagram_curve(%i): failed to write provenance file %s",
+                curve_number,
+                provenance_f_name.c_str());
+        }
+    }
+
+    void load_provenance_if_available()
+    {
+        if(provenance_f_name.empty())
+        {
+            provenance_f_name.assign(
+                (std::filesystem::path(full_path)/"curve_provenance.dat").string());
+        }
+        provenance_metadata_available =
+            load_curve_provenance(provenance_f_name, provenance);
+    }
+
     void load_symmetry_events_if_available()
     {
         symmetry_events.set_file_name(
@@ -344,24 +378,10 @@ private:
         {
             return true;
         }
-        return lower.segment_id == upper.segment_id && !is_incomplete_segment(lower.segment_id);
-    }
-
-    bool terminal_pair_not_at_lambda(const values_t& lower, const values_t& upper, const T& lambda_star) const
-    {
-        const bool lower_terminal = is_terminal_endpoint(lower.endpoint_reason);
-        const bool upper_terminal = is_terminal_endpoint(upper.endpoint_reason);
-        if(!lower_terminal && !upper_terminal)
-        {
-            return false;
-        }
-        return !(lower.lambda == lambda_star || upper.lambda == lambda_star);
-    }
-
-    bool terminal_pair(const values_t& lower, const values_t& upper) const
-    {
-        return is_terminal_endpoint(lower.endpoint_reason) ||
-               is_terminal_endpoint(upper.endpoint_reason);
+        // An incomplete endpoint means that the segment could not be extended;
+        // it does not invalidate the already accepted states inside the
+        // segment. Only interpolation across segment boundaries is forbidden.
+        return lower.segment_id == upper.segment_id;
     }
 
     bool is_incomplete_pair(const values_t& lower, const values_t& upper) const
@@ -397,6 +417,8 @@ public:
         full_path.assign((std::filesystem::path(data_directory) / std::to_string(curve_number)).string());
         debug_f_name.assign(full_path.c_str() + std::string("/") + std::string("debug_curve.dat"));
         metadata_f_name.assign(full_path.c_str() + std::string("/") + std::string("metadata_curve.dat"));
+        provenance_f_name.assign(
+            (std::filesystem::path(full_path)/"curve_provenance.dat").string());
         symmetry_events.set_file_name(
             std::filesystem::path(full_path)/"symmetry_events.dat");
         log->info_f("container::bifurcation_diagram_curve: FULL PATH: %s", full_path.c_str());
@@ -409,7 +431,44 @@ public:
         set_directory(data_directory_);
         set_curve_number(curve_number);
         load_metadata_if_available();
+        load_provenance_if_available();
         load_symmetry_events_if_available();
+    }
+
+    void set_analytical_branch_provenance(
+        const uint64_t branch_id,
+        const std::string& branch_name)
+    {
+        provenance.origin = curve_origin::analytical;
+        provenance.analytical_branch_id = branch_id;
+        provenance.analytical_branch_name = branch_name;
+        provenance_metadata_available = true;
+        write_provenance_file();
+    }
+
+    const curve_provenance& get_curve_provenance() const
+    {
+        return provenance;
+    }
+
+    bool has_curve_provenance_metadata() const
+    {
+        return provenance_metadata_available;
+    }
+
+    int get_curve_number() const
+    {
+        return curve_number;
+    }
+
+    uint64_t get_current_segment_id() const
+    {
+        return current_segment_id;
+    }
+
+    std::size_t point_count() const
+    {
+        return container.size();
     }
 
     void start_new_segment()
@@ -638,11 +697,6 @@ public:
                 }
                 continue;
             }
-            if(terminal_pair_not_at_lambda(p_j, p_jp, lambda_star))
-            {
-                status.skipped_discontinuous++;
-                continue;
-            }
             {
                 if((p_j.lambda == lambda_star)&&(p_j.is_data_avaliable))
                 {
@@ -682,16 +736,8 @@ public:
                     }
                     else
                     {
-                        if(terminal_pair(p_j, p_jp))
-                        {
-                            status.skipped_discontinuous++;
-                        }
-                        else
-                        {
-                            //std::string fail_find_files = std::string("container::bifurcation_diagram_curve(") + std::to_string(curve_number) + std::string("): failed to find a valid solution for the parameter = ") + std::to_string(lambda_star) + std::string(" with lower flag = ") + std::to_string(stat_l) + std::string(" and upper flag = ") + std::to_string(stat_u) + std::string(", indexing = (") + std::to_string(ind) + std::string(",") + std::to_string(indp) + std::string(").");
-                            status.missing_data++;
-                            log->warning_f("container::bifurcation_diagram_curve(%i): !!!failed to add intersectoin at (%i(%i), %i(%i)) for the solution at lambda =  %lf !!!", curve_number, ind, int(stat_l), indp, int(stat_u), lambda_star);
-                        }
+                        status.missing_data++;
+                        log->warning_f("container::bifurcation_diagram_curve(%i): !!!failed to add intersectoin at (%i(%i), %i(%i)) for the solution at lambda =  %lf !!!", curve_number, ind, int(stat_l), indp, int(stat_u), lambda_star);
 
                         //throw std::runtime_error( fail_find_files );
                     }
@@ -710,10 +756,6 @@ public:
             const auto& p_j = container[j];
             const auto& p_jp = container[j + 1];
             if(!can_interpolate_between(p_j, p_jp))
-            {
-                continue;
-            }
-            if(terminal_pair_not_at_lambda(p_j, p_jp, lambda_star))
             {
                 continue;
             }
@@ -838,6 +880,7 @@ public:
         if(debug_file.is_open())
             debug_file.close();
         write_metadata_file();
+        write_provenance_file();
         curve_open = false; 
         log->info_f("container::bifurcation_diagram_curve(%i) closed.", curve_number); 
     }
@@ -892,6 +935,13 @@ public:
     b_d_container_t return_curve_vector()
     {
         return(container);
+    }
+
+    bool read_saved_solution_for_audit(
+        const values_t& point,
+        T_vec& output)
+    {
+        return read_saved_point(point, output);
     }
 
 private:

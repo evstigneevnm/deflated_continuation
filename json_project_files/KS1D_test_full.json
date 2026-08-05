@@ -101,8 +101,9 @@
         },
         "restart_policy": {
             "allow_incomplete_restart_intersections": false,
-            "allow_knot_interpolation_failure": false,
-            "allow_failed_continuation_curve_save": false,
+      "allow_knot_interpolation_failure": false,
+      "allow_failed_continuation_curve_save": false,
+      "preserve_partial_curves": true,
             "check_duplicate_after_deflation": true,
             "duplicate_after_deflation_retries": 2,
             "duplicate_after_deflation_tolerance": 1.0e-8,
@@ -130,11 +131,35 @@
                     }
                 ]
             },
-            "seed_schedule": {
-                "enabled": true,
-                "registry_file": "deflation_seed_registry.json",
-                "save_registry": true
-            }
+      "seed_schedule": {
+        "enabled": true,
+        "registry_file": "deflation_seed_registry.json",
+        "save_registry": true
+      },
+      "failed_candidate_registry": {
+        "enabled": true,
+        "registry_file": "failed_continuations/registry.json",
+        "state_directory": "failed_continuations/states",
+        "policy_generation": 1
+      },
+      "recovery_registry": {
+        "enabled": true,
+        "registry_file": "continuation_recovery_registry.json",
+        "checkpoint_directory": "recovery_checkpoints",
+        "policy_generation": 1,
+        "process_before_deflation": false
+      },
+      "topology_registry": {
+        "enabled": true,
+        "registry_file": "branch_topology.json",
+        "endpoint_directory": "branch_topology/endpoints",
+        "policy_generation": 1,
+        "absolute_parameter_tolerance": 1e-7,
+        "relative_parameter_tolerance": 1e-9,
+        "state_tolerance": 1e-8,
+        "minimum_tangent_line_similarity": 0.9,
+        "record_transverse_junctions": true
+      }
         },
         "branch_intersection_policy": {
             "enabled": true,

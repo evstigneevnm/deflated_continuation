@@ -69,6 +69,27 @@ void verify_full_configuration(const std::string& file_name)
         continuation.restart_policy.seed_schedule.enabled,
         "deterministic seed schedule");
     require(
+        continuation.restart_policy.preserve_partial_curves,
+        "partial curve preservation");
+    require(
+        continuation.restart_policy.failed_candidate_registry.enabled,
+        "persistent failed-candidate registry");
+    require(
+        continuation.restart_policy.recovery_registry.enabled,
+        "continuation recovery registry");
+    require(
+        !continuation.restart_policy.recovery_registry.process_before_deflation,
+        "automatic recovery remains opt-in");
+    require(
+        continuation.restart_policy.topology_registry.enabled,
+        "branch topology registry");
+    require(
+        close_value(
+            continuation.restart_policy.topology_registry.
+                minimum_tangent_line_similarity,
+            T(0.9)),
+        "topology tangent threshold");
+    require(
         continuation.continuation_parameter_bounds.enabled,
         "explicit continuation bounds");
     require(
@@ -92,6 +113,15 @@ void verify_full_configuration(const std::string& file_name)
     require(continuation.branch_intersection_policy.detect_forward_approach, "forward branch detection");
     require(continuation.branch_intersection_policy.forward_distance_extrapolation_power == 2,
             "forward extrapolation power");
+    require(
+        continuation.branch_intersection_policy.localize_analytical_targets,
+        "analytical target localization default");
+    require(
+        close_value(
+            continuation.branch_intersection_policy.
+                analytical_target_parameter_tolerance,
+            T(1.0e-7)),
+        "analytical target parameter tolerance default");
     require(continuation.self_intersection_policy.enabled, "self intersection");
     require(continuation.isotropy_transition_policy.maximum_order == 16, "isotropy order");
     require(continuation.predictor_chart_policy.enforce, "predictor chart enforcement");
@@ -195,6 +225,14 @@ void verify_optional_policy_defaults(const std::string& file_name)
             "knot relocation default");
     require(!continuation.restart_policy.seed_schedule.enabled,
             "seed schedule default");
+    require(continuation.restart_policy.preserve_partial_curves,
+            "partial preservation default");
+    require(continuation.restart_policy.failed_candidate_registry.enabled,
+            "failed registry default");
+    require(continuation.restart_policy.recovery_registry.enabled,
+            "recovery registry default");
+    require(continuation.restart_policy.topology_registry.enabled,
+            "topology registry default");
     require(!continuation.continuation_parameter_bounds.enabled,
             "continuation bounds default");
     require(

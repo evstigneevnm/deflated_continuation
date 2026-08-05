@@ -2,6 +2,7 @@
 #define __MAIN_DEFLATION_CONTINUATION_ANALYTICAL_BRANCH_EXECUTOR_H__
 
 #include <cstddef>
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -48,7 +49,7 @@ public:
         Stabilize&& stabilize,
         Save&& save)
     {
-        if(archive_exists || !enabled)
+        if(!enabled)
         {
             return false;
         }
@@ -71,6 +72,26 @@ public:
                     static_cast<unsigned int>(branch_id),
                     static_cast<unsigned long long>(count));
             });
+
+        if(archive_exists)
+        {
+            std::size_t curve_index = 0;
+            for(const std::size_t branch_id: branches)
+            {
+                if(!diagram_->restore_analytical_curve_provenance(
+                       curve_index,
+                       static_cast<std::uint64_t>(branch_id),
+                       exact_solutions_->name(branch_id)))
+                {
+                    log_->warning_f(
+                        "MAIN:deflation_continuation: failed to restore analytical branch %llu provenance on archived curve %llu.",
+                        static_cast<unsigned long long>(branch_id),
+                        static_cast<unsigned long long>(curve_index));
+                }
+                ++curve_index;
+            }
+            return false;
+        }
 
         bool any_success = false;
         for(const std::size_t branch_id: branches)
@@ -123,6 +144,9 @@ private:
         Curve* curve = nullptr;
         diagram_->init_new_curve();
         diagram_->get_current_ref(curve);
+        curve->set_analytical_branch_provenance(
+            static_cast<std::uint64_t>(branch_id),
+            exact_solutions_->name(branch_id));
         const bool success = continuation_->continuate_curve(
             curve,
             exact_value.get(),

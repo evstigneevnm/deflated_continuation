@@ -7,6 +7,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace visualization
 {
@@ -101,9 +102,19 @@ struct visualization_write_result
 {
     std::filesystem::path data_file;
     std::string kind;
+    std::string format;
+    std::string field_name;
+    std::string scalar_type;
+    std::string storage_order;
+    std::string producer_backend;
     std::size_t points = 0;
     std::size_t components = 1;
     double coordinate_extent = 0.0;
+    std::vector<std::size_t> shape;
+    std::vector<double> origin;
+    std::vector<double> spacing;
+    std::vector<bool> periodic;
+    std::vector<std::string> axis_names;
 };
 
 template<class VectorOperations>

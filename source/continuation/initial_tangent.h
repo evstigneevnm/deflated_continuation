@@ -32,6 +32,7 @@ public:
     typedef typename VectorOperations::vector_type  T_vec;
     using shifted_newton_pair = continuation::shifted_newton_pair<T>;
     using tangent_candidate_quality = continuation::tangent_candidate_quality<T>;
+    using tangent_equation_quality = continuation::tangent_equation_quality<T>;
 
 
     initial_tangent(VectorOperations*& vec_ops_, Loggin* log_, NewtonMethod* newton_, LinearOperator*& lin_op_, LinearSystemSolver*& lin_solv_, bool = true):
@@ -71,6 +72,13 @@ public:
         tangent_quality_policy = policy;
     }
 
+    void set_tangent_equation_quality_policy(
+        const tangent_equation_quality_policy<T>& policy)
+    {
+        policy.validate();
+        tangent_equation_policy = policy;
+    }
+
     bool validate_tangent_candidate(
         NonlinearOperator* nonlin_op,
         const T_vec& x,
@@ -80,6 +88,19 @@ public:
         const T& predictor_ds,
         const char* method)
     {
+        const auto quality = log_tangent_diagnostics(
+            nonlin_op,
+            x,
+            lambda,
+            method,
+            x_s,
+            lambda_s);
+        if(!tangent_equation_quality_is_acceptable(
+               quality,
+               tangent_equation_policy))
+        {
+            return false;
+        }
         return chart_validator.accepts(
             nonlin_op,
             x,
@@ -164,19 +185,39 @@ public:
             lambda_s/=norm;
             vec_ops->scale(T(1)/norm, x_s);
             //vec_ops->scale(T(1)/T(vec_ops->get_l2_size()), x_s);
-            const T tangent_residual = log_tangent_diagnostics(nonlin_op, x, lambda, "linear solve", x_s, lambda_s);
-            bool accept_linear_tangent = true;
+            const auto tangent_quality = log_tangent_diagnostics(
+                nonlin_op,
+                x,
+                lambda,
+                "linear solve",
+                x_s,
+                lambda_s);
+            bool accept_linear_tangent =
+                tangent_equation_quality_is_acceptable(
+                    tangent_quality,
+                    tangent_equation_policy);
             if constexpr(nonlinear_operators::detail::has_projected_tangent_system<NonlinearOperator, T_vec, T>::value)
             {
-                accept_linear_tangent = tangent_residual <= projected_direct_tangent_residual_tol();
+                accept_linear_tangent =
+                    accept_linear_tangent &&
+                    tangent_quality.absolute_residual <=
+                        projected_direct_tangent_residual_tol();
                 if(!accept_linear_tangent)
                 {
                     log->warning_f(
-                        "continuation::initial_tangent: rejected projected direct tangent candidate because tangent residual = %le exceeds tolerance = %le.",
-                        (double)tangent_residual,
+                        "continuation::initial_tangent: rejected projected direct tangent candidate because tangent residual = %le exceeds tolerance = %le or its relative residual is invalid.",
+                        (double)tangent_quality.absolute_residual,
                         (double)projected_direct_tangent_residual_tol());
-                    linear_system_converged = false;
                 }
+            }
+            if(!accept_linear_tangent)
+            {
+                log->warning_f(
+                    "continuation::initial_tangent: rejected direct tangent candidate: absolute residual = %le, relative residual = %le, maximum relative residual = %le.",
+                    (double)tangent_quality.absolute_residual,
+                    (double)tangent_quality.relative_residual,
+                    (double)tangent_equation_policy.maximum_relative_residual);
+                linear_system_converged = false;
             }
             if(accept_linear_tangent)
             {
@@ -505,7 +546,6 @@ private:
                method,
                predictor_ds))
         {
-            log_tangent_diagnostics(nonlin_op, x, lambda, method, x_s, lambda_s);
             log->info("continuation::initial_tangent: Newton-Raphson secant estimate ends successfully.");
             return true;
         }
@@ -527,6 +567,13 @@ private:
         {
             secant_builder.build_row(sign, x, shifted, secant_candidate_kind::two_sided, x_s, lambda_s, method);
             if(secant_builder.normalize(method, x_s, lambda_s) &&
+               tangent_candidate_is_acceptable(
+                   nonlin_op,
+                   x,
+                   lambda,
+                   method,
+                   x_s,
+                   lambda_s) &&
                chart_validator.accepts(
                    nonlin_op,
                    x,
@@ -546,6 +593,13 @@ private:
         {
             secant_builder.build_row(sign, x, shifted, secant_candidate_kind::plus_one_sided, x_s, lambda_s, method);
             if(secant_builder.normalize(method, x_s, lambda_s) &&
+               tangent_candidate_is_acceptable(
+                   nonlin_op,
+                   x,
+                   lambda,
+                   method,
+                   x_s,
+                   lambda_s) &&
                chart_validator.accepts(
                    nonlin_op,
                    x,
@@ -564,6 +618,13 @@ private:
         {
             secant_builder.build_row(sign, x, shifted, secant_candidate_kind::minus_one_sided, x_s, lambda_s, method);
             if(secant_builder.normalize(method, x_s, lambda_s) &&
+               tangent_candidate_is_acceptable(
+                   nonlin_op,
+                   x,
+                   lambda,
+                   method,
+                   x_s,
+                   lambda_s) &&
                chart_validator.accepts(
                    nonlin_op,
                    x,
@@ -581,7 +642,27 @@ private:
         return false;
     }
 
-    T log_tangent_diagnostics(
+    bool tangent_candidate_is_acceptable(
+        NonlinearOperator* nonlin_op,
+        const T_vec& x,
+        const T& lambda,
+        const char* method,
+        const T_vec& x_s,
+        const T& lambda_s)
+    {
+        const auto quality = log_tangent_diagnostics(
+            nonlin_op,
+            x,
+            lambda,
+            method,
+            x_s,
+            lambda_s);
+        return tangent_equation_quality_is_acceptable(
+            quality,
+            tangent_equation_policy);
+    }
+
+    tangent_equation_quality log_tangent_diagnostics(
         NonlinearOperator* nonlin_op,
         const T_vec& x,
         const T& lambda,
@@ -598,26 +679,39 @@ private:
 
         // f stores -J_lambda, so J*x_s - lambda_s*f is
         // J*x_s + J_lambda*lambda_s, the tangent equation residual.
+        const T parameter_term_norm =
+            common::scalar_math::abs(lambda_s)*vec_ops->norm_l2(f);
         lin_op->apply(x_s, f1);
+        const T jacobian_term_norm = vec_ops->norm_l2(f1);
         vec_ops->add_mul(-lambda_s, f, f1);
         const T tangent_residual = vec_ops->norm_l2(f1);
+        const auto quality = make_tangent_equation_quality(
+            tangent_residual,
+            jacobian_term_norm,
+            parameter_term_norm);
 
         log->info_f(
-            "continuation::initial_tangent: diagnostics: method = %s, ||x_s|| = %le, lambda_s = %le, ||(x_s,lambda_s)|| = %le, tangent equation residual = %le",
+            "continuation::initial_tangent: diagnostics: method = %s, ||x_s|| = %le, lambda_s = %le, ||(x_s,lambda_s)|| = %le, tangent equation residual = %le, equation scale = %le, relative residual = %le",
             method,
             (double)x_s_norm,
             (double)lambda_s,
             (double)rank1_norm,
-            (double)tangent_residual);
-        if(tangent_residual > T(1))
+            (double)quality.absolute_residual,
+            (double)quality.equation_scale,
+            (double)quality.relative_residual);
+        if(!tangent_equation_quality_is_acceptable(
+               quality,
+               tangent_equation_policy))
         {
             log->warning_f(
-                "continuation::initial_tangent: validation warning: tangent equation residual is large: method = %s, residual = %le, lambda_s = %le.",
+                "continuation::initial_tangent: rejected tangent candidate by equation validation: method = %s, absolute residual = %le, relative residual = %le, maximum relative residual = %le, lambda_s = %le.",
                 method,
-                (double)tangent_residual,
+                (double)quality.absolute_residual,
+                (double)quality.relative_residual,
+                (double)tangent_equation_policy.maximum_relative_residual,
                 (double)lambda_s);
         }
-        return tangent_residual;
+        return quality;
     }
 
     VectorOperations* vec_ops;
@@ -637,6 +731,7 @@ private:
         Loggin,
         NonlinearOperator> chart_validator;
     projected_tangent_quality_policy<T> tangent_quality_policy;
+    tangent_equation_quality_policy<T> tangent_equation_policy;
     
 };
 

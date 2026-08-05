@@ -108,6 +108,10 @@ jobs:
           ./"$BUILD_DIR"/analytical_branch_executor/test_analytical_branch_executor.bin
           make test_knot_executor.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/knot_executor"
           ./"$BUILD_DIR"/knot_executor/test_knot_executor.bin
+          make test_continuation_registries.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/continuation_registries"
+          ./"$BUILD_DIR"/continuation_registries/test_continuation_registries.bin
+          make test_branch_topology_registry.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/branch_topology_registry"
+          ./"$BUILD_DIR"/branch_topology_registry/test_branch_topology_registry.bin
           make test_deflation_seed_registry.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/deflation_seed_registry"
           ./"$BUILD_DIR"/deflation_seed_registry/test_deflation_seed_registry.bin
           make test_linear_solve_recovery.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/linear_solve_recovery"
@@ -120,6 +124,8 @@ jobs:
           ./"$BUILD_DIR"/curve_interpolator/test_curve_interpolator.bin
           make test_curve_intersection_search.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/curve_intersection_search"
           ./"$BUILD_DIR"/curve_intersection_search/test_curve_intersection_search.bin
+          make test_curve_provenance.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/curve_provenance"
+          ./"$BUILD_DIR"/curve_provenance/test_curve_provenance.bin
           make test_diagram_archive.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/diagram_archive"
           ./"$BUILD_DIR"/diagram_archive/test_diagram_archive.bin
           make test_stability_diagram_archive.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_diagram_archive"
@@ -166,6 +172,8 @@ jobs:
           ./"$BUILD_DIR"/stabilized_storage/test_stabilized_storage.bin
           make test_symmetry_solution_storage.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/symmetry_solution_storage" REAL_TYPE=double
           ./"$BUILD_DIR"/symmetry_solution_storage/test_symmetry_solution_storage.bin
+          make test_residual_translation_orbit_aligner_2d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/residual_translation_orbit_aligner_2d"
+          ./"$BUILD_DIR"/residual_translation_orbit_aligner_2d/test_residual_translation_orbit_aligner_2d.bin
 
   fftw-operations-cpu:
     needs: [symmetry-foundation-cpu]
@@ -187,6 +195,63 @@ jobs:
           ./"$BUILD_DIR"/fftw_operations/test_fftw_operations.bin
           make test_fft_facade_fftw.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fft_facade_fftw"
           ./"$BUILD_DIR"/fft_facade_fftw/test_fft_facade_fftw.bin
+
+  fourier-discretization-cpu:
+    needs: [scfd-vector-operations-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3 python3-numpy python3-matplotlib libboost-dev libboost-serialization-dev libfftw3-dev libopenblas-dev
+          fi
+      - name: Build and validate reusable Fourier discretization and KS2D
+        run: |
+          export OMP_NUM_THREADS=8
+          KS2D_BUILD="$BUILD_DIR/ks2d_cpu_omp"
+          make test_fourier_discretization_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_fourier_discretization_cpu_omp.bin
+          make test_fourier_translation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_fourier_translation_cpu_omp.bin
+          make test_periodic_affine_group_2d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_periodic_affine_group_2d.bin
+          make test_residual_translation_group_2d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_residual_translation_group_2d.bin
+          make test_finite_group_manifest.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_finite_group_manifest.bin
+          make test_KS2D_operator_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_KS2D_operator_cpu_omp.bin
+          make test_numpy_array_writer.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_numpy_array_writer.bin
+          PLOT_PYTHON=python3
+          if ! "$PLOT_PYTHON" -c 'import matplotlib, numpy' >/dev/null 2>&1; then
+            if [ -x "$HOME/anaconda3/bin/python" ]; then
+              PLOT_PYTHON="$HOME/anaconda3/bin/python"
+            else
+              echo "NumPy and Matplotlib are required for the KS2D visualization test" >&2
+              exit 1
+            fi
+          fi
+          MPLCONFIGDIR="$KS2D_BUILD/matplotlib" "$PLOT_PYTHON" plot_scripts/tests/test_plot_bd_solutions.py
+          make KS2D_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          python3 scripts/write_ks2d_ci_config.py "$KS2D_BUILD/ks2d_ci.json" "$KS2D_BUILD/project" --clean-project --nx 12 --ny 12 --steps 8
+          timeout 120s ./"$KS2D_BUILD"/KS2D_bd_cpu_omp.bin "$KS2D_BUILD/ks2d_ci.json" --seed-zero 2.0 --continue-seed-only --quiet
+          python3 scripts/validate_symmetry_group_manifest.py "$KS2D_BUILD/project" --expected-order 8
+          python3 scripts/validate_ks1d_zero_branch.py "$KS2D_BUILD/project" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
+          make KS2D_prepare_visualization_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/KS2D_prepare_visualization_cpu_omp.bin "$KS2D_BUILD/ks2d_ci.json" --output-dir "$KS2D_BUILD/visualization" --branch 0 --max-points 1 --quiet
+          python3 scripts/validate_ks2d_visualization.py "$KS2D_BUILD/visualization/manifest.jsonl" --nx 12 --ny 12 --expected-backend scfd_omp_fftw --maximum-absolute-value 1e-12
+          make KS2D_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          timeout 180s ./"$KS2D_BUILD"/KS2D_stability_cpu_omp.bin "$KS2D_BUILD/ks2d_ci.json" --quiet
+          python3 scripts/validate_stability_diagram.py "$KS2D_BUILD/project" --expected-curves 1 --min-points 10 --require-complete --require-plot-sidecar --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
+          python3 scripts/write_ks2d_ci_config.py "$KS2D_BUILD/ks2d_nontrivial_ci.json" "$KS2D_BUILD/project_nontrivial" --clean-project --nx 12 --ny 16 --steps 100 --step-size 2 --max-step-size 5 --skip-file-output 10 --seed-parameter 4.333 --parameter-min 3.99 --parameter-max 4.4 --deflation-attempts 1 --newton-deflation-iterations 80 --newton-deflation-weight 0.5 --newton-deflation-tolerance 1e-8 --linear-solver-iterations 150 --linear-solver-tolerance 1e-3 --add-analytical-solution --enable-branch-intersections --enable-seed-schedule --max-failed-continuations-per-knot 1
+          timeout 120s ./"$KS2D_BUILD"/KS2D_bd_cpu_omp.bin "$KS2D_BUILD/ks2d_nontrivial_ci.json" --quiet
+          python3 scripts/validate_ks2d_nontrivial_branch.py "$KS2D_BUILD/project_nontrivial" --seed-parameter 4.333 --minimum-norm 1e-3
 
   lapack-wrap-cpu:
     needs: [scfd-vector-operations-cpu]
@@ -446,6 +511,51 @@ jobs:
           fi
           make test_fft_facade_cufft.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fft_facade_cufft" REAL_TYPE=double
           ./"$BUILD_DIR"/fft_facade_cufft/test_fft_facade_cufft.bin auto
+
+  fourier-discretization-cuda:
+    needs: [scfd-vector-operations-cuda, fft-facade-cuda, eigensolver-foundation-cuda]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Build and validate when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA Fourier discretization: nvidia-smi not found"
+            exit 0
+          fi
+          if ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA Fourier discretization: no usable NVIDIA device"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA Fourier discretization: nvcc not found"
+            exit 0
+          fi
+          KS2D_BUILD="$BUILD_DIR/ks2d_cuda"
+          make test_fourier_discretization_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_fourier_discretization_cuda.bin
+          make test_fourier_translation_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_fourier_translation_cuda.bin
+          make test_KS2D_operator_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_KS2D_operator_cuda.bin
+          make test_numpy_array_writer.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_numpy_array_writer.bin
+          make KS2D_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          python3 scripts/write_ks2d_ci_config.py "$KS2D_BUILD/ks2d_ci.json" "$KS2D_BUILD/project" --clean-project --nx 12 --ny 12 --steps 8
+          timeout 120s ./"$KS2D_BUILD"/KS2D_bd_cuda.bin "$KS2D_BUILD/ks2d_ci.json" --seed-zero 2.0 --continue-seed-only --quiet auto
+          python3 scripts/validate_symmetry_group_manifest.py "$KS2D_BUILD/project" --expected-order 8
+          python3 scripts/validate_ks1d_zero_branch.py "$KS2D_BUILD/project" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
+          make KS2D_prepare_visualization_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/KS2D_prepare_visualization_cuda.bin "$KS2D_BUILD/ks2d_ci.json" --output-dir "$KS2D_BUILD/visualization" --branch 0 --max-points 1 --quiet auto
+          python3 scripts/validate_ks2d_visualization.py "$KS2D_BUILD/visualization/manifest.jsonl" --nx 12 --ny 12 --expected-backend scfd_cuda_cufft --maximum-absolute-value 1e-12
+          make KS2D_stability_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          timeout 180s ./"$KS2D_BUILD"/KS2D_stability_cuda.bin "$KS2D_BUILD/ks2d_ci.json" --quiet auto
+          python3 scripts/validate_stability_diagram.py "$KS2D_BUILD/project" --expected-curves 1 --min-points 10 --require-complete --require-plot-sidecar --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
+          python3 scripts/write_ks2d_ci_config.py "$KS2D_BUILD/ks2d_nontrivial_ci.json" "$KS2D_BUILD/project_nontrivial" --clean-project --nx 12 --ny 16 --steps 100 --step-size 2 --max-step-size 5 --skip-file-output 10 --seed-parameter 4.333 --parameter-min 3.99 --parameter-max 4.4 --deflation-attempts 1 --newton-deflation-iterations 80 --newton-deflation-weight 0.5 --newton-deflation-tolerance 1e-8 --linear-solver-iterations 150 --linear-solver-tolerance 1e-3 --add-analytical-solution --enable-branch-intersections --enable-seed-schedule --max-failed-continuations-per-knot 1
+          timeout 120s ./"$KS2D_BUILD"/KS2D_bd_cuda.bin "$KS2D_BUILD/ks2d_nontrivial_ci.json" --quiet auto
+          python3 scripts/validate_ks2d_nontrivial_branch.py "$KS2D_BUILD/project_nontrivial" --seed-parameter 4.333 --minimum-norm 1e-3
 
   ks1d-sym-cpu-omp:
     needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]

@@ -370,6 +370,78 @@ void parse_seed_schedule(
         json.value("save_registry", params.save_registry);
 }
 
+template<class Params>
+void parse_failed_candidate_registry(
+    const nlohmann::json& json,
+    Params& params)
+{
+    params.set_default();
+    params.enabled = json.value("enabled", params.enabled);
+    params.registry_file = json.value(
+        "registry_file",
+        params.registry_file);
+    params.state_directory = json.value(
+        "state_directory",
+        params.state_directory);
+    params.policy_generation = json.value(
+        "policy_generation",
+        params.policy_generation);
+}
+
+template<class Params>
+void parse_recovery_registry(
+    const nlohmann::json& json,
+    Params& params)
+{
+    params.set_default();
+    params.enabled = json.value("enabled", params.enabled);
+    params.registry_file = json.value(
+        "registry_file",
+        params.registry_file);
+    params.checkpoint_directory = json.value(
+        "checkpoint_directory",
+        params.checkpoint_directory);
+    params.policy_generation = json.value(
+        "policy_generation",
+        params.policy_generation);
+    params.process_before_deflation = json.value(
+        "process_before_deflation",
+        params.process_before_deflation);
+}
+
+template<class T, class Params>
+void parse_topology_registry(
+    const nlohmann::json& json,
+    Params& params)
+{
+    params.set_default();
+    params.enabled = json.value("enabled", params.enabled);
+    params.registry_file = json.value(
+        "registry_file",
+        params.registry_file);
+    params.endpoint_directory = json.value(
+        "endpoint_directory",
+        params.endpoint_directory);
+    params.policy_generation = json.value(
+        "policy_generation",
+        params.policy_generation);
+    params.absolute_parameter_tolerance = json.value(
+        "absolute_parameter_tolerance",
+        params.absolute_parameter_tolerance);
+    params.relative_parameter_tolerance = json.value(
+        "relative_parameter_tolerance",
+        params.relative_parameter_tolerance);
+    params.state_tolerance = json.value(
+        "state_tolerance",
+        params.state_tolerance);
+    params.minimum_tangent_line_similarity = json.value(
+        "minimum_tangent_line_similarity",
+        params.minimum_tangent_line_similarity);
+    params.record_transverse_junctions = json.value(
+        "record_transverse_junctions",
+        params.record_transverse_junctions);
+}
+
 template<class T, class Params>
 void parse_restart_policy(const nlohmann::json& json, Params& params)
 {
@@ -380,6 +452,8 @@ void parse_restart_policy(const nlohmann::json& json, Params& params)
         "allow_knot_interpolation_failure", params.allow_knot_interpolation_failure);
     params.allow_failed_continuation_curve_save = json.value(
         "allow_failed_continuation_curve_save", params.allow_failed_continuation_curve_save);
+    params.preserve_partial_curves = json.value(
+        "preserve_partial_curves", params.preserve_partial_curves);
     params.check_duplicate_after_deflation = json.value(
         "check_duplicate_after_deflation", params.check_duplicate_after_deflation);
     params.duplicate_after_deflation_retries = json.value(
@@ -394,6 +468,17 @@ void parse_restart_policy(const nlohmann::json& json, Params& params)
     parse_seed_schedule(
         json.value("seed_schedule", nlohmann::json::object()),
         params.seed_schedule);
+    parse_failed_candidate_registry(
+        json.value(
+            "failed_candidate_registry",
+            nlohmann::json::object()),
+        params.failed_candidate_registry);
+    parse_recovery_registry(
+        json.value("recovery_registry", nlohmann::json::object()),
+        params.recovery_registry);
+    parse_topology_registry<T>(
+        json.value("topology_registry", nlohmann::json::object()),
+        params.topology_registry);
 }
 
 template<class T, class Params>
@@ -461,6 +546,11 @@ void parse_branch_intersection_policy(const nlohmann::json& json, Params& params
         "maximum_verified_forward_steps_ahead", params.maximum_verified_forward_steps_ahead);
     params.maximum_verified_forward_distance_step_ratio = json.value(
         "maximum_verified_forward_distance_step_ratio", params.maximum_verified_forward_distance_step_ratio);
+    params.localize_analytical_targets = json.value(
+        "localize_analytical_targets", params.localize_analytical_targets);
+    params.analytical_target_parameter_tolerance = json.value(
+        "analytical_target_parameter_tolerance",
+        params.analytical_target_parameter_tolerance);
     params.verbose = json.value("verbose", params.verbose);
 }
 

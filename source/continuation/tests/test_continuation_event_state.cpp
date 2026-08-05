@@ -41,23 +41,46 @@ void test_endpoint_precedence()
     require_true(state.incomplete(), "step reset preserves curve completeness state");
     state.reset_curve();
     require_true(!state.incomplete(), "curve reset clears completeness state");
+
+    continuation::continuation_endpoint_state analytical_state;
+    analytical_state.observe(reason_t::analytical_branch);
+    analytical_state.observe(reason_t::boundary_max);
+    require_true(
+        analytical_state.pending_reason() == reason_t::analytical_branch,
+        "analytical branch is not overwritten by a boundary");
 }
 
 void test_pending_branch_event()
 {
     continuation::pending_branch_event<double> event;
-    event.update(6.25, 4, 19);
+    container::curve_provenance analytical_target;
+    analytical_target.origin = container::curve_origin::analytical;
+    analytical_target.analytical_branch_id = 7;
+    event.update(6.25, 4, 19, analytical_target);
     event.increment_refinements();
     event.increment_refinements();
     require_true(event.active(), "branch event is active");
     require_true(event.matches(4, 19), "branch event identity matches");
     require_true(event.refinements() == 2, "branch refinement count");
     require_true(event.lambda() == 6.25, "branch event lambda");
+    require_true(
+        event.target_provenance().is_analytical() &&
+            event.target_provenance().analytical_branch_id == 7,
+        "pending event preserves analytical branch identity");
 
-    event.update(6.2, 4, 19);
+    event.update(6.2, 4, 19, analytical_target);
     require_true(event.refinements() == 2, "same event keeps refinement count");
+    require_true(
+        event.prediction_is_stable(1.0e-2),
+        "analytical event accepts a stable repeated parameter prediction");
+    require_true(
+        !event.prediction_is_stable(1.0e-4),
+        "analytical event rejects an unstable parameter prediction");
     event.update(7.0, 5, 3);
     require_true(event.refinements() == 0, "new event resets refinement count");
+    require_true(
+        !event.prediction_is_stable(1.0),
+        "new branch event has no previous prediction");
     require_true(!event.note_miss(2), "first event miss is tolerated");
     require_true(!event.note_miss(2), "second event miss is tolerated");
     require_true(event.note_miss(2), "third event miss expires event");

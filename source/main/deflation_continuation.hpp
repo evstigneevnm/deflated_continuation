@@ -26,12 +26,14 @@
 #include <containers/knots.hpp>
 #include <containers/knot_registry.h>
 #include <containers/deflation_seed_registry.h>
+#include <containers/failed_continuation_registry.h>
 #include <containers/branch_intersection.h>
 #include <containers/curve_helper_container.h>
 #include <containers/bifurcation_diagram_curve.h>
 #include <containers/bifurcation_diagram.h>
 #include <containers/bifurcation_diagram/diagram_archive.h>
 #include <containers/bifurcation_diagram/symmetry_event_registry_sync.h>
+#include <containers/bifurcation_diagram/topology/branch_topology_registry.h>
 #include <containers/symmetry_event_registry.h>
 
 #include <continuation/continuation.hpp>
@@ -39,6 +41,7 @@
 
 #include <deflation/solution_storage.h>
 #include <deflation/deflation.hpp>
+#include <symmetry/finite_group_manifest.h>
 
 #include <main/deflation_continuation/solver_bundle.h>
 #include <main/deflation_continuation/parameter_application.h>
@@ -47,6 +50,7 @@
 #include <main/deflation_continuation/knot_relocation_controller.h>
 #include <main/deflation_continuation/analytical_branch_executor.h>
 #include <main/deflation_continuation/knot_executor.h>
+#include <main/deflation_continuation/continuation_recovery_registry.h>
 
 
 
@@ -54,6 +58,28 @@ namespace main_classes{
 
 namespace detail
 {
+
+template<class SolutionStorage, class = void>
+struct has_explicit_symmetry_archive_definition: std::false_type
+{
+};
+
+template<class SolutionStorage>
+struct has_explicit_symmetry_archive_definition<
+    SolutionStorage,
+    std::void_t<
+        decltype(std::declval<const SolutionStorage&>().
+            symmetry_definition_fingerprint()),
+        decltype(std::declval<const SolutionStorage&>().
+            symmetry_action_names()),
+        decltype(std::declval<const SolutionStorage&>().
+            duplicate_tolerance()),
+        decltype(std::declval<SolutionStorage&>().canonical_distance(
+            std::declval<const typename SolutionStorage::T_vec&>(),
+            std::declval<const typename SolutionStorage::T_vec&>()))>>:
+    std::true_type
+{
+};
 
 template<class SolutionStorage, class Vector>
 auto stabilize_solution_if_available(SolutionStorage* storage, Vector& x) -> decltype(storage->stabilize_in_place(x), void())
@@ -111,6 +137,69 @@ auto nearest_stabilized_distance_if_available(SolutionStorage* storage, Vector& 
 inline bool nearest_stabilized_distance_if_available(...)
 {
     return false;
+}
+
+template<class SolutionStorage, class Vector, class Scalar>
+auto symmetry_orbit_distance_if_available(
+    SolutionStorage* storage,
+    const Vector& left,
+    const Vector& right,
+    Scalar& distance) -> decltype(
+        storage->canonical_distance(left, right),
+        bool())
+{
+    distance = static_cast<Scalar>(
+        storage->canonical_distance(left, right));
+    return true;
+}
+
+inline bool symmetry_orbit_distance_if_available(...)
+{
+    return false;
+}
+
+template<class SolutionStorage, class Vector>
+auto align_endpoint_geometry_if_available(
+    SolutionStorage* storage,
+    const Vector& reference,
+    const Vector& source,
+    const Vector& source_tangent,
+    Vector& aligned_source,
+    Vector& aligned_tangent,
+    int) -> decltype(
+        storage->align_endpoint_geometry(
+            reference,
+            source,
+            source_tangent,
+            aligned_source,
+            aligned_tangent),
+        bool())
+{
+    storage->align_endpoint_geometry(
+        reference,
+        source,
+        source_tangent,
+        aligned_source,
+        aligned_tangent);
+    return true;
+}
+
+inline bool align_endpoint_geometry_if_available(...)
+{
+    return false;
+}
+
+template<class SolutionStorage>
+auto symmetry_definition_fingerprint_if_available(
+    const SolutionStorage* storage,
+    int) -> decltype(storage->symmetry_definition_fingerprint(), std::string())
+{
+    return storage->symmetry_definition_fingerprint();
+}
+
+inline std::string symmetry_definition_fingerprint_if_available(...)
+{
+    return "identity";
 }
 
 } // namespace detail
@@ -281,6 +370,14 @@ private:
         knots_t,
         Log,
         intersection_status_t> knot_executor_t;
+    typedef container::failed_continuation_registry<
+        VectorOperations,
+        VectorFileOperations> failed_continuation_registry_t;
+    typedef deflation_continuation_detail::continuation_recovery_registry<
+        VectorFileOperations> continuation_recovery_registry_t;
+    typedef container::topology::branch_topology_registry<
+        VectorOperations,
+        VectorFileOperations> branch_topology_registry_t;
 
     class branch_distance_workspace
     {
@@ -295,10 +392,14 @@ private:
             vec_ops->start_use_vector(b_work);
             vec_ops->init_vector(diff);
             vec_ops->start_use_vector(diff);
+            vec_ops->init_vector(tangent_work);
+            vec_ops->start_use_vector(tangent_work);
         }
 
         ~branch_distance_workspace()
         {
+            vec_ops->stop_use_vector(tangent_work);
+            vec_ops->free_vector(tangent_work);
             vec_ops->stop_use_vector(diff);
             vec_ops->free_vector(diff);
             vec_ops->stop_use_vector(b_work);
@@ -309,6 +410,16 @@ private:
 
         T distance(const T_vec& a, const T_vec& b)
         {
+            T quotient_distance = T(0);
+            if(detail::symmetry_orbit_distance_if_available(
+                   storage,
+                   a,
+                   b,
+                   quotient_distance))
+            {
+                return quotient_distance;
+            }
+
             vec_ops->assign(a, a_work);
             vec_ops->assign(b, b_work);
             detail::stabilize_solution_if_available(storage, a_work);
@@ -317,12 +428,65 @@ private:
             return vec_ops->norm_l2(diff);
         }
 
+        container::topology::endpoint_geometry_metrics<T> endpoint_geometry(
+            const T_vec& reference,
+            const T_vec& reference_tangent,
+            const T reference_parameter_tangent,
+            const T_vec& source,
+            const T_vec& source_tangent,
+            const T source_parameter_tangent)
+        {
+            if(!detail::align_endpoint_geometry_if_available(
+                   storage,
+                   reference,
+                   source,
+                   source_tangent,
+                   b_work,
+                   tangent_work,
+                   0))
+            {
+                vec_ops->assign(source, b_work);
+                vec_ops->assign(source_tangent, tangent_work);
+            }
+            vec_ops->assign_mul(
+                T(1),
+                b_work,
+                T(-1),
+                reference,
+                diff);
+            const T reference_tangent_norm =
+                vec_ops->norm_l2(reference_tangent);
+            const T source_tangent_norm =
+                vec_ops->norm_l2(tangent_work);
+            const T reference_extended_sq =
+                reference_tangent_norm*reference_tangent_norm +
+                reference_parameter_tangent*reference_parameter_tangent;
+            const T source_extended_sq =
+                source_tangent_norm*source_tangent_norm +
+                source_parameter_tangent*source_parameter_tangent;
+            container::topology::endpoint_geometry_metrics<T> result;
+            result.state_distance = vec_ops->norm_l2(diff);
+            if(reference_extended_sq > T(0) && source_extended_sq > T(0))
+            {
+                const T product = vec_ops->scalar_prod(
+                    reference_tangent,
+                    tangent_work) +
+                    reference_parameter_tangent*source_parameter_tangent;
+                result.tangent_line_similarity = std::min<T>(
+                    T(1),
+                    std::abs(product)/std::sqrt(
+                        reference_extended_sq*source_extended_sq));
+            }
+            return result;
+        }
+
     private:
         VectorOperations* vec_ops;
         sol_storage_def_t* storage;
         T_vec a_work;
         T_vec b_work;
         T_vec diff;
+        T_vec tangent_work;
     };
 
 public:
@@ -479,6 +643,16 @@ public:
 /*std::vector<T> knots_*/    
     {
         knots->add_element(parameters->deflation_continuation.deflation_knots);
+        const auto& configured_bounds =
+            parameters->deflation_continuation.continuation_parameter_bounds;
+        if(configured_bounds.enabled)
+        {
+            // container::knots reserves its first and last values as bounds.
+            // Inject explicit bounds so every configured deflation knot remains
+            // an executable interior knot.
+            knots->add_element(configured_bounds.minimum);
+            knots->add_element(configured_bounds.maximum);
+        }
     }
 
     void set_boundary_refinement_policy()
@@ -561,13 +735,17 @@ public:
             policy.maximum_forward_refinements,
             policy.minimum_forward_refinements_for_verification,
             policy.maximum_verified_forward_steps_ahead,
-            policy.maximum_verified_forward_distance_step_ratio);
+            policy.maximum_verified_forward_distance_step_ratio,
+            policy.localize_analytical_targets,
+            policy.analytical_target_parameter_tolerance);
         continuate_analytical->set_branch_intersection_refinement(
             policy.forward_refinement_step_factor,
             policy.maximum_forward_refinements,
             policy.minimum_forward_refinements_for_verification,
             policy.maximum_verified_forward_steps_ahead,
-            policy.maximum_verified_forward_distance_step_ratio);
+            policy.maximum_verified_forward_distance_step_ratio,
+            policy.localize_analytical_targets,
+            policy.analytical_target_parameter_tolerance);
 
         if(!policy.enabled)
         {
@@ -589,6 +767,7 @@ public:
                 uint64_t& hit_segment_id,
                 T& hit_forward_steps_ahead,
                 T& hit_endpoint_distance_step_ratio,
+                container::curve_provenance& hit_target_provenance,
                 std::string& reason) -> container::branch_intersection_detection
             {
                 container::branch_intersection_result<T> result;
@@ -617,10 +796,15 @@ public:
                 hit_forward_steps_ahead = result.forward_steps_ahead;
                 hit_endpoint_distance_step_ratio =
                     result.endpoint_distance_step_ratio;
+                hit_target_provenance = result.target_provenance;
                 std::ostringstream stream;
+                const char* target_label =
+                    result.target_provenance.is_analytical()
+                        ? "analytical branch"
+                        : "known branch";
                 if(result.forward_approach)
                 {
-                    stream << "predicted known branch encounter with curve "
+                    stream << "predicted " << target_label << " encounter with curve "
                            << result.curve_number
                            << ", segment " << result.segment_id
                            << ", current state distance = " << result.state_distance
@@ -631,7 +815,7 @@ public:
                 }
                 else
                 {
-                    stream << "known branch intersection with curve " << result.curve_number
+                    stream << target_label << " intersection with curve " << result.curve_number
                            << ", segment " << result.segment_id
                            << ", state distance = " << result.state_distance
                            << ", tolerance = " << result.state_tolerance;
@@ -826,6 +1010,7 @@ public:
         if(result.succeeded())
         {
             bif_diag->reset_curve_output_directories();
+            validate_loaded_archive_symmetry_definition();
             synchronize_symmetry_event_registry();
             log->info_f(
                 "MAIN:deflation_continuation: read data for the bifurcaiton diagram from %s",
@@ -870,9 +1055,136 @@ public:
                 result.message.c_str());
             return;
         }
+        save_current_symmetry_definition_manifest();
         log->info_f(
             "MAIN:deflation_continuation: saved data for the bifurcaiton diagram in %s",
             path.c_str());
+    }
+
+    std::filesystem::path symmetry_definition_manifest_path() const
+    {
+        return std::filesystem::path(project_dir)/
+            "symmetry_group.json";
+    }
+
+    void save_current_symmetry_definition_manifest()
+    {
+        if constexpr(
+            detail::has_explicit_symmetry_archive_definition<
+                sol_storage_def_t>::value)
+        {
+            const std::string fingerprint =
+                sol_storage_def->symmetry_definition_fingerprint();
+            const auto actions =
+                sol_storage_def->symmetry_action_names();
+            if(fingerprint.empty())
+            {
+                return;
+            }
+            const symmetry::finite_group_manifest manifest{
+                symmetry::finite_group_manifest::current_version,
+                fingerprint,
+                actions};
+            const auto result = symmetry::save_finite_group_manifest(
+                symmetry_definition_manifest_path(),
+                manifest);
+            if(!result.succeeded())
+            {
+                log->warning_f(
+                    "MAIN:deflation_continuation: failed to save symmetry_group.json: %s",
+                    result.message.c_str());
+            }
+        }
+    }
+
+    void validate_loaded_archive_symmetry_definition()
+    {
+        if constexpr(
+            detail::has_explicit_symmetry_archive_definition<
+                sol_storage_def_t>::value)
+        {
+            const std::string fingerprint =
+                sol_storage_def->symmetry_definition_fingerprint();
+            const auto actions =
+                sol_storage_def->symmetry_action_names();
+            if(fingerprint.empty())
+            {
+                return;
+            }
+
+            const auto manifest_result =
+                symmetry::load_finite_group_manifest(
+                    symmetry_definition_manifest_path());
+            if(manifest_result.succeeded() &&
+               symmetry::finite_group_manifest_matches(
+                   manifest_result.manifest,
+                   fingerprint,
+                   actions))
+            {
+                return;
+            }
+            if(manifest_result.status !=
+                   symmetry::finite_group_manifest_status::missing &&
+               manifest_result.status !=
+                   symmetry::finite_group_manifest_status::success)
+            {
+                throw std::runtime_error(
+                    "failed to validate symmetry_group.json: " +
+                    manifest_result.message);
+            }
+
+            const T parameter_tolerance =
+                std::sqrt(std::numeric_limits<T>::epsilon());
+            const double state_tolerance =
+                sol_storage_def->duplicate_tolerance();
+            log->warning_f(
+                "MAIN:deflation_continuation: bifurcation archive has %s symmetry definition; auditing saved curves against finite group %s before restart.",
+                manifest_result.status ==
+                        symmetry::finite_group_manifest_status::missing
+                    ? "no"
+                    : "a different",
+                fingerprint.c_str());
+            const auto audit =
+                bif_diag->audit_saved_symmetry_duplicates(
+                    sol_storage_def,
+                    parameter_tolerance,
+                    state_tolerance,
+                    3);
+            if(!audit.complete())
+            {
+                throw std::runtime_error(
+                    "legacy symmetry archive audit could not read all "
+                    "required states; archive was not modified: " +
+                    audit.summary());
+            }
+            if(audit.has_duplicates())
+            {
+                throw std::runtime_error(
+                    "legacy symmetry archive contains duplicate group-orbit "
+                    "branches under the current definition; archive and "
+                    "curve directories were not modified: " +
+                    audit.summary());
+            }
+
+            const symmetry::finite_group_manifest current_manifest{
+                symmetry::finite_group_manifest::current_version,
+                fingerprint,
+                actions};
+            const auto save_result =
+                symmetry::save_finite_group_manifest(
+                    symmetry_definition_manifest_path(),
+                    current_manifest);
+            if(!save_result.succeeded())
+            {
+                throw std::runtime_error(
+                    "legacy symmetry archive passed its audit but the "
+                    "definition manifest could not be committed: " +
+                    save_result.message);
+            }
+            log->warning_f(
+                "MAIN:deflation_continuation: legacy bifurcation archive passed the current finite-group audit (%s); symmetry_group.json was committed.",
+                audit.summary().c_str());
+        }
     }
 
     void synchronize_symmetry_event_registry()
@@ -962,12 +1274,13 @@ public:
     {
         const std::string file_name =
             parameters->bifurcaiton_diagram_file_name;
-        knot_relocation_controller_t knot_relocation(
+        auto knot_relocation = std::make_shared<knot_relocation_controller_t>(
             parameters->deflation_continuation.restart_policy.knot_relocation,
             parameters->deflation_continuation.deflation_knots,
             project_dir,
             log);
-        knot_registry_t knot_registry(knot_relocation.registry_file_name());
+        auto knot_registry = std::make_shared<knot_registry_t>(
+            knot_relocation->registry_file_name());
         const auto& seed_schedule_settings =
             parameters->deflation_continuation
                 .restart_policy
@@ -984,6 +1297,122 @@ public:
         }
         deflation_seed_registry_t seed_registry(
             seed_registry_file);
+        const auto& failed_registry_settings =
+            parameters->deflation_continuation
+                .restart_policy
+                .failed_candidate_registry;
+        auto registry_distance_workspace =
+            std::make_shared<branch_distance_workspace>(
+                vec_ops,
+                sol_storage_def);
+        typename failed_continuation_registry_t::settings
+            failed_registry_configuration;
+        failed_registry_configuration.enabled =
+            failed_registry_settings.enabled;
+        failed_registry_configuration.project_directory = project_dir;
+        failed_registry_configuration.registry_file =
+            failed_registry_settings.registry_file;
+        failed_registry_configuration.state_directory =
+            failed_registry_settings.state_directory;
+        failed_registry_configuration.policy_generation =
+            failed_registry_settings.policy_generation;
+        failed_registry_configuration.symmetry_fingerprint =
+            detail::symmetry_definition_fingerprint_if_available(
+                sol_storage_def,
+                0);
+        std::ostringstream continuation_fingerprint;
+        continuation_fingerprint
+            << "n=" << vec_ops->get_vector_size()
+            << ";ds=" << parameters->deflation_continuation.step_size
+            << ";dsmax=" << parameters->deflation_continuation.max_step_size
+            << ";steps=" << parameters->deflation_continuation.continuation_steps
+            << ";newton_tol="
+            << parameters->deflation_continuation.newton_extended_continuation.tolerance
+            << ";linear_tol="
+            << parameters->deflation_continuation.linear_solver_extended.lin_solver_tol;
+        failed_registry_configuration.continuation_fingerprint =
+            continuation_fingerprint.str();
+        auto failed_registry =
+            std::make_shared<failed_continuation_registry_t>(
+                vec_ops,
+                file_ops,
+                failed_registry_configuration,
+                [registry_distance_workspace](
+                    const T_vec& left,
+                    const T_vec& right)
+                {
+                    return registry_distance_workspace->distance(
+                        left,
+                        right);
+                });
+
+        const auto& recovery_registry_settings =
+            parameters->deflation_continuation
+                .restart_policy
+                .recovery_registry;
+        typename continuation_recovery_registry_t::settings
+            recovery_registry_configuration;
+        recovery_registry_configuration.enabled =
+            recovery_registry_settings.enabled;
+        recovery_registry_configuration.project_directory = project_dir;
+        recovery_registry_configuration.registry_file =
+            recovery_registry_settings.registry_file;
+        recovery_registry_configuration.checkpoint_directory =
+            recovery_registry_settings.checkpoint_directory;
+        recovery_registry_configuration.policy_generation =
+            recovery_registry_settings.policy_generation;
+        auto recovery_registry =
+            std::make_shared<continuation_recovery_registry_t>(
+                file_ops,
+                recovery_registry_configuration);
+        const auto& topology_registry_settings =
+            parameters->deflation_continuation
+                .restart_policy
+                .topology_registry;
+        typename branch_topology_registry_t::settings
+            topology_registry_configuration;
+        topology_registry_configuration.enabled =
+            topology_registry_settings.enabled;
+        topology_registry_configuration.project_directory = project_dir;
+        topology_registry_configuration.registry_file =
+            topology_registry_settings.registry_file;
+        topology_registry_configuration.endpoint_directory =
+            topology_registry_settings.endpoint_directory;
+        topology_registry_configuration.policy_generation =
+            topology_registry_settings.policy_generation;
+        topology_registry_configuration.symmetry_fingerprint =
+            failed_registry_configuration.symmetry_fingerprint;
+        topology_registry_configuration.match.absolute_parameter_tolerance =
+            topology_registry_settings.absolute_parameter_tolerance;
+        topology_registry_configuration.match.relative_parameter_tolerance =
+            topology_registry_settings.relative_parameter_tolerance;
+        topology_registry_configuration.match.state_tolerance =
+            topology_registry_settings.state_tolerance;
+        topology_registry_configuration.match.minimum_tangent_line_similarity =
+            topology_registry_settings.minimum_tangent_line_similarity;
+        topology_registry_configuration.match.record_transverse_junctions =
+            topology_registry_settings.record_transverse_junctions;
+        auto topology_registry =
+            std::make_shared<branch_topology_registry_t>(
+                vec_ops,
+                file_ops,
+                topology_registry_configuration,
+                [registry_distance_workspace](
+                    const T_vec& reference,
+                    const T_vec& reference_tangent,
+                    const T& reference_parameter_tangent,
+                    const T_vec& source,
+                    const T_vec& source_tangent,
+                    const T& source_parameter_tangent)
+                {
+                    return registry_distance_workspace->endpoint_geometry(
+                        reference,
+                        reference_tangent,
+                        reference_parameter_tangent,
+                        source,
+                        source_tangent,
+                        source_parameter_tangent);
+                });
         const auto& relocation_settings =
             parameters->deflation_continuation
                 .restart_policy
@@ -993,7 +1422,7 @@ public:
             relocation_settings.manual_overrides)
         {
             intersection_status_t status;
-            knot_registry.set(
+            knot_registry->set(
                 item.requested,
                 item.effective,
                 item.reason,
@@ -1008,16 +1437,16 @@ public:
         if(manual_registry_changed &&
            relocation_settings.save_registry)
         {
-            knot_registry.save();
+            knot_registry->save();
         }
 
         auto knot_resolver =
-            [&knot_registry](
+            [knot_registry](
                 const T& requested_parameter,
                 T& effective_parameter) -> bool
             {
                 typename knot_registry_t::entry entry;
-                if(knot_registry.find(requested_parameter, entry))
+                if(knot_registry->find(requested_parameter, entry))
                 {
                     effective_parameter = entry.effective;
                     return true;
@@ -1040,7 +1469,7 @@ public:
         if(configured_bounds.resolve_with_knot_registry)
         {
             T resolved = continuation_minimum;
-            if(knot_registry.resolve(
+            if(knot_registry->resolve(
                    continuation_minimum,
                    resolved))
             {
@@ -1051,7 +1480,7 @@ public:
                 continuation_minimum = resolved;
             }
             resolved = continuation_maximum;
-            if(knot_registry.resolve(
+            if(knot_registry->resolve(
                    continuation_maximum,
                    resolved))
             {
@@ -1079,7 +1508,7 @@ public:
             double(continuation_maximum));
 
         auto active_knot_relocator =
-            [this, &knot_relocation](
+            [this, knot_relocation](
                 const T& requested_parameter,
                 const T& parameter_left,
                 const T_vec& value_left,
@@ -1088,7 +1517,7 @@ public:
                 T& effective_parameter,
                 T_vec& effective_value) -> bool
             {
-                return knot_relocation.relocate_active_intersection(
+                return knot_relocation->relocate_active_intersection(
                     requested_parameter,
                     parameter_left,
                     value_left,
@@ -1159,25 +1588,25 @@ public:
             return bif_diag->current_curve();
         };
         callbacks.resolve_parameter = knot_resolver;
-        callbacks.relocation_registry_file = [&knot_relocation]()
+        callbacks.relocation_registry_file = [knot_relocation]()
         {
-            return knot_relocation.registry_file_name();
+            return knot_relocation->registry_file_name();
         };
         callbacks.rebuild_intersections = [this](const T& parameter)
         {
             return rebuild_intersections_at_lambda(parameter);
         };
         callbacks.relocate_intersection =
-            [this, &knot_registry, &knot_relocation](
+            [this, knot_registry, knot_relocation](
                 const T& requested_parameter,
                 const intersection_status_t& failed_status,
                 T& effective_parameter,
                 intersection_status_t& effective_status)
             {
-                return knot_relocation.relocate_restart_intersection(
+                return knot_relocation->relocate_restart_intersection(
                     requested_parameter,
                     failed_status,
-                    knot_registry,
+                    *knot_registry,
                     effective_parameter,
                     effective_status,
                     [this](const T& candidate)
@@ -1233,20 +1662,57 @@ public:
                     value,
                     distance);
             };
+        callbacks.nearest_persistent_rejection =
+            [failed_registry](
+                const T& parameter,
+                const T_vec& value,
+                T& distance,
+                std::uint64_t& id)
+            {
+                return failed_registry->nearest_active(
+                    parameter,
+                    value,
+                    distance,
+                    id);
+            };
+        callbacks.mark_persistent_rejection_seen =
+            [failed_registry](const std::uint64_t id)
+            {
+                failed_registry->mark_seen(id);
+            };
+        callbacks.record_persistent_rejection =
+            [failed_registry](
+                const T& requested_parameter,
+                const T& effective_parameter,
+                const T_vec& value,
+                const continuation::continuation_curve_result<T>& result)
+            {
+                failed_registry->record(
+                    requested_parameter,
+                    effective_parameter,
+                    value,
+                    result);
+            };
         callbacks.continue_candidate =
             [this, &active_curve](T_vec& value, const T& parameter)
             {
                 bif_diag->init_new_curve();
                 bif_diag->get_current_ref(active_curve);
-                const bool success = continuate->continuate_curve(
+                const auto result = continuate->continuate_curve_result(
                     active_curve,
                     value,
                     parameter);
                 bif_diag->close_curve();
-                return success;
+                return result;
             };
         callbacks.accept_candidate =
-            [this, &file_name, &active_curve](const T& parameter)
+            [this,
+             &file_name,
+             &active_curve,
+             recovery_registry,
+             topology_registry](
+                const T& parameter,
+                const continuation::continuation_curve_result<T>& result)
             {
                 if(!bif_diag->commit_current_curve_symmetry_events())
                 {
@@ -1254,6 +1720,93 @@ public:
                         "MAIN:deflation_continuation: failed to commit symmetry events for an accepted curve");
                 }
                 save_data(file_name);
+                for(unsigned int index = 0;
+                    index < result.semicurves_started;
+                    ++index)
+                {
+                    const auto& semicurve = result.semicurves[index];
+                    if(!semicurve.has_progress())
+                    {
+                        continue;
+                    }
+                    T_vec state;
+                    T_vec tangent;
+                    vec_ops->init_vector(state);
+                    vec_ops->start_use_vector(state);
+                    vec_ops->init_vector(tangent);
+                    vec_ops->start_use_vector(tangent);
+                    T endpoint_parameter = T(0);
+                    T endpoint_parameter_tangent = T(0);
+                    const bool checkpoint_available =
+                        continuate->copy_recovery_checkpoint(
+                            index,
+                            state,
+                            tangent,
+                            endpoint_parameter,
+                            endpoint_parameter_tangent);
+                    std::uint64_t recovery_id = 0;
+                    if(checkpoint_available && semicurve.recoverable())
+                    {
+                        recovery_id = recovery_registry->record(
+                            active_curve->get_curve_number(),
+                            parameter,
+                            semicurve,
+                            state,
+                            tangent,
+                            endpoint_parameter,
+                            endpoint_parameter_tangent);
+                    }
+                    if(checkpoint_available)
+                    {
+                        const auto topology_result =
+                            topology_registry->record_endpoint(
+                                active_curve->get_curve_number(),
+                                semicurve.segment_id,
+                                semicurve.segment_id,
+                                semicurve.last_point_index,
+                                endpoint_parameter,
+                                state,
+                                tangent,
+                                endpoint_parameter_tangent,
+                                semicurve.endpoint_reason,
+                                recovery_id);
+                        if(topology_result.matched &&
+                           topology_result.kind ==
+                               container::topology::connection_kind::
+                                   continuation_join)
+                        {
+                            if(topology_result.matched_recovery_task_id != 0)
+                            {
+                                recovery_registry->resolve_by_connection(
+                                    topology_result.matched_recovery_task_id,
+                                    topology_result.connection_id);
+                            }
+                            if(recovery_id != 0)
+                            {
+                                recovery_registry->resolve_by_connection(
+                                    recovery_id,
+                                    topology_result.connection_id);
+                            }
+                            log->info_f(
+                                "MAIN:deflation_continuation: topology joined endpoint %llu to endpoint %llu through connection %llu.",
+                                static_cast<unsigned long long>(
+                                    topology_result.endpoint_id),
+                                static_cast<unsigned long long>(
+                                    topology_result.matched_endpoint_id),
+                                static_cast<unsigned long long>(
+                                    topology_result.connection_id));
+                        }
+                    }
+                    vec_ops->stop_use_vector(tangent);
+                    vec_ops->free_vector(tangent);
+                    vec_ops->stop_use_vector(state);
+                    vec_ops->free_vector(state);
+                    if(!checkpoint_available)
+                    {
+                        throw std::runtime_error(
+                            "MAIN:deflation_continuation: accepted semicurve endpoint has no continuation checkpoint");
+                    }
+                }
                 active_curve->find_intersection(parameter, sol_storage_def);
             };
         callbacks.discard_candidate = [this]()
@@ -1268,11 +1821,13 @@ public:
         const auto& restart =
             parameters->deflation_continuation.restart_policy;
         deflation_continuation_detail::knot_execution_policy<T> policy;
-        policy.relocation_enabled = knot_relocation.enabled();
+        policy.relocation_enabled = knot_relocation->enabled();
         policy.allow_incomplete_restart_intersections =
             restart.allow_incomplete_restart_intersections;
         policy.allow_failed_continuation_curve_save =
             restart.allow_failed_continuation_curve_save;
+        policy.preserve_partial_curves =
+            restart.preserve_partial_curves;
         policy.max_failed_continuations_per_knot =
             restart.max_failed_continuations_per_knot;
         policy.failed_continuation_rejection_tolerance =

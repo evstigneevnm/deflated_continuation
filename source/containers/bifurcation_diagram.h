@@ -13,6 +13,8 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <system_error>
@@ -24,6 +26,7 @@
 
 #include <containers/branch_intersection.h>
 #include <containers/intersection_status.h>
+#include <containers/bifurcation_diagram/symmetry_archive_audit.h>
 
 namespace container
 {
@@ -151,6 +154,50 @@ public:
     std::size_t curve_count() const
     {
         return curve_container.size();
+    }
+
+    bool restore_analytical_curve_provenance(
+        const std::size_t curve_index,
+        const std::uint64_t analytical_branch_id,
+        const std::string& analytical_branch_name)
+    {
+        // Provenance-aware archives are matched by stable branch identity,
+        // independent of curve order or failed analytical branches.
+        for(auto& curve: curve_container)
+        {
+            curve.set_main_refs(
+                vec_ops, file_ops, log, nonlin_op, newton, cont_help);
+            if(!curve.has_curve_provenance_metadata())
+            {
+                continue;
+            }
+            const auto& provenance = curve.get_curve_provenance();
+            if(provenance.is_analytical() &&
+               provenance.analytical_branch_id == analytical_branch_id)
+            {
+                return true;
+            }
+        }
+
+        if(curve_index >= curve_container.size())
+        {
+            return false;
+        }
+        auto& curve = curve_container[curve_index];
+        if(curve.has_curve_provenance_metadata())
+        {
+            return false;
+        }
+
+        curve.set_analytical_branch_provenance(
+            analytical_branch_id,
+            analytical_branch_name);
+        log->warning_f(
+            "container::bifurcation_diagram: restored missing analytical provenance for legacy curve %llu as exact branch %llu (%s).",
+            static_cast<unsigned long long>(curve_index),
+            static_cast<unsigned long long>(analytical_branch_id),
+            analytical_branch_name.c_str());
+        return true;
     }
     
     void init_new_curve()
@@ -304,6 +351,163 @@ public:
 
     }
 
+    template<class SymmetryStorage>
+    symmetry_archive_audit_result<T> audit_saved_symmetry_duplicates(
+        SymmetryStorage* storage,
+        const T parameter_tolerance,
+        const double state_tolerance,
+        const std::size_t minimum_matching_samples = 3)
+    {
+        if(storage == nullptr)
+        {
+            throw std::invalid_argument(
+                "bifurcation_diagram symmetry audit requires storage");
+        }
+        if(!(parameter_tolerance >= T(0)) ||
+           !(state_tolerance >= 0.0) ||
+           minimum_matching_samples == 0)
+        {
+            throw std::invalid_argument(
+                "bifurcation_diagram symmetry audit got invalid tolerances");
+        }
+
+        symmetry_archive_audit_result<T> result;
+        T_vec left_state;
+        T_vec right_state;
+        vec_ops->init_vector(left_state);
+        vec_ops->init_vector(right_state);
+        vec_ops->start_use_vector(left_state);
+        vec_ops->start_use_vector(right_state);
+        const auto release = [this, &left_state, &right_state]()
+        {
+            vec_ops->stop_use_vector(right_state);
+            vec_ops->free_vector(right_state);
+            vec_ops->stop_use_vector(left_state);
+            vec_ops->free_vector(left_state);
+        };
+
+        try
+        {
+            for(std::size_t first = 0;
+                first < curve_container.size();
+                ++first)
+            {
+                auto& first_curve = curve_container[first];
+                first_curve.set_main_refs(
+                    vec_ops, file_ops, log, nonlin_op, newton, cont_help);
+                const auto first_points =
+                    first_curve.return_curve_vector();
+                for(std::size_t second = first + 1;
+                    second < curve_container.size();
+                    ++second)
+                {
+                    auto& second_curve = curve_container[second];
+                    second_curve.set_main_refs(
+                        vec_ops, file_ops, log, nonlin_op, newton, cont_help);
+                    const auto second_points =
+                        second_curve.return_curve_vector();
+
+                    symmetry_duplicate_curve_pair<T> duplicate;
+                    duplicate.first_curve = first;
+                    duplicate.second_curve = second;
+                    bool have_matching_sample = false;
+                    for(const auto& left_point: first_points)
+                    {
+                        if(!left_point.is_data_avaliable)
+                        {
+                            continue;
+                        }
+                        bool left_loaded = false;
+                        for(const auto& right_point: second_points)
+                        {
+                            if(!right_point.is_data_avaliable)
+                            {
+                                continue;
+                            }
+                            const T scale = T(1) + std::max(
+                                std::abs(left_point.lambda),
+                                std::abs(right_point.lambda));
+                            if(std::abs(
+                                   left_point.lambda -
+                                   right_point.lambda) >
+                               parameter_tolerance*scale)
+                            {
+                                continue;
+                            }
+                            if(!left_loaded)
+                            {
+                                if(!first_curve.read_saved_solution_for_audit(
+                                       left_point,
+                                       left_state))
+                                {
+                                    ++result.read_failures;
+                                    break;
+                                }
+                                left_loaded = true;
+                            }
+                            if(!second_curve.read_saved_solution_for_audit(
+                                   right_point,
+                                   right_state))
+                            {
+                                ++result.read_failures;
+                                continue;
+                            }
+                            ++result.compared_state_pairs;
+                            const double distance =
+                                storage->canonical_distance(
+                                    left_state,
+                                    right_state);
+                            if(distance > state_tolerance)
+                            {
+                                continue;
+                            }
+
+                            const T parameter = T(0.5)*(
+                                left_point.lambda +
+                                right_point.lambda);
+                            if(!have_matching_sample)
+                            {
+                                duplicate.minimum_parameter = parameter;
+                                duplicate.maximum_parameter = parameter;
+                                have_matching_sample = true;
+                            }
+                            else
+                            {
+                                duplicate.minimum_parameter = std::min(
+                                    duplicate.minimum_parameter,
+                                    parameter);
+                                duplicate.maximum_parameter = std::max(
+                                    duplicate.maximum_parameter,
+                                    parameter);
+                            }
+                            ++duplicate.matching_samples;
+                            duplicate.maximum_state_distance = std::max(
+                                duplicate.maximum_state_distance,
+                                distance);
+                        }
+                    }
+
+                    const T minimum_span =
+                        T(10)*parameter_tolerance;
+                    if(duplicate.matching_samples >=
+                           minimum_matching_samples &&
+                       duplicate.maximum_parameter -
+                           duplicate.minimum_parameter > minimum_span)
+                    {
+                        result.duplicate_curve_pairs.push_back(duplicate);
+                    }
+                }
+            }
+        }
+        catch(...)
+        {
+            release();
+            throw;
+        }
+        release();
+        return result;
+    }
+
     template<class StateDistance>
     bool find_branch_intersection(
         const T& step_lambda0,
@@ -344,6 +548,7 @@ public:
                    result,
                    state_distance))
             {
+                result.target_provenance = curve.get_curve_provenance();
                 return true;
             }
         }

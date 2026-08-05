@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+#include <containers/bifurcation_diagram/curve_provenance.h>
+
 namespace continuation
 {
 
@@ -16,20 +18,35 @@ public:
         refinements_ = 0;
         misses_ = 0;
         lambda_ = T(0);
+        previous_lambda_ = T(0);
+        previous_prediction_available_ = false;
         curve_number_ = -1;
         segment_id_ = 0;
+        target_provenance_ = {};
     }
 
-    void update(const T lambda, const int curve_number, const std::uint64_t segment_id)
+    void update(
+        const T lambda,
+        const int curve_number,
+        const std::uint64_t segment_id,
+        const container::curve_provenance& target_provenance = {})
     {
-        if(!matches(curve_number, segment_id))
+        const bool same_event = matches(curve_number, segment_id);
+        if(!same_event)
         {
             refinements_ = 0;
+            previous_prediction_available_ = false;
+        }
+        else
+        {
+            previous_lambda_ = lambda_;
+            previous_prediction_available_ = true;
         }
         active_ = true;
         lambda_ = lambda;
         curve_number_ = curve_number;
         segment_id_ = segment_id;
+        target_provenance_ = target_provenance;
         misses_ = 0;
     }
 
@@ -83,13 +100,39 @@ public:
         return segment_id_;
     }
 
+    const container::curve_provenance& target_provenance() const
+    {
+        return target_provenance_;
+    }
+
+    bool prediction_is_stable(const T relative_tolerance) const
+    {
+        if(!previous_prediction_available_ || relative_tolerance <= T(0))
+        {
+            return false;
+        }
+        const T current_abs = lambda_ < T(0) ? -lambda_ : lambda_;
+        const T previous_abs =
+            previous_lambda_ < T(0) ? -previous_lambda_ : previous_lambda_;
+        const T scale = current_abs > previous_abs
+            ? (current_abs > T(1) ? current_abs : T(1))
+            : (previous_abs > T(1) ? previous_abs : T(1));
+        const T difference = lambda_ < previous_lambda_
+            ? previous_lambda_ - lambda_
+            : lambda_ - previous_lambda_;
+        return difference <= relative_tolerance*scale;
+    }
+
 private:
     bool active_ = false;
     unsigned int refinements_ = 0;
     unsigned int misses_ = 0;
     T lambda_ = T(0);
+    T previous_lambda_ = T(0);
+    bool previous_prediction_available_ = false;
     int curve_number_ = -1;
     std::uint64_t segment_id_ = 0;
+    container::curve_provenance target_provenance_;
 };
 
 } // namespace continuation

@@ -27,6 +27,68 @@ enum class secant_candidate_kind
 };
 
 template<class T>
+struct tangent_equation_quality
+{
+    T absolute_residual = T(0);
+    T equation_scale = T(0);
+    T relative_residual = T(0);
+    bool finite = true;
+};
+
+template<class T>
+struct tangent_equation_quality_policy
+{
+    T maximum_relative_residual = T(0.25);
+    T absolute_residual_tolerance = T(1.0e-8);
+
+    void validate() const
+    {
+        if(!common::scalar_math::isfinite(maximum_relative_residual) ||
+           !common::scalar_math::isfinite(absolute_residual_tolerance) ||
+           maximum_relative_residual < T(0) ||
+           absolute_residual_tolerance < T(0))
+        {
+            throw std::invalid_argument(
+                "invalid tangent equation quality policy");
+        }
+    }
+};
+
+template<class T>
+tangent_equation_quality<T> make_tangent_equation_quality(
+    const T absolute_residual,
+    const T jacobian_term_norm,
+    const T parameter_term_norm)
+{
+    tangent_equation_quality<T> quality;
+    quality.absolute_residual = absolute_residual;
+    quality.equation_scale = jacobian_term_norm + parameter_term_norm;
+    const T minimum_scale =
+        T(64)*std::numeric_limits<T>::epsilon();
+    const T denominator = quality.equation_scale > minimum_scale
+        ? quality.equation_scale
+        : minimum_scale;
+    quality.relative_residual = absolute_residual/denominator;
+    quality.finite =
+        common::scalar_math::isfinite(quality.absolute_residual) &&
+        common::scalar_math::isfinite(quality.equation_scale) &&
+        common::scalar_math::isfinite(quality.relative_residual);
+    return quality;
+}
+
+template<class T>
+bool tangent_equation_quality_is_acceptable(
+    const tangent_equation_quality<T>& quality,
+    const tangent_equation_quality_policy<T>& policy)
+{
+    return quality.finite &&
+           (quality.absolute_residual <=
+                policy.absolute_residual_tolerance ||
+            quality.relative_residual <=
+                policy.maximum_relative_residual);
+}
+
+template<class T>
 struct tangent_candidate_quality
 {
     const char* method = "unknown";

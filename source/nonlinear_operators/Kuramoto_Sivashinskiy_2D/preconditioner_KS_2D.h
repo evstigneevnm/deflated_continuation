@@ -1,54 +1,35 @@
-#ifndef __PRECONDITIONER_KS_2D_H__
-#define __PRECONDITIONER_KS_2D_H__
-
-
-/**
-*   Helper preconditioner class for iterative linear solver
-*   It is calling a method defined in nonlinear_operator
-*   Also requires linear operator while using iterative Krylov solver
-*/
-
+#ifndef __PRECONDITIONER_KURAMOTO_SIVASHINSKIY_2D_H__
+#define __PRECONDITIONER_KURAMOTO_SIVASHINSKIY_2D_H__
 
 namespace nonlinear_operators
 {
 
-template<class vector_operations, class nonlinear_operator, class linear_operator> 
+template<class VectorOperations, class NonlinearOperator, class LinearOperator>
 class preconditioner_KS_2D
 {
 public:
-    typedef typename vector_operations::scalar_type  T;
-    typedef typename vector_operations::vector_type  T_vec;
+    using vector_type = typename VectorOperations::vector_type;
 
-    preconditioner_KS_2D(nonlinear_operator*& nonlin_op_):
-    nonlin_op(nonlin_op_)
+    explicit preconditioner_KS_2D(NonlinearOperator* nonlinear_operator):
+        nonlinear_operator_(nonlinear_operator)
     {
-
     }
 
-    ~preconditioner_KS_2D()
+    void set_operator(const LinearOperator* linear_operator) const
     {
-
-    }
-    
-    void set_operator(const linear_operator *op_)const 
-    {
-        lin_op = (linear_operator*)op_;
+        linear_operator_ = linear_operator;
     }
 
-    void apply(T_vec& x)const
+    void apply(vector_type& input_output) const
     {
-        nonlin_op->preconditioner_jacobian_u(x);
+        nonlinear_operator_->preconditioner_jacobian_u(input_output);
     }
 
 private:
-    nonlinear_operator* nonlin_op;
-    mutable const linear_operator* lin_op;
-
-    
+    NonlinearOperator* nonlinear_operator_;
+    mutable const LinearOperator* linear_operator_ = nullptr;
 };
 
-
-}
-
+} // namespace nonlinear_operators
 
 #endif

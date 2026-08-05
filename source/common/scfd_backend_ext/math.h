@@ -42,6 +42,26 @@ struct math
         return sqrt(x);
 #endif
     }
+
+    __DEVICE_TAG__ static T sin(const T& x)
+    {
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+        return ::sin(x);
+#else
+        using std::sin;
+        return sin(x);
+#endif
+    }
+
+    __DEVICE_TAG__ static T cos(const T& x)
+    {
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+        return ::cos(x);
+#else
+        using std::cos;
+        return cos(x);
+#endif
+    }
 };
 
 template<class Backend, class T>

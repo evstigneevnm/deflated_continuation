@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot a bifurcation diagram with solution-profile insets from manifest.jsonl."""
+"""Plot a bifurcation diagram with solution insets from manifest.jsonl."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import plot_bd as bd
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Plot a BD norm and overlay saved solution profiles from visualization/manifest.jsonl."
+        description="Plot a BD norm and overlay saved solution profiles or fields from visualization/manifest.jsonl."
     )
     parser.add_argument("config", help="JSON project config file")
     parser.add_argument(
@@ -137,6 +137,44 @@ def parse_args() -> argparse.Namespace:
         type=bd.positive_float,
         metavar="POINTS",
         help="Override the numbered BD point-label font size.",
+    )
+    parser.add_argument(
+        "--field-render",
+        choices=("imshow", "contourf"),
+        default="imshow",
+        help="Rendering method for two-dimensional scalar fields.",
+    )
+    parser.add_argument(
+        "--field-cmap",
+        default="RdBu_r",
+        help="Matplotlib colormap for two-dimensional scalar fields.",
+    )
+    parser.add_argument(
+        "--field-color-scale",
+        choices=("selected", "snapshot"),
+        default="selected",
+        help="Use one symmetric color range for selected fields or scale each snapshot independently.",
+    )
+    parser.add_argument(
+        "--field-vmin",
+        type=float,
+        help="Override the lower two-dimensional field color limit.",
+    )
+    parser.add_argument(
+        "--field-vmax",
+        type=float,
+        help="Override the upper two-dimensional field color limit.",
+    )
+    parser.add_argument(
+        "--field-colorbar",
+        action="store_true",
+        help="Draw one colorbar for fields using --fit-solutions and the selected shared color scale.",
+    )
+    parser.add_argument(
+        "--contour-levels",
+        type=int,
+        default=16,
+        help="Number of filled-contour levels used by --field-render contourf.",
     )
     bd.add_branch_display_arguments(parser)
     bd.add_stability_arguments(parser)
@@ -287,6 +325,86 @@ def read_profile(path: Path) -> tuple[list[float], list[float]]:
     return xs, ys
 
 
+def is_scalar_field_2d(record: dict[str, Any]) -> bool:
+    return record.get("kind") == "physical_scalar_2d"
+
+
+def read_scalar_field(record: dict[str, Any]):
+    import numpy as np
+
+    if record.get("format") not in (None, "npy"):
+        raise ValueError(
+            f"Unsupported two-dimensional field format '{record.get('format')}' "
+            f"on manifest line {record.get('manifest_line')}"
+        )
+    path = record["resolved_data_file"]
+    field = np.load(path, allow_pickle=False)
+    expected_shape = tuple(int(value) for value in record.get("shape", []))
+    if expected_shape and field.shape != expected_shape:
+        raise ValueError(
+            f"Field shape {field.shape} does not match manifest shape {expected_shape}: {path}"
+        )
+    if field.ndim != 2:
+        raise ValueError(f"Expected a two-dimensional scalar field, got shape {field.shape}: {path}")
+    return field
+
+
+def scalar_field_extent(record: dict[str, Any], shape: tuple[int, int]) -> tuple[float, float, float, float]:
+    origin = [float(value) for value in record.get("origin", [0.0, 0.0])]
+    spacing = [float(value) for value in record.get("spacing", [1.0, 1.0])]
+    if len(origin) != 2 or len(spacing) != 2:
+        raise ValueError(
+            f"Two-dimensional field metadata requires two origin and spacing values "
+            f"on manifest line {record.get('manifest_line')}"
+        )
+    return (
+        origin[0],
+        origin[0] + spacing[0] * shape[0],
+        origin[1],
+        origin[1] + spacing[1] * shape[1],
+    )
+
+
+def scalar_field_limits(fields: list[Any], args: argparse.Namespace) -> tuple[float, float] | None:
+    import numpy as np
+
+    if not fields or args.field_color_scale == "snapshot":
+        return None
+    finite_minima: list[float] = []
+    finite_maxima: list[float] = []
+    for field in fields:
+        finite = field[np.isfinite(field)]
+        if finite.size:
+            finite_minima.append(float(finite.min()))
+            finite_maxima.append(float(finite.max()))
+    if not finite_minima:
+        raise ValueError("Selected two-dimensional fields contain no finite values")
+    bound = max(abs(min(finite_minima)), abs(max(finite_maxima)))
+    if bound == 0.0:
+        bound = 1.0
+    vmin = args.field_vmin if args.field_vmin is not None else -bound
+    vmax = args.field_vmax if args.field_vmax is not None else bound
+    if not vmin < vmax:
+        raise ValueError(f"Invalid field color limits: vmin={vmin}, vmax={vmax}")
+    return vmin, vmax
+
+
+def snapshot_field_limits(field, args: argparse.Namespace) -> tuple[float, float]:
+    import numpy as np
+
+    finite = field[np.isfinite(field)]
+    if finite.size == 0:
+        raise ValueError("A selected two-dimensional field contains no finite values")
+    bound = max(abs(float(finite.min())), abs(float(finite.max())))
+    if bound == 0.0:
+        bound = 1.0
+    vmin = args.field_vmin if args.field_vmin is not None else -bound
+    vmax = args.field_vmax if args.field_vmax is not None else bound
+    if not vmin < vmax:
+        raise ValueError(f"Invalid field color limits: vmin={vmin}, vmax={vmax}")
+    return vmin, vmax
+
+
 def default_output(project_dir: Path, label: str, branches: list[int]) -> Path:
     safe_label = re.sub(r"[^A-Za-z0-9_.-]+", "_", label).strip("_") or "norm"
     branch_suffix = ""
@@ -395,6 +513,19 @@ def add_solution_insets(
 ):
     from matplotlib.patches import ConnectionPatch
 
+    field_cache = {
+        record["resolved_data_file"]: read_scalar_field(record)
+        for record in records
+        if is_scalar_field_2d(record)
+    }
+    shared_field_limits = scalar_field_limits(list(field_cache.values()), args)
+    if args.field_colorbar and args.field_color_scale != "selected":
+        raise ValueError("--field-colorbar requires --field-color-scale selected")
+    if args.field_colorbar and not args.fit_solutions:
+        raise ValueError("--field-colorbar requires --fit-solutions")
+    field_axes = []
+    field_mappable = None
+
     color_cycle = itertools.cycle(
         [
             "tab:blue",
@@ -427,10 +558,48 @@ def add_solution_insets(
                 args.thumbnail_width,
                 args.thumbnail_height,
             )
+        if args.field_colorbar and field_cache:
+            position[0] *= 0.94
+            position[2] *= 0.94
         inset = inset_parent.inset_axes(position)
-        xs, ys = read_profile(record["resolved_data_file"])
         color = next(color_cycle)
-        inset.plot(xs, ys, color=color, linewidth=0.9)
+        if is_scalar_field_2d(record):
+            import numpy as np
+
+            field = field_cache[record["resolved_data_file"]]
+            limits = shared_field_limits or snapshot_field_limits(field, args)
+            extent = scalar_field_extent(record, field.shape)
+            if args.field_render == "contourf":
+                spacing_x = (extent[1] - extent[0]) / field.shape[0]
+                spacing_y = (extent[3] - extent[2]) / field.shape[1]
+                x_values = extent[0] + spacing_x * np.arange(field.shape[0])
+                y_values = extent[2] + spacing_y * np.arange(field.shape[1])
+                levels = np.linspace(limits[0], limits[1], max(args.contour_levels, 2) + 1)
+                field_mappable = inset.contourf(
+                    x_values,
+                    y_values,
+                    field.T,
+                    levels=levels,
+                    cmap=args.field_cmap,
+                )
+                inset.set_xlim(extent[0], extent[1])
+                inset.set_ylim(extent[2], extent[3])
+            else:
+                field_mappable = inset.imshow(
+                    field.T,
+                    origin="lower",
+                    extent=extent,
+                    aspect="equal",
+                    interpolation="nearest",
+                    cmap=args.field_cmap,
+                    vmin=limits[0],
+                    vmax=limits[1],
+                )
+            inset.set_aspect("equal", adjustable="box")
+            field_axes.append(inset)
+        else:
+            xs, ys = read_profile(record["resolved_data_file"])
+            inset.plot(xs, ys, color=color, linewidth=0.9)
         inset.set_xticks([])
         inset.set_yticks([])
         inset.set_title(
@@ -467,6 +636,20 @@ def add_solution_insets(
         )
         figure.add_artist(connection)
 
+    if args.field_colorbar and field_mappable is not None and field_axes:
+        colorbar_axis = inset_parent.inset_axes([0.965, 0.1, 0.012, 0.8])
+        colorbar = figure.colorbar(
+            field_mappable,
+            cax=colorbar_axis,
+        )
+        field_names = {
+            str(record.get("field_name", "field"))
+            for record in records
+            if is_scalar_field_2d(record)
+        }
+        if len(field_names) == 1:
+            colorbar.set_label(next(iter(field_names)))
+
 
 def render_plot(
     plt,
@@ -485,7 +668,8 @@ def render_plot(
     if args.fit_solutions:
         columns = min(max(args.thumbnail_columns, 1), max(len(records), 1))
         solution_rows = max(math.ceil(len(records) / columns), 1)
-        solution_height = max(1.6, 1.45 * solution_rows)
+        row_height = 2.0 if any(is_scalar_field_2d(record) for record in records) else 1.45
+        solution_height = max(1.6, row_height * solution_rows)
         diagram_height = 5.5
         figure = plt.figure(figsize=(11.5, diagram_height + solution_height))
         grid = figure.add_gridspec(

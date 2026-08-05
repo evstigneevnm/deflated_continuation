@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import sys
@@ -42,6 +43,22 @@ class StabilityPlotRecord:
     @property
     def unstable_dimension(self) -> int:
         return self.unstable_real + 2 * self.unstable_complex_pairs
+
+
+class CurveRows(list):
+    """Curve rows with optional per-row continuation segment identifiers."""
+
+    def __init__(
+        self,
+        rows: list[list[float]],
+        segment_ids: list[int] | None = None,
+    ) -> None:
+        super().__init__(rows)
+        self.segment_ids = (
+            segment_ids
+            if segment_ids is not None and len(segment_ids) == len(rows)
+            else [0] * len(rows)
+        )
 
 
 def positive_float(value: str) -> float:
@@ -326,6 +343,31 @@ def read_curve_file(path: Path) -> list[list[float]]:
     return rows
 
 
+def read_curve_segment_ids(path: Path, row_count: int) -> list[int]:
+    if not path.exists():
+        return [0] * row_count
+
+    segment_ids: list[int] = []
+    with path.open("r", encoding="utf-8") as stream:
+        for line in stream:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            fields = stripped.split()
+            if len(fields) < 6:
+                return [0] * row_count
+            try:
+                source_index = int(fields[0])
+                segment_id = int(fields[4])
+            except ValueError:
+                return [0] * row_count
+            if source_index != len(segment_ids):
+                return [0] * row_count
+            segment_ids.append(segment_id)
+
+    return segment_ids if len(segment_ids) == row_count else [0] * row_count
+
+
 def load_curves(project_dir: Path) -> dict[str, list[list[float]]]:
     curves: dict[str, list[list[float]]] = {}
     for branch_dir in sorted((path for path in project_dir.iterdir() if path.is_dir()), key=branch_sort_key):
@@ -334,7 +376,14 @@ def load_curves(project_dir: Path) -> dict[str, list[list[float]]]:
             curve_file = branch_dir / "debug_curve.dat"
         if not curve_file.exists():
             continue
-        rows = read_curve_file(curve_file)
+        raw_rows = read_curve_file(curve_file)
+        rows = CurveRows(
+            raw_rows,
+            read_curve_segment_ids(
+                branch_dir / "metadata_curve.dat",
+                len(raw_rows),
+            ),
+        )
         if rows:
             curves[branch_dir.name] = rows
     return curves
@@ -577,12 +626,19 @@ def line_style(style: str) -> dict:
 def curve_coordinates(rows: list[list[float]], norm_index: int) -> tuple[list[float], list[float]]:
     xs: list[float] = []
     ys: list[float] = []
-    for row in rows:
+    segment_ids = getattr(rows, "segment_ids", [0] * len(rows))
+    previous_segment: int | None = None
+    for source_index, row in enumerate(rows):
         value = row_norm_value(row, norm_index)
         if value is None:
             continue
+        segment_id = segment_ids[source_index]
+        if previous_segment is not None and segment_id != previous_segment:
+            xs.append(math.nan)
+            ys.append(math.nan)
         xs.append(row[0])
         ys.append(value)
+        previous_segment = segment_id
     return xs, ys
 
 
@@ -593,13 +649,21 @@ def curve_coordinates_with_indices(
     xs: list[float] = []
     ys: list[float] = []
     indices: list[int] = []
+    segment_ids = getattr(rows, "segment_ids", [0] * len(rows))
+    previous_segment: int | None = None
     for source_index, row in enumerate(rows):
         value = row_norm_value(row, norm_index)
         if value is None:
             continue
+        segment_id = segment_ids[source_index]
+        if previous_segment is not None and segment_id != previous_segment:
+            xs.append(math.nan)
+            ys.append(math.nan)
+            indices.append(source_index)
         xs.append(row[0])
         ys.append(value)
         indices.append(source_index)
+        previous_segment = segment_id
     return xs, ys, indices
 
 

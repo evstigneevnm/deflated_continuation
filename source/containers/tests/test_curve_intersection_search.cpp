@@ -164,16 +164,55 @@ int main()
             "self intersection");
         require(result.reason == "self_intersection", "self intersection reason");
 
-        incomplete_segments.push_back(1);
+        points.resize(2);
+        points[0].lambda = 10.0;
+        points[0].vector_norms = {-9.0};
+        points[0].point_index = 0;
+        points[0].segment_id = 4;
+        points[0].semicurve_id = 4;
+        points[0].endpoint_reason = container::curve_endpoint_reason::none;
+        points[1].lambda = 30.0;
+        points[1].vector_norms = {-29.0};
+        points[1].point_index = 1;
+        points[1].segment_id = 4;
+        points[1].semicurve_id = 4;
+        points[1].endpoint_reason =
+            container::curve_endpoint_reason::boundary_max;
+
+        for(const double parameter: {15.0, 19.0, 29.0})
+        {
+            result = {};
+            const double left_parameter = parameter - 0.25;
+            const double right_parameter = parameter + 0.25;
+            require(
+                search.find_branch_intersection(
+                    left_parameter,
+                    1.0 - left_parameter,
+                    right_parameter,
+                    1.0 - right_parameter,
+                    {1.0 - left_parameter},
+                    {1.0 - right_parameter},
+                    branch_policy,
+                    true,
+                    "unused",
+                    0,
+                    hit,
+                    result,
+                    distance),
+                "boundary-ended analytical segment remains searchable at lambda " +
+                    std::to_string(parameter));
+        }
+
+        incomplete_segments.push_back(4);
         result = {};
         require(
-            !search.find_branch_intersection(
-                0.0,
-                0.0,
-                1.0,
-                1.0,
-                {0.0},
-                {1.0},
+            search.find_branch_intersection(
+                15.0,
+                -14.0,
+                19.0,
+                -18.0,
+                {-14.0},
+                {-18.0},
                 branch_policy,
                 true,
                 "unused",
@@ -181,7 +220,7 @@ int main()
                 hit,
                 result,
                 distance),
-            "incomplete segment exclusion");
+            "accepted portion of recoverable segment remains searchable");
     }
     catch(const std::exception& exception)
     {

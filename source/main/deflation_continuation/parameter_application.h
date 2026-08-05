@@ -220,6 +220,10 @@ container::branch_intersection_policy<Scalar> make_branch_intersection_policy(
         parameters.maximum_verified_forward_steps_ahead;
     policy.maximum_verified_forward_distance_step_ratio =
         parameters.maximum_verified_forward_distance_step_ratio;
+    policy.localize_analytical_targets =
+        parameters.localize_analytical_targets;
+    policy.analytical_target_parameter_tolerance =
+        parameters.analytical_target_parameter_tolerance;
     policy.verbose = parameters.verbose;
     container::validate_branch_intersection_policy(policy);
     return policy;

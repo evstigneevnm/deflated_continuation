@@ -10,7 +10,10 @@
 */
 
 #include <algorithm>
+#include <array>
+#include <cstdint>
 #include <functional>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -23,6 +26,7 @@
 #include <continuation/initial_tangent.h>
 #include <continuation/convergence_strategy.h>
 #include <continuation/continuation_endpoint_state.h>
+#include <continuation/continuation_result.h>
 #include <continuation/observational_knot_sample.h>
 #include <continuation/pending_branch_event.h>
 #include <continuation/progress_monitor.h>
@@ -42,6 +46,18 @@ template<class Curve>
 auto start_new_curve_segment_if_available(Curve* curve) -> decltype(curve->start_new_segment(), void())
 {
     curve->start_new_segment();
+}
+
+template<class Curve>
+auto current_curve_segment_id_if_available(Curve* curve, int)
+    -> decltype(curve->get_current_segment_id(), uint64_t())
+{
+    return curve->get_current_segment_id();
+}
+
+inline uint64_t current_curve_segment_id_if_available(...)
+{
+    return 0;
 }
 
 inline void start_new_curve_segment_if_available(...)
@@ -121,6 +137,7 @@ private:
         uint64_t& hit_segment_id,
         T& hit_forward_steps_ahead,
         T& hit_endpoint_distance_step_ratio,
+        container::curve_provenance& hit_target_provenance,
         std::string& reason)> branch_intersection_checker_t;
     typedef std::function<bool(
         Curve* curve,
@@ -209,6 +226,7 @@ public:
     }
     ~continuation()
     {
+        clear_recovery_checkpoints();
         unset_all_vectors();
         delete init_tangent;
         delete continuation_step;
@@ -322,7 +340,9 @@ public:
         const unsigned int maximum_refinements,
         const unsigned int minimum_refinements_for_verification,
         const T maximum_verified_steps_ahead,
-        const T maximum_verified_distance_step_ratio)
+        const T maximum_verified_distance_step_ratio,
+        const bool localize_analytical_targets,
+        const T analytical_target_parameter_tolerance)
     {
         if(step_factor <= T(0) || step_factor >= T(1))
         {
@@ -341,7 +361,8 @@ public:
                 "branch intersection minimum verification refinements must be positive and not exceed the refinement limit");
         }
         if(maximum_verified_steps_ahead <= T(0) ||
-           maximum_verified_distance_step_ratio <= T(0))
+           maximum_verified_distance_step_ratio <= T(0) ||
+           analytical_target_parameter_tolerance <= T(0))
         {
             throw std::invalid_argument(
                 "branch intersection verification thresholds must be positive");
@@ -353,6 +374,9 @@ public:
         maximum_verified_branch_steps_ahead = maximum_verified_steps_ahead;
         maximum_verified_branch_distance_step_ratio =
             maximum_verified_distance_step_ratio;
+        localize_analytical_branch_targets = localize_analytical_targets;
+        analytical_branch_parameter_tolerance =
+            analytical_target_parameter_tolerance;
     }
 
     void set_self_intersection_checker(self_intersection_checker_t checker_)
@@ -374,7 +398,10 @@ public:
         
     }
 
-    bool continuate_curve(Curve*& curve_, const T_vec& x0_, const T& lambda0_)
+    continuation_curve_result<T> continuate_curve_result(
+        Curve*& curve_,
+        const T_vec& x0_,
+        const T& lambda0_)
     {
         update_knots();
         bif_diag = curve_;
@@ -382,6 +409,10 @@ public:
         fail_flag = false;
         hard_failure = false;
         endpoint_state.reset_curve();
+        last_curve_result = {};
+        recovery_checkpoint_valid.fill(false);
+        last_accepted_checkpoint_valid = false;
+        current_curve_point_offset = 0;
         branch_event.clear();
         just_interpolated = false;
         continue_next_step = true;
@@ -403,6 +434,20 @@ public:
 
         while (break_semicurve < 2)
         {
+            const unsigned int semicurve_index =
+                last_curve_result.semicurves_started;
+            if(semicurve_index >= last_curve_result.semicurves.size())
+            {
+                break;
+            }
+            current_semicurve_points = 0;
+            current_semicurve_endpoint_reason = endpoint_reason_t::none;
+            current_semicurve_failure = continuation_failure_kind::none;
+            current_semicurve_failure_message.clear();
+            current_semicurve_attempted_step = T(0);
+            current_semicurve_retry_count = 0;
+            current_semicurve_last_parameter = lambda_start;
+            last_accepted_checkpoint_valid = false;
             continue_next_step = true;
             chart::prepare_continuation_seed(
                 vec_ops,
@@ -411,7 +456,47 @@ public:
                 x_start,
                 x0);
             detail::start_new_curve_segment_if_available(bif_diag);
+            const std::uint64_t segment_id =
+                detail::current_curve_segment_id_if_available(
+                    bif_diag,
+                    0);
+            const std::uint64_t first_point_index =
+                current_curve_point_offset;
+            const int semicurve_direction = direction;
             start_semicurve();
+            auto& semicurve =
+                last_curve_result.semicurves[semicurve_index];
+            semicurve.direction = semicurve_direction;
+            semicurve.accepted_points = current_semicurve_points;
+            semicurve.segment_id = segment_id;
+            semicurve.first_point_index = first_point_index;
+            semicurve.last_point_index = current_semicurve_points == 0
+                ? first_point_index
+                : first_point_index + current_semicurve_points - 1;
+            semicurve.start_parameter = lambda_start;
+            semicurve.last_parameter = current_semicurve_last_parameter;
+            semicurve.endpoint_reason = current_semicurve_endpoint_reason;
+            semicurve.failure = current_semicurve_failure;
+            semicurve.attempted_step = current_semicurve_attempted_step;
+            semicurve.retry_count = current_semicurve_retry_count;
+            semicurve.message = current_semicurve_failure_message;
+            semicurve.status =
+                current_semicurve_failure != continuation_failure_kind::none ||
+                container::is_incomplete_endpoint(
+                    current_semicurve_endpoint_reason)
+                    ? semicurve_status::open_recoverable
+                    : semicurve_status::complete;
+            current_curve_point_offset += current_semicurve_points;
+            if(semicurve.has_progress())
+            {
+                capture_recovery_checkpoint(semicurve_index);
+            }
+            ++last_curve_result.semicurves_started;
+            if(current_semicurve_endpoint_reason ==
+               endpoint_reason_t::closed_return)
+            {
+                last_curve_result.branch_closed = true;
+            }
             change_direction(); //if we reached the origin, then this is irrelevant. Else, change direction and do it again
             vec_ops->assign(x_start, x0);
             lambda0 = lambda_start;
@@ -422,7 +507,37 @@ public:
             }
         }
         bif_diag->print_curve();
-        return !hard_failure && !endpoint_state.incomplete();
+        return last_curve_result;
+    }
+
+    bool continuate_curve(Curve*& curve_, const T_vec& x0_, const T& lambda0_)
+    {
+        return continuate_curve_result(curve_, x0_, lambda0_).complete();
+    }
+
+    const continuation_curve_result<T>& last_continuation_result() const
+    {
+        return last_curve_result;
+    }
+
+    bool copy_recovery_checkpoint(
+        const unsigned int semicurve_index,
+        T_vec& state,
+        T_vec& tangent,
+        T& parameter,
+        T& parameter_tangent) const
+    {
+        if(semicurve_index >= recovery_checkpoint_valid.size() ||
+           !recovery_checkpoint_valid[semicurve_index])
+        {
+            return false;
+        }
+        vec_ops->assign(recovery_checkpoint_state[semicurve_index], state);
+        vec_ops->assign(recovery_checkpoint_tangent[semicurve_index], tangent);
+        parameter = recovery_checkpoint_parameter[semicurve_index];
+        parameter_tangent =
+            recovery_checkpoint_parameter_tangent[semicurve_index];
+        return true;
     }
 
 
@@ -466,6 +581,7 @@ protected: //changed to protected for inheritance
     T configured_lambda_min = T(0);
     T configured_lambda_max = T(0);
     T_vec x0, x0_s, x1, x1_back, x1_s, x_check, x_output, x_knot_sample, x_branch_intersection, x_pending_branch_event;
+    T_vec x_last_accepted, x_last_accepted_s;
     char break_semicurve = 0;
     bool fail_flag = false;
     bool hard_failure = false;
@@ -484,10 +600,94 @@ protected: //changed to protected for inheritance
     unsigned int minimum_branch_refinements_for_verification = 3;
     T maximum_verified_branch_steps_ahead = T(0.1);
     T maximum_verified_branch_distance_step_ratio = T(0.3);
+    bool localize_analytical_branch_targets = true;
+    T analytical_branch_parameter_tolerance = T(1.0e-7);
     pending_branch_event<T> branch_event;
     self_intersection_checker_t self_intersection_checker;
     progress_monitor_policy<T> progress_policy;
     progress_monitor<T> accepted_progress_monitor;
+    continuation_curve_result<T> last_curve_result;
+    unsigned int current_semicurve_points = 0;
+    endpoint_reason_t current_semicurve_endpoint_reason =
+        endpoint_reason_t::none;
+    continuation_failure_kind current_semicurve_failure =
+        continuation_failure_kind::none;
+    std::string current_semicurve_failure_message;
+    T current_semicurve_attempted_step = T(0);
+    unsigned int current_semicurve_retry_count = 0;
+    T current_semicurve_last_parameter = T(0);
+    std::uint64_t current_curve_point_offset = 0;
+    std::array<T_vec, 2> recovery_checkpoint_state;
+    std::array<T_vec, 2> recovery_checkpoint_tangent;
+    std::array<bool, 2> recovery_checkpoint_initialized{{false, false}};
+    std::array<bool, 2> recovery_checkpoint_valid{{false, false}};
+    std::array<T, 2> recovery_checkpoint_parameter{{T(0), T(0)}};
+    std::array<T, 2> recovery_checkpoint_parameter_tangent{{T(0), T(0)}};
+    bool last_accepted_checkpoint_valid = false;
+    T last_accepted_parameter = T(0);
+    T last_accepted_parameter_tangent = T(0);
+
+    void update_last_accepted_checkpoint(
+        const T_vec& state,
+        const T_vec& tangent,
+        const T parameter,
+        const T parameter_tangent)
+    {
+        vec_ops->assign(state, x_last_accepted);
+        vec_ops->assign(tangent, x_last_accepted_s);
+        last_accepted_parameter = parameter;
+        last_accepted_parameter_tangent = parameter_tangent;
+        last_accepted_checkpoint_valid = true;
+    }
+
+    void capture_recovery_checkpoint(const unsigned int index)
+    {
+        if(index >= recovery_checkpoint_valid.size())
+        {
+            return;
+        }
+        if(!recovery_checkpoint_initialized[index])
+        {
+            vec_ops->init_vector(recovery_checkpoint_state[index]);
+            vec_ops->start_use_vector(recovery_checkpoint_state[index]);
+            vec_ops->init_vector(recovery_checkpoint_tangent[index]);
+            vec_ops->start_use_vector(recovery_checkpoint_tangent[index]);
+            recovery_checkpoint_initialized[index] = true;
+        }
+        if(!last_accepted_checkpoint_valid)
+        {
+            return;
+        }
+        vec_ops->assign(
+            x_last_accepted,
+            recovery_checkpoint_state[index]);
+        vec_ops->assign(
+            x_last_accepted_s,
+            recovery_checkpoint_tangent[index]);
+        recovery_checkpoint_parameter[index] = last_accepted_parameter;
+        recovery_checkpoint_parameter_tangent[index] =
+            last_accepted_parameter_tangent;
+        recovery_checkpoint_valid[index] = true;
+    }
+
+    void clear_recovery_checkpoints()
+    {
+        for(unsigned int index = 0;
+            index < recovery_checkpoint_initialized.size();
+            ++index)
+        {
+            if(!recovery_checkpoint_initialized[index])
+            {
+                continue;
+            }
+            vec_ops->stop_use_vector(recovery_checkpoint_tangent[index]);
+            vec_ops->free_vector(recovery_checkpoint_tangent[index]);
+            vec_ops->stop_use_vector(recovery_checkpoint_state[index]);
+            vec_ops->free_vector(recovery_checkpoint_state[index]);
+            recovery_checkpoint_initialized[index] = false;
+            recovery_checkpoint_valid[index] = false;
+        }
+    }
 
     void set_pending_endpoint_reason(endpoint_reason_t reason)
     {
@@ -504,6 +704,7 @@ protected: //changed to protected for inheritance
         {
             endpoint_state.mark_incomplete();
         }
+        current_semicurve_endpoint_reason = reason;
     }
 
     void add_solution_to_curve(
@@ -517,6 +718,12 @@ protected: //changed to protected for inheritance
         if(container::is_incomplete_endpoint(endpoint_reason))
         {
             endpoint_state.mark_incomplete();
+        }
+        ++current_semicurve_points;
+        current_semicurve_last_parameter = lambda;
+        if(endpoint_reason != endpoint_reason_t::none)
+        {
+            current_semicurve_endpoint_reason = endpoint_reason;
         }
         if(solution_postprocessor)
         {
@@ -545,10 +752,14 @@ private:
         vec_ops->init_vector(x_knot_sample); vec_ops->start_use_vector(x_knot_sample);
         vec_ops->init_vector(x_branch_intersection); vec_ops->start_use_vector(x_branch_intersection);
         vec_ops->init_vector(x_pending_branch_event); vec_ops->start_use_vector(x_pending_branch_event);
+        vec_ops->init_vector(x_last_accepted); vec_ops->start_use_vector(x_last_accepted);
+        vec_ops->init_vector(x_last_accepted_s); vec_ops->start_use_vector(x_last_accepted_s);
     }
     void unset_all_vectors()
     {
         vec_ops->stop_use_vector(x_pending_branch_event); vec_ops->free_vector(x_pending_branch_event);
+        vec_ops->stop_use_vector(x_last_accepted_s); vec_ops->free_vector(x_last_accepted_s);
+        vec_ops->stop_use_vector(x_last_accepted); vec_ops->free_vector(x_last_accepted);
         vec_ops->stop_use_vector(x_branch_intersection); vec_ops->free_vector(x_branch_intersection);
         vec_ops->stop_use_vector(x_output); vec_ops->free_vector(x_output);
         vec_ops->stop_use_vector(x_check); vec_ops->free_vector(x_check);
@@ -765,6 +976,23 @@ private:
 
     }
 
+    bool parameter_is_within_bounds(const T& value) const
+    {
+        const auto magnitude = [](const T& item) -> T
+        {
+            using std::abs;
+            return abs(item);
+        };
+        const T scale = std::max<T>(
+            T(1),
+            std::max<T>(
+                std::max<T>(magnitude(lambda_min), magnitude(lambda_max)),
+                magnitude(value)));
+        const T tolerance = T(64)*std::numeric_limits<T>::epsilon()*scale;
+        return value >= lambda_min - tolerance &&
+               value <= lambda_max + tolerance;
+    }
+
     bools2 check_boundary_intersection(
         const T lambda_boundary,
         const endpoint_reason_t exact_reason,
@@ -796,19 +1024,21 @@ private:
             return bools2(true, false);
         }
 
-        vec_ops->assign(x1_back, x1);
-        lambda1 = converged_lambda;
         if(preserve_last_converged_boundary_point)
         {
+            vec_ops->assign(x0, x1);
+            lambda1 = lambda0;
             fail_flag = false;
             set_pending_endpoint_reason(approximate_reason);
             log->warning_f(
-                "continuation::check_interval: exact boundary refinement at lambda = %le failed; preserving the converged point at lambda = %le and marking an approximate boundary endpoint.",
+                "continuation::check_interval: exact boundary refinement at lambda = %le failed; preserving the preceding accepted in-bounds point at lambda = %le and marking an approximate boundary endpoint.",
                 double(lambda_boundary),
                 double(lambda1));
             return bools2(true, false);
         }
 
+        vec_ops->assign(x1_back, x1);
+        lambda1 = converged_lambda;
         fail_flag = true;
         set_pending_endpoint_reason(
             endpoint_reason_t::knot_interpolation_failure);
@@ -1034,6 +1264,11 @@ private:
             log->info_f("continuation::start_semicurve: starting semicurve with direction = %i", direction);
             branch_event.clear();
             obtain_seed_tangent();
+            update_last_accepted_checkpoint(
+                x0,
+                x0_s,
+                lambda0,
+                lambda0_s);
         }
         catch(const std::exception& e)
         {
@@ -1043,6 +1278,11 @@ private:
             fail_flag = true;
             hard_failure = true;
             endpoint_state.mark_incomplete();
+            current_semicurve_endpoint_reason =
+                endpoint_reason_t::hard_failure;
+            current_semicurve_failure =
+                continuation_failure_kind::initial_tangent;
+            current_semicurve_failure_message = e.what();
         }
         if(!fail_flag)
         {        
@@ -1091,9 +1331,18 @@ private:
                                 x1,
                                 true,
                                 endpoint_reason_t::no_progress);
+                            update_last_accepted_checkpoint(
+                                x1,
+                                x1_s,
+                                lambda1,
+                                lambda1_s);
                             continue_next_step = false;
                             break_semicurve++;
                             endpoint_state.mark_incomplete();
+                            current_semicurve_failure =
+                                continuation_failure_kind::no_progress;
+                            current_semicurve_failure_message =
+                                "accepted-state progress watchdog stopped the semicurve";
                             break;
                         }
                     }
@@ -1105,6 +1354,7 @@ private:
                         uint64_t hit_segment_id = 0;
                         T hit_forward_steps_ahead = T(0);
                         T hit_endpoint_distance_step_ratio = T(0);
+                        container::curve_provenance hit_target_provenance;
                         std::string hit_reason;
                         branch_detection = branch_intersection_checker(
                             lambda0,
@@ -1117,7 +1367,15 @@ private:
                             hit_segment_id,
                             hit_forward_steps_ahead,
                             hit_endpoint_distance_step_ratio,
+                            hit_target_provenance,
                             hit_reason);
+                        if(branch_detection != container::branch_intersection_detection::none &&
+                           !parameter_is_within_bounds(hit_lambda))
+                        {
+                            branch_detection =
+                                container::branch_intersection_detection::none;
+                            branch_event.clear();
+                        }
                         if(branch_detection == container::branch_intersection_detection::verified)
                         {
                             const T corrected_hit_lambda = hit_lambda;
@@ -1125,6 +1383,8 @@ private:
                                    hit_curve_number,
                                    hit_segment_id))
                             {
+                                hit_target_provenance =
+                                    branch_event.target_provenance();
                                 hit_lambda = branch_event.lambda();
                                 vec_ops->assign(
                                     x_pending_branch_event,
@@ -1144,14 +1404,10 @@ private:
                             did_knot_interpolation = true;
                             continue_next_step = false;
                             break_semicurve++;
-                            if(hit_reason == "analytical branch endpoint")
-                            {
-                                set_pending_endpoint_reason(endpoint_reason_t::analytical_branch);
-                            }
-                            else
-                            {
-                                set_pending_endpoint_reason(endpoint_reason_t::known_branch);
-                            }
+                            set_pending_endpoint_reason(
+                                hit_target_provenance.is_analytical()
+                                    ? endpoint_reason_t::analytical_branch
+                                    : endpoint_reason_t::known_branch);
                             log->warning_f(
                                 "continuation::start_semicurve: stopped semicurve at lambda = %le due to %s.",
                                 double(lambda1),
@@ -1162,12 +1418,13 @@ private:
                             branch_event.update(
                                 hit_lambda,
                                 hit_curve_number,
-                                hit_segment_id);
+                                hit_segment_id,
+                                hit_target_provenance);
                             vec_ops->assign(
                                 x_branch_intersection,
                                 x_pending_branch_event);
                             branch_event.increment_refinements();
-                            const bool event_localized =
+                            const bool generic_event_localized =
                                 container::forward_branch_event_is_localized(
                                     branch_event.refinements(),
                                     hit_forward_steps_ahead,
@@ -1175,6 +1432,16 @@ private:
                                     minimum_branch_refinements_for_verification,
                                     maximum_verified_branch_steps_ahead,
                                     maximum_verified_branch_distance_step_ratio);
+                            const bool analytical_event_localized =
+                                localize_analytical_branch_targets &&
+                                branch_event.target_provenance().is_analytical() &&
+                                branch_event.refinements() >=
+                                    minimum_branch_refinements_for_verification &&
+                                branch_event.prediction_is_stable(
+                                    analytical_branch_parameter_tolerance);
+                            const bool event_localized =
+                                generic_event_localized ||
+                                analytical_event_localized;
                             if(event_localized)
                             {
                                 lambda1 = branch_event.lambda();
@@ -1182,7 +1449,10 @@ private:
                                 did_knot_interpolation = true;
                                 continue_next_step = false;
                                 break_semicurve++;
-                                set_pending_endpoint_reason(endpoint_reason_t::known_branch);
+                                set_pending_endpoint_reason(
+                                    branch_event.target_provenance().is_analytical()
+                                        ? endpoint_reason_t::analytical_branch
+                                        : endpoint_reason_t::known_branch);
                                 log->warning_f(
                                     "continuation::start_semicurve: localized branch encounter with curve %i at lambda = %le after %u refinements (estimated steps ahead = %le, distance/step = %le); stopping before the singular corrector can switch branches.",
                                     hit_curve_number,
@@ -1209,6 +1479,10 @@ private:
                                 endpoint_state.mark_incomplete();
                                 set_pending_endpoint_reason(
                                     endpoint_reason_t::unresolved_branch_intersection);
+                                current_semicurve_failure =
+                                    continuation_failure_kind::unresolved_intersection;
+                                current_semicurve_failure_message =
+                                    "branch intersection could not be verified";
                                 log->warning_f(
                                     "continuation::start_semicurve: could not verify a predicted branch intersection after %u refinements; stopping at lambda = %le without inserting a known-branch state.",
                                     branch_event.refinements(),
@@ -1260,6 +1534,13 @@ private:
                                 hit_reason.empty() ? "curve-local self intersection" : hit_reason.c_str());
                         }
                     }
+                    if(continue_next_step &&
+                       (lambda1 < lambda_min || lambda1 > lambda_max))
+                    {
+                        // A verified branch encounter takes precedence over a
+                        // boundary crossed by the same accepted step.
+                        check_interval();
+                    }
                     if((s>1)&&(!just_interpolated))
                     {
                         if(continue_next_step)
@@ -1281,6 +1562,11 @@ private:
                         just_interpolated = false;
                     }
                     //if try blocks passes, THIS is executed:
+                    update_last_accepted_checkpoint(
+                        x1,
+                        x1_s,
+                        lambda1,
+                        lambda1_s);
                     add_solution_to_curve(
                         lambda1,
                         x1,
@@ -1308,6 +1594,16 @@ private:
                     hard_failure = true;
                     endpoint_state.mark_incomplete();
                     mark_last_curve_point(endpoint_reason_t::hard_failure);
+                    const auto& attempt =
+                        continuation_step->last_attempt_state();
+                    current_semicurve_failure =
+                        attempt.failure == continuation_failure_kind::none
+                            ? continuation_failure_kind::unknown
+                            : attempt.failure;
+                    current_semicurve_failure_message = e.what();
+                    current_semicurve_attempted_step =
+                        attempt.attempted_step;
+                    current_semicurve_retry_count = attempt.retry_count;
                     continue_next_step = false;                   
                 }
                 if(!continue_next_step)
@@ -1323,6 +1619,10 @@ private:
                 break_semicurve++;
                 endpoint_state.mark_incomplete();
                 mark_last_curve_point(endpoint_reason_t::max_steps);
+                current_semicurve_failure =
+                    continuation_failure_kind::maximum_steps;
+                current_semicurve_failure_message =
+                    "maximum continuation steps reached";
             }
 
         }       

@@ -1,14 +1,14 @@
 #ifndef __DEFLATION_SYMMETRY_SOLUTION_STORAGE_H__
 #define __DEFLATION_SYMMETRY_SOLUTION_STORAGE_H__
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
-
-#include <symmetry/stabilized_storage.h>
 
 namespace deflation
 {
@@ -40,6 +40,70 @@ auto stabilize_canonical_if_available(
     symmetry_adapter->stabilize_canonical(source, destination);
 }
 
+template<class SymmetryAdapter>
+auto explicit_symmetry_definition_fingerprint(
+    const SymmetryAdapter* symmetry_adapter,
+    int) -> decltype(
+        symmetry_adapter->symmetry_definition_fingerprint(),
+        std::string())
+{
+    return symmetry_adapter->symmetry_definition_fingerprint();
+}
+
+template<class SymmetryAdapter>
+auto explicit_symmetry_definition_fingerprint(
+    const SymmetryAdapter* symmetry_adapter,
+    long) -> decltype(
+        symmetry_adapter->finite_registry()->has_explicit_definition_fingerprint(),
+        std::string())
+{
+    const auto* registry = symmetry_adapter->finite_registry();
+    return registry != nullptr &&
+            registry->has_explicit_definition_fingerprint()
+        ? registry->definition_fingerprint()
+        : std::string{};
+}
+
+template<class SymmetryAdapter>
+std::string explicit_symmetry_definition_fingerprint(
+    const SymmetryAdapter*,
+    ...)
+{
+    return {};
+}
+
+template<class SymmetryAdapter>
+auto explicit_symmetry_action_names(
+    const SymmetryAdapter* symmetry_adapter,
+    int) -> decltype(
+        symmetry_adapter->symmetry_action_names(),
+        std::vector<std::string>())
+{
+    return symmetry_adapter->symmetry_action_names();
+}
+
+template<class SymmetryAdapter>
+auto explicit_symmetry_action_names(
+    const SymmetryAdapter* symmetry_adapter,
+    long) -> decltype(
+        symmetry_adapter->finite_registry()->action_names(),
+        std::vector<std::string>())
+{
+    const auto* registry = symmetry_adapter->finite_registry();
+    return registry != nullptr &&
+            registry->has_explicit_definition_fingerprint()
+        ? registry->action_names()
+        : std::vector<std::string>{};
+}
+
+template<class SymmetryAdapter>
+std::vector<std::string> explicit_symmetry_action_names(
+    const SymmetryAdapter*,
+    ...)
+{
+    return {};
+}
+
 template<class SymmetryAdapter, class Vector>
 void stabilize_canonical_if_available(
     SymmetryAdapter* symmetry_adapter,
@@ -48,6 +112,85 @@ void stabilize_canonical_if_available(
     long)
 {
     symmetry_adapter->stabilize(source, destination);
+}
+
+template<class SymmetryAdapter, class Vector>
+auto align_orbit_closest_to_reference_if_available(
+    SymmetryAdapter* symmetry_adapter,
+    const Vector& reference,
+    const Vector& source,
+    Vector& destination,
+    int) -> decltype(
+        symmetry_adapter->align_orbit_closest_to_reference(
+            reference,
+            source,
+            destination),
+        void())
+{
+    symmetry_adapter->align_orbit_closest_to_reference(
+        reference,
+        source,
+        destination);
+}
+
+template<class SymmetryAdapter, class Vector>
+void align_orbit_closest_to_reference_if_available(
+    SymmetryAdapter* symmetry_adapter,
+    const Vector&,
+    const Vector& source,
+    Vector& destination,
+    long)
+{
+    stabilize_canonical_if_available(
+        symmetry_adapter,
+        source,
+        destination,
+        0);
+}
+
+template<class SymmetryAdapter, class Vector>
+auto align_orbit_and_tangent_closest_to_reference_if_available(
+    SymmetryAdapter* symmetry_adapter,
+    const Vector& reference,
+    const Vector& source,
+    const Vector& source_tangent,
+    Vector& destination,
+    Vector& tangent_destination,
+    int) -> decltype(
+        symmetry_adapter->align_orbit_and_tangent_closest_to_reference(
+            reference,
+            source,
+            source_tangent,
+            destination,
+            tangent_destination),
+        bool())
+{
+    symmetry_adapter->align_orbit_and_tangent_closest_to_reference(
+        reference,
+        source,
+        source_tangent,
+        destination,
+        tangent_destination);
+    return true;
+}
+
+template<class SymmetryAdapter, class Vector>
+bool align_orbit_and_tangent_closest_to_reference_if_available(
+    SymmetryAdapter* symmetry_adapter,
+    const Vector& reference,
+    const Vector& source,
+    const Vector& source_tangent,
+    Vector& destination,
+    Vector& tangent_destination,
+    long)
+{
+    (void)symmetry_adapter;
+    (void)reference;
+    (void)source;
+    (void)source_tangent;
+    (void)destination;
+    (void)tangent_destination;
+    return false;
 }
 
 template<class SymmetryAdapter, class Vector>
@@ -103,6 +246,28 @@ public:
         stabilize(source, destination);
     }
 
+    void align_orbit_closest_to_reference(
+        const vector_type&,
+        const vector_type& source,
+        vector_type& destination) const
+    {
+        stabilize(source, destination);
+    }
+
+    void align_orbit_and_tangent_closest_to_reference(
+        const vector_type& reference,
+        const vector_type& source,
+        const vector_type& source_tangent,
+        vector_type& destination,
+        vector_type& tangent_destination) const
+    {
+        align_orbit_closest_to_reference(
+            reference,
+            source,
+            destination);
+        vec_ops->assign(source_tangent, tangent_destination);
+    }
+
     void pullback_distance_gradient(
         const vector_type&,
         const vector_type&,
@@ -110,6 +275,19 @@ public:
         vector_type& gradient) const
     {
         vec_ops->assign(slice_gradient, gradient);
+    }
+
+    void pullback_canonical_distance_gradient(
+        const vector_type& source,
+        const vector_type& slice_state,
+        const vector_type& slice_gradient,
+        vector_type& gradient) const
+    {
+        pullback_distance_gradient(
+            source,
+            slice_state,
+            slice_gradient,
+            gradient);
     }
 
 private:
@@ -124,8 +302,6 @@ public:
     using symmetry_adapter_type = SymmetryAdapter;
     using T = typename VectorOperations::scalar_type;
     using T_vec = typename VectorOperations::vector_type;
-    using host_state_type = std::vector<T>;
-    using stabilized_host_storage_type = symmetry::stabilized_storage<host_state_type>;
 
     symmetry_solution_storage(
         VectorOperations* vec_ops_,
@@ -155,7 +331,7 @@ public:
         vec_ops(vec_ops_),
         symmetry_adapter(symmetry_adapter_),
         log(log_),
-        canonical_host_storage(duplicate_tolerance_),
+        duplicate_tolerance_(duplicate_tolerance_),
         norm_weight(norm_weight_),
         P(P_),
         number_of_solutions_(number_of_solutions)
@@ -209,6 +385,32 @@ public:
         return symmetry_adapter;
     }
 
+    std::string symmetry_definition_fingerprint() const
+    {
+        require_symmetry_adapter();
+        return detail::explicit_symmetry_definition_fingerprint(
+            symmetry_adapter,
+            0);
+    }
+
+    std::vector<std::string> symmetry_action_names() const
+    {
+        require_symmetry_adapter();
+        return detail::explicit_symmetry_action_names(
+            symmetry_adapter,
+            0);
+    }
+
+    double duplicate_tolerance() const
+    {
+        return duplicate_tolerance_;
+    }
+
+    std::size_t duplicates_skipped_since_clear() const
+    {
+        return duplicates_skipped_since_clear_;
+    }
+
     void set_known_solution(const T_vec& x0_p)
     {
         require_symmetry_adapter();
@@ -224,13 +426,18 @@ public:
     void push_back(const T_vec& vect)
     {
         require_symmetry_adapter();
-        detail::stabilize_canonical_if_available(symmetry_adapter, vect, x_hat, 0);
-        const host_state_type host_state = get_host_state(x_hat);
-        if(!canonical_host_storage.add_if_new(host_state))
+        for(const auto& stored: container)
         {
-            detail::log_symmetry_solution_storage_message(log, "deflation::symmetry_solution_storage: skipped duplicate stabilized solution");
-            return;
+            if(orbit_distance(stored.get_ref(), vect) <=
+               static_cast<T>(duplicate_tolerance()))
+            {
+                ++duplicates_skipped_since_clear_;
+                detail::log_symmetry_solution_storage_message(log, "deflation::symmetry_solution_storage: skipped duplicate symmetry-orbit solution");
+                return;
+            }
         }
+
+        detail::stabilize_canonical_if_available(symmetry_adapter, vect, x_hat, 0);
         container.emplace_back(vec_ops, x_hat, log);
         elements_number++;
     }
@@ -238,8 +445,8 @@ public:
     void clear()
     {
         container.clear();
-        canonical_host_storage.clear();
         elements_number = 0;
+        duplicates_skipped_since_clear_ = 0;
     }
 
     unsigned int get_size() const
@@ -255,8 +462,47 @@ public:
     double nearest_stabilized_distance(const T_vec& vect)
     {
         require_symmetry_adapter();
-        detail::stabilize_canonical_if_available(symmetry_adapter, vect, x_hat, 0);
-        return canonical_host_storage.nearest_distance(get_host_state(x_hat)).first;
+        T nearest = std::numeric_limits<T>::infinity();
+        for(const auto& stored: container)
+        {
+            nearest = std::min(
+                nearest,
+                orbit_distance(stored.get_ref(), vect));
+        }
+        return static_cast<double>(nearest);
+    }
+
+    double canonical_distance(const T_vec& left, const T_vec& right)
+    {
+        require_symmetry_adapter();
+        return static_cast<double>(orbit_distance(left, right));
+    }
+
+    void align_endpoint_geometry(
+        const T_vec& reference,
+        const T_vec& source,
+        const T_vec& source_tangent,
+        T_vec& aligned_source,
+        T_vec& aligned_tangent)
+    {
+        require_symmetry_adapter();
+        if(!detail::align_orbit_and_tangent_closest_to_reference_if_available(
+               symmetry_adapter,
+               reference,
+               source,
+               source_tangent,
+               aligned_source,
+               aligned_tangent,
+               0))
+        {
+            detail::align_orbit_closest_to_reference_if_available(
+                symmetry_adapter,
+                reference,
+                source,
+                aligned_source,
+                0);
+            vec_ops->assign(source_tangent, aligned_tangent);
+        }
     }
 
     void stabilize(const T_vec& source, T_vec& destination)
@@ -350,6 +596,11 @@ private:
             return array_;
         }
 
+        const T_vec& get_ref() const
+        {
+            return array_;
+        }
+
     private:
         void release()
         {
@@ -378,16 +629,6 @@ private:
         }
     }
 
-    host_state_type get_host_state(const T_vec& x) const
-    {
-        host_state_type host(vec_ops->get_size(x), T(0));
-        if(!host.empty())
-        {
-            vec_ops->get(x, host.data(), host.size());
-        }
-        return host;
-    }
-
     T distance_contribution(const T norm, const T total_elements) const
     {
         return T(1)/(std::pow(norm, P)*total_elements);
@@ -396,6 +637,23 @@ private:
     T distance_derivative_factor(const T norm, const T total_elements) const
     {
         return P/(std::pow(norm, P + T(2))*total_elements);
+    }
+
+    T orbit_distance(const T_vec& reference, const T_vec& source)
+    {
+        detail::align_orbit_closest_to_reference_if_available(
+            symmetry_adapter,
+            reference,
+            source,
+            distance_help,
+            0);
+        vec_ops->assign_mul(
+            T(1),
+            distance_help,
+            T(-1),
+            reference,
+            slice_gradient);
+        return vec_ops->norm_l2(slice_gradient);
     }
 
     void calc_distance_norms(const T_vec& x, T_vec& c, const T p)
@@ -446,12 +704,13 @@ private:
     VectorOperations* vec_ops;
     SymmetryAdapter* symmetry_adapter;
     Log* log;
-    stabilized_host_storage_type canonical_host_storage;
+    double duplicate_tolerance_;
     T norm_weight;
     T P;
     bool ignore_zero_ = false;
     unsigned int number_of_solutions_;
     unsigned int elements_number = 0;
+    std::size_t duplicates_skipped_since_clear_ = 0;
     T distance = T(1);
     T_vec distance_help;
     T_vec slice_gradient;

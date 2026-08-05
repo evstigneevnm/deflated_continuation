@@ -1,5 +1,6 @@
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -7,6 +8,7 @@
 #include <continuation/initial_tangent_chart_validator.h>
 #include <continuation/initial_tangent_secant_builder.h>
 #include <continuation/semicurve_tangent_cache.h>
+#include <continuation/tangent_normalization.h>
 
 namespace
 {
@@ -70,6 +72,14 @@ struct mock_vector_operations
         const double vector_norm = norm(vector);
         return std::sqrt(vector_norm*vector_norm + scalar*scalar);
     }
+    bool check_is_valid_number(const vector_type& vector) const
+    {
+        for(const double value: vector)
+        {
+            if(!std::isfinite(value)) return false;
+        }
+        return true;
+    }
 
     std::size_t size;
 };
@@ -104,6 +114,44 @@ struct mock_newton
 
 void test_tangent_quality_policy()
 {
+    continuation::tangent_equation_quality_policy<double> equation_policy;
+    const auto accurate_equation =
+        continuation::make_tangent_equation_quality(
+            1.0e-3,
+            2.0,
+            2.0);
+    require_true(
+        "small relative tangent residual is accepted",
+        continuation::tangent_equation_quality_is_acceptable(
+            accurate_equation,
+            equation_policy));
+
+    const auto inconsistent_equation =
+        continuation::make_tangent_equation_quality(
+            30.0,
+            0.0,
+            30.0);
+    require_true(
+        "pure-parameter inconsistent tangent is rejected",
+        !continuation::tangent_equation_quality_is_acceptable(
+            inconsistent_equation,
+            equation_policy));
+    require_close(
+        "inconsistent tangent relative residual",
+        inconsistent_equation.relative_residual,
+        1.0);
+
+    const auto roundoff_equation =
+        continuation::make_tangent_equation_quality(
+            1.0e-10,
+            0.0,
+            0.0);
+    require_true(
+        "roundoff-scale tangent residual is accepted",
+        continuation::tangent_equation_quality_is_acceptable(
+            roundoff_equation,
+            equation_policy));
+
     continuation::projected_tangent_quality_policy<double> policy;
     continuation::tangent_candidate_quality<double> quality;
     quality.solved = true;
@@ -192,6 +240,41 @@ void test_tangent_candidate_selector()
     require_true("invalid candidate is ignored", !selector.consider(invalid));
 }
 
+void test_tangent_normalization()
+{
+    mock_vector_operations vec_ops(2);
+    mock_vector_operations::vector_type tangent{3.0, 4.0};
+    double lambda_tangent = 12.0;
+    require_true(
+        "finite rank-one tangent normalizes",
+        continuation::normalize_rank1_tangent(
+            &vec_ops,
+            tangent,
+            lambda_tangent));
+    require_close(
+        "normalized rank-one tangent has unit norm",
+        vec_ops.norm_rank1(tangent, lambda_tangent),
+        1.0);
+
+    tangent = {0.0, 0.0};
+    lambda_tangent = 0.0;
+    require_true(
+        "zero rank-one tangent is rejected",
+        !continuation::normalize_rank1_tangent(
+            &vec_ops,
+            tangent,
+            lambda_tangent));
+
+    tangent = {std::numeric_limits<double>::quiet_NaN(), 0.0};
+    lambda_tangent = 1.0;
+    require_true(
+        "non-finite rank-one tangent is rejected",
+        !continuation::normalize_rank1_tangent(
+            &vec_ops,
+            tangent,
+            lambda_tangent));
+}
+
 void test_secant_builder_and_identity_chart()
 {
     mock_vector_operations vec_ops(3);
@@ -254,6 +337,7 @@ int main()
     test_tangent_candidate_selector();
     test_secant_builder_and_identity_chart();
     test_semicurve_tangent_cache();
+    test_tangent_normalization();
     std::cout << "Checks: " << checks << ", failures: " << failures << '\n';
     if(failures != 0)
     {

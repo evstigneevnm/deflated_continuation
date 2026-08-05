@@ -5,6 +5,7 @@
 #include <string>
 
 #include <continuation/chart_helpers.h>
+#include <continuation/tangent_normalization.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
 #include <numerical_algos/lin_solvers/linear_solve_recovery.h>
 
@@ -135,7 +136,7 @@ public:
         T tolerance_local = T(1.0e-5)*vec_ops->get_l2_size();
         SM_solver->get_linsolver_handle()->monitor().set_temp_tolerance(tolerance_local);
         SM_solver->get_linsolver_handle()->monitor().set_temp_max_iterations(1000);
-        const bool flag_lin_solver =
+        bool flag_lin_solver =
             numerical_algos::lin_solvers::recovery::
                 solve_with_unpreconditioned_retry(
                     SM_solver,
@@ -172,9 +173,18 @@ public:
         SM_solver->get_linsolver_handle()->monitor().restore_max_iterations();
         SM_solver->get_linsolver_handle()->monitor().restore_tolerance();
 
-        T norm = vec_ops->norm_rank1(x_1_s, lambda_1_s);
-        lambda_1_s /= norm;
-        vec_ops->scale(T(1)/norm, x_1_s);
+        if(flag_lin_solver &&
+           !normalize_rank1_tangent(vec_ops, x_1_s, lambda_1_s))
+        {
+            log->warning(
+                "continuation::projected_system_operator: tangent solve returned a zero or non-finite tangent.");
+            flag_lin_solver = false;
+        }
+        if(!flag_lin_solver)
+        {
+            vec_ops->assign_scalar(T(0), x_1_s);
+            lambda_1_s = T(0);
+        }
 
         if(verbose)
         {

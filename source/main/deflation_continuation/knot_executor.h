@@ -2,11 +2,13 @@
 #define __MAIN_DEFLATION_CONTINUATION_KNOT_EXECUTOR_H__
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <string>
 #include <utility>
 
+#include <continuation/continuation_result.h>
 #include <main/deflation_continuation/rejected_candidate_cache.h>
 
 namespace main_classes
@@ -20,6 +22,7 @@ struct knot_execution_policy
     bool relocation_enabled = false;
     bool allow_incomplete_restart_intersections = false;
     bool allow_failed_continuation_curve_save = false;
+    bool preserve_partial_curves = true;
     unsigned int max_failed_continuations_per_knot = 0;
     Scalar failed_continuation_rejection_tolerance = Scalar(1.0e-8);
     bool check_duplicate_after_deflation = true;
@@ -33,6 +36,7 @@ struct knot_execution_result
     unsigned int solutions_found = 0;
     unsigned int accepted_curves = 0;
     unsigned int discarded_curves = 0;
+    unsigned int partial_curves = 0;
     unsigned int skipped_incomplete_knots = 0;
 };
 
@@ -55,8 +59,25 @@ struct knot_executor_callbacks
     std::function<void(Vector&)> get_deflated_solution;
     std::function<void(Vector&)> stabilize;
     std::function<bool(Vector&, Scalar&)> nearest_known_distance;
-    std::function<bool(Vector&, const Scalar&)> continue_candidate;
-    std::function<void(const Scalar&)> accept_candidate;
+    std::function<bool(
+        const Scalar&,
+        const Vector&,
+        Scalar&,
+        std::uint64_t&)> nearest_persistent_rejection;
+    std::function<void(std::uint64_t)> mark_persistent_rejection_seen;
+    std::function<void(
+        const Scalar&,
+        const Scalar&,
+        const Vector&,
+        const continuation::continuation_curve_result<Scalar>&)>
+        record_persistent_rejection;
+    std::function<continuation::continuation_curve_result<Scalar>(
+        Vector&,
+        const Scalar&)> continue_candidate;
+    std::function<void(
+        const Scalar&,
+        const continuation::continuation_curve_result<Scalar>&)>
+        accept_candidate;
     std::function<void()> discard_candidate;
     std::function<void()> save_archive;
 };
@@ -213,19 +234,47 @@ public:
                             effective_parameter,
                             deflated_solution,
                             nearest_rejected_distance);
-                    if(rejected_distance_available &&
-                       nearest_rejected_distance <=
-                           policy_.failed_continuation_rejection_tolerance)
+                    std::uint64_t persistent_rejection_id = 0;
+                    scalar_type persistent_rejection_distance =
+                        std::numeric_limits<scalar_type>::infinity();
+                    const bool persistent_rejection_available =
+                        callbacks_.nearest_persistent_rejection &&
+                        callbacks_.nearest_persistent_rejection(
+                            effective_parameter,
+                            deflated_solution,
+                            persistent_rejection_distance,
+                            persistent_rejection_id);
+                    const bool rejected_by_session =
+                        rejected_distance_available &&
+                        nearest_rejected_distance <=
+                            policy_.failed_continuation_rejection_tolerance;
+                    const bool rejected_by_persistence =
+                        persistent_rejection_available &&
+                        persistent_rejection_distance <=
+                            policy_.failed_continuation_rejection_tolerance;
+                    if(rejected_by_session || rejected_by_persistence)
                     {
+                        const scalar_type reported_distance =
+                            std::min(
+                                nearest_rejected_distance,
+                                persistent_rejection_distance);
+                        if(rejected_by_persistence &&
+                           callbacks_.mark_persistent_rejection_seen)
+                        {
+                            callbacks_.mark_persistent_rejection_seen(
+                                persistent_rejection_id);
+                        }
                         candidate_duplicate = true;
                         is_new_solution = false;
                         log_->warning_f(
-                            "MAIN:deflation_continuation: deflated Newton returned a candidate rejected after failed continuation at lambda = %lf with stabilized distance = %le and tolerance = %le.",
+                            "MAIN:deflation_continuation: deflated Newton returned a candidate rejected after failed continuation at lambda = %lf with stabilized distance = %le and tolerance = %le%s.",
                             double(effective_parameter),
-                            double(nearest_rejected_distance),
-                            double(policy_.failed_continuation_rejection_tolerance));
+                            double(reported_distance),
+                            double(policy_.failed_continuation_rejection_tolerance),
+                            rejected_by_persistence
+                                ? " (persistent registry)"
+                                : "");
                     }
-
                     if(!candidate_duplicate &&
                        policy_.check_duplicate_after_deflation)
                     {
@@ -264,14 +313,27 @@ public:
                 "MAIN:deflation_continuation: found %i solutions for lambda = %lf.",
                 static_cast<int>(result.solutions_found),
                 double(effective_parameter));
-            const bool continuation_success = callbacks_.continue_candidate(
+            const auto continuation_result = callbacks_.continue_candidate(
                 deflated_solution,
                 effective_parameter);
-            if(continuation_success ||
+            const bool preserve_partial =
+                policy_.preserve_partial_curves &&
+                continuation_result.has_valid_progress();
+            if(continuation_result.complete() || preserve_partial ||
                policy_.allow_failed_continuation_curve_save)
             {
-                callbacks_.accept_candidate(effective_parameter);
+                callbacks_.accept_candidate(
+                    effective_parameter,
+                    continuation_result);
                 ++result.accepted_curves;
+                if(!continuation_result.complete())
+                {
+                    ++result.partial_curves;
+                    log_->warning_f(
+                        "MAIN:deflation_continuation: preserved a recoverable partial curve at lambda = %lf with %u started semicurves.",
+                        double(effective_parameter),
+                        continuation_result.semicurves_started);
+                }
                 continue;
             }
 
@@ -282,6 +344,14 @@ public:
             rejected_candidates.add(
                 effective_parameter,
                 deflated_solution);
+            if(callbacks_.record_persistent_rejection)
+            {
+                callbacks_.record_persistent_rejection(
+                    requested_parameter,
+                    effective_parameter,
+                    deflated_solution,
+                    continuation_result);
+            }
             ++failed_continuations_at_knot;
             ++result.discarded_curves;
             log_->warning_f(

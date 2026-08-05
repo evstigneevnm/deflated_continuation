@@ -71,6 +71,18 @@ struct vector_ops
         return std::sqrt(scalar_prod(value, value) + scalar*scalar);
     }
 
+    bool check_is_valid_number(const vector_type& value) const
+    {
+        for(const auto entry: value)
+        {
+            if(!std::isfinite(entry))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     std::size_t size;
 };
 

@@ -62,6 +62,18 @@ struct fake_registry
 
 struct fake_curve
 {
+    void set_analytical_branch_provenance(
+        const std::uint64_t branch_id_,
+        const std::string& branch_name_)
+    {
+        branch_id = branch_id_;
+        branch_name = branch_name_;
+        provenance_set = true;
+    }
+
+    std::uint64_t branch_id = 0;
+    std::string branch_name;
+    bool provenance_set = false;
 };
 
 struct fake_continuation
@@ -102,12 +114,25 @@ struct fake_diagram
     void close_curve() { ++closed; }
     bool commit_current_curve_symmetry_events() { ++committed; return true; }
     void discard_current_curve() { ++discarded; }
+    bool restore_analytical_curve_provenance(
+        const std::size_t curve_index,
+        const std::uint64_t branch_id,
+        const std::string& branch_name)
+    {
+        restored_curve_indices.push_back(curve_index);
+        restored_branch_ids.push_back(branch_id);
+        restored_branch_names.push_back(branch_name);
+        return true;
+    }
 
     fake_curve curve;
     int initialized = 0;
     int closed = 0;
     int committed = 0;
     int discarded = 0;
+    std::vector<std::size_t> restored_curve_indices;
+    std::vector<std::uint64_t> restored_branch_ids;
+    std::vector<std::string> restored_branch_names;
 };
 
 void require(bool condition, const std::string& message)
@@ -158,6 +183,10 @@ int main()
         require(continuation.continuation_calls == 1, "selected branch count");
         require(continuation.clear_calls == 1 && !continuation.provider, "provider cleanup");
         require(diagram.committed == 1 && diagram.discarded == 0, "accepted curve");
+        require(
+            diagram.curve.provenance_set && diagram.curve.branch_id == 1 &&
+                diagram.curve.branch_name == "exact_1",
+            "analytical branch provenance");
         require(stabilized == 1 && saved == 1, "callbacks");
         require(vector_operations.active_vectors == 0, "vector cleanup");
 
@@ -185,6 +214,31 @@ int main()
                 []() {}),
             "archive restart skips analytical branches");
         require(continuation.continuation_calls == calls_before_skip, "skip has no continuation");
+        require(
+            diagram.restored_curve_indices == std::vector<std::size_t>{0} &&
+                diagram.restored_branch_ids == std::vector<std::uint64_t>{0} &&
+                diagram.restored_branch_names == std::vector<std::string>{"exact_0"},
+            "legacy archive analytical provenance restoration");
+
+        diagram.restored_curve_indices.clear();
+        diagram.restored_branch_ids.clear();
+        diagram.restored_branch_names.clear();
+        require(
+            !executor.build_if_available(
+                true,
+                true,
+                std::vector<unsigned int>{0, 1},
+                4.0,
+                false,
+                [](std::vector<double>&) {},
+                []() {}),
+            "multiple analytical branches are restored without continuation");
+        require(
+            diagram.restored_curve_indices == std::vector<std::size_t>({0, 1}) &&
+                diagram.restored_branch_ids == std::vector<std::uint64_t>({0, 1}) &&
+                diagram.restored_branch_names ==
+                    std::vector<std::string>({"exact_0", "exact_1"}),
+            "multiple analytical branch identities preserve selection order");
     }
     catch(const std::exception& error)
     {

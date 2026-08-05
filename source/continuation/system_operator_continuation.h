@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include <numerical_algos/lin_solvers/linear_solve_recovery.h>
+#include <continuation/tangent_normalization.h>
 
 namespace continuation
 {
@@ -155,9 +156,18 @@ public:
 
             SM_solver->get_linsolver_handle()->monitor().restore_max_iterations();
             SM_solver->get_linsolver_handle()->monitor().restore_tolerance();
-            T norm = vec_ops->norm_rank1(x_1_s, lambda_1_s);
-            lambda_1_s/=norm;
-            vec_ops->scale(T(1.0)/(norm), x_1_s);
+            if(flag_lin_solver &&
+               !normalize_rank1_tangent(vec_ops, x_1_s, lambda_1_s))
+            {
+                log->warning(
+                    "continuation::system_operator: tangent solve returned a zero or non-finite tangent.");
+                flag_lin_solver = false;
+            }
+            if(!flag_lin_solver)
+            {
+                vec_ops->assign_scalar(T(0), x_1_s);
+                lambda_1_s = T(0);
+            }
             
             //vec_ops->scale(T(vec_ops->get_l2_size()), x_1_s);
 

@@ -67,8 +67,7 @@ public:
         {
             const auto& lower = (*points_)[static_cast<std::size_t>(index)];
             const auto& upper = (*points_)[static_cast<std::size_t>(index + 1)];
-            if(!can_interpolate_between(lower, upper, segment_metadata_available) ||
-               terminal_pair(lower, upper))
+            if(!can_interpolate_between(lower, upper, segment_metadata_available))
             {
                 continue;
             }
@@ -253,7 +252,6 @@ public:
             const auto& lower = (*points_)[static_cast<std::size_t>(index)];
             const auto& upper = (*points_)[static_cast<std::size_t>(index + 1)];
             if(!can_interpolate_between(lower, upper, segment_metadata_available) ||
-               terminal_pair(lower, upper) ||
                !contains_lambda(lower, upper, step_lambda0) ||
                !contains_lambda(lower, upper, step_lambda1))
             {
@@ -398,8 +396,7 @@ public:
             const auto& upper = (*points_)[static_cast<std::size_t>(index + 1)];
             const uint64_t candidate_latest_index = std::max(lower.point_index, upper.point_index);
             if(latest_index <= candidate_latest_index + policy.minimum_index_gap ||
-               !can_interpolate_between(lower, upper, segment_metadata_available) ||
-               terminal_pair(lower, upper))
+               !can_interpolate_between(lower, upper, segment_metadata_available))
             {
                 continue;
             }
@@ -704,26 +701,10 @@ private:
         {
             return true;
         }
-        return lower.segment_id == upper.segment_id &&
-               !is_incomplete_segment(lower.segment_id);
-    }
-
-    static bool terminal_pair(const Point& lower, const Point& upper)
-    {
-        return is_terminal_endpoint(lower.endpoint_reason) ||
-               is_terminal_endpoint(upper.endpoint_reason);
-    }
-
-    static bool terminal_pair_not_at_lambda(
-        const Point& lower,
-        const Point& upper,
-        const scalar_type& lambda)
-    {
-        if(!terminal_pair(lower, upper))
-        {
-            return false;
-        }
-        return !(lower.lambda == lambda || upper.lambda == lambda);
+        // Accepted states remain a valid searchable branch segment even when
+        // its terminal endpoint is recoverable. Segment boundaries, rather
+        // than completion status, are interpolation barriers.
+        return lower.segment_id == upper.segment_id;
     }
 
     static bool contains_lambda(
@@ -804,8 +785,7 @@ private:
         {
             const auto& lower = (*points_)[static_cast<std::size_t>(index)];
             const auto& upper = (*points_)[static_cast<std::size_t>(index + 1)];
-            if(!can_interpolate_between(lower, upper, segment_metadata_available) ||
-               terminal_pair_not_at_lambda(lower, upper, lambda))
+            if(!can_interpolate_between(lower, upper, segment_metadata_available))
             {
                 continue;
             }

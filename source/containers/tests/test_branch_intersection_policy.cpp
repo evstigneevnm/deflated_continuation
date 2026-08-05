@@ -128,6 +128,21 @@ int main()
     }
     require(zero_refinement_budget_rejected, "zero forward-refinement budget was not rejected");
 
+    bool invalid_analytical_tolerance_rejected = false;
+    try
+    {
+        policy.maximum_forward_refinements = 8;
+        policy.analytical_target_parameter_tolerance = 0.0;
+        container::validate_branch_intersection_policy(policy);
+    }
+    catch(const std::invalid_argument&)
+    {
+        invalid_analytical_tolerance_rejected = true;
+    }
+    require(
+        invalid_analytical_tolerance_rejected,
+        "zero analytical-target parameter tolerance was not rejected");
+
     std::cout << "branch intersection policy tests passed\n";
     return EXIT_SUCCESS;
 }

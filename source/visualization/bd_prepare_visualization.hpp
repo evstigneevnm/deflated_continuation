@@ -308,9 +308,19 @@ private:
         manifest << "\"state_file\":\"" << detail::json_escape(state_file.string()) << "\",";
         manifest << "\"data_file\":\"" << detail::json_escape(path_for_manifest(result.data_file, output_dir)) << "\",";
         manifest << "\"kind\":\"" << detail::json_escape(result.kind) << "\",";
+        write_optional_string(manifest, "format", result.format);
+        write_optional_string(manifest, "field_name", result.field_name);
+        write_optional_string(manifest, "scalar_type", result.scalar_type);
+        write_optional_string(manifest, "storage_order", result.storage_order);
+        write_optional_string(manifest, "producer_backend", result.producer_backend);
         manifest << "\"points\":" << result.points << ",";
         manifest << "\"components\":" << result.components << ",";
         manifest << "\"coordinate_extent\":" << std::setprecision(17) << result.coordinate_extent << ",";
+        write_size_array(manifest, "shape", result.shape);
+        write_double_array(manifest, "origin", result.origin);
+        write_double_array(manifest, "spacing", result.spacing);
+        write_bool_array(manifest, "periodic", result.periodic);
+        write_string_array(manifest, "axis_names", result.axis_names);
         manifest << "\"segment_id\":" << meta.segment_id << ",";
         manifest << "\"semicurve_id\":" << meta.semicurve_id << ",";
         manifest << "\"forced_store\":" << (meta.forced_store ? "true" : "false") << ",";
@@ -326,6 +336,89 @@ private:
         }
         manifest << "]}";
         manifest << "\n";
+    }
+
+    static void write_optional_string(
+        std::ofstream& manifest,
+        const char* key,
+        const std::string& value)
+    {
+        if(!value.empty())
+        {
+            manifest << "\"" << key << "\":\"" << detail::json_escape(value) << "\",";
+        }
+    }
+
+    static void write_size_array(
+        std::ofstream& manifest,
+        const char* key,
+        const std::vector<std::size_t>& values)
+    {
+        if(values.empty())
+        {
+            return;
+        }
+        manifest << "\"" << key << "\":[";
+        for(std::size_t index = 0; index < values.size(); ++index)
+        {
+            manifest << (index == 0 ? "" : ",") << values[index];
+        }
+        manifest << "],";
+    }
+
+    static void write_double_array(
+        std::ofstream& manifest,
+        const char* key,
+        const std::vector<double>& values)
+    {
+        if(values.empty())
+        {
+            return;
+        }
+        manifest << "\"" << key << "\":[";
+        for(std::size_t index = 0; index < values.size(); ++index)
+        {
+            manifest << (index == 0 ? "" : ",") << std::setprecision(17) << values[index];
+        }
+        manifest << "],";
+    }
+
+    static void write_bool_array(
+        std::ofstream& manifest,
+        const char* key,
+        const std::vector<bool>& values)
+    {
+        if(values.empty())
+        {
+            return;
+        }
+        manifest << "\"" << key << "\":[";
+        for(std::size_t index = 0; index < values.size(); ++index)
+        {
+            manifest << (index == 0 ? "" : ",") << (values[index] ? "true" : "false");
+        }
+        manifest << "],";
+    }
+
+    static void write_string_array(
+        std::ofstream& manifest,
+        const char* key,
+        const std::vector<std::string>& values)
+    {
+        if(values.empty())
+        {
+            return;
+        }
+        manifest << "\"" << key << "\":[";
+        for(std::size_t index = 0; index < values.size(); ++index)
+        {
+            if(index != 0)
+            {
+                manifest << ",";
+            }
+            manifest << "\"" << detail::json_escape(values[index]) << "\"";
+        }
+        manifest << "],";
     }
 
     VectorOperations* vec_ops;

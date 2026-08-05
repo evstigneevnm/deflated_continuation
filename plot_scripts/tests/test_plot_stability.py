@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import math
 import sys
 import tempfile
 import unittest
@@ -13,6 +14,37 @@ import plot_bd as bd
 
 
 class StabilityPlotDataTests(unittest.TestCase):
+    def test_curve_segments_insert_line_breaks(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            branch = project / "0"
+            branch.mkdir()
+            (branch / "debug_curve_all.dat").write_text(
+                "0.0 1.0 0\n"
+                "0.5 2.0 1\n"
+                "0.0 1.0 2\n"
+                "-0.5 3.0 3\n",
+                encoding="utf-8",
+            )
+            (branch / "metadata_curve.dat").write_text(
+                "# index lambda saved file segment semicurve forced reason\n"
+                "0 0.0 1 1 1 1 1 none\n"
+                "1 0.5 1 2 1 1 0 none\n"
+                "2 0.0 1 3 2 2 1 none\n"
+                "3 -0.5 1 4 2 2 0 none\n",
+                encoding="utf-8",
+            )
+
+            rows = bd.load_curves(project)["0"]
+            xs, ys, source_indices = bd.curve_coordinates_with_indices(
+                rows,
+                0,
+            )
+            self.assertEqual(len(xs), 5)
+            self.assertTrue(math.isnan(xs[2]))
+            self.assertTrue(math.isnan(ys[2]))
+            self.assertEqual(source_indices, [0, 1, 2, 2, 3])
+
     def test_exact_event_coordinates_and_source_index_coloring(self):
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary)
