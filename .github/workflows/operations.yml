@@ -197,7 +197,36 @@ jobs:
           ./"$BUILD_DIR"/fft_facade_fftw/test_fft_facade_fftw.bin
 
   fourier-discretization-cpu:
-    needs: [scfd-vector-operations-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
+    needs: [scfd-vector-operations-cpu, fftw-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libfftw3-dev
+          fi
+      - name: Build and validate reusable Fourier discretization
+        run: |
+          export OMP_NUM_THREADS=8
+          FOURIER_BUILD="$BUILD_DIR/fourier_discretization_cpu_omp"
+          make test_fourier_discretization_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$FOURIER_BUILD" REAL_TYPE=double
+          ./"$FOURIER_BUILD"/test_fourier_discretization_cpu_omp.bin
+          make test_fourier_translation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$FOURIER_BUILD" REAL_TYPE=double
+          ./"$FOURIER_BUILD"/test_fourier_translation_cpu_omp.bin
+          make test_periodic_affine_group_2d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$FOURIER_BUILD" REAL_TYPE=double
+          ./"$FOURIER_BUILD"/test_periodic_affine_group_2d.bin
+          make test_residual_translation_group_2d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$FOURIER_BUILD" REAL_TYPE=double
+          ./"$FOURIER_BUILD"/test_residual_translation_group_2d.bin
+          make test_finite_group_manifest.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$FOURIER_BUILD" REAL_TYPE=double
+          ./"$FOURIER_BUILD"/test_finite_group_manifest.bin
+
+  ks2d-cpu-omp:
+    needs: [fourier-discretization-cpu, eigensolver-foundation-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -210,22 +239,16 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends build-essential make python3 python3-numpy python3-matplotlib libboost-dev libboost-serialization-dev libfftw3-dev libopenblas-dev
           fi
-      - name: Build and validate reusable Fourier discretization and KS2D
+      - name: Build and test KS2D nonlinear operator
         run: |
           export OMP_NUM_THREADS=8
           KS2D_BUILD="$BUILD_DIR/ks2d_cpu_omp"
-          make test_fourier_discretization_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
-          ./"$KS2D_BUILD"/test_fourier_discretization_cpu_omp.bin
-          make test_fourier_translation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
-          ./"$KS2D_BUILD"/test_fourier_translation_cpu_omp.bin
-          make test_periodic_affine_group_2d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
-          ./"$KS2D_BUILD"/test_periodic_affine_group_2d.bin
-          make test_residual_translation_group_2d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
-          ./"$KS2D_BUILD"/test_residual_translation_group_2d.bin
-          make test_finite_group_manifest.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
-          ./"$KS2D_BUILD"/test_finite_group_manifest.bin
           make test_KS2D_operator_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
           ./"$KS2D_BUILD"/test_KS2D_operator_cpu_omp.bin
+      - name: Validate KS2D analytical branch and visualization
+        run: |
+          export OMP_NUM_THREADS=8
+          KS2D_BUILD="$BUILD_DIR/ks2d_cpu_omp"
           make test_numpy_array_writer.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
           ./"$KS2D_BUILD"/test_numpy_array_writer.bin
           PLOT_PYTHON=python3
@@ -246,9 +269,17 @@ jobs:
           make KS2D_prepare_visualization_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
           ./"$KS2D_BUILD"/KS2D_prepare_visualization_cpu_omp.bin "$KS2D_BUILD/ks2d_ci.json" --output-dir "$KS2D_BUILD/visualization" --branch 0 --max-points 1 --quiet
           python3 scripts/validate_ks2d_visualization.py "$KS2D_BUILD/visualization/manifest.jsonl" --nx 12 --ny 12 --expected-backend scfd_omp_fftw --maximum-absolute-value 1e-12
+      - name: Validate KS2D stability analysis
+        run: |
+          export OMP_NUM_THREADS=8
+          KS2D_BUILD="$BUILD_DIR/ks2d_cpu_omp"
           make KS2D_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
           timeout 180s ./"$KS2D_BUILD"/KS2D_stability_cpu_omp.bin "$KS2D_BUILD/ks2d_ci.json" --quiet
           python3 scripts/validate_stability_diagram.py "$KS2D_BUILD/project" --expected-curves 1 --min-points 10 --require-complete --require-plot-sidecar --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
+      - name: Validate KS2D nontrivial deflation and continuation
+        run: |
+          export OMP_NUM_THREADS=8
+          KS2D_BUILD="$BUILD_DIR/ks2d_cpu_omp"
           python3 scripts/write_ks2d_ci_config.py "$KS2D_BUILD/ks2d_nontrivial_ci.json" "$KS2D_BUILD/project_nontrivial" --clean-project --nx 12 --ny 16 --steps 20 --step-size 2 --max-step-size 5 --skip-file-output 5 --seed-parameter 4.333 --parameter-min 3.99 --parameter-max 4.4 --deflation-attempts 1 --newton-deflation-iterations 80 --newton-deflation-weight 0.5 --newton-deflation-tolerance 1e-8 --linear-solver-iterations 150 --linear-solver-tolerance 1e-3 --add-analytical-solution --enable-branch-intersections --enable-seed-schedule --max-failed-continuations-per-knot 1
           timeout 120s ./"$KS2D_BUILD"/KS2D_bd_cpu_omp.bin "$KS2D_BUILD/ks2d_nontrivial_ci.json" --quiet
           python3 scripts/validate_ks2d_nontrivial_branch.py "$KS2D_BUILD/project_nontrivial" --seed-parameter 4.333 --minimum-norm 1e-3
