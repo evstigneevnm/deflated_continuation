@@ -15,6 +15,7 @@
 #include <vector>
 
 #include <contrib/json/nlohmann/json.hpp>
+#include <common/scalar_math.h>
 #include <containers/curve_endpoint_reason.h>
 
 namespace container
@@ -344,7 +345,9 @@ private:
     {
         const scalar_type scale = std::max<scalar_type>(
             scalar_type(1),
-            std::max<scalar_type>(std::abs(left), std::abs(right)));
+            std::max<scalar_type>(
+                common::scalar_math::abs(left),
+                common::scalar_math::abs(right)));
         return settings_.match.absolute_parameter_tolerance +
             settings_.match.relative_parameter_tolerance*scale;
     }
@@ -390,7 +393,8 @@ private:
                     continue;
                 }
                 const scalar_type parameter_distance =
-                    std::abs(existing.parameter - candidate.parameter);
+                    common::scalar_math::abs(
+                        existing.parameter - candidate.parameter);
                 if(parameter_distance > parameter_tolerance(
                        existing.parameter,
                        candidate.parameter))
@@ -447,7 +451,8 @@ private:
                     ? connection_kind::continuation_join
                     : connection_kind::transverse_junction;
                 connection.parameter_distance =
-                    std::abs(matched->parameter - candidate.parameter);
+                    common::scalar_math::abs(
+                        matched->parameter - candidate.parameter);
                 connection.state_distance = best_join != nullptr
                     ? best_join_distance
                     : best_transverse_distance;

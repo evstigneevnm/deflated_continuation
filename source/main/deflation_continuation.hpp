@@ -23,6 +23,8 @@
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 #include <numerical_algos/newton_solvers/newton_solver.h>
 
+#include <common/scalar_math.h>
+
 #include <containers/knots.hpp>
 #include <containers/knot_registry.h>
 #include <containers/deflation_seed_registry.h>
@@ -474,7 +476,8 @@ private:
                     reference_parameter_tangent*source_parameter_tangent;
                 result.tangent_line_similarity = std::min<T>(
                     T(1),
-                    std::abs(product)/std::sqrt(
+                    common::scalar_math::abs(product)/
+                    common::scalar_math::sqrt(
                         reference_extended_sq*source_extended_sq));
             }
             return result;
@@ -1134,7 +1137,8 @@ public:
             }
 
             const T parameter_tolerance =
-                std::sqrt(std::numeric_limits<T>::epsilon());
+                common::scalar_math::sqrt(
+                    std::numeric_limits<T>::epsilon());
             const double state_tolerance =
                 sol_storage_def->duplicate_tolerance();
             log->warning_f(
