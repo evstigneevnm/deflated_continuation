@@ -833,6 +833,7 @@ struct parameters
         bool            require_complete_scan_coverage;
         unsigned int    spectrum_classification_retries;
         unsigned int    transition_classification_confirmations;
+        bool            confirm_regular_stability_points;
         bool            correct_stability_transitions_with_newton;
         unsigned int    transition_refinement_maximum_iterations;
         unsigned int    transition_refinement_maximum_subdivisions;
@@ -856,6 +857,7 @@ struct parameters
             require_complete_scan_coverage                     = true;
             spectrum_classification_retries                    = 2;
             transition_classification_confirmations            = 2;
+            confirm_regular_stability_points                   = false;
             correct_stability_transitions_with_newton          = false;
             transition_refinement_maximum_iterations           = 20;
             transition_refinement_maximum_subdivisions          = 8;
@@ -893,6 +895,9 @@ struct parameters
                       << spectrum_classification_retries << std::endl;
             std::cout << "||==transition_classification_confirmations: "
                       << transition_classification_confirmations
+                      << std::endl;
+            std::cout << "||==confirm_regular_stability_points: "
+                      << confirm_regular_stability_points
                       << std::endl;
             std::cout << "||==correct_stability_transitions_with_newton: "
                       << correct_stability_transitions_with_newton
@@ -982,6 +987,9 @@ struct parameters
                 std::cout
                     << "||  |==multiplicity_probe_count: "
                     << config.aggregation.probe_count
+                    << ", minimum_successful_probes = "
+                    << config.aggregation.
+                           minimum_successful_probes
                     << std::endl;
                 std::cout
                     << "||  |==small_system: "
@@ -997,6 +1005,22 @@ struct parameters
                     << "||  |==eigenvector_independence_tolerance: "
                     << config.aggregation.
                            eigenvector_independence_tolerance
+                    << std::endl;
+                std::cout
+                    << "||  |==Ritz_subspace_recycling: "
+                    << (config.recycling.enabled
+                            ? "enabled"
+                            : "disabled")
+                    << ", maximum_vectors = "
+                    << config.recycling.maximum_vectors
+                    << ", innovation_weight = "
+                    << config.recycling.innovation_weight
+                    << ", residual_tolerances = "
+                    << config.recycling.
+                           absolute_residual_tolerance
+                    << " "
+                    << config.recycling.
+                           relative_residual_tolerance
                     << std::endl;
             }
             std::cout << "||==linear_solver: " << std::endl;

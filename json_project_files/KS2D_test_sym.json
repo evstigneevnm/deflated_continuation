@@ -194,14 +194,16 @@
     },
     "stability_continuation": {
         "left_halfplane_stable_eigenvalues": true,
+        "stability_boundary_tolerance": 1.0e-4,
         "Krylov_subspace_dimension": 20,
         "desired_spectrum": 4,
         "correct_stability_transitions_with_newton": false,
         "transition_refinement_maximum_iterations": 20,
         "transition_refinement_maximum_subdivisions": 8,
-        "transition_refinement_parameter_tolerance": 1.0e-8,
+        "transition_refinement_parameter_tolerance": 1.0e-4,
         "spectrum_classification_retries": 2,
         "transition_classification_confirmations": 2,
+        "confirm_regular_stability_points": true,
         "Cayley_transform_sigma_mu": [
             12.0,
             -12.0
@@ -232,9 +234,9 @@
                 ]
             },
             "outer": {
-                "desired_eigenvalues": 8,
-                "krylov_dimension": 28,
-                "restart_dimension": 14,
+                "desired_eigenvalues": 12,
+                "krylov_dimension": 40,
+                "restart_dimension": 20,
                 "maximum_restarts": 60,
                 "absolute_tolerance": 1.0e-10,
                 "relative_tolerance": 1.0e-8,
@@ -276,12 +278,20 @@
                 "absolute_tolerance": 1.0e-7,
                 "relative_tolerance": 1.0e-6,
                 "minimum_successful_scans": 4,
-                "minimum_eigenpairs": 6,
+                "minimum_eigenpairs": 10,
                 "require_all_scans": true,
-                "probe_count": 2,
-                "require_all_probes": true,
+                "probe_count": 6,
+                "minimum_successful_probes": 4,
+                "require_all_probes": false,
                 "eigenvector_independence_tolerance": 1.0e-6,
                 "eigenvector_orthogonalization_passes": 2
+            },
+            "recycling": {
+                "enabled": false,
+                "maximum_vectors": 16,
+                "innovation_weight": 0.2,
+                "absolute_residual_tolerance": 1.0e-8,
+                "relative_residual_tolerance": 0.25
             }
         },
         "linear_solver": {

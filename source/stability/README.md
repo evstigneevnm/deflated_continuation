@@ -72,6 +72,8 @@ The modern JSON configuration controls:
 - required successful scans and recovered eigenpairs;
 - probe count and probe-failure policy;
 - eigenvalue clustering and eigenvector-rank tolerances.
+- optional residual-validated Ritz-subspace recycling between nearby
+  continuation states.
 
 `require_all_scans` and `require_all_probes` establish computational
 coverage of the configured work. They do not prove that the selected
@@ -79,9 +81,19 @@ shifts enclose every unstable eigenvalue. Shift selection must still be
 validated for each model and parameter range.
 
 The probe count must be large enough to expose expected geometric
-multiplicity. Constrained models should inject their nonlinear
-operator's randomizer instead of relying on the generic vector-space
-randomizer.
+multiplicity. `minimum_successful_probes` permits a bounded number of
+failed probe solves without accepting fewer probes than the configured
+coverage floor. The stability facade applies the nonlinear operator's
+stability-specific randomizer to every generated probe when the
+eigensolver supports probe injection.
+
+For a finite equivariance group, unrelated random probes are not always
+the preferred way to recover symmetry-protected multiplicity. A model
+may preconfigure the scan's indexed probe generator with selected group
+actions. The initial vector is probe zero and subsequent probes receive
+both their index and that initial vector. KS2D uses independent random
+seeds paired with their axis-swapped copies. Its half-shift actions only
+change Fourier signs and therefore do not add eigenspace rank.
 
 Dimension changes are confirmed before transition refinement. A
 `dimension_guarded_eigensolver` uses its exact host-dense solver for
@@ -89,10 +101,22 @@ this confirmation when the state dimension is below the configured
 small-system limit, while leaving ordinary branch traversal on the
 matrix-free path. When no dedicated confirmation solver is available,
 `transition_classification_confirmations` independent matrix-free
-classifications must agree. An inconsistent signature aborts the curve
-transaction instead of creating a false bifurcation. Confirmed endpoint
-signatures also replace provisional regular-point classifications in
-the pending stability curve.
+classifications must reach consensus. If the first runs disagree, the
+configured classification retries are used as additional confirmation
+runs. Only the repeatedly recovered signature with the largest real
+unstable-subspace dimension is accepted; an unconfirmed larger
+signature or conflicting signatures of equal dimension abort the curve
+transaction. This reflects the one-sided failure mode of a
+residual-validated Krylov solve: it may miss a direction in a repeated
+eigenspace, but one run is not allowed to introduce an extra direction.
+Confirmed endpoint signatures also replace provisional regular-point
+classifications in the pending stability curve.
+
+Confirmed transition refinement uses a single classification at an
+ordinary midpoint. Full consensus is requested only for an incomplete
+classification, a signature outside both endpoint dimensions, or the
+final accepted midpoint. This preserves the multiplicity guard without
+doubling every matrix-free solve in a long refinement.
 
 `inner_solver.basis_retry_sizes` is an optional strictly increasing
 list of GMRES restart dimensions. When a healthy affine factor fails,
@@ -100,6 +124,36 @@ the scan retries that factor with each larger basis before trying the
 configured shift perturbations. Each retry owns a fresh solver
 assembly, so the larger Krylov storage exists only while it is needed.
 Physical residual tolerances are not relaxed.
+
+## Ritz-Subspace Recycling
+
+`matrix_free_eigensolver.recycling` reuses converged physical Ritz
+vectors while traversing a continuous curve. It does not reuse an old
+Arnoldi factorization after the Jacobian changes. Before each solve,
+the cached real invariant vectors are applied to the current real
+linearization, their current complex Rayleigh quotients are recomputed,
+and they are retained only when the resulting physical eigenpair
+residuals satisfy the configured absolute or relative tolerance.
+Accepted vectors are combined with a nonzero fresh random component
+controlled by `innovation_weight`.
+
+Cache updates follow the same transaction as stability classification.
+Independent confirmation attempts see the last committed cache;
+vectors recovered by a failed or disputed classification are rolled
+back. The cache is reset at the start of every curve and at saved curve
+breaks, so vectors are never carried across unrelated semicurves.
+
+The policy is disabled by default. Its fields are:
+
+- `enabled`;
+- `maximum_vectors`;
+- `innovation_weight` in `(0, 1]`;
+- `absolute_residual_tolerance`;
+- `relative_residual_tolerance`.
+
+The implementation uses only the vector-space interface and ordinary
+real operator actions. The same path therefore supports serial, OMP,
+CUDA, and other SCFD-backed vector spaces.
 
 ## Persistence
 

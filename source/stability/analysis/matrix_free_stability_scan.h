@@ -13,6 +13,7 @@
 #include "detail/vector_workspace.h"
 #include "eigenvector_rank_aggregator.h"
 #include "matrix_free_stability_solver.h"
+#include "recycled_ritz_subspace.h"
 #include "spectrum_scan_aggregator.h"
 
 namespace stability
@@ -87,8 +88,15 @@ public:
         spectrum_scan_aggregation_options<real_type>;
     using recovered_vector_storage_type =
         typename assembly_type::recovered_vector_storage_type;
+    using recycled_subspace_type =
+        recycled_ritz_subspace<real_space_type>;
+    using recycling_options_type =
+        typename recycled_subspace_type::options_type;
     using probe_generator_type =
-        std::function<void(vector_type&)>;
+        std::function<void(
+            std::size_t,
+            const vector_type&,
+            vector_type&)>;
 
     matrix_free_stability_scan(
         std::shared_ptr<real_space_type> real_space,
@@ -109,7 +117,8 @@ public:
           inner_parameters_(std::move(inner_parameters)),
           aggregation_options_(std::move(aggregation_options)),
           log_(log),
-          probe_generator_(std::move(probe_generator))
+          probe_generator_(std::move(probe_generator)),
+          recycled_subspace_(*real_space_)
     {
         if(scans_.empty())
             throw std::invalid_argument(
@@ -148,25 +157,38 @@ public:
             aggregation_options_);
         detail::vector_workspace<real_space_type> probe(
             real_space_.get());
+        detail::vector_workspace<real_space_type> recycled_probe(
+            real_space_.get());
+
+        typename eigenvector_rank_aggregator<
+            real_space_type>::options_type rank_options;
+        rank_options.eigenvalue_absolute_tolerance =
+            aggregation_options_.absolute_tolerance;
+        rank_options.eigenvalue_relative_tolerance =
+            aggregation_options_.relative_tolerance;
+        rank_options.independence_tolerance =
+            aggregation_options_.eigenvector_independence_tolerance;
+        rank_options.orthogonalization_passes =
+            aggregation_options_.eigenvector_orthogonalization_passes;
+        eigenvector_rank_aggregator<real_space_type>
+            recycle_candidates(*real_space_, rank_options);
+        const auto recycle_validation =
+            recycled_subspace_.validate(real_operator_);
+        std::size_t recycled_probe_seeds = 0;
+
+        const std::size_t required_successful_probes =
+            aggregation_options_.require_all_probes
+            ? aggregation_options_.probe_count
+            : aggregation_options_.minimum_successful_probes;
+
         for(const auto& scan : scans_)
         {
-            typename eigenvector_rank_aggregator<
-                real_space_type>::options_type rank_options;
-            rank_options.eigenvalue_absolute_tolerance =
-                aggregation_options_.absolute_tolerance;
-            rank_options.eigenvalue_relative_tolerance =
-                aggregation_options_.relative_tolerance;
-            rank_options.independence_tolerance =
-                aggregation_options_.
-                    eigenvector_independence_tolerance;
-            rank_options.orthogonalization_passes =
-                aggregation_options_.
-                    eigenvector_orthogonalization_passes;
             eigenvector_rank_aggregator<real_space_type>
                 physical_subspace(*real_space_, rank_options);
 
             result_type scan_result;
             std::size_t successful_probes = 0;
+            std::size_t successful_fresh_probes = 0;
             eigensolvers::eigensolver_status first_failure =
                 eigensolvers::eigensolver_status::success;
             std::string probe_failures;
@@ -189,8 +211,23 @@ public:
                     &initial_vector;
                 if(probe_index != 0)
                 {
-                    generate_probe(probe.get());
+                    generate_probe(
+                        probe_index,
+                        initial_vector,
+                        probe.get());
                     probe_vector = &probe.get();
+                }
+                const bool recycled_seed =
+                    probe_index >= required_successful_probes &&
+                    recycled_subspace_.make_seed(
+                        probe_index,
+                        *probe_vector,
+                        recycle_validation.accepted_indices,
+                        recycled_probe.get());
+                if(recycled_seed)
+                {
+                    probe_vector = &recycled_probe.get();
+                    ++recycled_probe_seeds;
                 }
 
                 const std::size_t attempt_count =
@@ -299,7 +336,12 @@ public:
                             probe_result.coverage_complete)
                         {
                             ++successful_probes;
+                            if(!recycled_seed)
+                                ++successful_fresh_probes;
                             physical_subspace.add(
+                                probe_result,
+                                recovered_vectors);
+                            recycle_candidates.add(
                                 probe_result,
                                 recovered_vectors);
                             probe_succeeded = true;
@@ -353,10 +395,9 @@ public:
             scan_result.eigenpairs =
                 physical_subspace.estimates();
             const bool accepted_probes =
-                successful_probes != 0 &&
-                (!aggregation_options_.require_all_probes ||
-                 successful_probes ==
-                     aggregation_options_.probe_count);
+                successful_probes >= required_successful_probes &&
+                successful_fresh_probes >=
+                    required_successful_probes;
             scan_result.status =
                 accepted_probes &&
                     !scan_result.eigenpairs.empty()
@@ -376,7 +417,11 @@ public:
                 << "multiplicity probes: "
                 << successful_probes << "/"
                 << aggregation_options_.probe_count
-                << " succeeded, "
+                << " succeeded (minimum "
+                << required_successful_probes << "), "
+                << successful_fresh_probes
+                << " fresh probes succeeded (minimum "
+                << required_successful_probes << "), "
                 << scan_result.eigenpairs.size()
                 << " independent physical eigenpairs";
             if(!probe_failures.empty())
@@ -390,7 +435,28 @@ public:
                 std::move(scan_result),
                 scan.label);
         }
-        return aggregate.finish();
+        result_type result = aggregate.finish();
+        result.operator_calls +=
+            recycle_validation.operator_calls;
+        if(result.succeeded())
+            recycled_subspace_.stage(recycle_candidates);
+        if(recycled_subspace_.enabled())
+        {
+            std::ostringstream recycling;
+            recycling
+                << "Ritz recycling: committed="
+                << recycled_subspace_.size()
+                << ", accepted="
+                << recycle_validation.accepted_indices.size()
+                << ", rejected="
+                << recycle_validation.rejected_vectors
+                << ", seeded_probes="
+                << recycled_probe_seeds;
+            result.diagnostic = result.diagnostic.empty()
+                ? recycling.str()
+                : result.diagnostic + "; " + recycling.str();
+        }
+        return result;
     }
 
     std::size_t scan_count() const
@@ -401,6 +467,51 @@ public:
     const std::vector<scan_definition_type>& scans() const
     {
         return scans_;
+    }
+
+    void set_probe_generator(probe_generator_type probe_generator)
+    {
+        probe_generator_ = std::move(probe_generator);
+    }
+
+    bool has_probe_generator() const
+    {
+        return static_cast<bool>(probe_generator_);
+    }
+
+    void set_recycling_options(recycling_options_type options)
+    {
+        recycled_subspace_.set_options(std::move(options));
+    }
+
+    const recycling_options_type& recycling_options() const
+    {
+        return recycled_subspace_.options();
+    }
+
+    void begin_recycling_transaction() const
+    {
+        recycled_subspace_.begin_transaction();
+    }
+
+    void commit_recycling_transaction() const
+    {
+        recycled_subspace_.commit_transaction();
+    }
+
+    void rollback_recycling_transaction() const
+    {
+        recycled_subspace_.rollback_transaction();
+    }
+
+    void reset_recycled_subspace() const
+    {
+        recycled_subspace_.clear();
+    }
+
+    std::size_t recycled_subspace_size() const
+    {
+        return recycled_subspace_.size();
     }
 
 private:
@@ -425,12 +536,19 @@ private:
     aggregation_options_type aggregation_options_;
     log_type* log_;
     probe_generator_type probe_generator_;
+    mutable recycled_subspace_type recycled_subspace_;
 
-    void generate_probe(vector_type& probe) const
+    void generate_probe(
+        std::size_t probe_index,
+        const vector_type& initial_vector,
+        vector_type& probe) const
     {
         if(probe_generator_)
         {
-            probe_generator_(probe);
+            probe_generator_(
+                probe_index,
+                initial_vector,
+                probe);
         }
         else
         {

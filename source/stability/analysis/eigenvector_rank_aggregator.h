@@ -149,6 +149,18 @@ public:
         return entries_.size();
     }
 
+    template<class Function>
+    void for_each_entry(Function&& function) const
+    {
+        for(const auto& entry : entries_)
+        {
+            function(
+                entry.estimate,
+                entry.real->get(),
+                entry.imaginary->get());
+        }
+    }
+
 private:
     struct entry_type
     {

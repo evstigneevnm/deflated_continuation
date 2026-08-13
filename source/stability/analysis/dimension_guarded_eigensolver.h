@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 
 #include <stability/eigensolvers/eigensolver_result.h>
 
@@ -12,6 +13,67 @@ namespace stability
 {
 namespace analysis
 {
+
+namespace detail
+{
+
+template<class Eigensolver, class ProbeGenerator, class = void>
+struct has_probe_generator_setter : std::false_type
+{
+};
+
+template<class Eigensolver, class ProbeGenerator>
+struct has_probe_generator_setter<
+    Eigensolver,
+    ProbeGenerator,
+    std::void_t<decltype(
+        std::declval<Eigensolver&>().set_probe_generator(
+            std::declval<ProbeGenerator>()))>>
+    : std::true_type
+{
+};
+
+template<class Eigensolver, class = void>
+struct has_probe_generator_query : std::false_type
+{
+};
+
+template<class Eigensolver>
+struct has_probe_generator_query<
+    Eigensolver,
+    std::void_t<decltype(
+        std::declval<const Eigensolver&>().
+            has_probe_generator())>>
+    : std::true_type
+{
+};
+
+template<class Eigensolver, class = void>
+struct has_primary_recycling_control : std::false_type
+{
+};
+
+template<class Eigensolver>
+struct has_primary_recycling_control<
+    Eigensolver,
+    std::void_t<
+        decltype(
+            std::declval<const Eigensolver&>().
+                begin_recycling_transaction()),
+        decltype(
+            std::declval<const Eigensolver&>().
+                commit_recycling_transaction()),
+        decltype(
+            std::declval<const Eigensolver&>().
+                rollback_recycling_transaction()),
+        decltype(
+            std::declval<const Eigensolver&>().
+                reset_recycled_subspace())>>
+    : std::true_type
+{
+};
+
+} // namespace detail
 
 /**
  * Selects an exact small-system eigensolver when requested and otherwise
@@ -40,7 +102,7 @@ public:
         "dimension-guarded eigensolvers require the same result type");
 
     dimension_guarded_eigensolver(
-        const primary_type& primary,
+        primary_type& primary,
         const small_system_type& small_system,
         std::size_t dimension,
         std::size_t maximum_small_dimension,
@@ -153,6 +215,65 @@ public:
         return result;
     }
 
+    template<
+        class ProbeGenerator,
+        std::enable_if_t<
+            detail::has_probe_generator_setter<
+                primary_type,
+                ProbeGenerator>::value,
+            int> = 0>
+    void set_probe_generator(ProbeGenerator probe_generator)
+    {
+        primary_.set_probe_generator(
+            std::move(probe_generator));
+    }
+
+    template<
+        class Primary = primary_type,
+        std::enable_if_t<
+            detail::has_probe_generator_query<Primary>::value,
+            int> = 0>
+    bool has_probe_generator() const
+    {
+        return primary_.has_probe_generator();
+    }
+
+    void begin_recycling_transaction() const
+    {
+        if constexpr(
+            detail::has_primary_recycling_control<primary_type>::value)
+        {
+            primary_.begin_recycling_transaction();
+        }
+    }
+
+    void commit_recycling_transaction() const
+    {
+        if constexpr(
+            detail::has_primary_recycling_control<primary_type>::value)
+        {
+            primary_.commit_recycling_transaction();
+        }
+    }
+
+    void rollback_recycling_transaction() const
+    {
+        if constexpr(
+            detail::has_primary_recycling_control<primary_type>::value)
+        {
+            primary_.rollback_recycling_transaction();
+        }
+    }
+
+    void reset_recycled_subspace() const
+    {
+        if constexpr(
+            detail::has_primary_recycling_control<primary_type>::value)
+        {
+            primary_.reset_recycled_subspace();
+        }
+    }
+
 private:
     static void prefix_diagnostic(
         result_type& result,
@@ -164,7 +285,7 @@ private:
             : prefix + ": " + result.diagnostic;
     }
 
-    const primary_type& primary_;
+    primary_type& primary_;
     const small_system_type& small_system_;
     std::size_t dimension_;
     std::size_t maximum_small_dimension_;

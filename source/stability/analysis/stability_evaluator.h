@@ -1,12 +1,16 @@
 #ifndef __STABILITY_ANALYSIS_STABILITY_EVALUATOR_H__
 #define __STABILITY_ANALYSIS_STABILITY_EVALUATOR_H__
 
+#include <algorithm>
 #include <exception>
 #include <cstddef>
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include "detail/vector_workspace.h"
 #include "stability_point_result.h"
@@ -61,6 +65,92 @@ struct has_classification_confirmation<
 {
 };
 
+template<class Eigensolver, class = void>
+struct has_recycling_transaction : std::false_type
+{
+};
+
+template<class Eigensolver>
+struct has_recycling_transaction<
+    Eigensolver,
+    std::void_t<
+        decltype(
+            std::declval<const Eigensolver&>().
+                begin_recycling_transaction()),
+        decltype(
+            std::declval<const Eigensolver&>().
+                commit_recycling_transaction()),
+        decltype(
+            std::declval<const Eigensolver&>().
+                rollback_recycling_transaction())>>
+    : std::true_type
+{
+};
+
+template<class Eigensolver, class = void>
+struct has_recycled_subspace_reset : std::false_type
+{
+};
+
+template<class Eigensolver>
+struct has_recycled_subspace_reset<
+    Eigensolver,
+    std::void_t<decltype(
+        std::declval<const Eigensolver&>().
+            reset_recycled_subspace())>>
+    : std::true_type
+{
+};
+
+template<class Eigensolver>
+class recycling_transaction
+{
+public:
+    explicit recycling_transaction(Eigensolver* eigensolver)
+        : eigensolver_(eigensolver)
+    {
+        if constexpr(has_recycling_transaction<Eigensolver>::value)
+        {
+            eigensolver_->begin_recycling_transaction();
+            active_ = true;
+        }
+    }
+
+    recycling_transaction(const recycling_transaction&) = delete;
+    recycling_transaction& operator=(
+        const recycling_transaction&) = delete;
+
+    ~recycling_transaction()
+    {
+        if constexpr(has_recycling_transaction<Eigensolver>::value)
+        {
+            if(active_)
+                eigensolver_->rollback_recycling_transaction();
+        }
+    }
+
+    template<class Result>
+    Result finish(Result result)
+    {
+        if constexpr(has_recycling_transaction<Eigensolver>::value)
+        {
+            if(active_)
+            {
+                if(result.succeeded())
+                    eigensolver_->commit_recycling_transaction();
+                else
+                    eigensolver_->rollback_recycling_transaction();
+                active_ = false;
+            }
+        }
+        return result;
+    }
+
+private:
+    Eigensolver* eigensolver_;
+    bool active_ = false;
+};
+
 } // namespace detail
 
 template<
@@ -111,7 +201,10 @@ public:
             spectrum_classification_status::invalid_input)
             return preparation;
 
-        return analyze_prepared(initial_vector_.get());
+        detail::recycling_transaction<EigensolverAdapter>
+            transaction(eigensolver_);
+        return transaction.finish(
+            analyze_prepared(initial_vector_.get()));
     }
 
     result_type analyze(
@@ -126,7 +219,10 @@ public:
             spectrum_classification_status::invalid_input)
             return preparation;
 
-        return analyze_prepared(initial_vector);
+        detail::recycling_transaction<EigensolverAdapter>
+            transaction(eigensolver_);
+        return transaction.finish(
+            analyze_prepared(initial_vector));
     }
 
     result_type analyze_confirmed(
@@ -139,6 +235,9 @@ public:
             preparation.classification_status !=
             spectrum_classification_status::invalid_input)
             return preparation;
+
+        detail::recycling_transaction<EigensolverAdapter>
+            transaction(eigensolver_);
 
         if constexpr(
             detail::has_classification_confirmation<
@@ -162,38 +261,44 @@ public:
                         : "classification confirmed by dedicated "
                           "eigensolver: " + result.diagnostic;
                 }
-                return result;
+                return transaction.finish(std::move(result));
             }
         }
 
-        result_type confirmed =
-            analyze_prepared(initial_vector_.get());
-        if(!confirmed.succeeded())
-            return confirmed;
-
-        const unstable_dimension expected = confirmed.unstable;
-        std::size_t total_attempts =
-            confirmed.classification_attempts;
-        for(std::size_t confirmation = 1;
-            confirmation < classification_confirmation_count_;
-            ++confirmation)
+        struct consensus_candidate
         {
-            try
+            unstable_dimension signature;
+            result_type result;
+            std::size_t occurrences = 0;
+        };
+
+        std::vector<consensus_candidate> candidates;
+        std::size_t total_attempts = 0;
+        bool disagreement_observed = false;
+        const std::size_t maximum_runs =
+            classification_confirmation_count_ +
+            classification_retry_count_;
+        for(std::size_t run = 0; run < maximum_runs; ++run)
+        {
+            if(run != 0)
             {
-                initial_vector_policy_(initial_vector_.get());
-            }
-            catch(const std::exception& error)
-            {
-                return failure(
-                    eigensolvers::eigensolver_status::operator_failure,
-                    error.what());
-            }
-            catch(...)
-            {
-                return failure(
-                    eigensolvers::eigensolver_status::operator_failure,
-                    "failed to prepare an independent stability "
-                    "confirmation vector");
+                try
+                {
+                    initial_vector_policy_(initial_vector_.get());
+                }
+                catch(const std::exception& error)
+                {
+                    return failure(
+                        eigensolvers::eigensolver_status::operator_failure,
+                        error.what());
+                }
+                catch(...)
+                {
+                    return failure(
+                        eigensolvers::eigensolver_status::operator_failure,
+                        "failed to prepare an independent stability "
+                        "confirmation vector");
+                }
             }
 
             result_type repeated =
@@ -205,33 +310,112 @@ public:
                     "transition classification confirmation failed: " +
                     repeated.diagnostic;
                 repeated.classification_attempts = total_attempts;
-                return repeated;
+                return transaction.finish(std::move(repeated));
             }
-            if(repeated.unstable != expected)
+
+            auto candidate = candidates.begin();
+            for(; candidate != candidates.end(); ++candidate)
             {
-                repeated.classification_status =
-                    spectrum_classification_status::incomplete;
-                repeated.classification_attempts = total_attempts;
-                repeated.diagnostic =
-                    "transition classification is inconsistent across "
-                    "independent eigensolver runs: expected unstable "
-                    "signature (" +
-                    std::to_string(expected.real) + "," +
-                    std::to_string(expected.complex_pairs) +
-                    "), obtained (" +
-                    std::to_string(repeated.unstable.real) + "," +
+                if(candidate->signature == repeated.unstable)
+                    break;
+            }
+            if(candidate == candidates.end())
+            {
+                disagreement_observed = !candidates.empty();
+                candidates.push_back(consensus_candidate{
+                    repeated.unstable,
+                    repeated,
+                    1});
+            }
+            else
+            {
+                candidate->result = repeated;
+                ++candidate->occurrences;
+            }
+
+            if(
+                run + 1 >= classification_confirmation_count_ &&
+                !disagreement_observed)
+            {
+                result_type confirmed = candidates.front().result;
+                confirmed.classification_attempts = total_attempts;
+                confirmed.diagnostic =
+                    "classification confirmed by " +
                     std::to_string(
-                        repeated.unstable.complex_pairs) + ")";
-                return repeated;
+                        classification_confirmation_count_) +
+                    " independent eigensolver run(s)";
+                return transaction.finish(std::move(confirmed));
+            }
+            if(
+                run + 1 >= classification_confirmation_count_ &&
+                disagreement_observed &&
+                run + 1 == maximum_runs)
+            {
+                break;
             }
         }
 
-        confirmed.classification_attempts = total_attempts;
-        confirmed.diagnostic =
-            "classification confirmed by " +
-            std::to_string(classification_confirmation_count_) +
-            " independent eigensolver run(s)";
-        return confirmed;
+        int maximum_subspace_dimension = -1;
+        for(const auto& candidate : candidates)
+        {
+            maximum_subspace_dimension = std::max(
+                maximum_subspace_dimension,
+                candidate.signature.real_subspace_dimension());
+        }
+
+        const consensus_candidate* selected = nullptr;
+        bool ambiguous = false;
+        for(const auto& candidate : candidates)
+        {
+            if(
+                candidate.signature.real_subspace_dimension() !=
+                    maximum_subspace_dimension ||
+                candidate.occurrences <
+                    classification_confirmation_count_)
+            {
+                continue;
+            }
+            if(selected != nullptr)
+            {
+                ambiguous = true;
+                break;
+            }
+            selected = &candidate;
+        }
+        if(selected != nullptr && !ambiguous)
+        {
+            result_type confirmed = selected->result;
+            confirmed.classification_attempts = total_attempts;
+            confirmed.diagnostic =
+                "classification consensus recovered after " +
+                std::to_string(candidates.size()) +
+                " observed unstable signature(s) in " +
+                std::to_string(maximum_runs) +
+                " independent eigensolver run(s)";
+            return transaction.finish(std::move(confirmed));
+        }
+
+        result_type inconsistent = candidates.back().result;
+        inconsistent.classification_status =
+            spectrum_classification_status::incomplete;
+        inconsistent.classification_attempts = total_attempts;
+        std::ostringstream diagnostic;
+        diagnostic
+            << "transition classification is inconsistent across "
+               "independent eigensolver runs";
+        for(const auto& candidate : candidates)
+        {
+            diagnostic
+                << "; signature ("
+                << candidate.signature.real << ','
+                << candidate.signature.complex_pairs
+                << ") occurred " << candidate.occurrences
+                << " time(s) {"
+                << classification_summary(candidate.result)
+                << '}';
+        }
+        inconsistent.diagnostic = diagnostic.str();
+        return transaction.finish(std::move(inconsistent));
     }
 
     SpectrumClassifier& classifier()
@@ -269,6 +453,16 @@ public:
         return classification_confirmation_count_;
     }
 
+    void reset_recycled_subspace()
+    {
+        if constexpr(
+            detail::has_recycled_subspace_reset<
+                EigensolverAdapter>::value)
+        {
+            eigensolver_->reset_recycled_subspace();
+        }
+    }
+
 private:
     VectorOperations* vector_operations_;
     LinearizationProvider* linearization_provider_;
@@ -278,6 +472,34 @@ private:
     detail::vector_workspace<VectorOperations> initial_vector_;
     std::size_t classification_retry_count_ = 0;
     std::size_t classification_confirmation_count_ = 2;
+
+    static std::string classification_summary(
+        const result_type& result)
+    {
+        std::ostringstream message;
+        message
+            << "stable_real=" << result.stable_real
+            << ", neutral_real=" << result.neutral_real
+            << ", unstable=(" << result.unstable.real
+            << "," << result.unstable.complex_pairs << ")"
+            << ", neutral_complex_pairs="
+            << result.neutral_complex_pairs
+            << ", eigenvalues=[";
+        message << std::scientific << std::setprecision(6);
+        for(std::size_t index = 0;
+            index < result.eigenpairs.size();
+            ++index)
+        {
+            if(index != 0)
+                message << ", ";
+            message
+                << "(" << result.eigenpairs[index].value.real()
+                << "," << result.eigenpairs[index].value.imag()
+                << ")";
+        }
+        message << "]";
+        return message.str();
+    }
 
     result_type prepare(
         const vector_type& state,

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -16,6 +17,60 @@
 
 namespace stability
 {
+
+namespace detail
+{
+
+template<class Eigensolver, class Vector, class = void>
+struct has_stability_probe_generator : std::false_type
+{
+};
+
+template<class Eigensolver, class Vector>
+struct has_stability_probe_generator<
+    Eigensolver,
+    Vector,
+    std::void_t<decltype(
+        std::declval<Eigensolver&>().set_probe_generator(
+            std::declval<std::function<void(
+                std::size_t,
+                const Vector&,
+                Vector&)>>()))>>
+    : std::true_type
+{
+};
+
+template<class Eigensolver, class = void>
+struct has_stability_probe_generator_query : std::false_type
+{
+};
+
+template<class Eigensolver>
+struct has_stability_probe_generator_query<
+    Eigensolver,
+    std::void_t<decltype(
+        std::declval<const Eigensolver&>().
+            has_probe_generator())>>
+    : std::true_type
+{
+};
+
+template<class Eigensolver, class = void>
+struct has_recycled_subspace_reset : std::false_type
+{
+};
+
+template<class Eigensolver>
+struct has_recycled_subspace_reset<
+    Eigensolver,
+    std::void_t<decltype(
+        std::declval<const Eigensolver&>().
+            reset_recycled_subspace())>>
+    : std::true_type
+{
+};
+
+} // namespace detail
 
 /**
  * Bifurcation-diagram stability facade.
@@ -111,6 +166,7 @@ public:
         if(eigensolver_adapter_ == nullptr)
             throw std::invalid_argument(
                 "stability_analysis: eigensolver adapter is null");
+        configure_stability_probe_generator();
     }
 
     void set_linear_operator_stable_eigenvalues_halfplane(T sign)
@@ -225,6 +281,16 @@ public:
         transition_refiner_.reset_transition_state_aligner();
     }
 
+    void reset_recycled_subspace()
+    {
+        if constexpr(
+            detail::has_recycled_subspace_reset<
+                eigensolver_adapter_type>::value)
+        {
+            eigensolver_adapter_->reset_recycled_subspace();
+        }
+    }
+
     analysis_result_type analyze(
         const T_vec& state,
         T parameter)
@@ -262,6 +328,22 @@ public:
         return result;
     }
 
+    analysis_result_type analyze_independent(
+        const T_vec& state,
+        T parameter)
+    {
+        reset_recycled_subspace();
+        return analyze(state, parameter);
+    }
+
+    analysis_result_type analyze_confirmed_independent(
+        const T_vec& state,
+        T parameter)
+    {
+        reset_recycled_subspace();
+        return analyze_confirmed(state, parameter);
+    }
+
     transition_result_type refine_transition(
         const T_vec& state_1,
         T parameter_1,
@@ -271,9 +353,9 @@ public:
         unsigned int maximum_iterations = 0)
     {
         const analysis_result_type result_1 =
-            analyze(state_1, parameter_1);
+            analyze_independent(state_1, parameter_1);
         const analysis_result_type result_2 =
-            analyze(state_2, parameter_2);
+            analyze_independent(state_2, parameter_2);
 
         typename transition_refiner_type::options_type options =
             transition_options_;
@@ -299,9 +381,9 @@ public:
         unsigned int maximum_iterations = 0)
     {
         const analysis_result_type result_1 =
-            analyze_confirmed(state_1, parameter_1);
+            analyze_confirmed_independent(state_1, parameter_1);
         const analysis_result_type result_2 =
-            analyze_confirmed(state_2, parameter_2);
+            analyze_confirmed_independent(state_2, parameter_2);
         ensure_classified(
             result_1,
             "stability_analysis::refine_transition_confirmed");
@@ -454,9 +536,9 @@ public:
         unsigned int maximum_iterations = 0)
     {
         const analysis_result_type result_1 =
-            analyze(state_1, parameter_1);
+            analyze_independent(state_1, parameter_1);
         const analysis_result_type result_2 =
-            analyze(state_2, parameter_2);
+            analyze_independent(state_2, parameter_2);
         ensure_classified(
             result_1,
             "stability_analysis::bisect_bifurcaiton_point");
@@ -507,6 +589,35 @@ private:
     typename transition_refiner_type::options_type
         transition_options_;
     unsigned int transition_maximum_subdivisions_ = 8;
+
+    void configure_stability_probe_generator()
+    {
+        if constexpr(
+            detail::has_stability_probe_generator<
+                eigensolver_adapter_type,
+                T_vec>::value)
+        {
+            if constexpr(
+                detail::has_stability_probe_generator_query<
+                    eigensolver_adapter_type>::value)
+            {
+                if(eigensolver_adapter_->has_probe_generator())
+                    return;
+            }
+            NonlinearOperations* nonlinear_operations =
+                nonlin_op_;
+            eigensolver_adapter_->set_probe_generator(
+                [nonlinear_operations](
+                    std::size_t,
+                    const T_vec&,
+                    T_vec& vector)
+                {
+                    analysis::initialize_stability_probe(
+                        *nonlinear_operations,
+                        vector);
+                });
+        }
+    }
 
     static linearization_provider_type*
     resolve_linearization_provider(

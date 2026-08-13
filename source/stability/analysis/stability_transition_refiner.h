@@ -3,6 +3,8 @@
 
 #include <cmath>
 #include <cstddef>
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -54,6 +56,7 @@ struct stability_transition_options
     Real parameter_tolerance = Real(0);
     bool correct_with_fixed_parameter_newton = true;
     bool confirm_stability_classification = false;
+    bool use_recycled_stability_subspace = false;
 };
 
 template<class Real>
@@ -220,21 +223,58 @@ public:
                 state_corrected = true;
             }
 
-            result.stability =
-                options.confirm_stability_classification
-                ? evaluator_->analyze_confirmed(
-                      refined_state,
-                      result.parameter)
-                : evaluator_->analyze(
-                      refined_state,
-                      result.parameter);
+            if(!options.use_recycled_stability_subspace)
+                evaluator_->reset_recycled_subspace();
+            result.stability = evaluator_->analyze(
+                refined_state,
+                result.parameter);
             result.iterations = iteration + 1;
+
+            using std::abs;
+            const bool final_midpoint =
+                iteration + 1 == options.maximum_iterations ||
+                (
+                    options.parameter_tolerance > scalar_type(0) &&
+                    scalar_type(0.5)*
+                        abs(upper_parameter - lower_parameter) <=
+                        options.parameter_tolerance);
+            bool unexpected_signature = false;
+            if(result.stability.succeeded())
+            {
+                const int provisional_dimension =
+                    result.stability.unstable.
+                        real_subspace_dimension();
+                unexpected_signature =
+                    provisional_dimension !=
+                        lower_subspace_dimension &&
+                    provisional_dimension !=
+                        upper_subspace_dimension;
+            }
+            if(
+                options.confirm_stability_classification &&
+                (
+                    !result.stability.succeeded() ||
+                    unexpected_signature ||
+                    final_midpoint))
+            {
+                if(!options.use_recycled_stability_subspace)
+                    evaluator_->reset_recycled_subspace();
+                result.stability = evaluator_->analyze_confirmed(
+                    refined_state,
+                    result.parameter);
+            }
             if(!result.stability.succeeded())
             {
                 result.status =
                     stability_transition_status::
                         stability_solver_failure;
-                result.diagnostic = result.stability.diagnostic;
+                std::ostringstream diagnostic;
+                diagnostic
+                    << "stability classification failed at lambda = "
+                    << std::setprecision(16)
+                    << result.parameter << ": "
+                    << result.stability.diagnostic;
+                result.diagnostic = diagnostic.str();
                 return result;
             }
 
@@ -316,7 +356,6 @@ public:
                 return result;
             }
 
-            using std::abs;
             if(options.parameter_tolerance > scalar_type(0) &&
                abs(upper_parameter - lower_parameter) <=
                    options.parameter_tolerance)

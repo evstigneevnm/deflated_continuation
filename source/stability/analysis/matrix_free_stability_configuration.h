@@ -16,6 +16,7 @@
 #include <stability/eigensolvers/transformations/stability_polynomial_factorization.h>
 
 #include "matrix_free_stability_config.h"
+#include "recycled_ritz_subspace.h"
 #include "spectrum_scan_aggregator.h"
 
 namespace stability
@@ -198,6 +199,9 @@ void validate_matrix_free_stability_config(
             config.transformation.shifts.size() ||
         aggregation.minimum_eigenpairs == 0 ||
         aggregation.probe_count == 0 ||
+        aggregation.minimum_successful_probes == 0 ||
+        aggregation.minimum_successful_probes >
+            aggregation.probe_count ||
         !finite(
             aggregation.eigenvector_independence_tolerance) ||
         !(aggregation.eigenvector_independence_tolerance >
@@ -219,6 +223,22 @@ void validate_matrix_free_stability_config(
     {
         throw std::invalid_argument(
             "invalid small-system stability eigensolver "
+            "configuration");
+    }
+
+    const auto& recycling = config.recycling;
+    if(
+        recycling.maximum_vectors == 0 ||
+        !finite(recycling.innovation_weight) ||
+        !(recycling.innovation_weight > Real{}) ||
+        !(recycling.innovation_weight <= Real(1)) ||
+        !finite(recycling.absolute_residual_tolerance) ||
+        recycling.absolute_residual_tolerance < Real{} ||
+        !finite(recycling.relative_residual_tolerance) ||
+        recycling.relative_residual_tolerance < Real{})
+    {
+        throw std::invalid_argument(
+            "invalid matrix-free Ritz-subspace recycling "
             "configuration");
     }
 }
@@ -435,6 +455,8 @@ make_spectrum_scan_aggregation_options(
         config.aggregation.require_all_scans;
     result.probe_count =
         config.aggregation.probe_count;
+    result.minimum_successful_probes =
+        config.aggregation.minimum_successful_probes;
     result.require_all_probes =
         config.aggregation.require_all_probes;
     result.eigenvector_independence_tolerance =
@@ -443,6 +465,23 @@ make_spectrum_scan_aggregation_options(
     result.eigenvector_orthogonalization_passes =
         config.aggregation.
             eigenvector_orthogonalization_passes;
+    return result;
+}
+
+template<class Real>
+recycled_ritz_subspace_options<Real>
+make_recycled_ritz_subspace_options(
+    const matrix_free_stability_config<Real>& config)
+{
+    validate_matrix_free_stability_config(config);
+    recycled_ritz_subspace_options<Real> result;
+    result.enabled = config.recycling.enabled;
+    result.maximum_vectors = config.recycling.maximum_vectors;
+    result.innovation_weight = config.recycling.innovation_weight;
+    result.absolute_residual_tolerance =
+        config.recycling.absolute_residual_tolerance;
+    result.relative_residual_tolerance =
+        config.recycling.relative_residual_tolerance;
     return result;
 }
 

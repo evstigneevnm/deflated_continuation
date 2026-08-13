@@ -177,6 +177,10 @@ void verify_full_configuration(const std::string& file_name)
             transition_classification_confirmations == 2,
         "transition classification confirmation count");
     require(
+        !parameters.stability_continuation.
+            confirm_regular_stability_points,
+        "regular stability confirmation default");
+    require(
         parameters.stability_continuation.
             transition_refinement_maximum_iterations == 20,
         "transition refinement maximum iterations");
@@ -295,6 +299,7 @@ void verify_stability_classifier_overrides(const std::string& file_name)
     stability_json["require_complete_scan_coverage"] = false;
     stability_json["spectrum_classification_retries"] = 4;
     stability_json["transition_classification_confirmations"] = 3;
+    stability_json["confirm_regular_stability_points"] = true;
     stability_json["correct_stability_transitions_with_newton"] =
         false;
     stability_json["transition_refinement_maximum_iterations"] = 37;
@@ -336,6 +341,9 @@ void verify_stability_classifier_overrides(const std::string& file_name)
     require(
         stability.transition_classification_confirmations == 3,
         "transition classification confirmation override");
+    require(
+        stability.confirm_regular_stability_points,
+        "regular stability confirmation override");
     require(
         !stability.correct_stability_transitions_with_newton,
         "stability transition refinement override");
@@ -412,9 +420,17 @@ void verify_matrix_free_stability_configuration(
             {"minimum_eigenpairs", 7},
             {"require_all_scans", false},
             {"probe_count", 3},
+            {"minimum_successful_probes", 2},
             {"require_all_probes", false},
             {"eigenvector_independence_tolerance", 8.0e-7},
             {"eigenvector_orthogonalization_passes", 3}
+        }},
+        {"recycling", {
+            {"enabled", true},
+            {"maximum_vectors", 21},
+            {"innovation_weight", 0.2},
+            {"absolute_residual_tolerance", 3.0e-8},
+            {"relative_residual_tolerance", 0.15}
         }},
         {"small_system", {
             {"enabled", true},
@@ -527,6 +543,7 @@ void verify_matrix_free_stability_configuration(
             config.aggregation.minimum_eigenpairs == 7 &&
             !config.aggregation.require_all_scans &&
             config.aggregation.probe_count == 3 &&
+            config.aggregation.minimum_successful_probes == 2 &&
             !config.aggregation.require_all_probes &&
             close_value(
                 config.aggregation.
@@ -535,6 +552,19 @@ void verify_matrix_free_stability_configuration(
             config.aggregation.
                 eigenvector_orthogonalization_passes == 3,
         "matrix-free aggregation");
+    require(
+        config.recycling.enabled &&
+            config.recycling.maximum_vectors == 21 &&
+            close_value(
+                config.recycling.innovation_weight,
+                T(0.2)) &&
+            close_value(
+                config.recycling.absolute_residual_tolerance,
+                T(3.0e-8)) &&
+            close_value(
+                config.recycling.relative_residual_tolerance,
+                T(0.15)),
+        "matrix-free Ritz-subspace recycling");
 }
 
 }

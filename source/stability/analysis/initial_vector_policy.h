@@ -2,11 +2,52 @@
 #define __STABILITY_ANALYSIS_INITIAL_VECTOR_POLICY_H__
 
 #include <stdexcept>
+#include <type_traits>
+#include <utility>
 
 namespace stability
 {
 namespace analysis
 {
+
+namespace detail
+{
+
+template<class NonlinearOperations, class Vector, class = void>
+struct has_randomize_stability_vector : std::false_type
+{
+};
+
+template<class NonlinearOperations, class Vector>
+struct has_randomize_stability_vector<
+    NonlinearOperations,
+    Vector,
+    std::void_t<decltype(
+        std::declval<NonlinearOperations&>().
+            randomize_stability_vector(std::declval<Vector&>()))>>
+    : std::true_type
+{
+};
+
+} // namespace detail
+
+template<class NonlinearOperations, class Vector>
+void initialize_stability_probe(
+    NonlinearOperations& nonlinear_operations,
+    Vector& vector)
+{
+    if constexpr(
+        detail::has_randomize_stability_vector<
+            NonlinearOperations,
+            Vector>::value)
+    {
+        nonlinear_operations.randomize_stability_vector(vector);
+    }
+    else
+    {
+        nonlinear_operations.randomize_vector(vector);
+    }
+}
 
 template<class VectorOperations>
 class vector_operations_random_initial_vector
@@ -50,7 +91,9 @@ public:
     template<class Vector>
     void operator()(Vector& vector) const
     {
-        nonlinear_operations_->randomize_vector(vector);
+        initialize_stability_probe(
+            *nonlinear_operations_,
+            vector);
     }
 
 private:

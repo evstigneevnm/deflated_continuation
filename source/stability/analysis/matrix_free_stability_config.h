@@ -139,10 +139,20 @@ struct matrix_free_stability_config
         std::size_t minimum_eigenpairs = 1;
         bool require_all_scans = true;
         std::size_t probe_count = 1;
+        std::size_t minimum_successful_probes = 1;
         bool require_all_probes = true;
         Real eigenvector_independence_tolerance =
             Real(1.0e-6);
         std::size_t eigenvector_orthogonalization_passes = 2;
+    };
+
+    struct recycling_config
+    {
+        bool enabled = false;
+        std::size_t maximum_vectors = 16;
+        Real innovation_weight = Real(0.1);
+        Real absolute_residual_tolerance = Real(1.0e-8);
+        Real relative_residual_tolerance = Real(0.25);
     };
 
     struct small_system_config
@@ -162,6 +172,7 @@ struct matrix_free_stability_config
     inner_solver_config inner_solver;
     retry_config retry;
     aggregation_config aggregation;
+    recycling_config recycling;
     small_system_config small_system;
 };
 

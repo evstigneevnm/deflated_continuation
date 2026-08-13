@@ -158,6 +158,38 @@ void test_validation()
         "zero multiplicity probe count rejected");
 
     invalid = config;
+    invalid.aggregation.probe_count = 2;
+    invalid.aggregation.minimum_successful_probes = 3;
+    require_throws(
+        [&invalid]
+        {
+            stability::analysis::
+                validate_matrix_free_stability_config(invalid);
+        },
+        "impossible multiplicity probe coverage rejected");
+
+    invalid = config;
+    invalid.recycling.enabled = true;
+    invalid.recycling.maximum_vectors = 0;
+    require_throws(
+        [&invalid]
+        {
+            stability::analysis::
+                validate_matrix_free_stability_config(invalid);
+        },
+        "zero recycled-subspace capacity rejected");
+
+    invalid = config;
+    invalid.recycling.innovation_weight = 1.5;
+    require_throws(
+        [&invalid]
+        {
+            stability::analysis::
+                validate_matrix_free_stability_config(invalid);
+        },
+        "invalid recycled-subspace innovation rejected");
+
+    invalid = config;
     invalid.transformation.shifts.clear();
     require_throws(
         [&invalid]

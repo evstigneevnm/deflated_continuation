@@ -27,6 +27,7 @@ struct spectrum_scan_aggregation_options
     std::size_t minimum_eigenpairs = 1;
     bool require_all_scans = true;
     std::size_t probe_count = 1;
+    std::size_t minimum_successful_probes = 1;
     bool require_all_probes = true;
     Real eigenvector_independence_tolerance = Real(1.0e-6);
     std::size_t eigenvector_orthogonalization_passes = 2;

@@ -365,6 +365,15 @@ public:
         randomize_vector( output, lambda0_, random_profile_counter_++ );
     }
 
+    void randomize_stability_vector( vector_type &output )
+    {
+        vector_operations_->assign_random(
+            output,
+            scalar_type( -1 ),
+            scalar_type( 1 )
+        );
+    }
+
     void randomize_vector( vector_type &output, const scalar_type parameter, const std::uint64_t seed_id )
     {
         discretization::fourier::initialization::fill_low_mode_odd_physical_field_2d<backend_type, scalar_type>(

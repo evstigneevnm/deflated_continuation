@@ -246,6 +246,10 @@ void parse_matrix_free_stability_config(
     config.aggregation.probe_count = aggregation.value(
         "probe_count",
         config.aggregation.probe_count);
+    config.aggregation.minimum_successful_probes =
+        aggregation.value(
+            "minimum_successful_probes",
+            config.aggregation.minimum_successful_probes);
     config.aggregation.require_all_probes = aggregation.value(
         "require_all_probes",
         config.aggregation.require_all_probes);
@@ -259,6 +263,24 @@ void parse_matrix_free_stability_config(
             "eigenvector_orthogonalization_passes",
             config.aggregation.
                 eigenvector_orthogonalization_passes);
+
+    const auto recycling =
+        json.value("recycling", nlohmann::json::object());
+    config.recycling.enabled = recycling.value(
+        "enabled",
+        config.recycling.enabled);
+    config.recycling.maximum_vectors = recycling.value(
+        "maximum_vectors",
+        config.recycling.maximum_vectors);
+    config.recycling.innovation_weight = recycling.value(
+        "innovation_weight",
+        config.recycling.innovation_weight);
+    config.recycling.absolute_residual_tolerance = recycling.value(
+        "absolute_residual_tolerance",
+        config.recycling.absolute_residual_tolerance);
+    config.recycling.relative_residual_tolerance = recycling.value(
+        "relative_residual_tolerance",
+        config.recycling.relative_residual_tolerance);
 
     const auto small_system =
         json.value("small_system", nlohmann::json::object());
@@ -727,6 +749,9 @@ void parse_stability_continuation(
     params.transition_classification_confirmations = json.value(
         "transition_classification_confirmations",
         params.transition_classification_confirmations);
+    params.confirm_regular_stability_points = json.value(
+        "confirm_regular_stability_points",
+        params.confirm_regular_stability_points);
     params.correct_stability_transitions_with_newton = json.value(
         "correct_stability_transitions_with_newton",
         params.correct_stability_transitions_with_newton);

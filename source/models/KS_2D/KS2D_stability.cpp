@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -188,6 +189,26 @@ int main(int argc, char** argv)
             nonlinear_operator.configure_finite_symmetry_actions(
                 finite_actions,
                 finite_symmetry_group);
+        const int axis_swap_action =
+            finite_actions.find("axis_swap");
+        if(axis_swap_action < 0)
+        {
+            throw std::runtime_error(
+                "KS2D stability requires the axis-swap action");
+        }
+        const bool uses_preferred_small_system =
+            config.small_system.enabled &&
+            config.small_system.prefer &&
+            state_size <= config.small_system.maximum_dimension;
+        if(
+            !uses_preferred_small_system &&
+            (config.aggregation.probe_count < 4 ||
+             config.aggregation.probe_count % 2 != 0))
+        {
+            throw std::invalid_argument(
+                "KS2D stability requires an even multiplicity probe "
+                "count of at least four for paired axis-swap probes");
+        }
         identity_adapter_type identity_adapter(real_space.get());
         residual_translation_aligner_type residual_translation_aligner(
             real_space.get(),
@@ -229,6 +250,44 @@ int main(int argc, char** argv)
             stability::analysis::make_spectrum_scan_aggregation_options(config),
             !command_line.quiet && config.inner_solver.verbose ? &linear_solver_log : nullptr
         );
+        matrix_free_eigensolver.set_recycling_options(
+            stability::analysis::
+                make_recycled_ritz_subspace_options(config));
+        auto paired_probe_base = std::make_shared<
+            stability::analysis::detail::vector_workspace<
+                vec_ops_real>>(real_space.get());
+        matrix_free_eigensolver.set_probe_generator(
+            [real_space,
+             &nonlinear_operator,
+             &finite_actions,
+             paired_probe_base,
+             axis_swap_action](
+                std::size_t probe_index,
+                const typename vec_ops_real::vector_type& initial_probe,
+                typename vec_ops_real::vector_type& probe)
+            {
+                if(probe_index == 1)
+                {
+                    finite_actions.apply(
+                        static_cast<std::size_t>(axis_swap_action),
+                        initial_probe,
+                        probe);
+                    return;
+                }
+                if(probe_index % 2 == 0)
+                {
+                    nonlinear_operator.randomize_stability_vector(
+                        probe);
+                    real_space->assign(
+                        probe,
+                        paired_probe_base->get());
+                    return;
+                }
+                finite_actions.apply(
+                    static_cast<std::size_t>(axis_swap_action),
+                    paired_probe_base->get(),
+                    probe);
+            });
         dense_lapack_type small_system_lapack;
         typename small_system_eigensolver_type::options_type small_system_options;
         small_system_options.absolute_residual_tolerance =
@@ -273,7 +332,55 @@ int main(int argc, char** argv)
         (void)finite_action_workspace;
         driver.set_transition_state_aligner(&quotient_adapter);
         driver.set_parameters();
-        if(command_line.edit)
+        if(!command_line.second_state_file.empty())
+        {
+            const auto result = driver.execute_single_transition(
+                command_line.state_file,
+                static_cast<real>(command_line.state_parameter),
+                command_line.second_state_file,
+                static_cast<real>(command_line.second_state_parameter),
+                command_line.confirm);
+            std::cout
+                << "Two-state stability transition result: status="
+                << stability::analysis::stability_transition_status_name(
+                       result.status)
+                << ", lambda=" << std::setprecision(17)
+                << result.parameter
+                << ", before=("
+                << result.before_stability.unstable.real << ','
+                << result.before_stability.unstable.complex_pairs
+                << "), after=("
+                << result.after_stability.unstable.real << ','
+                << result.after_stability.unstable.complex_pairs
+                << "), iterations=" << result.iterations;
+            if(!result.diagnostic.empty())
+                std::cout << ", diagnostic=" << result.diagnostic;
+            std::cout << '\n';
+            if(!result.succeeded())
+                throw std::runtime_error(
+                    "two-state stability transition replay failed");
+        }
+        else if(!command_line.state_file.empty())
+        {
+            const auto result = driver.execute_single_state(
+                command_line.state_file,
+                static_cast<real>(command_line.state_parameter),
+                command_line.confirm);
+            std::cout
+                << "Single-state stability result: status="
+                << stability::analysis::spectrum_classification_status_name(
+                       result.classification_status)
+                << ", unstable=("
+                << result.unstable.real << ','
+                << result.unstable.complex_pairs
+                << "), attempts="
+                << result.classification_attempts
+                << ", diagnostic=" << result.diagnostic << '\n';
+            if(!result.succeeded())
+                throw std::runtime_error(
+                    "single-state stability replay failed");
+        }
+        else if(command_line.edit)
         {
             driver.edit();
         }

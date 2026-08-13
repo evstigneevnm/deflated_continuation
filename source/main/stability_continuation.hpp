@@ -381,6 +381,7 @@ public:
 
         int container_index = 0;
         int requested_curve = curve_number_;
+        stab->reset_recycled_subspace();
         const std::vector<curve_point_type> curve_points =
             bif_diag->get_curve_points_vector(requested_curve);
         std::size_t symmetry_endpoint_count = 0;
@@ -500,6 +501,7 @@ public:
 
             if( curve_break )
             {
+                stab->reset_recycled_subspace();
                 queue_pointer->clear();
                 queue_lambda->clear();
                 queue_dims->clear();
@@ -527,6 +529,7 @@ public:
                     static_cast<unsigned long long>(
                         following_symmetry_endpoint->point_index),
                     double(following_symmetry_endpoint->lambda));
+                stab->reset_recycled_subspace();
                 queue_pointer->clear();
                 queue_lambda->clear();
                 queue_dims->clear();
@@ -542,7 +545,11 @@ public:
             
             try
             {
-                const auto stability_point = stab->analyze(x_p, lambda_p);
+                const auto stability_point =
+                    parameters->stability_continuation.
+                        confirm_regular_stability_points
+                    ? stab->analyze_confirmed(x_p, lambda_p)
+                    : stab->analyze(x_p, lambda_p);
                 if(!stability_point.succeeded())
                 {
                     throw std::runtime_error(
@@ -576,11 +583,11 @@ public:
                     {
                         log->info_f("container::stability_diagram: (lambda0,||x0||) = (%lf;%lf), (lambda1,||x1||) = (%lf;%lf).", double(queue_lambda->at(0)), vec_ops->norm(queue_pointer->at(0)), double(queue_lambda->at(1)), vec_ops->norm(queue_pointer->at(1)) );
                         const auto lower_confirmation =
-                            stab->analyze_confirmed(
+                            stab->analyze_confirmed_independent(
                                 queue_pointer->at(0),
                                 queue_lambda->at(0));
                         const auto upper_confirmation =
-                            stab->analyze_confirmed(
+                            stab->analyze_confirmed_independent(
                                 queue_pointer->at(1),
                                 queue_lambda->at(1));
                         if(!lower_confirmation.succeeded())
@@ -682,6 +689,7 @@ public:
                                             after_dimension,
                                             transition_state);
                                     });
+                            stab->reset_recycled_subspace();
                         }
                     }
 

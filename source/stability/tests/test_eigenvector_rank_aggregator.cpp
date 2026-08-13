@@ -13,6 +13,8 @@
 #include <nmfd/detail/vector_wrap.h>
 #include <stability/analysis/eigenvector_rank_aggregator.h>
 
+#include "common/recycled_ritz_subspace_test_suite.h"
+
 namespace
 {
 
@@ -182,6 +184,12 @@ void run_backend(const std::string& label)
     require(
         rejected_invalid_index,
         label + " rejects a missing Ritz-vector index");
+
+    vector_space_type recycling_space(3);
+    stability_tests::run_recycled_ritz_subspace_test_suite(
+        recycling_space,
+        label,
+        require);
 }
 
 } // namespace

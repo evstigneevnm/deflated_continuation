@@ -440,6 +440,9 @@ void test_complex_pair_recovery(const std::string& label)
     scan_config.inner_solver.divide_norms_by_relative_base = false;
     scan_config.aggregation.minimum_successful_scans = 2;
     scan_config.aggregation.require_all_scans = true;
+    scan_config.aggregation.probe_count = 4;
+    scan_config.aggregation.minimum_successful_probes = 2;
+    scan_config.aggregation.require_all_probes = false;
 
     const auto scans =
         stability::analysis::make_matrix_free_stability_scans<
@@ -457,6 +460,8 @@ void test_complex_pair_recovery(const std::string& label)
             scans.front().inner_basis_retry_sizes ==
                 std::vector<unsigned int>({5}),
         label + " scan preserves inner basis retry policy");
+    std::size_t generated_probe_count = 0;
+    bool generated_probe_indices_valid = true;
     scan_type scan_driver(
         real_space,
         complex_space,
@@ -465,7 +470,22 @@ void test_complex_pair_recovery(const std::string& label)
         scans,
         scan_inner_parameters,
         stability::analysis::
-            make_spectrum_scan_aggregation_options(scan_config));
+            make_spectrum_scan_aggregation_options(scan_config),
+        nullptr,
+        [&generated_probe_count,
+         &generated_probe_indices_valid,
+         &real_space](
+            std::size_t probe_index,
+            const typename real_space_type::vector_type& source,
+            typename real_space_type::vector_type& destination)
+        {
+            generated_probe_indices_valid =
+                generated_probe_indices_valid &&
+                probe_index >= std::size_t(1) &&
+                probe_index < std::size_t(4);
+            ++generated_probe_count;
+            real_space->assign(source, destination);
+        });
     const auto scanned = scan_driver.execute(*initial);
     require(
         scanned.succeeded() &&
@@ -474,11 +494,53 @@ void test_complex_pair_recovery(const std::string& label)
             scanned.scans_succeeded == 2,
         label + " sequential spectral scan status: " +
             scanned.diagnostic);
+    require(
+        generated_probe_indices_valid &&
+            generated_probe_count == 3*scans.size(),
+        label + " spectral scan invokes indexed probe generator");
     const auto scan_classified = classifier.classify(scanned);
     require(
         scan_classified.succeeded() &&
             scan_classified.neutral_complex_pairs == 1,
         label + " aggregated physical spectrum classification");
+
+    typename scan_type::recycling_options_type recycling_options;
+    recycling_options.enabled = true;
+    recycling_options.maximum_vectors = 4;
+    recycling_options.innovation_weight = real_type(0.2);
+    recycling_options.absolute_residual_tolerance = real_type(1.0e-10);
+    recycling_options.relative_residual_tolerance = real_type(1.0e-8);
+    scan_driver.set_recycling_options(recycling_options);
+
+    scan_driver.begin_recycling_transaction();
+    const auto recycling_prime = scan_driver.execute(*initial);
+    if(recycling_prime.succeeded())
+        scan_driver.commit_recycling_transaction();
+    else
+        scan_driver.rollback_recycling_transaction();
+    require(
+        recycling_prime.succeeded() &&
+            scan_driver.recycled_subspace_size() > 0,
+        label + " matrix-free scan commits recovered Ritz vectors: " +
+            recycling_prime.diagnostic);
+
+    scan_driver.begin_recycling_transaction();
+    const auto recycled_scan = scan_driver.execute(*initial);
+    if(recycled_scan.succeeded())
+        scan_driver.commit_recycling_transaction();
+    else
+        scan_driver.rollback_recycling_transaction();
+    require(
+        recycled_scan.succeeded() &&
+            recycled_scan.diagnostic.find("accepted=0") ==
+                std::string::npos &&
+            recycled_scan.diagnostic.find(
+                "2 fresh probes succeeded (minimum 2)") !=
+                std::string::npos &&
+            recycled_scan.diagnostic.find("seeded_probes=4") !=
+                std::string::npos,
+        label + " matrix-free scan reuses validated Ritz vectors: " +
+            recycled_scan.diagnostic);
 }
 
 template<class Backend>

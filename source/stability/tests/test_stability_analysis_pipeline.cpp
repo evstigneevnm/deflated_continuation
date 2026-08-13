@@ -1,6 +1,7 @@
 #include <cmath>
 #include <complex>
 #include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -222,6 +223,80 @@ private:
 };
 
 template<class VectorSpace>
+class distinct_stability_probe_problem
+{
+public:
+    using scalar_type = typename VectorSpace::scalar_type;
+    using vector_type = typename VectorSpace::vector_type;
+
+    explicit distinct_stability_probe_problem(VectorSpace* vector_space)
+        : vector_space_(vector_space)
+    {
+    }
+
+    void randomize_vector(vector_type& vector)
+    {
+        vector_space_->assign_scalar(scalar_type(1), vector);
+        ++deflation_probe_calls_;
+    }
+
+    void randomize_stability_vector(vector_type& vector)
+    {
+        vector_space_->assign_scalar(scalar_type(2), vector);
+        ++stability_probe_calls_;
+    }
+
+    std::size_t deflation_probe_calls() const
+    {
+        return deflation_probe_calls_;
+    }
+
+    std::size_t stability_probe_calls() const
+    {
+        return stability_probe_calls_;
+    }
+
+private:
+    VectorSpace* vector_space_;
+    std::size_t deflation_probe_calls_ = 0;
+    std::size_t stability_probe_calls_ = 0;
+};
+
+template<class Backend>
+void test_distinct_stability_probe_policy(const std::string& label)
+{
+    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_type = typename vector_space_type::vector_type;
+    using problem_type = distinct_stability_probe_problem<vector_space_type>;
+    using policy_type =
+        stability::analysis::nonlinear_operator_random_initial_vector<
+            problem_type>;
+
+    vector_space_type vector_space(4);
+    problem_type problem(&vector_space);
+    policy_type policy(&problem);
+    vector_type vector;
+    vector_space.init_vector(vector);
+    vector_space.start_use_vector(vector);
+
+    policy(vector);
+    double first = 0.0;
+    vector_space.get(vector, &first, std::size_t(1));
+    require(
+        first == 2.0,
+        label + " stability-specific probe is selected");
+    require(
+        problem.stability_probe_calls() == 1,
+        label + " stability-specific probe is called once");
+    require(
+        problem.deflation_probe_calls() == 0,
+        label + " deflation probe remains unused by stability");
+
+    vector_space.stop_use_vector(vector);
+    vector_space.free_vector(vector);
+}
+
+template<class VectorSpace>
 class separate_linearization_provider
 {
 public:
@@ -259,6 +334,11 @@ public:
     using vector_type = typename VectorSpace::vector_type;
     using result_type =
         stability::eigensolvers::eigensolver_result<real_type>;
+    using probe_generator_type =
+        std::function<void(
+            std::size_t,
+            const vector_type&,
+            vector_type&)>;
 
     explicit parameter_spectrum_adapter(Problem* problem)
         : problem_(problem)
@@ -289,9 +369,31 @@ public:
         fail_ = value;
     }
 
+    void set_probe_generator(probe_generator_type probe_generator)
+    {
+        probe_generator_ = std::move(probe_generator);
+    }
+
+    bool probe_generator_configured() const
+    {
+        return static_cast<bool>(probe_generator_);
+    }
+
+    void generate_probe(
+        std::size_t probe_index,
+        const vector_type& initial_vector,
+        vector_type& vector) const
+    {
+        probe_generator_(
+            probe_index,
+            initial_vector,
+            vector);
+    }
+
 private:
     Problem* problem_;
     bool fail_ = false;
+    probe_generator_type probe_generator_;
 };
 
 template<class VectorSpace, class Problem>
@@ -467,6 +569,99 @@ public:
 
 private:
     std::size_t calls_ = 0;
+};
+
+template<class VectorSpace, class Problem>
+class recovering_confirmation_spectrum_adapter
+{
+public:
+    using real_type = typename VectorSpace::scalar_type;
+    using vector_type = typename VectorSpace::vector_type;
+    using result_type =
+        stability::eigensolvers::eigensolver_result<real_type>;
+
+    explicit recovering_confirmation_spectrum_adapter(Problem*)
+    {
+    }
+
+    result_type execute(const vector_type&)
+    {
+        ++calls_;
+        result_type result = successful_spectrum({
+            estimate({2.0, 0.0})
+        });
+        if(calls_ >= 2)
+            result.eigenpairs.push_back(estimate({3.0, 0.0}));
+        return result;
+    }
+
+    std::size_t calls() const
+    {
+        return calls_;
+    }
+
+private:
+    std::size_t calls_ = 0;
+};
+
+template<class VectorSpace, class Problem>
+class transactional_spectrum_adapter
+{
+public:
+    using real_type = typename VectorSpace::scalar_type;
+    using vector_type = typename VectorSpace::vector_type;
+    using result_type =
+        stability::eigensolvers::eigensolver_result<real_type>;
+
+    explicit transactional_spectrum_adapter(Problem*)
+    {
+    }
+
+    result_type execute(const vector_type&)
+    {
+        ++execute_calls_;
+        if(fail_)
+        {
+            result_type result;
+            result.status =
+                stability::eigensolvers::eigensolver_status::
+                    inner_solver_failure;
+            return result;
+        }
+        return successful_spectrum({estimate({-1.0, 0.0})});
+    }
+
+    void begin_recycling_transaction() const
+    {
+        ++begin_calls_;
+    }
+
+    void commit_recycling_transaction() const
+    {
+        ++commit_calls_;
+    }
+
+    void rollback_recycling_transaction() const
+    {
+        ++rollback_calls_;
+    }
+
+    void fail(bool value)
+    {
+        fail_ = value;
+    }
+
+    std::size_t begin_calls() const { return begin_calls_; }
+    std::size_t commit_calls() const { return commit_calls_; }
+    std::size_t rollback_calls() const { return rollback_calls_; }
+    std::size_t execute_calls() const { return execute_calls_; }
+
+private:
+    bool fail_ = false;
+    std::size_t execute_calls_ = 0;
+    mutable std::size_t begin_calls_ = 0;
+    mutable std::size_t commit_calls_ = 0;
+    mutable std::size_t rollback_calls_ = 0;
 };
 
 template<class VectorSpace, class Problem>
@@ -1210,6 +1405,133 @@ void test_classification_confirmation_consensus(
 }
 
 template<class Backend>
+void test_classification_confirmation_retry_consensus(
+    const std::string& label)
+{
+    using vector_space_type =
+        scfd_vector_operations<Backend, double>;
+    using vector_type = typename vector_space_type::vector_type;
+    using problem_type = parameterized_problem<vector_space_type>;
+    using adapter_type =
+        recovering_confirmation_spectrum_adapter<
+            vector_space_type,
+            problem_type>;
+    using classifier_type =
+        stability::analysis::spectrum_classifier<double>;
+    using initial_policy_type =
+        stability::analysis::nonlinear_operator_random_initial_vector<
+            problem_type>;
+    using evaluator_type =
+        stability::analysis::stability_evaluator<
+            vector_space_type,
+            problem_type,
+            adapter_type,
+            classifier_type,
+            initial_policy_type>;
+
+    vector_space_type vector_space(4);
+    problem_type problem(&vector_space);
+    adapter_type adapter(&problem);
+    evaluator_type evaluator(
+        &vector_space,
+        &problem,
+        &adapter,
+        classifier_type{},
+        initial_policy_type(&problem));
+    evaluator.set_classification_confirmation_count(2);
+    evaluator.set_classification_retry_count(1);
+
+    vector_type state;
+    vector_space.init_vector(state);
+    vector_space.start_use_vector(state);
+    vector_space.assign_scalar(0.0, state);
+
+    const auto result = evaluator.analyze_confirmed(state, 0.5);
+    require(
+        result.succeeded() && result.unstable.real == 2,
+        label + " confirmation retry recovers repeated higher rank");
+    require(
+        result.classification_attempts == 3 && adapter.calls() == 3,
+        label + " confirmation retry consumes one extra run");
+    require(
+        result.diagnostic.find("consensus recovered") !=
+            std::string::npos,
+        label + " confirmation retry diagnostic");
+
+    vector_space.stop_use_vector(state);
+    vector_space.free_vector(state);
+}
+
+template<class Backend>
+void test_recycling_transaction(const std::string& label)
+{
+    using vector_space_type =
+        scfd_vector_operations<Backend, double>;
+    using problem_type = parameterized_problem<vector_space_type>;
+    using adapter_type = transactional_spectrum_adapter<
+        vector_space_type,
+        problem_type>;
+    using classifier_type =
+        stability::analysis::spectrum_classifier<double>;
+    using initial_policy_type =
+        stability::analysis::nonlinear_operator_random_initial_vector<
+            problem_type>;
+    using evaluator_type = stability::analysis::stability_evaluator<
+        vector_space_type,
+        problem_type,
+        adapter_type,
+        classifier_type,
+        initial_policy_type>;
+
+    vector_space_type vector_space(3);
+    problem_type problem(&vector_space);
+    adapter_type adapter(&problem);
+    evaluator_type evaluator(
+        &vector_space,
+        &problem,
+        &adapter,
+        classifier_type{},
+        initial_policy_type(&problem));
+
+    typename vector_space_type::vector_type state;
+    vector_space.init_vector(state);
+    vector_space.start_use_vector(state);
+    vector_space.assign_scalar(0.0, state);
+
+    const auto successful = evaluator.analyze(state, 0.0);
+    require(
+        successful.succeeded() &&
+            adapter.begin_calls() == 1 &&
+            adapter.commit_calls() == 1 &&
+            adapter.rollback_calls() == 0,
+        label + " successful classification commits one recycle transaction");
+
+    adapter.fail(true);
+    const auto failed = evaluator.analyze(state, 0.0);
+    require(
+        !failed.succeeded() &&
+            adapter.begin_calls() == 2 &&
+            adapter.commit_calls() == 1 &&
+            adapter.rollback_calls() == 1,
+        label + " failed classification rolls back recycle transaction");
+
+    adapter.fail(false);
+    evaluator.set_classification_confirmation_count(2);
+    const std::size_t executions_before = adapter.execute_calls();
+    const auto confirmed = evaluator.analyze_confirmed(state, 0.0);
+    require(
+        confirmed.succeeded() &&
+            adapter.execute_calls() - executions_before == 2 &&
+            adapter.begin_calls() == 3 &&
+            adapter.commit_calls() == 2 &&
+            adapter.rollback_calls() == 1,
+        label + " independent confirmations share one recycle transaction");
+
+    vector_space.stop_use_vector(state);
+    vector_space.free_vector(state);
+}
+
+template<class Backend>
 void test_unexpected_secant_signature_recovery(
     const std::string& label)
 {
@@ -1615,6 +1937,27 @@ void test_structured_facade()
         &problem,
         &newton,
         &eigensolver_adapter);
+    require(
+        eigensolver_adapter.probe_generator_configured(),
+        "structured facade configures matrix-free probe generator");
+    vector_type configured_probe;
+    vector_space.init_vector(configured_probe);
+    vector_space.start_use_vector(configured_probe);
+    vector_space.assign_scalar(0.0, configured_probe);
+    eigensolver_adapter.generate_probe(
+        std::size_t(1),
+        configured_probe,
+        configured_probe);
+    double configured_probe_value = 0.0;
+    vector_space.get(
+        configured_probe,
+        &configured_probe_value,
+        std::size_t(1));
+    require(
+        configured_probe_value == 1.0,
+        "structured facade reuses nonlinear stability probe policy");
+    vector_space.stop_use_vector(configured_probe);
+    vector_space.free_vector(configured_probe);
     facade.set_linear_operator_stable_eigenvalues_halfplane(-1.0);
 
     vector_type lower;
@@ -1854,6 +2197,9 @@ void test_facade_with_separate_linearization_provider()
 int main()
 {
     test_spectrum_classifier();
+    test_distinct_stability_probe_policy<scfd::backend::serial_cpu>(
+        "serial");
+    test_distinct_stability_probe_policy<scfd::backend::omp>("OMP");
     test_evaluator_and_refiner<scfd::backend::serial_cpu>("serial");
     test_evaluator_and_refiner<scfd::backend::omp>("OMP");
     test_classification_retry<scfd::backend::serial_cpu>("serial");
@@ -1867,6 +2213,12 @@ int main()
         scfd::backend::serial_cpu>("serial");
     test_classification_confirmation_consensus<
         scfd::backend::omp>("OMP");
+    test_classification_confirmation_retry_consensus<
+        scfd::backend::serial_cpu>("serial");
+    test_classification_confirmation_retry_consensus<
+        scfd::backend::omp>("OMP");
+    test_recycling_transaction<scfd::backend::serial_cpu>("serial");
+    test_recycling_transaction<scfd::backend::omp>("OMP");
     test_multiple_transition_sequence<scfd::backend::serial_cpu>(
         "serial");
     test_multiple_transition_sequence<scfd::backend::omp>("OMP");

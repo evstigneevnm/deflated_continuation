@@ -238,6 +238,9 @@ int main(int argc, char** argv)
                 config.inner_solver.verbose
                 ? &linear_solver_log
                 : nullptr);
+        eigensolver.set_recycling_options(
+            stability::analysis::
+                make_recycled_ritz_subspace_options(config));
 
         if(!command_line.quiet)
         {

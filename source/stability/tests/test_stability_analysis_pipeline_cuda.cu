@@ -15,6 +15,8 @@
 #include <stability/analysis/stability_evaluator.h>
 #include <stability/analysis/stability_transition_refiner.h>
 
+#include "common/recycled_ritz_subspace_test_suite.h"
+
 namespace
 {
 
@@ -225,6 +227,12 @@ private:
 
 int run()
 {
+    vector_space_type recycling_space(3);
+    stability_tests::run_recycled_ritz_subspace_test_suite(
+        recycling_space,
+        "CUDA",
+        require);
+
     using classifier_type =
         stability::analysis::spectrum_classifier<double>;
     using initial_policy_type =
