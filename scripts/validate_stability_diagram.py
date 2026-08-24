@@ -129,7 +129,7 @@ def validate_plot_records(
     curve: Path,
     records: list[StabilityRecord],
     continuation_count: int,
-) -> None:
+) -> list[StabilityPlotRecord]:
     sidecar = curve / "debug_curve_stability_plot.dat"
     plot_records = read_plot_records(sidecar)
     if len(plot_records) != len(records):
@@ -143,15 +143,20 @@ def validate_plot_records(
     previous_source_index = -1
     for record, plot_record in zip(records, plot_records):
         if (
-            plot_record.source_index < previous_source_index
-            or plot_record.source_index < 0
+            plot_record.source_index < 0
             or plot_record.source_index >= continuation_count
         ):
             raise RuntimeError(
                 f"{curve}: invalid plot source index "
                 f"{plot_record.source_index}"
             )
-        previous_source_index = plot_record.source_index
+        if record.point_type != "topology_break":
+            if plot_record.source_index < previous_source_index:
+                raise RuntimeError(
+                    f"{curve}: non-monotone stability source index "
+                    f"{plot_record.source_index}"
+                )
+            previous_source_index = plot_record.source_index
         if (
             plot_record.point_type != record.point_type
             or plot_record.unstable_real != record.unstable_real
@@ -179,11 +184,48 @@ def validate_plot_records(
                 raise RuntimeError(
                     f"{curve}: inconsistent bifurcation plot metadata"
                 )
+        elif record.point_type == "topology_break":
+            if (
+                plot_record.event_type != "topology"
+                or plot_record.event_id <= 0
+            ):
+                raise RuntimeError(
+                    f"{curve}: inconsistent topology-break plot metadata"
+                )
         elif plot_record.event_type != "none":
             raise RuntimeError(
                 f"{curve}: non-bifurcation plot record has event type "
                 f"{plot_record.event_type!r}"
             )
+    return plot_records
+
+
+def validate_complete_traversal(
+    curve: Path,
+    records: list[StabilityRecord],
+    continuation_count: int,
+    plot_records: list[StabilityPlotRecord] | None,
+) -> None:
+    if plot_records is None:
+        if len(records) != continuation_count:
+            raise RuntimeError(
+                f"{curve}: stability records ({len(records)}) do not "
+                f"cover continuation records ({continuation_count})"
+            )
+        return
+
+    if not plot_records:
+        raise RuntimeError(f"{curve}: stability plot sidecar is empty")
+    if (
+        plot_records[0].source_index != 0
+        or plot_records[-1].source_index != continuation_count - 1
+    ):
+        raise RuntimeError(
+            f"{curve}: stability traversal covers source indices "
+            f"[{plot_records[0].source_index}, "
+            f"{plot_records[-1].source_index}], expected [0, "
+            f"{continuation_count - 1}]"
+        )
 
 
 def validate_record(
@@ -206,13 +248,15 @@ def validate_record(
             or record.solution_id != 0
         ):
             raise RuntimeError(f"{curve}: inconsistent unstable record")
-    elif record.point_type == "bifurcation":
+    elif record.point_type in {"bifurcation", "topology_break"}:
         if record.solution_id <= 0:
-            raise RuntimeError(f"{curve}: bifurcation record has no solution")
+            raise RuntimeError(
+                f"{curve}: {record.point_type} record has no solution"
+            )
         solution_path = curve / f"s{record.solution_id}"
         if not solution_path.is_file():
             raise RuntimeError(
-                f"{curve}: missing bifurcation solution {solution_path.name}"
+                f"{curve}: missing event solution {solution_path.name}"
             )
     else:
         raise RuntimeError(
@@ -267,6 +311,7 @@ def validate(args: argparse.Namespace) -> None:
     stable_records = 0
     unstable_records = 0
     bifurcation_records: list[StabilityRecord] = []
+    topology_break_records: list[StabilityRecord] = []
     for curve in curves:
         stability_path = curve / "debug_curve_stability.dat"
         records = read_records(stability_path)
@@ -275,24 +320,23 @@ def validate(args: argparse.Namespace) -> None:
                 f"{curve}: expected at least {args.min_points} stability "
                 f"records, found {len(records)}"
             )
-        if args.require_complete:
-            continuation_records = nonempty_lines(
-                curve / "debug_curve_all.dat"
-            )
-            if len(records) != len(continuation_records):
-                raise RuntimeError(
-                    f"{curve}: stability records ({len(records)}) do not "
-                    f"cover continuation records ({len(continuation_records)})"
-                )
-        else:
-            continuation_records = nonempty_lines(
-                curve / "debug_curve_all.dat"
-            )
-        if args.require_plot_sidecar:
-            validate_plot_records(
+        continuation_records = nonempty_lines(
+            curve / "debug_curve_all.dat"
+        )
+        sidecar = curve / "debug_curve_stability_plot.dat"
+        plot_records = None
+        if args.require_plot_sidecar or sidecar.is_file():
+            plot_records = validate_plot_records(
                 curve,
                 records,
                 len(continuation_records),
+            )
+        if args.require_complete:
+            validate_complete_traversal(
+                curve,
+                records,
+                len(continuation_records),
+                plot_records,
             )
         for record in records:
             validate_record(curve, record, args)
@@ -300,8 +344,10 @@ def validate(args: argparse.Namespace) -> None:
                 stable_records += 1
             elif record.point_type == "unstable":
                 unstable_records += 1
-            else:
+            elif record.point_type == "bifurcation":
                 bifurcation_records.append(record)
+            else:
+                topology_break_records.append(record)
         total_records += len(records)
 
     if (
@@ -311,6 +357,14 @@ def validate(args: argparse.Namespace) -> None:
         raise RuntimeError(
             f"expected {args.expected_bifurcations} bifurcations, found "
             f"{len(bifurcation_records)}"
+        )
+    if (
+        args.expected_topology_breaks is not None
+        and len(topology_break_records) != args.expected_topology_breaks
+    ):
+        raise RuntimeError(
+            f"expected {args.expected_topology_breaks} topology breaks, "
+            f"found {len(topology_break_records)}"
         )
     if stable_records < args.min_stable_points:
         raise RuntimeError(
@@ -347,7 +401,8 @@ def validate(args: argparse.Namespace) -> None:
         f"Validated stability diagram: curves={len(curves)}, "
         f"records={total_records}, stable={stable_records}, "
         f"unstable={unstable_records}, "
-        f"bifurcations={len(bifurcation_records)}"
+        f"bifurcations={len(bifurcation_records)}, "
+        f"topology_breaks={len(topology_break_records)}"
     )
 
 
@@ -360,11 +415,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--require-plot-sidecar", action="store_true")
     parser.add_argument(
         "--expected-point-type",
-        choices=("stable", "unstable", "bifurcation"),
+        choices=("stable", "unstable", "bifurcation", "topology_break"),
     )
     parser.add_argument("--expected-unstable-real", type=int)
     parser.add_argument("--expected-unstable-complex-pairs", type=int)
     parser.add_argument("--expected-bifurcations", type=int)
+    parser.add_argument("--expected-topology-breaks", type=int)
     parser.add_argument("--min-stable-points", type=int, default=0)
     parser.add_argument("--min-unstable-points", type=int, default=0)
     parser.add_argument(

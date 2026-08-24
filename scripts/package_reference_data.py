@@ -24,6 +24,7 @@ REQUIRED_PAYLOAD_FILES = (
     "KS1D/N128/full_stability_20260730/manifest.json",
     "KS1D/N128/stability_20260824/full/manifest.json",
     "KS1D/N128/stability_20260824/symmetric/manifest.json",
+    "KS2D/N256x256/symmetric_stability_20260824/manifest.json",
     "eigensolvers/baseline_20260725/manifest.json",
     "eigensolvers/eigs_paper_stage3_20260725/manifest.json",
     "eigensolvers/eigs_paper_stage4_20260725/manifest.json",

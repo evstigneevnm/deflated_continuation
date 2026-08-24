@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "repository": "https://github.com/evstigneevnm/deflated_continuation",
-  "latest": "20260824",
+  "latest": "20260824-ks2d",
   "assets": [
     {
       "version": "20260730",
@@ -92,6 +92,68 @@
         {
           "path": "data/reference/KS1D/N128/stability_20260824/symmetric",
           "description": "Post-refactoring 9-curve symmetric KS1D stability validation on 16 CPU cores"
+        },
+        {
+          "path": "data/reference/eigensolvers/baseline_20260725",
+          "description": "Pre-refactoring eigensolver and linear-solver baseline"
+        },
+        {
+          "path": "data/reference/eigensolvers/eigs_paper_stage3_20260725",
+          "description": "Matrix Market and direct Krylov-Schur validation"
+        },
+        {
+          "path": "data/reference/eigensolvers/eigs_paper_stage4_20260725",
+          "description": "Transformed-operator and rotated-spectrum validation"
+        },
+        {
+          "path": "data/reference/eigensolvers/eigs_paper_stage5_20260725",
+          "description": "S80 spectrum, angle-scan, and factorized-recovery validation"
+        }
+      ]
+    },
+    {
+      "version": "20260824-ks2d",
+      "release_tag": "reference-data-20260824-ks2d",
+      "file": "deflated-continuation-reference-data-20260824-ks2d.tar.xz",
+      "url": "https://github.com/evstigneevnm/deflated_continuation/releases/download/reference-data-20260824-ks2d/deflated-continuation-reference-data-20260824-ks2d.tar.xz",
+      "sha256": "127a61d91fa25d1f416064b3189d9dc2e207211920102fdbe1cef51d8701912e",
+      "size_bytes": 223212564,
+      "archive_root": "data/reference",
+      "created_on": "2026-08-24",
+      "source_base_commit": "72949047fd91e22ce35397199f86e99edf47be60",
+      "source_worktree_dirty": true,
+      "datasets": [
+        {
+          "path": "data/reference/KS1D/N64/symmetric",
+          "description": "Primary N=64 symmetric KS1D bifurcation regression"
+        },
+        {
+          "path": "data/reference/KS1D/N64/full",
+          "description": "Primary N=64 full Fourier/SO(2) KS1D regression"
+        },
+        {
+          "path": "data/reference/KS1D/N128/symmetric",
+          "description": "N=128 symmetric KS1D resolution validation"
+        },
+        {
+          "path": "data/reference/KS1D/N128/full",
+          "description": "N=128 full Fourier/SO(2) KS1D resolution validation"
+        },
+        {
+          "path": "data/reference/KS1D/N128/full_stability_20260730",
+          "description": "Accepted 29-curve full KS1D diagram and stability analysis over lambda in [1,110]"
+        },
+        {
+          "path": "data/reference/KS1D/N128/stability_20260824/full",
+          "description": "Post-refactoring 29-curve full KS1D stability validation on 16 CPU cores"
+        },
+        {
+          "path": "data/reference/KS1D/N128/stability_20260824/symmetric",
+          "description": "Post-refactoring 9-curve symmetric KS1D stability validation on 16 CPU cores"
+        },
+        {
+          "path": "data/reference/KS2D/N256x256/symmetric_stability_20260824",
+          "description": "Accepted 36-curve symmetric KS2D bifurcation and stability validation at 256 x 256 resolution"
         },
         {
           "path": "data/reference/eigensolvers/baseline_20260725",

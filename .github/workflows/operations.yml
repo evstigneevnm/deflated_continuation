@@ -131,6 +131,7 @@ jobs:
           make test_stability_diagram_archive.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_diagram_archive"
           ./"$BUILD_DIR"/stability_diagram_archive/test_stability_diagram_archive.bin
           python3 plot_scripts/tests/test_plot_stability.py
+          python3 scripts/tests/test_validate_stability_diagram.py
           make test_symmetry_event_registry_sync.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/symmetry_event_registry_sync"
           ./"$BUILD_DIR"/symmetry_event_registry_sync/test_symmetry_event_registry_sync.bin
 
