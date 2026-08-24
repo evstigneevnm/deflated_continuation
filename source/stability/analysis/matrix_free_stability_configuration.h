@@ -18,6 +18,7 @@
 #include "matrix_free_stability_config.h"
 #include "recycled_ritz_subspace.h"
 #include "spectrum_scan_aggregator.h"
+#include <stability/tracking/tracked_invariant_subspace.h>
 
 namespace stability
 {
@@ -239,6 +240,38 @@ void validate_matrix_free_stability_config(
     {
         throw std::invalid_argument(
             "invalid matrix-free Ritz-subspace recycling "
+            "configuration");
+    }
+
+    const auto& tracking = config.invariant_subspace_tracking;
+    if(
+        tracking.maximum_dimension == 0 ||
+        tracking.maximum_seed_vectors == 0 ||
+        tracking.maximum_seed_vectors > tracking.maximum_dimension ||
+        tracking.coverage_recovery_maximum_seed_vectors >
+            tracking.maximum_dimension ||
+        tracking.orthogonalization_passes == 0 ||
+        !finite(tracking.seed_innovation_weight) ||
+        !(tracking.seed_innovation_weight > Real{}) ||
+        !(tracking.seed_innovation_weight <= Real(1)) ||
+        !finite(tracking.dependence_tolerance) ||
+        !(tracking.dependence_tolerance > Real{}) ||
+        !finite(tracking.minimum_retained_residual_ratio) ||
+        !(tracking.minimum_retained_residual_ratio > Real{}) ||
+        !(tracking.minimum_retained_residual_ratio < Real(1)) ||
+        !finite(tracking.absolute_invariance_tolerance) ||
+        tracking.absolute_invariance_tolerance < Real{} ||
+        !finite(tracking.relative_invariance_tolerance) ||
+        tracking.relative_invariance_tolerance < Real{} ||
+        !finite(tracking.real_eigenvalue_tolerance) ||
+        tracking.real_eigenvalue_tolerance < Real{} ||
+        !finite(tracking.eigenvalue_group_tolerance) ||
+        !(tracking.eigenvalue_group_tolerance > Real{}) ||
+        !finite(tracking.principal_angle_rank_tolerance) ||
+        !(tracking.principal_angle_rank_tolerance > Real{}))
+    {
+        throw std::invalid_argument(
+            "invalid matrix-free invariant-subspace tracking "
             "configuration");
     }
 }
@@ -482,6 +515,39 @@ make_recycled_ritz_subspace_options(
         config.recycling.absolute_residual_tolerance;
     result.relative_residual_tolerance =
         config.recycling.relative_residual_tolerance;
+    return result;
+}
+
+template<class Real>
+tracking::tracked_invariant_subspace_options<Real>
+make_tracked_invariant_subspace_options(
+    const matrix_free_stability_config<Real>& config)
+{
+    validate_matrix_free_stability_config(config);
+    const auto& source = config.invariant_subspace_tracking;
+    tracking::tracked_invariant_subspace_options<Real> result;
+    result.enabled = source.enabled;
+    result.maximum_dimension = source.maximum_dimension;
+    result.maximum_seed_vectors = source.maximum_seed_vectors;
+    result.coverage_recovery_maximum_seed_vectors =
+        source.coverage_recovery_maximum_seed_vectors;
+    result.orthogonalization_passes =
+        source.orthogonalization_passes;
+    result.seed_innovation_weight =
+        source.seed_innovation_weight;
+    result.dependence_tolerance = source.dependence_tolerance;
+    result.minimum_retained_residual_ratio =
+        source.minimum_retained_residual_ratio;
+    result.absolute_invariance_tolerance =
+        source.absolute_invariance_tolerance;
+    result.relative_invariance_tolerance =
+        source.relative_invariance_tolerance;
+    result.real_eigenvalue_tolerance =
+        source.real_eigenvalue_tolerance;
+    result.eigenvalue_group_tolerance =
+        source.eigenvalue_group_tolerance;
+    result.principal_angle_rank_tolerance =
+        source.principal_angle_rank_tolerance;
     return result;
 }
 

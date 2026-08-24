@@ -110,6 +110,15 @@ inline bool is_terminal_endpoint(curve_endpoint_reason reason)
     return reason != curve_endpoint_reason::none;
 }
 
+inline bool is_parameter_boundary_endpoint(
+    curve_endpoint_reason reason)
+{
+    return reason == curve_endpoint_reason::boundary_min ||
+           reason == curve_endpoint_reason::boundary_max ||
+           reason == curve_endpoint_reason::boundary_min_approximate ||
+           reason == curve_endpoint_reason::boundary_max_approximate;
+}
+
 inline bool is_stability_refinement_barrier(
     curve_endpoint_reason reason)
 {

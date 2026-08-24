@@ -73,6 +73,43 @@ struct has_primary_recycling_control<
 {
 };
 
+template<class Eigensolver, class = void>
+struct has_primary_ritz_recycling_reset : std::false_type
+{
+};
+
+template<class Eigensolver>
+struct has_primary_ritz_recycling_reset<
+    Eigensolver,
+    std::void_t<decltype(
+        std::declval<const Eigensolver&>().
+            reset_recycled_ritz_subspace())>>
+    : std::true_type
+{
+};
+
+template<class Eigensolver, class Vector, class = void>
+struct has_primary_classification_reconciliation : std::false_type
+{
+};
+
+template<class Eigensolver, class Vector>
+struct has_primary_classification_reconciliation<
+    Eigensolver,
+    Vector,
+    std::void_t<
+        decltype(
+            std::declval<const Eigensolver&>().
+                classification_reconciliation_available()),
+        decltype(
+            std::declval<const Eigensolver&>().
+                execute_classification_reconciliation(
+                    std::declval<const Vector&>(),
+                    std::declval<std::size_t>()))>>
+    : std::true_type
+{
+};
+
 } // namespace detail
 
 /**
@@ -215,6 +252,41 @@ public:
         return result;
     }
 
+    bool classification_reconciliation_available() const
+    {
+        if constexpr(
+            detail::has_primary_classification_reconciliation<
+                primary_type,
+                vector_type>::value)
+        {
+            return primary_.classification_reconciliation_available();
+        }
+        return false;
+    }
+
+    result_type execute_classification_reconciliation(
+        const vector_type& initial_vector,
+        std::size_t minimum_results) const
+    {
+        if constexpr(
+            detail::has_primary_classification_reconciliation<
+                primary_type,
+                vector_type>::value)
+        {
+            return primary_.execute_classification_reconciliation(
+                initial_vector,
+                minimum_results);
+        }
+
+        result_type result;
+        result.status =
+            eigensolvers::eigensolver_status::invalid_input;
+        result.coverage_complete = false;
+        result.diagnostic =
+            "primary classification reconciliation is unavailable";
+        return result;
+    }
+
     template<
         class ProbeGenerator,
         std::enable_if_t<
@@ -268,6 +340,21 @@ public:
     void reset_recycled_subspace() const
     {
         if constexpr(
+            detail::has_primary_recycling_control<primary_type>::value)
+        {
+            primary_.reset_recycled_subspace();
+        }
+    }
+
+    void reset_recycled_ritz_subspace() const
+    {
+        if constexpr(
+            detail::has_primary_ritz_recycling_reset<
+                primary_type>::value)
+        {
+            primary_.reset_recycled_ritz_subspace();
+        }
+        else if constexpr(
             detail::has_primary_recycling_control<primary_type>::value)
         {
             primary_.reset_recycled_subspace();

@@ -1,6 +1,8 @@
 #ifndef __PRECONDITIONER_KURAMOTO_SIVASHINSKIY_2D_H__
 #define __PRECONDITIONER_KURAMOTO_SIVASHINSKIY_2D_H__
 
+#include <memory>
+
 namespace nonlinear_operators
 {
 
@@ -18,6 +20,12 @@ public:
     void set_operator(const LinearOperator* linear_operator) const
     {
         linear_operator_ = linear_operator;
+    }
+
+    void set_operator(
+        const std::shared_ptr<const LinearOperator>& linear_operator) const
+    {
+        linear_operator_ = linear_operator.get();
     }
 
     void apply(vector_type& input_output) const

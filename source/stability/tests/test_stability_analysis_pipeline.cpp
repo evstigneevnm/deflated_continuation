@@ -390,10 +390,32 @@ public:
             vector);
     }
 
+    void reset_recycled_ritz_subspace() const
+    {
+        ++ritz_reset_calls_;
+    }
+
+    void reset_recycled_subspace() const
+    {
+        ++full_reset_calls_;
+    }
+
+    std::size_t ritz_reset_calls() const
+    {
+        return ritz_reset_calls_;
+    }
+
+    std::size_t full_reset_calls() const
+    {
+        return full_reset_calls_;
+    }
+
 private:
     Problem* problem_;
     bool fail_ = false;
     probe_generator_type probe_generator_;
+    mutable std::size_t ritz_reset_calls_ = 0;
+    mutable std::size_t full_reset_calls_ = 0;
 };
 
 template<class VectorSpace, class Problem>
@@ -602,6 +624,99 @@ public:
 
 private:
     std::size_t calls_ = 0;
+};
+
+template<class VectorSpace, class Problem>
+class failed_then_recovering_confirmation_spectrum_adapter
+{
+public:
+    using real_type = typename VectorSpace::scalar_type;
+    using vector_type = typename VectorSpace::vector_type;
+    using result_type =
+        stability::eigensolvers::eigensolver_result<real_type>;
+
+    explicit failed_then_recovering_confirmation_spectrum_adapter(Problem*)
+    {
+    }
+
+    result_type execute(const vector_type&)
+    {
+        ++calls_;
+        if(calls_ == 1)
+        {
+            result_type failed;
+            failed.status =
+                stability::eigensolvers::eigensolver_status::
+                    no_convergence;
+            failed.diagnostic = "injected independent-run failure";
+            return failed;
+        }
+        return successful_spectrum({estimate({2.0, 0.0})});
+    }
+
+    std::size_t calls() const
+    {
+        return calls_;
+    }
+
+private:
+    std::size_t calls_ = 0;
+};
+
+template<class VectorSpace, class Problem>
+class reconciling_confirmation_spectrum_adapter
+{
+public:
+    using real_type = typename VectorSpace::scalar_type;
+    using vector_type = typename VectorSpace::vector_type;
+    using result_type =
+        stability::eigensolvers::eigensolver_result<real_type>;
+
+    explicit reconciling_confirmation_spectrum_adapter(Problem*)
+    {
+    }
+
+    result_type execute(const vector_type&)
+    {
+        ++calls_;
+        result_type result = successful_spectrum({
+            estimate({2.0, 0.0})
+        });
+        if(calls_ % 2 == 0)
+            result.eigenpairs.push_back(estimate({3.0, 0.0}));
+        return result;
+    }
+
+    bool classification_reconciliation_available() const
+    {
+        return true;
+    }
+
+    result_type execute_classification_reconciliation(
+        const vector_type&,
+        std::size_t) const
+    {
+        ++reconciliation_calls_;
+        return successful_spectrum({
+            estimate({2.0, 0.0}),
+            estimate({3.0, 0.0}),
+            estimate({4.0, 0.0})
+        });
+    }
+
+    std::size_t calls() const
+    {
+        return calls_;
+    }
+
+    std::size_t reconciliation_calls() const
+    {
+        return reconciliation_calls_;
+    }
+
+private:
+    std::size_t calls_ = 0;
+    mutable std::size_t reconciliation_calls_ = 0;
 };
 
 template<class VectorSpace, class Problem>
@@ -826,6 +941,47 @@ private:
 };
 
 template<class VectorSpace, class Problem>
+class off_branch_failure_spectrum_adapter
+{
+public:
+    using real_type = typename VectorSpace::scalar_type;
+    using vector_type = typename VectorSpace::vector_type;
+    using result_type =
+        stability::eigensolvers::eigensolver_result<real_type>;
+
+    explicit off_branch_failure_spectrum_adapter(Problem* problem)
+        : problem_(problem)
+    {
+    }
+
+    result_type execute(const vector_type&)
+    {
+        const real_type parameter = problem_->parameter();
+        using std::abs;
+        if(
+            abs(
+                problem_->linearization_state_value() -
+                parameter*parameter) > real_type(1.0e-10))
+        {
+            result_type failed;
+            failed.status =
+                stability::eigensolvers::eigensolver_status::
+                    no_convergence;
+            failed.diagnostic =
+                "injected off-branch eigensolver failure";
+            return failed;
+        }
+        return successful_spectrum({
+            estimate({parameter, 0.0}),
+            estimate({-5.0, 0.0})
+        });
+    }
+
+private:
+    Problem* problem_;
+};
+
+template<class VectorSpace, class Problem>
 class quadratic_branch_newton
 {
 public:
@@ -853,6 +1009,138 @@ public:
 
 private:
     VectorSpace* vector_space_;
+    std::size_t solve_calls_ = 0;
+};
+
+template<class VectorSpace, class Problem>
+class step_limited_quadratic_branch_newton
+{
+public:
+    using scalar_type = typename VectorSpace::scalar_type;
+    using vector_type = typename VectorSpace::vector_type;
+
+    step_limited_quadratic_branch_newton(
+        VectorSpace* vector_space,
+        scalar_type maximum_state_change,
+        bool alternate_representative = false)
+        : vector_space_(vector_space),
+          maximum_state_change_(maximum_state_change),
+          alternate_representative_(alternate_representative)
+    {
+    }
+
+    bool solve(Problem*, vector_type& state, scalar_type parameter)
+    {
+        scalar_type current = scalar_type{};
+        vector_space_->get(state, &current, std::size_t(1));
+        ++solve_calls_;
+        using std::abs;
+        if(
+            abs(current - parameter*parameter) >
+            maximum_state_change_)
+        {
+            ++failed_calls_;
+            return false;
+        }
+        const scalar_type representative =
+            alternate_representative_ && solve_calls_%2 == 0
+                ? scalar_type(-1)
+                : scalar_type(1);
+        vector_space_->assign_scalar(
+            representative*parameter*parameter,
+            state);
+        return true;
+    }
+
+    std::size_t solve_calls() const
+    {
+        return solve_calls_;
+    }
+
+    std::size_t failed_calls() const
+    {
+        return failed_calls_;
+    }
+
+private:
+    VectorSpace* vector_space_;
+    scalar_type maximum_state_change_;
+    bool alternate_representative_;
+    std::size_t solve_calls_ = 0;
+    std::size_t failed_calls_ = 0;
+};
+
+template<class VectorSpace, class Problem>
+class destructive_failing_newton
+{
+public:
+    using scalar_type = typename VectorSpace::scalar_type;
+    using vector_type = typename VectorSpace::vector_type;
+
+    explicit destructive_failing_newton(VectorSpace* vector_space)
+        : vector_space_(vector_space)
+    {
+    }
+
+    bool solve(Problem*, vector_type& state, scalar_type)
+    {
+        ++solve_calls_;
+        vector_space_->assign_scalar(scalar_type(123), state);
+        return false;
+    }
+
+    std::size_t solve_calls() const
+    {
+        return solve_calls_;
+    }
+
+private:
+    VectorSpace* vector_space_;
+    std::size_t solve_calls_ = 0;
+};
+
+template<class VectorSpace, class Problem>
+class guarded_quadratic_branch_newton
+{
+public:
+    using scalar_type = typename VectorSpace::scalar_type;
+    using vector_type = typename VectorSpace::vector_type;
+
+    explicit guarded_quadratic_branch_newton(
+        VectorSpace* vector_space)
+        : vector_space_(vector_space)
+    {
+    }
+
+    bool solve(Problem*, vector_type& state, scalar_type parameter)
+    {
+        scalar_type current = scalar_type{};
+        vector_space_->get(state, &current, std::size_t(1));
+        ++solve_calls_;
+        if(current == scalar_type(123))
+        {
+            saw_primary_mutation_ = true;
+            return false;
+        }
+        vector_space_->assign_scalar(
+            parameter*parameter,
+            state);
+        return true;
+    }
+
+    bool saw_primary_mutation() const
+    {
+        return saw_primary_mutation_;
+    }
+
+    std::size_t solve_calls() const
+    {
+        return solve_calls_;
+    }
+
+private:
+    VectorSpace* vector_space_;
+    bool saw_primary_mutation_ = false;
     std::size_t solve_calls_ = 0;
 };
 
@@ -1119,6 +1407,11 @@ void test_evaluator_and_refiner(const std::string& label)
     require(
         transition.succeeded(),
         label + " transition refinement succeeds");
+    require(
+        adapter.ritz_reset_calls() > 0 &&
+            adapter.full_reset_calls() == 0,
+        label +
+            " transition refinement preserves tracked subspace state");
     require(
         std::abs(transition.parameter) <= 1.0e-6,
         label + " transition parameter");
@@ -1397,6 +1690,11 @@ void test_classification_confirmation_consensus(
         result.diagnostic.find("inconsistent") != std::string::npos,
         label + " inconsistent confirmation diagnostic");
     require(
+        result.observed_unstable_dimensions.size() == 2 &&
+            result.observed_unstable_dimensions[0].occurrences == 1 &&
+            result.observed_unstable_dimensions[1].occurrences == 1,
+        label + " inconsistent confirmation preserves alternatives");
+    require(
         adapter.calls() == 2,
         label + " confirmation uses independent eigensolver runs");
 
@@ -1457,6 +1755,148 @@ void test_classification_confirmation_retry_consensus(
         result.diagnostic.find("consensus recovered") !=
             std::string::npos,
         label + " confirmation retry diagnostic");
+    require(
+        result.observed_unstable_dimensions.size() == 2,
+        label + " recovered consensus preserves observed alternatives");
+
+    vector_space.stop_use_vector(state);
+    vector_space.free_vector(state);
+}
+
+template<class Backend>
+void test_classification_confirmation_reconciliation(
+    const std::string& label)
+{
+    using vector_space_type =
+        scfd_vector_operations<Backend, double>;
+    using vector_type = typename vector_space_type::vector_type;
+    using problem_type = parameterized_problem<vector_space_type>;
+    using adapter_type =
+        reconciling_confirmation_spectrum_adapter<
+            vector_space_type,
+            problem_type>;
+    using classifier_type =
+        stability::analysis::spectrum_classifier<double>;
+    using initial_policy_type =
+        stability::analysis::nonlinear_operator_random_initial_vector<
+            problem_type>;
+    using evaluator_type =
+        stability::analysis::stability_evaluator<
+            vector_space_type,
+            problem_type,
+            adapter_type,
+            classifier_type,
+            initial_policy_type>;
+
+    vector_space_type vector_space(4);
+    problem_type problem(&vector_space);
+    adapter_type adapter(&problem);
+    evaluator_type evaluator(
+        &vector_space,
+        &problem,
+        &adapter,
+        classifier_type{},
+        initial_policy_type(&problem));
+    evaluator.set_classification_confirmation_count(2);
+
+    vector_type state;
+    vector_space.init_vector(state);
+    vector_space.start_use_vector(state);
+    vector_space.assign_scalar(0.0, state);
+
+    const auto result = evaluator.analyze_confirmed(state, 0.5);
+    require(
+        result.succeeded() &&
+            result.unstable.real == 3 &&
+            result.classification_attempts == 3,
+        label +
+            " reconciliation authoritatively accepts a validated "
+            "superset that differs from every incomplete run");
+    require(
+        adapter.calls() == 2 && adapter.reconciliation_calls() == 1,
+        label + " disagreement triggers exactly one reconciliation pass");
+    require(
+        result.diagnostic.find(
+            "authoritative validated-spectrum reconciliation") !=
+            std::string::npos,
+        label + " reconciliation is reported in the diagnostic");
+    require(
+        result.observed_unstable_dimensions.size() == 3 &&
+            result.observed_unstable_dimensions.back().signature.real == 3 &&
+            result.observed_unstable_dimensions.back().occurrences == 1,
+        label + " reconciliation preserves the alternative signatures");
+
+    vector_space.stop_use_vector(state);
+    vector_space.free_vector(state);
+}
+
+template<class Backend>
+void test_failed_classification_confirmation_retry(
+    const std::string& label)
+{
+    using vector_space_type =
+        scfd_vector_operations<Backend, double>;
+    using vector_type = typename vector_space_type::vector_type;
+    using problem_type = parameterized_problem<vector_space_type>;
+    using adapter_type =
+        failed_then_recovering_confirmation_spectrum_adapter<
+            vector_space_type,
+            problem_type>;
+    using classifier_type =
+        stability::analysis::spectrum_classifier<double>;
+    using initial_policy_type =
+        stability::analysis::nonlinear_operator_random_initial_vector<
+            problem_type>;
+    using evaluator_type =
+        stability::analysis::stability_evaluator<
+            vector_space_type,
+            problem_type,
+            adapter_type,
+            classifier_type,
+            initial_policy_type>;
+
+    vector_space_type vector_space(4);
+    problem_type problem(&vector_space);
+    adapter_type adapter(&problem);
+    evaluator_type evaluator(
+        &vector_space,
+        &problem,
+        &adapter,
+        classifier_type{},
+        initial_policy_type(&problem));
+    evaluator.set_classification_confirmation_count(2);
+    evaluator.set_classification_retry_count(1);
+
+    vector_type state;
+    vector_space.init_vector(state);
+    vector_space.start_use_vector(state);
+    vector_space.assign_scalar(0.0, state);
+
+    const auto result = evaluator.analyze_confirmed(state, 0.5);
+    require(
+        result.succeeded() && result.unstable.real == 1,
+        label +
+            " confirmation retry recovers after an independent solver "
+            "failure");
+    require(
+        result.classification_attempts == 3 && adapter.calls() == 3,
+        label + " failed confirmation consumes exactly one retry");
+    require(
+        result.diagnostic.find("after 1 failed run") !=
+            std::string::npos,
+        label + " recovered confirmation reports the failed run");
+    require(
+        result.diagnostic.find("run[0]") != std::string::npos &&
+            result.diagnostic.find(
+                "injected independent-run failure") !=
+                std::string::npos,
+        label +
+            " recovered confirmation preserves bounded failed-run "
+            "diagnostics");
+    require(
+        result.observed_unstable_dimensions.size() == 1 &&
+            result.observed_unstable_dimensions.front().occurrences == 2,
+        label + " consensus counts successful classifications only");
 
     vector_space.stop_use_vector(state);
     vector_space.free_vector(state);
@@ -1526,6 +1966,24 @@ void test_recycling_transaction(const std::string& label)
             adapter.commit_calls() == 2 &&
             adapter.rollback_calls() == 1,
         label + " independent confirmations share one recycle transaction");
+
+    adapter.fail(true);
+    evaluator.set_classification_retry_count(1);
+    const std::size_t failed_executions_before = adapter.execute_calls();
+    const auto failed_confirmation =
+        evaluator.analyze_confirmed(state, 0.0);
+    require(
+        !failed_confirmation.succeeded() &&
+            adapter.execute_calls() - failed_executions_before == 3 &&
+            adapter.begin_calls() == 4 &&
+            adapter.commit_calls() == 2 &&
+            adapter.rollback_calls() == 2,
+        label +
+            " exhausted failed confirmations roll back one transaction");
+    require(
+        failed_confirmation.diagnostic.find("failed in 3") !=
+            std::string::npos,
+        label + " exhausted confirmation reports every failed run");
 
     vector_space.stop_use_vector(state);
     vector_space.free_vector(state);
@@ -1638,6 +2096,412 @@ void test_unexpected_secant_signature_recovery(
             transition.parameter*transition.parameter) <=
             1.0e-12,
         label + " recovered state lies on the nonlinear branch");
+
+    vector_space.stop_use_vector(refined);
+    vector_space.stop_use_vector(upper);
+    vector_space.stop_use_vector(lower);
+    vector_space.free_vector(refined);
+    vector_space.free_vector(upper);
+    vector_space.free_vector(lower);
+}
+
+template<class Backend>
+void test_failed_secant_classification_recovery(
+    const std::string& label)
+{
+    using vector_space_type =
+        scfd_vector_operations<Backend, double>;
+    using vector_type = typename vector_space_type::vector_type;
+    using problem_type = parameterized_problem<vector_space_type>;
+    using adapter_type =
+        off_branch_failure_spectrum_adapter<
+            vector_space_type,
+            problem_type>;
+    using classifier_type =
+        stability::analysis::spectrum_classifier<double>;
+    using initial_policy_type =
+        stability::analysis::nonlinear_operator_random_initial_vector<
+            problem_type>;
+    using evaluator_type =
+        stability::analysis::stability_evaluator<
+            vector_space_type,
+            problem_type,
+            adapter_type,
+            classifier_type,
+            initial_policy_type>;
+    using newton_type =
+        quadratic_branch_newton<
+            vector_space_type,
+            problem_type>;
+    using refiner_type =
+        stability::analysis::stability_transition_refiner<
+            vector_space_type,
+            problem_type,
+            newton_type,
+            evaluator_type>;
+
+    vector_space_type vector_space(4);
+    problem_type problem(&vector_space);
+    adapter_type adapter(&problem);
+    evaluator_type evaluator(
+        &vector_space,
+        &problem,
+        &adapter,
+        classifier_type{},
+        initial_policy_type(&problem));
+    newton_type newton(&vector_space);
+    refiner_type refiner(
+        &vector_space,
+        &problem,
+        &newton,
+        &evaluator);
+
+    vector_type lower;
+    vector_type upper;
+    vector_type refined;
+    vector_space.init_vector(lower);
+    vector_space.init_vector(upper);
+    vector_space.init_vector(refined);
+    vector_space.start_use_vector(lower);
+    vector_space.start_use_vector(upper);
+    vector_space.start_use_vector(refined);
+    vector_space.assign_scalar(1.0, lower);
+    vector_space.assign_scalar(1.0, upper);
+
+    const auto lower_stability =
+        evaluator.analyze(lower, -1.0);
+    const auto upper_stability =
+        evaluator.analyze(upper, 1.0);
+    typename refiner_type::options_type options;
+    options.maximum_iterations = 24;
+    options.parameter_tolerance = 1.0e-6;
+    options.correct_with_fixed_parameter_newton = false;
+    const auto transition = refiner.refine(
+        lower,
+        -1.0,
+        lower_stability,
+        upper,
+        1.0,
+        upper_stability,
+        refined,
+        options);
+
+    require(
+        transition.succeeded(),
+        label +
+            " failed secant classification is recovered with Newton: " +
+            transition.diagnostic);
+    require(
+        transition.consistency_restarts > 0 &&
+            transition.consistency_restarts <= transition.iterations &&
+            newton.solve_calls() == transition.consistency_restarts,
+        label +
+            " failed secant classification corrects every off-branch "
+            "midpoint: restarts=" +
+            std::to_string(transition.consistency_restarts) +
+            ", iterations=" +
+            std::to_string(transition.iterations) +
+            ", Newton calls=" +
+            std::to_string(newton.solve_calls()));
+    require(
+        std::abs(transition.parameter) <= 1.0e-6,
+        label + " recovered failed-classification transition parameter");
+    std::vector<double> refined_host(4);
+    vector_space.get(
+        refined,
+        refined_host.data(),
+        refined_host.size());
+    require(
+        std::abs(
+            refined_host.front() -
+            transition.parameter*transition.parameter) <=
+                1.0e-9,
+        label +
+            " recovered failed-classification state lies on the branch: " +
+            std::to_string(refined_host.front()) + " vs " +
+            std::to_string(
+                transition.parameter*transition.parameter));
+
+    const std::size_t solve_calls_before_disabled_recovery =
+        newton.solve_calls();
+    options.
+        recover_failed_classification_with_fixed_parameter_newton =
+            false;
+    const auto unrecovered = refiner.refine(
+        lower,
+        -1.0,
+        lower_stability,
+        upper,
+        1.0,
+        upper_stability,
+        refined,
+        options);
+    require(
+        unrecovered.status ==
+                stability::analysis::stability_transition_status::
+                    stability_solver_failure &&
+            newton.solve_calls() ==
+                solve_calls_before_disabled_recovery,
+        label +
+            " disabled failed-classification recovery preserves the "
+            "secant failure");
+
+    vector_space.stop_use_vector(refined);
+    vector_space.stop_use_vector(upper);
+    vector_space.stop_use_vector(lower);
+    vector_space.free_vector(refined);
+    vector_space.free_vector(upper);
+    vector_space.free_vector(lower);
+}
+
+template<class Backend>
+void test_failed_transition_newton_homotopy_recovery(
+    const std::string& label)
+{
+    using vector_space_type =
+        scfd_vector_operations<Backend, double>;
+    using vector_type = typename vector_space_type::vector_type;
+    using problem_type = parameterized_problem<vector_space_type>;
+    using adapter_type =
+        curved_branch_artifact_spectrum_adapter<
+            vector_space_type,
+            problem_type>;
+    using classifier_type =
+        stability::analysis::spectrum_classifier<double>;
+    using initial_policy_type =
+        stability::analysis::nonlinear_operator_random_initial_vector<
+            problem_type>;
+    using evaluator_type =
+        stability::analysis::stability_evaluator<
+            vector_space_type,
+            problem_type,
+            adapter_type,
+            classifier_type,
+            initial_policy_type>;
+    using newton_type =
+        step_limited_quadratic_branch_newton<
+            vector_space_type,
+            problem_type>;
+    using refiner_type =
+        stability::analysis::stability_transition_refiner<
+            vector_space_type,
+            problem_type,
+            newton_type,
+            evaluator_type>;
+
+    vector_space_type vector_space(4);
+    problem_type problem(&vector_space);
+    adapter_type adapter(&problem);
+    evaluator_type evaluator(
+        &vector_space,
+        &problem,
+        &adapter,
+        classifier_type{},
+        initial_policy_type(&problem));
+    newton_type newton(&vector_space, 0.3, true);
+    refiner_type refiner(
+        &vector_space,
+        &problem,
+        &newton,
+        &evaluator);
+    sign_quotient_aligner<vector_space_type> aligner(&vector_space);
+    refiner.set_transition_state_aligner(&aligner);
+
+    vector_type lower;
+    vector_type upper;
+    vector_type refined;
+    vector_space.init_vector(lower);
+    vector_space.init_vector(upper);
+    vector_space.init_vector(refined);
+    vector_space.start_use_vector(lower);
+    vector_space.start_use_vector(upper);
+    vector_space.start_use_vector(refined);
+    vector_space.assign_scalar(1.0, lower);
+    vector_space.assign_scalar(1.0, upper);
+
+    const auto lower_stability = evaluator.analyze(lower, -1.0);
+    const auto upper_stability = evaluator.analyze(upper, 1.0);
+    typename refiner_type::options_type options;
+    options.maximum_iterations = 24;
+    options.parameter_tolerance = 1.0e-6;
+    options.correct_with_fixed_parameter_newton = false;
+    options.recover_failed_newton_with_parameter_homotopy = true;
+    options.parameter_homotopy_maximum_subdivisions = 16;
+    const auto transition = refiner.refine(
+        lower,
+        -1.0,
+        lower_stability,
+        upper,
+        1.0,
+        upper_stability,
+        refined,
+        options);
+
+    require(
+        transition.succeeded(),
+        label +
+            " parameter homotopy recovers failed transition Newton: " +
+            transition.diagnostic);
+    require(
+        transition.parameter_homotopy_recoveries >= 1 &&
+            transition.parameter_homotopy_steps >= 8 &&
+            newton.failed_calls() >= 1,
+        label +
+            " transition records adaptive parameter-homotopy recovery");
+    require(
+        std::abs(transition.parameter) <= 1.0e-6,
+        label + " homotopy-recovered transition parameter");
+    std::vector<double> refined_host(4);
+    vector_space.get(
+        refined,
+        refined_host.data(),
+        refined_host.size());
+    require(
+        std::abs(
+            refined_host.front() -
+            transition.parameter*transition.parameter) <= 1.0e-9,
+        label + " homotopy-recovered state lies on the branch");
+
+    options.recover_failed_newton_with_parameter_homotopy = false;
+    const auto unrecovered = refiner.refine(
+        lower,
+        -1.0,
+        lower_stability,
+        upper,
+        1.0,
+        upper_stability,
+        refined,
+        options);
+    require(
+        unrecovered.status ==
+            stability::analysis::stability_transition_status::
+                nonlinear_solver_failure,
+        label + " disabled homotopy preserves transition Newton failure");
+
+    vector_space.stop_use_vector(refined);
+    vector_space.stop_use_vector(upper);
+    vector_space.stop_use_vector(lower);
+    vector_space.free_vector(refined);
+    vector_space.free_vector(upper);
+    vector_space.free_vector(lower);
+}
+
+template<class Backend>
+void test_transition_fallback_newton(
+    const std::string& label)
+{
+    using vector_space_type =
+        scfd_vector_operations<Backend, double>;
+    using vector_type = typename vector_space_type::vector_type;
+    using problem_type = parameterized_problem<vector_space_type>;
+    using adapter_type =
+        curved_branch_artifact_spectrum_adapter<
+            vector_space_type,
+            problem_type>;
+    using classifier_type =
+        stability::analysis::spectrum_classifier<double>;
+    using initial_policy_type =
+        stability::analysis::nonlinear_operator_random_initial_vector<
+            problem_type>;
+    using evaluator_type =
+        stability::analysis::stability_evaluator<
+            vector_space_type,
+            problem_type,
+            adapter_type,
+            classifier_type,
+            initial_policy_type>;
+    using primary_newton_type = destructive_failing_newton<
+        vector_space_type,
+        problem_type>;
+    using fallback_newton_type = guarded_quadratic_branch_newton<
+        vector_space_type,
+        problem_type>;
+    using refiner_type =
+        stability::analysis::stability_transition_refiner<
+            vector_space_type,
+            problem_type,
+            primary_newton_type,
+            evaluator_type>;
+
+    vector_space_type vector_space(4);
+    problem_type problem(&vector_space);
+    adapter_type adapter(&problem);
+    evaluator_type evaluator(
+        &vector_space,
+        &problem,
+        &adapter,
+        classifier_type{},
+        initial_policy_type(&problem));
+    primary_newton_type primary_newton(&vector_space);
+    fallback_newton_type fallback_newton(&vector_space);
+    refiner_type refiner(
+        &vector_space,
+        &problem,
+        &primary_newton,
+        &evaluator);
+    refiner.set_fallback_newton(&fallback_newton);
+
+    vector_type lower;
+    vector_type upper;
+    vector_type refined;
+    vector_space.init_vector(lower);
+    vector_space.init_vector(upper);
+    vector_space.init_vector(refined);
+    vector_space.start_use_vector(lower);
+    vector_space.start_use_vector(upper);
+    vector_space.start_use_vector(refined);
+    vector_space.assign_scalar(1.0, lower);
+    vector_space.assign_scalar(1.0, upper);
+
+    vector_space.assign_scalar(1.0, refined);
+    const auto direct = refiner.correct_fixed_parameter_state(
+        refined,
+        0.5);
+    std::vector<double> refined_host(4);
+    vector_space.get(
+        refined,
+        refined_host.data(),
+        refined_host.size());
+    require(
+        direct.succeeded && direct.used_fallback &&
+            std::abs(refined_host.front() - 0.25) <= 1.0e-12,
+        label + " fallback Newton recovers a fixed-parameter state");
+    require(
+        !fallback_newton.saw_primary_mutation(),
+        label + " fallback Newton receives the original state");
+
+    const auto lower_stability = evaluator.analyze(lower, -1.0);
+    const auto upper_stability = evaluator.analyze(upper, 1.0);
+    typename refiner_type::options_type options;
+    options.maximum_iterations = 24;
+    options.parameter_tolerance = 1.0e-6;
+    options.correct_with_fixed_parameter_newton = true;
+    const auto transition = refiner.refine(
+        lower,
+        -1.0,
+        lower_stability,
+        upper,
+        1.0,
+        upper_stability,
+        refined,
+        options);
+    require(
+        transition.succeeded() &&
+            transition.fallback_newton_recoveries >= 1,
+        label + " transition records fallback-Newton recovery: " +
+            transition.diagnostic);
+    require(
+        !fallback_newton.saw_primary_mutation(),
+        label + " transition fallback remains transactional");
+
+    refiner.reset_fallback_newton();
+    vector_space.assign_scalar(1.0, refined);
+    const auto without_fallback =
+        refiner.correct_fixed_parameter_state(refined, 0.5);
+    require(
+        !without_fallback.succeeded &&
+            !without_fallback.used_fallback,
+        label + " disabled fallback preserves primary failure");
 
     vector_space.stop_use_vector(refined);
     vector_space.stop_use_vector(upper);
@@ -2217,6 +3081,14 @@ int main()
         scfd::backend::serial_cpu>("serial");
     test_classification_confirmation_retry_consensus<
         scfd::backend::omp>("OMP");
+    test_classification_confirmation_reconciliation<
+        scfd::backend::serial_cpu>("serial");
+    test_classification_confirmation_reconciliation<
+        scfd::backend::omp>("OMP");
+    test_failed_classification_confirmation_retry<
+        scfd::backend::serial_cpu>("serial");
+    test_failed_classification_confirmation_retry<
+        scfd::backend::omp>("OMP");
     test_recycling_transaction<scfd::backend::serial_cpu>("serial");
     test_recycling_transaction<scfd::backend::omp>("OMP");
     test_multiple_transition_sequence<scfd::backend::serial_cpu>(
@@ -2229,6 +3101,18 @@ int main()
     test_unexpected_secant_signature_recovery<
         scfd::backend::serial_cpu>("serial");
     test_unexpected_secant_signature_recovery<
+        scfd::backend::omp>("OMP");
+    test_failed_secant_classification_recovery<
+        scfd::backend::serial_cpu>("serial");
+    test_failed_secant_classification_recovery<
+        scfd::backend::omp>("OMP");
+    test_failed_transition_newton_homotopy_recovery<
+        scfd::backend::serial_cpu>("serial");
+    test_failed_transition_newton_homotopy_recovery<
+        scfd::backend::omp>("OMP");
+    test_transition_fallback_newton<
+        scfd::backend::serial_cpu>("serial");
+    test_transition_fallback_newton<
         scfd::backend::omp>("OMP");
     test_coalescence_before_hopf_refinement<
         scfd::backend::serial_cpu>("serial");

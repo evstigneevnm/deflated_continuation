@@ -182,6 +182,16 @@ void verify_full_configuration(const std::string& file_name)
         "regular stability confirmation default");
     require(
         parameters.stability_continuation.
+            recover_failed_transition_classification_with_newton,
+        "failed transition classification Newton recovery default");
+    require(
+        parameters.stability_continuation.
+            recover_failed_transition_newton_with_parameter_homotopy &&
+        parameters.stability_continuation.
+            transition_newton_homotopy_maximum_subdivisions == 64,
+        "failed transition Newton homotopy defaults");
+    require(
+        parameters.stability_continuation.
             transition_refinement_maximum_iterations == 20,
         "transition refinement maximum iterations");
     require(
@@ -196,8 +206,25 @@ void verify_full_configuration(const std::string& file_name)
         "transition refinement parameter tolerance");
     require(
         parameters.stability_continuation.
+            turning_point_guard_source_points == 2,
+        "turning-point source guard default");
+    require(
+        !parameters.stability_continuation.
+            allow_source_path_topology_splits,
+        "source-path topology splitting remains opt-in");
+    require(
+        parameters.stability_continuation.
             symmetry_endpoint_guard_source_points == 50,
         "symmetry endpoint source-point guard");
+    require(
+        parameters.stability_continuation.
+            classification_uncertainty_registry.enabled,
+        "classification uncertainty registry default enabled");
+    require(
+        parameters.stability_continuation.
+            classification_uncertainty_registry.file_name ==
+                "stability_uncertainty_registry.json",
+        "classification uncertainty registry default file");
 }
 
 template<class T>
@@ -216,10 +243,18 @@ void verify_optional_policy_defaults(const std::string& file_name)
     continuation_json.erase("boundary_refinement_policy");
     auto& stability_json = json.at("stability_continuation");
     stability_json.erase("correct_stability_transitions_with_newton");
+    stability_json.erase(
+        "recover_failed_transition_classification_with_newton");
+    stability_json.erase(
+        "recover_failed_transition_newton_with_parameter_homotopy");
+    stability_json.erase(
+        "transition_newton_homotopy_maximum_subdivisions");
     stability_json.erase("transition_refinement_maximum_iterations");
     stability_json.erase("transition_refinement_parameter_tolerance");
     stability_json.erase("transition_classification_confirmations");
+    stability_json.erase("turning_point_guard_source_points");
     stability_json.erase("symmetry_endpoint_guard_source_points");
+    stability_json.erase("classification_uncertainty_registry");
 
     const auto parameters = json.get<main_classes::parameters<T>>();
     const auto& continuation = parameters.deflation_continuation;
@@ -265,6 +300,15 @@ void verify_optional_policy_defaults(const std::string& file_name)
         !stability.correct_stability_transitions_with_newton,
         "secant stability transition refinement default");
     require(
+        stability.
+            recover_failed_transition_classification_with_newton,
+        "failed transition classification Newton recovery default");
+    require(
+        stability.
+            recover_failed_transition_newton_with_parameter_homotopy &&
+        stability.transition_newton_homotopy_maximum_subdivisions == 64,
+        "failed transition Newton homotopy defaults");
+    require(
         stability.transition_refinement_maximum_iterations == 20,
         "transition refinement maximum iterations default");
     require(
@@ -276,6 +320,12 @@ void verify_optional_policy_defaults(const std::string& file_name)
             T(0)),
         "transition refinement parameter tolerance default");
     require(
+        stability.turning_point_guard_source_points == 2,
+        "turning-point source guard default");
+    require(
+        !stability.allow_source_path_topology_splits,
+        "source-path topology split default");
+    require(
         stability.symmetry_endpoint_guard_source_points == 0,
         "symmetry endpoint source-point guard default");
     require(
@@ -284,6 +334,13 @@ void verify_optional_policy_defaults(const std::string& file_name)
     require(
         stability.transition_classification_confirmations == 2,
         "transition classification confirmation default");
+    require(
+        stability.classification_uncertainty_registry.enabled &&
+            stability.classification_uncertainty_registry.
+                maximum_diagnostic_length == 16384 &&
+            stability.classification_uncertainty_registry.
+                retain_resolved,
+        "classification uncertainty registry defaults");
 }
 
 template<class T>
@@ -302,11 +359,27 @@ void verify_stability_classifier_overrides(const std::string& file_name)
     stability_json["confirm_regular_stability_points"] = true;
     stability_json["correct_stability_transitions_with_newton"] =
         false;
+    stability_json[
+        "recover_failed_transition_classification_with_newton"] =
+            false;
+    stability_json[
+        "recover_failed_transition_newton_with_parameter_homotopy"] =
+            false;
+    stability_json[
+        "transition_newton_homotopy_maximum_subdivisions"] = 32;
     stability_json["transition_refinement_maximum_iterations"] = 37;
     stability_json["transition_refinement_maximum_subdivisions"] = 6;
     stability_json["transition_refinement_parameter_tolerance"] =
         7.5e-9;
+    stability_json["turning_point_guard_source_points"] = 7;
+    stability_json["allow_source_path_topology_splits"] = true;
     stability_json["symmetry_endpoint_guard_source_points"] = 31;
+    stability_json["classification_uncertainty_registry"] = {
+        {"enabled", true},
+        {"file_name", "custom_uncertainties.json"},
+        {"maximum_diagnostic_length", 2048},
+        {"retain_resolved", false}
+    };
 
     const auto parameters =
         json.get<main_classes::parameters<T>>();
@@ -348,6 +421,15 @@ void verify_stability_classifier_overrides(const std::string& file_name)
         !stability.correct_stability_transitions_with_newton,
         "stability transition refinement override");
     require(
+        !stability.
+            recover_failed_transition_classification_with_newton,
+        "failed transition classification Newton recovery override");
+    require(
+        !stability.
+             recover_failed_transition_newton_with_parameter_homotopy &&
+        stability.transition_newton_homotopy_maximum_subdivisions == 32,
+        "failed transition Newton homotopy overrides");
+    require(
         stability.transition_refinement_maximum_iterations == 37,
         "stability transition maximum iterations override");
     require(
@@ -359,8 +441,23 @@ void verify_stability_classifier_overrides(const std::string& file_name)
             T(7.5e-9)),
         "stability transition parameter tolerance override");
     require(
+        stability.turning_point_guard_source_points == 7,
+        "turning-point source guard override");
+    require(
+        stability.allow_source_path_topology_splits,
+        "source-path topology split override");
+    require(
         stability.symmetry_endpoint_guard_source_points == 31,
         "symmetry endpoint source-point guard override");
+    require(
+        stability.classification_uncertainty_registry.enabled &&
+            stability.classification_uncertainty_registry.file_name ==
+                "custom_uncertainties.json" &&
+            stability.classification_uncertainty_registry.
+                maximum_diagnostic_length == 2048 &&
+            !stability.classification_uncertainty_registry.
+                retain_resolved,
+        "classification uncertainty registry overrides");
 }
 
 template<class T>
@@ -431,6 +528,21 @@ void verify_matrix_free_stability_configuration(
             {"innovation_weight", 0.2},
             {"absolute_residual_tolerance", 3.0e-8},
             {"relative_residual_tolerance", 0.15}
+        }},
+        {"invariant_subspace_tracking", {
+            {"enabled", true},
+            {"maximum_dimension", 23},
+            {"maximum_seed_vectors", 7},
+            {"coverage_recovery_maximum_seed_vectors", 19},
+            {"orthogonalization_passes", 3},
+            {"seed_innovation_weight", 0.125},
+            {"dependence_tolerance", 2.0e-7},
+            {"minimum_retained_residual_ratio", 0.04},
+            {"absolute_invariance_tolerance", 4.0e-8},
+            {"relative_invariance_tolerance", 0.075},
+            {"real_eigenvalue_tolerance", 5.0e-8},
+            {"eigenvalue_group_tolerance", 8.0e-7},
+            {"principal_angle_rank_tolerance", 6.0e-7}
         }},
         {"small_system", {
             {"enabled", true},
@@ -565,6 +677,44 @@ void verify_matrix_free_stability_configuration(
                 config.recycling.relative_residual_tolerance,
                 T(0.15)),
         "matrix-free Ritz-subspace recycling");
+    require(
+        config.invariant_subspace_tracking.enabled &&
+            config.invariant_subspace_tracking.maximum_dimension == 23 &&
+            config.invariant_subspace_tracking.maximum_seed_vectors == 7 &&
+            config.invariant_subspace_tracking.
+                coverage_recovery_maximum_seed_vectors == 19 &&
+            config.invariant_subspace_tracking.orthogonalization_passes == 3 &&
+            close_value(
+                config.invariant_subspace_tracking.seed_innovation_weight,
+                T(0.125)) &&
+            close_value(
+                config.invariant_subspace_tracking.dependence_tolerance,
+                T(2.0e-7)) &&
+            close_value(
+                config.invariant_subspace_tracking.
+                    minimum_retained_residual_ratio,
+                T(0.04)) &&
+            close_value(
+                config.invariant_subspace_tracking.
+                    absolute_invariance_tolerance,
+                T(4.0e-8)) &&
+            close_value(
+                config.invariant_subspace_tracking.
+                    relative_invariance_tolerance,
+                T(0.075)) &&
+            close_value(
+                config.invariant_subspace_tracking.
+                    real_eigenvalue_tolerance,
+                T(5.0e-8)) &&
+            close_value(
+                config.invariant_subspace_tracking.
+                    eigenvalue_group_tolerance,
+                T(8.0e-7)) &&
+            close_value(
+                config.invariant_subspace_tracking.
+                    principal_angle_rank_tolerance,
+                T(6.0e-7)),
+        "matrix-free invariant-subspace tracking");
 }
 
 }

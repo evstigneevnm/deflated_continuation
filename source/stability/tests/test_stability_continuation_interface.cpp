@@ -285,9 +285,16 @@ int main()
         (
             "deflated_continuation_stability_interface_" +
             std::to_string(unique_id));
+    const std::filesystem::path relocated_fixture_directory =
+        fixture_directory.parent_path() /
+        (fixture_directory.filename().string() + "_relocated");
     std::error_code filesystem_error;
     std::filesystem::remove_all(
         fixture_directory,
+        filesystem_error);
+    filesystem_error.clear();
+    std::filesystem::remove_all(
+        relocated_fixture_directory,
         filesystem_error);
     filesystem_error.clear();
     std::filesystem::create_directories(
@@ -422,6 +429,99 @@ int main()
             bifurcation_save.succeeded(),
             "two-curve bifurcation fixture was not saved");
 
+        filesystem_error.clear();
+        std::filesystem::copy(
+            fixture_directory,
+            relocated_fixture_directory,
+            std::filesystem::copy_options::recursive,
+            filesystem_error);
+        require(
+            !filesystem_error,
+            "failed to copy the bifurcation archive relocation fixture");
+
+        const std::filesystem::path original_vector =
+            fixture_directory / "0" / "1";
+        const std::filesystem::path parked_original_vector =
+            fixture_directory / "0" / "1.original-location";
+        filesystem_error.clear();
+        std::filesystem::rename(
+            original_vector,
+            parked_original_vector,
+            filesystem_error);
+        require(
+            !filesystem_error,
+            "failed to hide the vector at the archive's original path");
+
+        try
+        {
+            bifurcation_diagram_type relocated_diagram(
+                &vector_operations,
+                &file_operations,
+                &log,
+                &nonlinear_operator,
+                &fixture_newton,
+                relocated_fixture_directory.string(),
+                1);
+            const auto relocation_load =
+                container::load_diagram_archive(
+                    (
+                        relocated_fixture_directory /
+                        parameters.bifurcaiton_diagram_file_name).string(),
+                    relocated_diagram);
+            require(
+                relocation_load.succeeded(),
+                "relocated bifurcation archive was not readable");
+
+            vector_operations.init_vector(state);
+            vector_operations.start_use_vector(state);
+            int relocated_curve = 0;
+            int relocated_point = 0;
+            real_type relocated_parameter = real_type(0);
+            const auto relocated_read =
+                relocated_diagram.get_solutoin_from_curve(
+                    relocated_curve,
+                    relocated_point,
+                    relocated_parameter,
+                    state);
+            require(
+                relocated_read.first && relocated_read.second,
+                "relocated archive did not resolve its saved vector");
+            require(
+                std::abs(relocated_parameter + real_type(0.8)) <
+                    real_type(1.0e-14) &&
+                    std::abs(
+                        vector_operations.norm_l2(state) -
+                        real_type(0.6)) < real_type(1.0e-14),
+                "relocated archive loaded the wrong saved state");
+            vector_operations.stop_use_vector(state);
+            vector_operations.free_vector(state);
+        }
+        catch(...)
+        {
+            std::error_code ignored;
+            std::filesystem::rename(
+                parked_original_vector,
+                original_vector,
+                ignored);
+            throw;
+        }
+
+        filesystem_error.clear();
+        std::filesystem::rename(
+            parked_original_vector,
+            original_vector,
+            filesystem_error);
+        require(
+            !filesystem_error,
+            "failed to restore the original relocation test vector");
+        filesystem_error.clear();
+        std::filesystem::remove_all(
+            relocated_fixture_directory,
+            filesystem_error);
+        require(
+            !filesystem_error,
+            "failed to remove the archive relocation fixture");
+
         adapter_type failing_adapter(2);
         bool injected_failure_observed = false;
         {
@@ -495,6 +595,26 @@ int main()
             !contains_temporary_file(fixture_directory),
             "interrupted traversal left temporary files");
 
+        using uncertainty_registry_type =
+            stability::persistence::
+                classification_uncertainty_registry<real_type>;
+        typename uncertainty_registry_type::options
+            uncertainty_options;
+        uncertainty_options.file_name =
+            fixture_directory /
+            parameters.stability_continuation.
+                classification_uncertainty_registry.file_name;
+        uncertainty_registry_type interrupted_uncertainties(
+            uncertainty_options);
+        require(
+            interrupted_uncertainties.unresolved_count() == 1 &&
+                interrupted_uncertainties.all().front().curve_number == 1 &&
+                interrupted_uncertainties.all().front().
+                    lower_source_point == 0 &&
+                interrupted_uncertainties.all().front().
+                    upper_source_point == 0,
+            "interrupted traversal did not persist the failed source point");
+
         adapter_type restart_adapter;
         {
             driver_type driver(
@@ -511,6 +631,14 @@ int main()
         require(
             restart_adapter.call_count() == 2,
             "restart did not resume at curve 1");
+        uncertainty_registry_type recovered_uncertainties(
+            uncertainty_options);
+        require(
+            recovered_uncertainties.unresolved_count() == 0 &&
+                recovered_uncertainties.all().size() == 1 &&
+                recovered_uncertainties.all().front().resolved,
+            "successful restart did not resolve the persisted "
+            "classification uncertainty");
 
         stability_diagram_type completed_diagram(
             &vector_operations,
@@ -578,11 +706,93 @@ int main()
                     "debug_curve_stability_plot.dat") ==
                     completed_curve1_plot,
             "no-op restart changed committed stability data");
+
+        const std::filesystem::path boundary_fixture_directory =
+            fixture_directory / "terminal_boundary_barrier";
+        std::filesystem::create_directories(
+            boundary_fixture_directory,
+            filesystem_error);
+        require(
+            !filesystem_error,
+            "failed to create terminal-boundary replay fixture");
+        parameters.path_to_project =
+            boundary_fixture_directory.string();
+        bifurcation_diagram_type boundary_source_diagram(
+            &vector_operations,
+            &file_operations,
+            &log,
+            &nonlinear_operator,
+            &fixture_newton,
+            boundary_fixture_directory.string(),
+            1);
+        vector_operations.init_vector(state);
+        vector_operations.start_use_vector(state);
+        boundary_source_diagram.init_new_curve();
+        vector_operations.assign_scalar(real_type(0.4), state);
+        boundary_source_diagram.get_current_ref()->add(
+            real_type(16.2),
+            state,
+            true);
+        vector_operations.assign_scalar(real_type(0.3), state);
+        boundary_source_diagram.get_current_ref()->add(
+            real_type(16.1),
+            state,
+            false);
+        vector_operations.assign_scalar(real_type(0.2), state);
+        boundary_source_diagram.get_current_ref()->add(
+            real_type(16.0),
+            state,
+            false);
+        vector_operations.assign_scalar(real_type(0), state);
+        boundary_source_diagram.get_current_ref()->add(
+            real_type(30),
+            state,
+            true,
+            container::curve_endpoint_reason::boundary_max);
+        boundary_source_diagram.close_curve();
+        vector_operations.stop_use_vector(state);
+        vector_operations.free_vector(state);
+
+        const auto boundary_archive_save =
+            container::save_diagram_archive(
+                (
+                    boundary_fixture_directory /
+                    parameters.bifurcaiton_diagram_file_name).string(),
+                boundary_source_diagram);
+        require(
+            boundary_archive_save.succeeded(),
+            "terminal-boundary replay fixture was not saved");
+
+        adapter_type barrier_adapter(0);
+        driver_type barrier_driver(
+            &vector_operations,
+            &file_operations,
+            &log,
+            &linear_solver_log,
+            &nonlinear_operator,
+            &parameters,
+            &barrier_adapter);
+        barrier_driver.set_parameters();
+        const auto barrier_transitions =
+            barrier_driver.execute_curve_transition_sequence(
+                0,
+                0,
+                3);
+        require(
+            barrier_transitions.empty(),
+            "discontinuous boundary replay invented a transition");
+        require(
+            barrier_adapter.call_count() == 0,
+            "discontinuous boundary replay invoked the eigensolver");
     }
     catch(const std::exception& error)
     {
         std::filesystem::remove_all(
             fixture_directory,
+            filesystem_error);
+        filesystem_error.clear();
+        std::filesystem::remove_all(
+            relocated_fixture_directory,
             filesystem_error);
         std::cerr << "FAILED: " << error.what() << '\n';
         return EXIT_FAILURE;
@@ -590,6 +800,10 @@ int main()
 
     std::filesystem::remove_all(
         fixture_directory,
+        filesystem_error);
+    filesystem_error.clear();
+    std::filesystem::remove_all(
+        relocated_fixture_directory,
         filesystem_error);
 
     std::cout

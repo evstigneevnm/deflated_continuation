@@ -282,6 +282,65 @@ void parse_matrix_free_stability_config(
         "relative_residual_tolerance",
         config.recycling.relative_residual_tolerance);
 
+    const auto tracking = json.value(
+        "invariant_subspace_tracking",
+        nlohmann::json::object());
+    config.invariant_subspace_tracking.enabled = tracking.value(
+        "enabled",
+        config.invariant_subspace_tracking.enabled);
+    config.invariant_subspace_tracking.maximum_dimension = tracking.value(
+        "maximum_dimension",
+        config.invariant_subspace_tracking.maximum_dimension);
+    config.invariant_subspace_tracking.maximum_seed_vectors = tracking.value(
+        "maximum_seed_vectors",
+        config.invariant_subspace_tracking.maximum_seed_vectors);
+    config.invariant_subspace_tracking.
+        coverage_recovery_maximum_seed_vectors = tracking.value(
+            "coverage_recovery_maximum_seed_vectors",
+            config.invariant_subspace_tracking.
+                coverage_recovery_maximum_seed_vectors);
+    config.invariant_subspace_tracking.orthogonalization_passes =
+        tracking.value(
+            "orthogonalization_passes",
+            config.invariant_subspace_tracking.orthogonalization_passes);
+    config.invariant_subspace_tracking.seed_innovation_weight =
+        tracking.value(
+            "seed_innovation_weight",
+            config.invariant_subspace_tracking.seed_innovation_weight);
+    config.invariant_subspace_tracking.dependence_tolerance = tracking.value(
+        "dependence_tolerance",
+        config.invariant_subspace_tracking.dependence_tolerance);
+    config.invariant_subspace_tracking.minimum_retained_residual_ratio =
+        tracking.value(
+            "minimum_retained_residual_ratio",
+            config.invariant_subspace_tracking.
+                minimum_retained_residual_ratio);
+    config.invariant_subspace_tracking.absolute_invariance_tolerance =
+        tracking.value(
+            "absolute_invariance_tolerance",
+            config.invariant_subspace_tracking.
+                absolute_invariance_tolerance);
+    config.invariant_subspace_tracking.relative_invariance_tolerance =
+        tracking.value(
+            "relative_invariance_tolerance",
+            config.invariant_subspace_tracking.
+                relative_invariance_tolerance);
+    config.invariant_subspace_tracking.real_eigenvalue_tolerance =
+        tracking.value(
+            "real_eigenvalue_tolerance",
+            config.invariant_subspace_tracking.
+                real_eigenvalue_tolerance);
+    config.invariant_subspace_tracking.eigenvalue_group_tolerance =
+        tracking.value(
+            "eigenvalue_group_tolerance",
+            config.invariant_subspace_tracking.
+                eigenvalue_group_tolerance);
+    config.invariant_subspace_tracking.principal_angle_rank_tolerance =
+        tracking.value(
+            "principal_angle_rank_tolerance",
+            config.invariant_subspace_tracking.
+                principal_angle_rank_tolerance);
+
     const auto small_system =
         json.value("small_system", nlohmann::json::object());
     config.small_system.enabled = small_system.value(
@@ -755,6 +814,27 @@ void parse_stability_continuation(
     params.correct_stability_transitions_with_newton = json.value(
         "correct_stability_transitions_with_newton",
         params.correct_stability_transitions_with_newton);
+    params.recover_failed_transition_classification_with_newton =
+        json.value(
+            "recover_failed_transition_classification_with_newton",
+            params.
+                recover_failed_transition_classification_with_newton);
+    params.recover_failed_transition_newton_with_parameter_homotopy =
+        json.value(
+            "recover_failed_transition_newton_with_parameter_homotopy",
+            params.
+                recover_failed_transition_newton_with_parameter_homotopy);
+    params.transition_newton_homotopy_maximum_subdivisions =
+        json.value(
+            "transition_newton_homotopy_maximum_subdivisions",
+            params.
+                transition_newton_homotopy_maximum_subdivisions);
+    if(params.transition_newton_homotopy_maximum_subdivisions < 2)
+    {
+        throw std::invalid_argument(
+            "transition Newton parameter homotopy requires at least "
+            "two subdivisions");
+    }
     params.transition_refinement_maximum_iterations = json.value(
         "transition_refinement_maximum_iterations",
         params.transition_refinement_maximum_iterations);
@@ -764,6 +844,12 @@ void parse_stability_continuation(
     params.transition_refinement_parameter_tolerance = json.value(
         "transition_refinement_parameter_tolerance",
         params.transition_refinement_parameter_tolerance);
+    params.turning_point_guard_source_points = json.value(
+        "turning_point_guard_source_points",
+        params.turning_point_guard_source_points);
+    params.allow_source_path_topology_splits = json.value(
+        "allow_source_path_topology_splits",
+        params.allow_source_path_topology_splits);
     params.symmetry_endpoint_guard_source_points = json.value(
         "symmetry_endpoint_guard_source_points",
         params.symmetry_endpoint_guard_source_points);
@@ -772,6 +858,38 @@ void parse_stability_continuation(
             "matrix_free_eigensolver",
             nlohmann::json::object()),
         params.matrix_free_eigensolver);
+    const auto uncertainty_registry = json.value(
+        "classification_uncertainty_registry",
+        nlohmann::json::object());
+    params.classification_uncertainty_registry.enabled =
+        uncertainty_registry.value(
+            "enabled",
+            params.classification_uncertainty_registry.enabled);
+    params.classification_uncertainty_registry.file_name =
+        uncertainty_registry.value(
+            "file_name",
+            params.classification_uncertainty_registry.file_name);
+    params.classification_uncertainty_registry.
+        maximum_diagnostic_length = uncertainty_registry.value(
+            "maximum_diagnostic_length",
+            params.classification_uncertainty_registry.
+                maximum_diagnostic_length);
+    params.classification_uncertainty_registry.retain_resolved =
+        uncertainty_registry.value(
+            "retain_resolved",
+            params.classification_uncertainty_registry.
+                retain_resolved);
+    if(
+        params.classification_uncertainty_registry.enabled &&
+        (
+            params.classification_uncertainty_registry.file_name.empty() ||
+            params.classification_uncertainty_registry.
+                maximum_diagnostic_length == 0))
+    {
+        throw std::invalid_argument(
+            "invalid stability classification uncertainty registry "
+            "configuration");
+    }
     parse_linear_solver<T>(json.at("linear_solver"), params.linear_solver);
     parse_newton<T>(json.at("newton"), params.newton);
 }

@@ -260,6 +260,73 @@ int main()
                     "3 4") == 0,
             "plot sidecar stores refined steady event metadata");
 
+        restored.open_curve(3);
+        const vector_operations::vector_type topology_left{5.0, 6.0};
+        const vector_operations::vector_type topology_right{7.0, 8.0};
+        restored.add_topology_break_with_plot_data(
+            4.5,
+            20,
+            21,
+            4.4,
+            4.5,
+            0.25,
+            {5.0, 6.0},
+            {1, 0},
+            {2, 0},
+            topology_left,
+            topology_right);
+        restored.close_curve();
+        require(
+            std::filesystem::is_regular_file(project_path/"3"/"s1") &&
+                std::filesystem::is_regular_file(
+                    project_path/"3"/"s1_right"),
+            "topology break preserves both reconstructed states");
+        const auto topology_plot_lines = data_lines(
+            project_path/"3"/"debug_curve_stability_plot.dat");
+        require(
+            topology_plot_lines.size() == 1 &&
+                topology_plot_lines[0].find(
+                    "21 4.5 topology_break 2 0 1 0 2 0 topology 1 2 "
+                    "5 6") == 0,
+            "plot sidecar marks a topology split");
+        const auto topology_lines = data_lines(
+            project_path/"3"/"debug_curve_stability_topology.dat");
+        require(
+            topology_lines.size() == 1 &&
+                topology_lines[0].find(
+                    "1 20 21 4.4000000000000004 4.5 4.5 0.25 "
+                    "1 0 2 0 s1 s1_right") == 0,
+            "topology sidecar records the source bracket and state files");
+        const auto topology_points =
+            restored.get_curve_points_vector(3);
+        require(
+            topology_points.size() == 1 &&
+                topology_points[0].point_type == "topology_break",
+            "topology break survives the stability archive model");
+
+        restored.open_curve(4);
+        restored.add_topology_break_with_plot_data(
+            5.5,
+            30,
+            31,
+            5.4,
+            5.5,
+            0.5,
+            {7.0},
+            {2, 0},
+            {3, 0},
+            topology_left,
+            topology_right);
+        restored.abandon_curve();
+        require(
+            !std::filesystem::exists(project_path/"4"/"s1") &&
+                !std::filesystem::exists(
+                    project_path/"4"/"s1_right") &&
+                !std::filesystem::exists(
+                    project_path/"4"/
+                        "debug_curve_stability_topology.dat"),
+            "aborted topology split removes both pending states");
+
         const auto resaved = container::save_diagram_archive(
             archive_path.string(),
             restored);

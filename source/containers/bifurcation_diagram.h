@@ -23,6 +23,7 @@
 //using boost for serialization
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
+#include <boost/serialization/split_member.hpp>
 
 #include <containers/branch_intersection.h>
 #include <containers/intersection_status.h>
@@ -73,13 +74,13 @@ private:
 
     typedef CurveHelper cont_help_t;
 
-    VectorOperations* vec_ops;
-    VectorFileOperations* file_ops;
-    Log* log;
-    NonlinearOperator* nonlin_op;
-    Newton* newton;
-    cont_help_t* cont_help;
-    unsigned int skip_output;
+    VectorOperations* vec_ops = nullptr;
+    VectorFileOperations* file_ops = nullptr;
+    Log* log = nullptr;
+    NonlinearOperator* nonlin_op = nullptr;
+    Newton* newton = nullptr;
+    cont_help_t* cont_help = nullptr;
+    unsigned int skip_output = 10;
     std::string directory;
     bool legend_written = false;
 
@@ -141,8 +142,14 @@ public:
     {
         for(auto& curve: curve_container)
         {
-            curve.set_main_refs(vec_ops, file_ops, log, nonlin_op, newton, cont_help);
-            curve.reset_output_directory(directory);
+            curve.rebind_runtime_directory(
+                vec_ops,
+                file_ops,
+                log,
+                nonlin_op,
+                newton,
+                cont_help,
+                directory);
         }
     }
 
@@ -275,6 +282,31 @@ public:
             return(zero);
         }
 
+    }
+
+    bool read_saved_solution_from_curve(
+        int curve_number_,
+        const std::uint64_t source_point_index,
+        T_vec& output)
+    {
+        if(
+            curve_number_ < 0 ||
+            static_cast<std::size_t>(curve_number_) >=
+                curve_container.size())
+        {
+            return false;
+        }
+        auto& curve = curve_container[static_cast<std::size_t>(curve_number_)];
+        curve.set_main_refs(
+            vec_ops,
+            file_ops,
+            log,
+            nonlin_op,
+            newton,
+            cont_help);
+        return curve.read_saved_solution_at_source_index(
+            source_point_index,
+            output);
     }
 
 
@@ -614,13 +646,31 @@ private:
 
 
     template<class Archive>
-    void serialize(Archive & ar, const unsigned int version)
+    void save(Archive& ar, const unsigned int) const
     {
         ar & curve_container;
         ar & skip_output;
         ar & curve_number;  //a curve number should be serialized!!!
         //ar & directory;      // should a directory be serialized?               
     }
+
+    template<class Archive>
+    void load(Archive& ar, const unsigned int)
+    {
+        ar & curve_container;
+        ar & skip_output;
+        ar & curve_number;
+
+        // The project root is runtime configuration, not archive state.
+        // Rebind every curve before any caller can resolve stored vectors or
+        // sidecars through the path serialized by an older project location.
+        if(cont_help != nullptr && !directory.empty())
+        {
+            reset_curve_output_directories();
+        }
+    }
+
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     
 };

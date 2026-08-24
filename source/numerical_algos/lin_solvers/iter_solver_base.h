@@ -49,13 +49,16 @@ protected:
     mutable monitor_type           monitor_;
     const vector_operations_type* vec_ops_;
     preconditioner_type* prec_;
+    preconditioner_type* configured_prec_;
+    bool preconditioner_bypass_;
     const linear_operator_type* A_;
 public:
     iter_solver_base(const vector_operations_type* vec_ops, 
                      Log *log, int obj_log_lev, const std::string& log_msg_prefix):
         logged_obj_t(log, obj_log_lev, log_msg_prefix), 
         monitor_(*vec_ops, log),
-        vec_ops_(vec_ops), prec_(nullptr)
+        vec_ops_(vec_ops), prec_(nullptr), configured_prec_(nullptr),
+        preconditioner_bypass_(false), A_(nullptr)
     {
         monitor_.set_log_msg_prefix(log_msg_prefix + monitor_.get_log_msg_prefix());
     }
@@ -65,7 +68,20 @@ public:
 
     void set_preconditioner(preconditioner_type *prec, bool own_prec = false) 
     { 
-        prec_ = prec; 
+        configured_prec_ = prec;
+        if(!preconditioner_bypass_)
+            prec_ = prec;
+    }
+
+    void set_preconditioner_bypass(const bool enabled)
+    {
+        preconditioner_bypass_ = enabled;
+        prec_ = enabled ? nullptr : configured_prec_;
+    }
+
+    bool preconditioner_bypass_enabled() const
+    {
+        return preconditioner_bypass_;
     }
 
     virtual bool solve(const linear_operator_type &A, const vector_type &b, 

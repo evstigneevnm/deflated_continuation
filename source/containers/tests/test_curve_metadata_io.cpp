@@ -117,6 +117,15 @@ int main()
                     container::curve_endpoint_reason::max_steps),
             "ordinary and incomplete stopping endpoints remain on the smooth segment");
         require(
+            container::is_parameter_boundary_endpoint(
+                container::curve_endpoint_reason::boundary_max) &&
+                container::is_parameter_boundary_endpoint(
+                    container::curve_endpoint_reason::
+                        boundary_min_approximate) &&
+                !container::is_parameter_boundary_endpoint(
+                    container::curve_endpoint_reason::analytical_branch),
+            "parameter boundary endpoint classification");
+        require(
             container::starts_new_curve_traversal_segment(
                 loaded[0],
                 loaded[1]),

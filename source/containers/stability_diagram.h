@@ -69,6 +69,24 @@ struct stability_plot_record
     std::vector<T> norms;
 };
 
+template<class T>
+struct stability_topology_record
+{
+    uint64_t event_id = 0;
+    uint64_t left_source_point = 0;
+    uint64_t right_source_point = 0;
+    T left_parameter = T{};
+    T right_parameter = T{};
+    T state_parameter = T{};
+    T aligned_relative_distance = T{};
+    int before_dim_R = 0;
+    int before_dim_C = 0;
+    int after_dim_R = 0;
+    int after_dim_C = 0;
+    std::string left_state_file;
+    std::string right_state_file;
+};
+
 
 
 template<class VectorOperations, class VectorFileOperations, class Log>
@@ -85,10 +103,13 @@ private:
     typedef std::vector<stability_point_type> curve_t;
     typedef stability_plot_record<T> stability_plot_point_type;
     typedef std::vector<stability_plot_point_type> plot_curve_t;
+    typedef stability_topology_record<T> stability_topology_point_type;
+    typedef std::vector<stability_topology_point_type> topology_curve_t;
 
     
     curve_t curve;
     plot_curve_t plot_curve;
+    topology_curve_t topology_curve;
     std::vector<curve_t> container_curves;
 
     
@@ -194,6 +215,7 @@ public:
         ensure_curve_directory_exists();
         curve.clear();
         plot_curve.clear();
+        topology_curve.clear();
         pending_files.clear();
         curve_opened = true;
 
@@ -244,6 +266,78 @@ public:
             norms_,
             before_dimension_,
             after_dimension_);
+    }
+
+    void add_topology_break_with_plot_data(
+        T state_parameter,
+        uint64_t left_source_point,
+        uint64_t right_source_point,
+        T left_parameter,
+        T right_parameter,
+        T aligned_relative_distance,
+        const std::vector<T>& norms,
+        std::pair<int, int> before_dimension,
+        std::pair<int, int> after_dimension,
+        const T_vec& left_state,
+        const T_vec& right_state)
+    {
+        if(!curve_opened)
+        {
+            throw std::runtime_error(
+                "stability_diagram: trying to add a topology break to "
+                "a closed curve");
+        }
+
+        ++id_file_name;
+        const std::string stem = "s" + std::to_string(id_file_name);
+        const std::string left_file =
+            (std::filesystem::path(curve_path)/stem).string();
+        const std::string right_file =
+            (std::filesystem::path(curve_path)/(stem + "_right")).string();
+        vec_file_ops->write_vector(left_file, left_state);
+        pending_files.emplace_back(left_file);
+        vec_file_ops->write_vector(right_file, right_state);
+        pending_files.emplace_back(right_file);
+
+        stability_point_type point;
+        point.lambda = state_parameter;
+        point.is_data_avaliable = true;
+        point.point_type = "topology_break";
+        point.unstable_dim_R = after_dimension.first;
+        point.unstable_dim_C = after_dimension.second;
+        point.id_file_name = id_file_name;
+        curve.push_back(point);
+
+        stability_plot_point_type plot_point;
+        plot_point.source_point_index = right_source_point;
+        plot_point.lambda = state_parameter;
+        plot_point.point_type = "topology_break";
+        plot_point.unstable_dim_R = after_dimension.first;
+        plot_point.unstable_dim_C = after_dimension.second;
+        plot_point.before_dim_R = before_dimension.first;
+        plot_point.before_dim_C = before_dimension.second;
+        plot_point.after_dim_R = after_dimension.first;
+        plot_point.after_dim_C = after_dimension.second;
+        plot_point.event_type = "topology";
+        plot_point.event_id = id_file_name;
+        plot_point.norms = norms;
+        plot_curve.push_back(std::move(plot_point));
+
+        stability_topology_point_type topology;
+        topology.event_id = id_file_name;
+        topology.left_source_point = left_source_point;
+        topology.right_source_point = right_source_point;
+        topology.left_parameter = left_parameter;
+        topology.right_parameter = right_parameter;
+        topology.state_parameter = state_parameter;
+        topology.aligned_relative_distance = aligned_relative_distance;
+        topology.before_dim_R = before_dimension.first;
+        topology.before_dim_C = before_dimension.second;
+        topology.after_dim_R = after_dimension.first;
+        topology.after_dim_C = after_dimension.second;
+        topology.left_state_file = stem;
+        topology.right_state_file = stem + "_right";
+        topology_curve.push_back(std::move(topology));
     }
 
     void add_with_plot_data(
@@ -424,6 +518,7 @@ public:
         container_curves.push_back(curve);
         curve.clear();
         plot_curve.clear();
+        topology_curve.clear();
         pending_files.clear();
     }
 
@@ -445,6 +540,7 @@ public:
         id_file_name = 0;
         curve.clear();
         plot_curve.clear();
+        topology_curve.clear();
         pending_files.clear();
         curve_opened = false;
     }
@@ -532,6 +628,7 @@ private:
     {
         print_legacy_curve();
         print_plot_curve();
+        print_topology_curve();
 
         log->info_f(
             "container::stability_diagram(%i): printed final stability "
@@ -664,6 +761,83 @@ private:
             std::filesystem::remove(temporary, ignored);
             throw std::runtime_error(
                 "stability_diagram: failed to replace plot sidecar '" +
+                file_name.string() + "': " + error.message());
+        }
+    }
+
+    void print_topology_curve()
+    {
+        const std::filesystem::path file_name =
+            std::filesystem::path(curve_path)/
+            "debug_curve_stability_topology.dat";
+        if(topology_curve.empty())
+        {
+            std::error_code error;
+            std::filesystem::remove(file_name, error);
+            if(error)
+            {
+                throw std::runtime_error(
+                    "stability_diagram: failed to remove stale topology "
+                    "sidecar '" + file_name.string() + "': " +
+                    error.message());
+            }
+            return;
+        }
+
+        const std::filesystem::path temporary(
+            file_name.string() + ".tmp");
+        std::error_code error;
+        std::filesystem::remove(temporary, error);
+        std::ofstream output(temporary, std::ofstream::out);
+        if(!output)
+        {
+            throw std::runtime_error(
+                "stability_diagram: failed to open temporary topology "
+                "sidecar: " + temporary.string());
+        }
+        output
+            << "# stability_topology_v1\n"
+            << "# event_id left_source right_source left_lambda "
+               "right_lambda state_lambda aligned_relative_distance "
+               "before_real before_complex_pairs after_real "
+               "after_complex_pairs left_state_file right_state_file\n";
+        output << std::setprecision(
+            std::numeric_limits<T>::max_digits10);
+        for(const auto& point : topology_curve)
+        {
+            output
+                << point.event_id << ' '
+                << point.left_source_point << ' '
+                << point.right_source_point << ' '
+                << point.left_parameter << ' '
+                << point.right_parameter << ' '
+                << point.state_parameter << ' '
+                << point.aligned_relative_distance << ' '
+                << point.before_dim_R << ' '
+                << point.before_dim_C << ' '
+                << point.after_dim_R << ' '
+                << point.after_dim_C << ' '
+                << point.left_state_file << ' '
+                << point.right_state_file << '\n';
+        }
+        output.flush();
+        output.close();
+        if(!output)
+        {
+            std::filesystem::remove(temporary, error);
+            throw std::runtime_error(
+                "stability_diagram: topology sidecar output did not "
+                "complete: " + temporary.string());
+        }
+
+        error.clear();
+        std::filesystem::rename(temporary, file_name, error);
+        if(error)
+        {
+            std::error_code ignored;
+            std::filesystem::remove(temporary, ignored);
+            throw std::runtime_error(
+                "stability_diagram: failed to replace topology sidecar '" +
                 file_name.string() + "': " + error.message());
         }
     }

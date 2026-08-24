@@ -61,6 +61,8 @@ public:
         result_.operator_calls += scan_result.operator_calls;
         result_.inner_solver_calls +=
             scan_result.inner_solver_calls;
+        result_.coverage_recoveries +=
+            scan_result.coverage_recoveries;
         result_.effective_subspace_dimension = std::max(
             result_.effective_subspace_dimension,
             scan_result.effective_subspace_dimension);
@@ -146,6 +148,19 @@ public:
             << result_.eigenpairs.size()
             << " physical eigenpairs after cross-scan merge "
             << "(minimum " << options_.minimum_eigenpairs << ")";
+        if(!enough_eigenpairs && !result_.eigenpairs.empty())
+        {
+            diagnostic << "; recovered values = [";
+            for(std::size_t index = 0;
+                index < result_.eigenpairs.size();
+                ++index)
+            {
+                if(index != 0)
+                    diagnostic << ", ";
+                diagnostic << result_.eigenpairs[index].value;
+            }
+            diagnostic << ']';
+        }
         if(!failures_.empty())
             diagnostic << "; failures: " << failures_;
         if(!successes_.empty())

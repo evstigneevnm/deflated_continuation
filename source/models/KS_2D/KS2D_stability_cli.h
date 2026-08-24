@@ -1,8 +1,10 @@
 #ifndef __KS2D_STABILITY_CLI_H__
 #define __KS2D_STABILITY_CLI_H__
 
+#include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #if defined(KS2D_VECTOR_BACKEND_CUDA)
 #include <common/cuda_init_scfd.h>
@@ -21,9 +23,16 @@ struct command_line_options
     std::string second_state_file;
     double second_state_parameter = 0.0;
     bool second_state_parameter_set = false;
+    double newton_target_parameter = 0.0;
+    bool newton_target_parameter_set = false;
     bool quiet = false;
     bool edit = false;
     bool confirm = false;
+    bool transition_sequence = false;
+    bool curve_transition = false;
+    int curve_transition_curve = -1;
+    std::uint64_t curve_transition_lower_source = 0;
+    std::uint64_t curve_transition_upper_source = 0;
 };
 
 inline bool backend_needs_device_init()
@@ -56,6 +65,25 @@ inline command_line_options parse_command_line(int argc, char** argv, std::strin
         else if(argument == "--confirm")
         {
             result.confirm = true;
+        }
+        else if(argument == "--transition-sequence")
+        {
+            result.transition_sequence = true;
+        }
+        else if(argument == "--curve-transition")
+        {
+            if(index + 3 >= argc)
+            {
+                throw std::invalid_argument(
+                    "--curve-transition requires CURVE LOWER_SOURCE "
+                    "UPPER_SOURCE");
+            }
+            result.curve_transition = true;
+            result.curve_transition_curve = std::stoi(argv[++index]);
+            result.curve_transition_lower_source =
+                std::stoull(argv[++index]);
+            result.curve_transition_upper_source =
+                std::stoull(argv[++index]);
         }
         else if(argument == "--edit")
         {
@@ -91,6 +119,14 @@ inline command_line_options parse_command_line(int argc, char** argv, std::strin
             result.second_state_parameter = std::stod(argv[++index]);
             result.second_state_parameter_set = true;
         }
+        else if(argument == "--newton-target")
+        {
+            if(index + 1 >= argc)
+                throw std::invalid_argument(
+                    "--newton-target requires a value");
+            result.newton_target_parameter = std::stod(argv[++index]);
+            result.newton_target_parameter_set = true;
+        }
         else if(backend_needs_device_init() && is_device_selector(argument))
         {
             result.device_selector = argument;
@@ -124,15 +160,71 @@ inline command_line_options parse_command_line(int argc, char** argv, std::strin
         throw std::invalid_argument(
             "two-state transition replay requires both state pairs");
     }
-    if(result.edit && !result.state_file.empty())
+    if(result.edit && (!result.state_file.empty() || result.curve_transition))
     {
         throw std::invalid_argument(
-            "--edit cannot be combined with --state-file");
+            "--edit cannot be combined with a replay mode");
     }
-    if(result.confirm && result.state_file.empty())
+    if(
+        result.confirm &&
+        result.state_file.empty() &&
+        !result.curve_transition)
     {
         throw std::invalid_argument(
-            "--confirm requires --state-file");
+            "--confirm requires a state or curve-transition replay");
+    }
+    if(result.transition_sequence && result.second_state_file.empty())
+    {
+        throw std::invalid_argument(
+            "--transition-sequence requires two state pairs");
+    }
+    if(result.newton_target_parameter_set && result.state_file.empty())
+    {
+        throw std::invalid_argument(
+            "--newton-target requires --state-file and --parameter");
+    }
+    if(result.curve_transition)
+    {
+        if(result.curve_transition_curve < 0)
+        {
+            throw std::invalid_argument(
+                "--curve-transition CURVE must be nonnegative");
+        }
+        if(
+            result.curve_transition_lower_source >=
+            result.curve_transition_upper_source)
+        {
+            throw std::invalid_argument(
+                "--curve-transition requires LOWER_SOURCE < "
+                "UPPER_SOURCE");
+        }
+        if(!result.confirm)
+        {
+            throw std::invalid_argument(
+                "--curve-transition requires --confirm");
+        }
+        if(
+            !result.state_file.empty() ||
+            !result.second_state_file.empty() ||
+            result.newton_target_parameter_set ||
+            result.transition_sequence)
+        {
+            throw std::invalid_argument(
+                "--curve-transition cannot be combined with another "
+                "replay mode");
+        }
+    }
+    if(
+        result.newton_target_parameter_set &&
+        (
+            !result.second_state_file.empty() ||
+            result.edit ||
+            result.confirm ||
+            result.transition_sequence))
+    {
+        throw std::invalid_argument(
+            "--newton-target cannot be combined with transition, "
+            "confirmation, or edit modes");
     }
     return result;
 }

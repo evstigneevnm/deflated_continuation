@@ -121,6 +121,33 @@ class StabilityPlotDataTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 bd.read_stability_plot_file(sidecar)
 
+    def test_topology_event_inserts_a_stability_line_break(self):
+        record = bd.StabilityPlotRecord(
+            source_index=2,
+            parameter=2.0,
+            point_type="topology_break",
+            unstable_real=2,
+            unstable_complex_pairs=0,
+            before_real=1,
+            before_complex_pairs=0,
+            after_real=2,
+            after_complex_pairs=0,
+            event_type="topology",
+            event_id=3,
+            norms=[4.0],
+        )
+        xs, ys, source_indices = bd.insert_stability_topology_breaks(
+            [0.0, 1.0, 2.0, 3.0],
+            [1.0, 2.0, 4.0, 5.0],
+            [0, 1, 2, 3],
+            [record],
+        )
+        self.assertEqual(len(xs), 5)
+        self.assertTrue(math.isnan(xs[2]))
+        self.assertTrue(math.isnan(ys[2]))
+        self.assertEqual(source_indices, [0, 1, 2, 2, 3])
+        self.assertIn("topology", bd.EVENT_STYLES)
+
 
 if __name__ == "__main__":
     unittest.main()

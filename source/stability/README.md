@@ -155,6 +155,160 @@ The implementation uses only the vector-space interface and ordinary
 real operator actions. The same path therefore supports serial, OMP,
 CUDA, and other SCFD-backed vector spaces.
 
+## Tracked Real Invariant Subspaces
+
+`matrix_free_eigensolver.invariant_subspace_tracking` follows a real
+invariant subspace instead of treating each recovered Ritz vector as an
+independent scalar object. A real eigenvector contributes one column and
+a complex-conjugate eigenpair contributes its real and imaginary plane.
+The backend-neutral basis is partitioned into eigenvalue-associated real
+blocks and validated at every new linearization point with
+`||JQ - Q(Q^T JQ)||_F`. Valid blocks continue to seed probes when another
+block has become stale; a complex pair or repeated eigenspace is accepted
+or rejected as a block rather than by basis-dependent individual columns.
+
+Validated directions seed additional probes; configured fresh probes are
+still executed, so tracking cannot hide a newly appearing eigendirection.
+During an independent confirmation transaction, newly recovered columns
+are combined with unmatched columns from the previously committed basis.
+The unmatched columns are seeded first. This bounded union addresses the
+one-sided failure in which one valid Krylov run omits a member of a
+multiple or tightly clustered eigenspace.
+
+Principal angles, dimension gaps, validation residuals, and retained-column
+counts are reported in the scan diagnostic. Tracker updates commit with the
+enclosing classification. Scalar Ritz retries may be reset during transition
+refinement without discarding the tracked invariant subspace; both caches are
+reset at a true curve-segment boundary.
+
+`maximum_seed_vectors` limits the routine tracking overhead. When every
+spectral scan succeeds but the merged physical spectrum still contains fewer
+than `aggregation.minimum_eigenpairs`,
+`coverage_recovery_maximum_seed_vectors` may request a single transactional
+retry with more validated tracked directions. A value of zero disables this
+retry. This keeps regular continuation points inexpensive while recovering
+tightly clustered or repeated eigenspaces only when the ordinary probes do
+not provide the requested coverage.
+
+Independent confirmation runs may fail without aborting immediately. A failed
+run consumes `spectrum_classification_retries`, while consensus still requires
+`transition_classification_confirmations` successful matching signatures.
+Thus solver failures cannot be counted as confirmations, and exhausting the
+retry budget still produces an explicit incomplete classification.
+
+If independent runs report different signatures, the matrix-free adapter first
+forms a transactional union of their strictly validated physical Ritz values.
+Only complete results and aggregate-undercoverage results for which every scan
+finished may contribute. Eigenvalues are matched at most once per run, so the
+union takes the maximum independently validated multiplicity rather than adding
+duplicate discoveries. If that union remains undercovered and the tracked
+subspace has accumulated more directions than the nominal seed budget, one
+bounded pass with `coverage_recovery_maximum_seed_vectors` augments it.
+Otherwise classification remains incomplete. This resolves intermittent
+spectral undercoverage without relaxing physical Ritz-residual tolerances or
+changing eigensolvers that do not expose reconciliation support.
+
+A successful reconciliation is authoritative rather than another consensus
+vote. Its spectrum is assembled transactionally from strict physical Ritz
+values at one frozen state, and therefore supersedes compatible incomplete
+subsets returned by individual probes. A failed or undercovered reconciliation
+does not override the independent-run disagreement.
+
+## Transition-State Recovery
+
+Saved solution vectors can be much farther apart than accepted continuation
+points. A straight secant state between two saved vectors may therefore have a
+large nonlinear residual, and its Jacobian spectrum is not a branch spectrum.
+Transition refinement first uses the configured direct fixed-parameter Newton
+correction. If that correction fails, the backend-neutral recovery path marches
+from each classified endpoint toward the target parameter. It retries with
+`2, 4, ...` fixed-parameter Newton substeps, aligns every accepted state to the
+previous symmetry representative, and stops at
+`transition_newton_homotopy_maximum_subdivisions`.
+
+The refiner also accepts an optional fallback Newton implementation. A failed
+primary correction is transactional: the original state is restored before the
+fallback is called, and a failed fallback restores it again. This permits a
+model executable to retain its usual continuation solver while supplying a
+more robust matrix-free solver for sparse transition-state reconstruction. The
+KS2D stability executable uses the NMFD right-preconditioned GMRES settings
+from `matrix_free_eigensolver.inner_solver` for this fallback. Complex vectors
+and shifts remain confined to the eigensolver; the fallback acts on the real
+Jacobian and the ordinary real vector space.
+
+The recovery is controlled by:
+
+- `recover_failed_transition_newton_with_parameter_homotopy`;
+- `transition_newton_homotopy_maximum_subdivisions`.
+
+It is invoked only after a direct Newton correction fails. Successful event
+diagnostics report the number of homotopy recoveries and accepted substeps.
+They also report how many state corrections required the fallback Newton.
+This strategy handles smooth fixed-parameter branch segments without changing
+the nonlinear operator or vector backend. Before refining a transition between
+two saved states, traversal also inspects every archived continuation parameter
+between their source indices. A monotone source path uses the ordinary
+fixed-parameter refiner. A path with one reversal is split into monotone sides:
+
+- each side is reconstructed transactionally from its saved endpoint;
+- the two adjacent turning-point guards are joined in source order with
+  forward and reverse secant predictors;
+- a smooth turning-point join is accepted only when at least one predicted
+  crossing recovers the independently reconstructed state on the other side;
+- if neither crossing joins, strict mode rejects the interval, while
+  `allow_source_path_topology_splits` preserves it as a topology barrier;
+- ordinary transitions are refined independently on each monotone side;
+- only a joined dimension change across the adjacent guards is recorded at a local
+  quadratic estimate of the parameter extremum, without Newton interpolation
+  between the two same-parameter branch states.
+
+Intervals with multiple reversals are decomposed into their complete sequence
+of monotone spans. Starting from the saved lower anchor, each span is marched
+in continuation source order. Every turning point is crossed with a state
+secant predictor and recorded separately when its unstable signature changes.
+Classification uses guards displaced from the singular point by
+`turning_point_guard_source_points` archived source steps (default: two), while
+the fold state and parameter still use the adjacent source points. The
+reconstructed path must finish at the saved upper anchor within the configured
+numerical matching tolerance;
+otherwise the complete curve transaction is rejected. This uses a fixed number
+of work vectors independent of the number of turns.
+
+If a forward reconstruction cannot reach the upper anchor, the source-path
+marcher also reconstructs backward from that anchor. The reverse path is
+aligned to the forward path with the configured finite-symmetry/quotient
+aligner. The paths are joined only when their aligned relative state distance
+passes the strict numerical matching tolerance. This prevents a successful
+fixed-parameter Newton solve on a different branch from being accepted as a
+continuation state.
+
+Some legacy curve archives contain a genuine state discontinuity while their
+source-point metadata still describes one segment. With
+`allow_source_path_topology_splits` disabled, such an interval remains a hard
+error. With the option enabled, independently reconstructed paths that do not
+meet become an explicit topology barrier instead:
+
+- the last forward state and first aligned reverse state are classified
+  independently;
+- transition refinement is performed only on each smooth side of the barrier;
+- no state or spectrum is interpolated across the barrier;
+- both states and their source-point bracket are persisted in
+  `debug_curve_stability_topology.dat`;
+- the event is exposed to plotting as `topology` and retained as an unresolved
+  `source_path_topology` uncertainty for later archive repair.
+
+Topology state files and sidecars are part of the curve transaction. An
+aborted curve removes them, and the uncertainty entry is written only after
+the stability curve and archive have committed.
+
+The fold work vectors are allocated only while a non-monotone bracket is
+processed. The diagnostic replay form is:
+
+```bash
+KS2D_stability_cuda.bin config.json dev_num:0 \
+  --curve-transition CURVE LOWER_SOURCE UPPER_SOURCE --confirm
+```
+
 ## Persistence
 
 The stability archive stores completed curves only. A curve is assembled
@@ -171,6 +325,16 @@ transition, the broad transition class, and the norm vector evaluated
 at the refined transition state. This lets visualization place an event
 at its refined coordinates rather than at a neighboring continuation
 sample while preserving archive compatibility.
+
+Failed classifications are written atomically to
+`stability_uncertainty_registry.json` by default. A record is keyed by the
+bifurcation curve, source-point bracket, and failure stage. It stores the
+failed parameter, bounded diagnostic text, retry count, and every observed
+unstable signature with its occurrence count. The record is not accepted as
+stability data. Restart retries the normal curve transaction, and a later
+successful point, endpoint confirmation, or transition refinement marks the
+same record resolved. Configuration is under
+`stability_continuation.classification_uncertainty_registry`.
 
 `plot_scripts/plot_bd.py` and `plot_scripts/plot_bd_solutions.py`
 automatically use these sidecars when present. By default they color

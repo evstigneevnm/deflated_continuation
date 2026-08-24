@@ -155,6 +155,23 @@ struct matrix_free_stability_config
         Real relative_residual_tolerance = Real(0.25);
     };
 
+    struct invariant_subspace_tracking_config
+    {
+        bool enabled = false;
+        std::size_t maximum_dimension = 16;
+        std::size_t maximum_seed_vectors = 8;
+        std::size_t coverage_recovery_maximum_seed_vectors = 0;
+        std::size_t orthogonalization_passes = 2;
+        Real seed_innovation_weight = Real(0.1);
+        Real dependence_tolerance = Real(1.0e-8);
+        Real minimum_retained_residual_ratio = Real(0.05);
+        Real absolute_invariance_tolerance = Real(1.0e-8);
+        Real relative_invariance_tolerance = Real(0.25);
+        Real real_eigenvalue_tolerance = Real(1.0e-8);
+        Real eigenvalue_group_tolerance = Real(1.0e-6);
+        Real principal_angle_rank_tolerance = Real(1.0e-8);
+    };
+
     struct small_system_config
     {
         bool enabled = false;
@@ -173,6 +190,7 @@ struct matrix_free_stability_config
     retry_config retry;
     aggregation_config aggregation;
     recycling_config recycling;
+    invariant_subspace_tracking_config invariant_subspace_tracking;
     small_system_config small_system;
 };
 

@@ -198,8 +198,13 @@
         "Krylov_subspace_dimension": 20,
         "desired_spectrum": 4,
         "correct_stability_transitions_with_newton": false,
+        "recover_failed_transition_classification_with_newton": true,
+        "recover_failed_transition_newton_with_parameter_homotopy": true,
+        "transition_newton_homotopy_maximum_subdivisions": 64,
         "transition_refinement_maximum_iterations": 20,
         "transition_refinement_maximum_subdivisions": 8,
+        "turning_point_guard_source_points": 2,
+        "allow_source_path_topology_splits": true,
         "transition_refinement_parameter_tolerance": 1.0e-4,
         "spectrum_classification_retries": 2,
         "transition_classification_confirmations": 2,
@@ -292,7 +297,28 @@
                 "innovation_weight": 0.2,
                 "absolute_residual_tolerance": 1.0e-8,
                 "relative_residual_tolerance": 0.25
+            },
+            "invariant_subspace_tracking": {
+                "enabled": true,
+                "maximum_dimension": 16,
+                "maximum_seed_vectors": 1,
+                "coverage_recovery_maximum_seed_vectors": 8,
+                "orthogonalization_passes": 2,
+                "seed_innovation_weight": 0.1,
+                "dependence_tolerance": 1.0e-7,
+                "minimum_retained_residual_ratio": 0.05,
+                "absolute_invariance_tolerance": 1.0e-7,
+                "relative_invariance_tolerance": 0.05,
+                "real_eigenvalue_tolerance": 1.0e-7,
+                "eigenvalue_group_tolerance": 1.0e-6,
+                "principal_angle_rank_tolerance": 1.0e-6
             }
+        },
+        "classification_uncertainty_registry": {
+            "enabled": true,
+            "file_name": "stability_uncertainty_registry.json",
+            "maximum_diagnostic_length": 16384,
+            "retain_resolved": true
         },
         "linear_solver": {
             "maximum_iterations": 150,
@@ -305,7 +331,7 @@
             "verbose": false
         },
         "newton": {
-            "maximum_iterations": 30,
+            "maximum_iterations": 40,
             "update_wight_maximum": 1.0,
             "save_norms_history": false,
             "verbose": false,

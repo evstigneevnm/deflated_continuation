@@ -8,6 +8,7 @@
 
 #include <stability/analysis/spectrum_classifier.h>
 #include <stability/analysis/spectrum_scan_aggregator.h>
+#include <stability/analysis/validated_spectrum_union.h>
 
 namespace
 {
@@ -266,6 +267,63 @@ void test_geometric_multiplicity_is_preserved()
         "within-scan eigenvalue multiplicity is preserved");
 }
 
+void test_validated_independent_spectrum_union()
+{
+    using union_type =
+        stability::analysis::validated_spectrum_union<double>;
+    union_type spectral_union;
+
+    auto complete = success(
+        {
+            estimate({3.0, 0.0}, 1.0e-10),
+            estimate({2.0, 0.0}, 2.0e-10),
+            estimate({2.0, 0.0}, 3.0e-10)
+        },
+        1,
+        1);
+    complete.scans_requested = 4;
+    complete.scans_succeeded = 4;
+    require(
+        spectral_union.add(complete),
+        "complete spectrum enters the independent union");
+
+    result_type undercovered;
+    undercovered.status =
+        stability::eigensolvers::eigensolver_status::no_convergence;
+    undercovered.coverage_complete = false;
+    undercovered.scans_requested = 4;
+    undercovered.scans_succeeded = 4;
+    undercovered.eigenpairs = {
+        estimate({4.0, 0.0}, 1.0e-11),
+        estimate({2.0 + 1.0e-10, 0.0}, 1.0e-11)
+    };
+    require(
+        spectral_union.add(undercovered),
+        "all-scan aggregate undercoverage contributes validated values");
+
+    const auto reconciled = spectral_union.finish(2, 4);
+    const auto repeated = std::count_if(
+        reconciled.eigenpairs.begin(),
+        reconciled.eigenpairs.end(),
+        [](const estimate_type& value)
+        {
+            return std::abs(value.value.real() - 2.0) < 1.0e-6;
+        });
+    require(
+        reconciled.succeeded() &&
+            reconciled.eigenpairs.size() == 4 &&
+            repeated == 2,
+        "independent union takes maximum multiplicity instead of summing "
+        "duplicates");
+
+    result_type incomplete_scan = undercovered;
+    incomplete_scan.scans_succeeded = 3;
+    require(
+        !spectral_union.add(incomplete_scan) &&
+            spectral_union.usable_results() == 2,
+        "partial scan failures do not enter the validated union");
+}
+
 } // namespace
 
 int main()
@@ -274,6 +332,7 @@ int main()
     test_partial_coverage_policy();
     test_minimum_aggregated_spectrum();
     test_geometric_multiplicity_is_preserved();
+    test_validated_independent_spectrum_union();
     std::cout
         << "Spectrum scan aggregation checks: "
         << checks << ", failures: " << failures << '\n';

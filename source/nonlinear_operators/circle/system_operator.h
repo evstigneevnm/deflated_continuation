@@ -9,6 +9,8 @@
 *
 */
 
+#include <numerical_algos/lin_solvers/linear_solve_recovery.h>
+
 
 namespace nonlinear_operators
 {
@@ -41,7 +43,18 @@ public:
         nonlin_op->set_linearization_point(x, lambda);
         nonlin_op->F(x, lambda, b); // 
         vec_ops->add_mul_scalar(T(0), T(-1), b); //b=-F(x,lambda)
-        flag_lin_solver = lin_solver->solve(*lin_op, b, d_x);
+        flag_lin_solver =
+            numerical_algos::lin_solvers::recovery::
+                solve_with_unpreconditioned_retry(
+                    lin_solver,
+                    [this, &d_x]()
+                    {
+                        return lin_solver->solve(*lin_op, b, d_x);
+                    },
+                    [this, &d_x]()
+                    {
+                        vec_ops->assign_scalar(T(0), d_x);
+                    });
         return flag_lin_solver;
     }
 private:

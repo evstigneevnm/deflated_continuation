@@ -70,6 +70,21 @@ struct has_recycled_subspace_reset<
 {
 };
 
+template<class Eigensolver, class = void>
+struct has_recycled_ritz_subspace_reset : std::false_type
+{
+};
+
+template<class Eigensolver>
+struct has_recycled_ritz_subspace_reset<
+    Eigensolver,
+    std::void_t<decltype(
+        std::declval<const Eigensolver&>().
+            reset_recycled_ritz_subspace())>>
+    : std::true_type
+{
+};
+
 } // namespace detail
 
 /**
@@ -122,6 +137,10 @@ private:
             evaluator_type>;
 
 public:
+    using fixed_parameter_correction_result_type =
+        typename transition_refiner_type::
+            fixed_parameter_correction_result;
+
     stability_analysis(
         VectorOperations* vec_ops,
         Log* log,
@@ -225,6 +244,52 @@ public:
             correct_with_fixed_parameter_newton;
     }
 
+    void set_failed_transition_classification_uses_fixed_parameter_newton(
+        bool value)
+    {
+        transition_options_.
+            recover_failed_classification_with_fixed_parameter_newton =
+                value;
+    }
+
+    bool failed_transition_classification_uses_fixed_parameter_newton()
+        const
+    {
+        return transition_options_.
+            recover_failed_classification_with_fixed_parameter_newton;
+    }
+
+    void set_failed_transition_newton_uses_parameter_homotopy(
+        bool value)
+    {
+        transition_options_.
+            recover_failed_newton_with_parameter_homotopy = value;
+    }
+
+    bool failed_transition_newton_uses_parameter_homotopy() const
+    {
+        return transition_options_.
+            recover_failed_newton_with_parameter_homotopy;
+    }
+
+    void set_transition_newton_homotopy_maximum_subdivisions(
+        unsigned int value)
+    {
+        if(value < 2)
+            throw std::invalid_argument(
+                "stability_analysis: transition Newton homotopy "
+                "requires at least two subdivisions");
+        transition_options_.parameter_homotopy_maximum_subdivisions =
+            value;
+    }
+
+    unsigned int transition_newton_homotopy_maximum_subdivisions()
+        const
+    {
+        return transition_options_.
+            parameter_homotopy_maximum_subdivisions;
+    }
+
     void set_transition_refinement_maximum_iterations(
         unsigned int value)
     {
@@ -281,6 +346,40 @@ public:
         transition_refiner_.reset_transition_state_aligner();
     }
 
+    void align_transition_state(
+        const T_vec& reference,
+        const T_vec& source,
+        T_vec& destination) const
+    {
+        transition_refiner_.align_state(
+            reference,
+            source,
+            destination);
+    }
+
+    template<class FallbackNewton>
+    void set_transition_fallback_newton(
+        FallbackNewton* fallback_newton)
+    {
+        transition_refiner_.set_fallback_newton(
+            fallback_newton);
+    }
+
+    void reset_transition_fallback_newton()
+    {
+        transition_refiner_.reset_fallback_newton();
+    }
+
+    fixed_parameter_correction_result_type
+    correct_fixed_parameter_state(
+        T_vec& state,
+        T parameter)
+    {
+        return transition_refiner_.correct_fixed_parameter_state(
+            state,
+            parameter);
+    }
+
     void reset_recycled_subspace()
     {
         if constexpr(
@@ -288,6 +387,20 @@ public:
                 eigensolver_adapter_type>::value)
         {
             eigensolver_adapter_->reset_recycled_subspace();
+        }
+    }
+
+    void reset_recycled_ritz_subspace()
+    {
+        if constexpr(
+            detail::has_recycled_ritz_subspace_reset<
+                eigensolver_adapter_type>::value)
+        {
+            eigensolver_adapter_->reset_recycled_ritz_subspace();
+        }
+        else
+        {
+            reset_recycled_subspace();
         }
     }
 
@@ -311,11 +424,17 @@ public:
         {
             log_->info_f(
                 "stability transition confirmation at lambda = %lf: "
-                "dim(U) = (%i,%i), attempts = %zu",
+                "dim(U) = (%i,%i), dim(N) = (%i,%i), "
+                "unclassified = %zu, attempts = %zu, "
+                "coverage recoveries = %zu",
                 double(parameter),
                 result.unstable.real,
                 result.unstable.complex_pairs,
-                result.classification_attempts);
+                result.neutral_real,
+                result.neutral_complex_pairs,
+                result.unclassified_eigenvalues,
+                result.classification_attempts,
+                result.coverage_recoveries);
         }
         else
         {
@@ -332,7 +451,7 @@ public:
         const T_vec& state,
         T parameter)
     {
-        reset_recycled_subspace();
+        reset_recycled_ritz_subspace();
         return analyze(state, parameter);
     }
 
@@ -340,7 +459,7 @@ public:
         const T_vec& state,
         T parameter)
     {
-        reset_recycled_subspace();
+        reset_recycled_ritz_subspace();
         return analyze_confirmed(state, parameter);
     }
 
@@ -454,14 +573,19 @@ public:
         log_->info_f(
             "stability transition refined to lambda = %lf, "
             "dim(U): before = (%i,%i), after = (%i,%i), "
-            "iterations = %i, consistency restarts = %i",
+            "iterations = %i, consistency restarts = %i, "
+            "parameter-homotopy recoveries = %i (%i steps), "
+            "fallback-Newton recoveries = %i",
             double(refined_parameter),
             transition.before_stability.unstable.real,
             transition.before_stability.unstable.complex_pairs,
             transition.after_stability.unstable.real,
             transition.after_stability.unstable.complex_pairs,
             int(transition.iterations),
-            int(transition.consistency_restarts));
+            int(transition.consistency_restarts),
+            int(transition.parameter_homotopy_recoveries),
+            int(transition.parameter_homotopy_steps),
+            int(transition.fallback_newton_recoveries));
         return transition;
     }
 
@@ -664,19 +788,19 @@ private:
                  : result.diagnostic));
     }
 
-    template<class TransitionResult>
     static void ensure_refined(
-        const TransitionResult& result,
+        const transition_result_type& result,
         const char* context)
     {
         if(result.succeeded())
             return;
-        throw std::runtime_error(
+        throw analysis::stability_transition_error<T>(
             std::string(context) + ": " +
-            (result.diagnostic.empty()
-                 ? analysis::stability_transition_status_name(
-                       result.status)
-                 : result.diagnostic));
+                (result.diagnostic.empty()
+                     ? analysis::stability_transition_status_name(
+                           result.status)
+                     : result.diagnostic),
+            result);
     }
 
     template<class EventCallback>
@@ -755,13 +879,18 @@ private:
         log_->info_f(
             "stability transition interval contains multiple events: "
             "lambda = %.16le has dim(U) = (%i,%i), splitting endpoint "
-            "dimensions %i and %i at subdivision depth %u",
+            "dimensions %i and %i at subdivision depth %u; "
+            "parameter-homotopy recoveries = %u (%u steps), "
+            "fallback-Newton recoveries = %u",
             double(transition.parameter),
             transition.stability.unstable.real,
             transition.stability.unstable.complex_pairs,
             lower_dimension,
             upper_dimension,
-            subdivision_depth + 1);
+            subdivision_depth + 1,
+            transition.parameter_homotopy_recoveries,
+            transition.parameter_homotopy_steps,
+            transition.fallback_newton_recoveries);
 
         std::size_t event_count = 0;
         if(lower_dimension != middle_dimension)
@@ -805,14 +934,19 @@ private:
         log_->info_f(
             "stability transition refined to lambda = %lf, "
             "dim(U): before = (%i,%i), after = (%i,%i), "
-            "iterations = %i, consistency restarts = %i",
+            "iterations = %i, consistency restarts = %i, "
+            "parameter-homotopy recoveries = %i (%i steps), "
+            "fallback-Newton recoveries = %i",
             double(transition.parameter),
             transition.before_stability.unstable.real,
             transition.before_stability.unstable.complex_pairs,
             transition.after_stability.unstable.real,
             transition.after_stability.unstable.complex_pairs,
             int(transition.iterations),
-            int(transition.consistency_restarts));
+            int(transition.consistency_restarts),
+            int(transition.parameter_homotopy_recoveries),
+            int(transition.parameter_homotopy_steps),
+            int(transition.fallback_newton_recoveries));
     }
 
     void log_result(
@@ -826,6 +960,14 @@ private:
                 "= %lf required %zu attempts",
                 double(parameter),
                 result.classification_attempts);
+        }
+        if(result.coverage_recoveries > 0)
+        {
+            log_->info_f(
+                "stability.execute: spectrum classification at lambda "
+                "= %lf used %zu tracked coverage recovery pass(es)",
+                double(parameter),
+                result.coverage_recoveries);
         }
         for(const auto& estimate : result.eigenpairs)
         {

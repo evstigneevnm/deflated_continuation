@@ -1012,7 +1012,6 @@ public:
         const auto result = container::load_diagram_archive(path, *bif_diag);
         if(result.succeeded())
         {
-            bif_diag->reset_curve_output_directories();
             validate_loaded_archive_symmetry_definition();
             synchronize_symmetry_event_registry();
             log->info_f(

@@ -15,6 +15,8 @@
 #include "matrix_free_stability_solver.h"
 #include "recycled_ritz_subspace.h"
 #include "spectrum_scan_aggregator.h"
+#include "validated_spectrum_union.h"
+#include <stability/tracking/tracked_invariant_subspace.h>
 
 namespace stability
 {
@@ -92,6 +94,10 @@ public:
         recycled_ritz_subspace<real_space_type>;
     using recycling_options_type =
         typename recycled_subspace_type::options_type;
+    using tracked_subspace_type =
+        tracking::tracked_invariant_subspace<real_space_type>;
+    using tracking_options_type =
+        typename tracked_subspace_type::options_type;
     using probe_generator_type =
         std::function<void(
             std::size_t,
@@ -118,7 +124,8 @@ public:
           aggregation_options_(std::move(aggregation_options)),
           log_(log),
           probe_generator_(std::move(probe_generator)),
-          recycled_subspace_(*real_space_)
+          recycled_subspace_(*real_space_),
+          tracked_subspace_(*real_space_)
     {
         if(scans_.empty())
             throw std::invalid_argument(
@@ -148,9 +155,147 @@ public:
                         "matrix-free stability retry factors are empty");
             }
         }
+        update_confirmation_union_options();
     }
 
     result_type execute(const vector_type& initial_vector) const
+    {
+        const auto& tracking = tracked_subspace_.options();
+        const std::size_t nominal_seed_limit =
+            tracking.maximum_seed_vectors;
+        result_type primary = execute_with_tracked_seed_limit(
+            initial_vector,
+            nominal_seed_limit);
+        const std::size_t recovery_seed_limit =
+            tracking.coverage_recovery_maximum_seed_vectors;
+        const bool aggregate_undercoverage =
+            !primary.succeeded() &&
+            primary.scans_requested != 0 &&
+            primary.scans_succeeded == primary.scans_requested &&
+            primary.eigenpairs.size() <
+                aggregation_options_.minimum_eigenpairs;
+        if(
+            !tracking.enabled ||
+            !aggregate_undercoverage ||
+            recovery_seed_limit <= nominal_seed_limit ||
+            tracked_subspace_.seed_size() <= nominal_seed_limit)
+        {
+            record_confirmation_spectrum(primary);
+            return primary;
+        }
+
+        result_type recovered = execute_with_tracked_seed_limit(
+            initial_vector,
+            recovery_seed_limit);
+        accumulate_work(recovered, primary);
+        ++recovered.coverage_recoveries;
+        const std::string recovery_diagnostic =
+            std::move(recovered.diagnostic);
+        std::ostringstream diagnostic;
+        diagnostic
+            << "tracked coverage recovery with seed limit "
+            << recovery_seed_limit
+            << (recovered.succeeded() ? " succeeded" : " failed")
+            << " after primary undercoverage {"
+            << primary.diagnostic << '}';
+        if(!recovery_diagnostic.empty())
+            diagnostic << "; recovery {" << recovery_diagnostic << '}';
+        recovered.diagnostic = diagnostic.str();
+        record_confirmation_spectrum(recovered);
+        return recovered;
+    }
+
+    bool classification_reconciliation_available() const
+    {
+        const auto& tracking = tracked_subspace_.options();
+        const bool expanded_tracking_available =
+            tracking.enabled &&
+            tracking.coverage_recovery_maximum_seed_vectors >
+                tracking.maximum_seed_vectors &&
+            tracked_subspace_.seed_size() >
+                tracking.maximum_seed_vectors;
+        return
+            confirmation_transaction_active_ &&
+            (
+                confirmation_union_.usable_results() >= 2 ||
+                expanded_tracking_available);
+    }
+
+    result_type execute_classification_reconciliation(
+        const vector_type& initial_vector,
+        std::size_t minimum_results) const
+    {
+        result_type result;
+        if(!classification_reconciliation_available())
+        {
+            result.status =
+                eigensolvers::eigensolver_status::invalid_input;
+            result.coverage_complete = false;
+            result.diagnostic =
+                "tracked classification reconciliation is unavailable";
+            return result;
+        }
+
+        result = confirmation_union_.finish(
+            minimum_results,
+            aggregation_options_.minimum_eigenpairs);
+        if(result.succeeded())
+        {
+            ++result.coverage_recoveries;
+            result.diagnostic =
+                "classification reconciled from the transactional "
+                "validated spectrum union without an additional scan: " +
+                result.diagnostic;
+            return result;
+        }
+
+        const auto& tracking = tracked_subspace_.options();
+        const std::size_t seed_limit =
+            tracking.
+                coverage_recovery_maximum_seed_vectors;
+        const bool expanded_tracking_available =
+            tracking.enabled &&
+            seed_limit > tracking.maximum_seed_vectors &&
+            tracked_subspace_.seed_size() >
+                tracking.maximum_seed_vectors;
+        if(!expanded_tracking_available)
+        {
+            result.diagnostic =
+                "classification spectrum union is incomplete and "
+                "expanded tracked reconciliation is unavailable: " +
+                result.diagnostic;
+            return result;
+        }
+
+        result_type expanded = execute_with_tracked_seed_limit(
+            initial_vector,
+            seed_limit);
+        record_confirmation_spectrum(expanded);
+        result = confirmation_union_.finish(
+            minimum_results,
+            aggregation_options_.minimum_eigenpairs);
+        accumulate_work(result, expanded);
+        ++result.coverage_recoveries;
+        const std::string expanded_detail =
+            std::move(expanded.diagnostic);
+        const std::string union_detail = std::move(result.diagnostic);
+        std::ostringstream diagnostic;
+        diagnostic
+            << "tracked classification reconciliation with seed limit "
+            << seed_limit
+            << (result.succeeded() ? " succeeded" : " failed");
+        if(!expanded_detail.empty())
+            diagnostic << " after expanded scan {" << expanded_detail << '}';
+        if(!union_detail.empty())
+            diagnostic << "; union {" << union_detail << '}';
+        result.diagnostic = diagnostic.str();
+        return result;
+    }
+
+private:
+    result_type execute_with_tracked_seed_limit(
+        const vector_type& initial_vector,
+        std::size_t tracked_seed_limit) const
     {
         spectrum_scan_aggregator<real_type> aggregate(
             scans_.size(),
@@ -158,6 +303,8 @@ public:
         detail::vector_workspace<real_space_type> probe(
             real_space_.get());
         detail::vector_workspace<real_space_type> recycled_probe(
+            real_space_.get());
+        detail::vector_workspace<real_space_type> tracked_probe(
             real_space_.get());
 
         typename eigenvector_rank_aggregator<
@@ -174,7 +321,16 @@ public:
             recycle_candidates(*real_space_, rank_options);
         const auto recycle_validation =
             recycled_subspace_.validate(real_operator_);
+        const auto tracked_validation =
+            tracked_subspace_.validate(real_operator_);
+        const std::size_t tracked_seed_count =
+            tracked_validation.accepted
+            ? std::min(
+                  tracked_validation.accepted_indices.size(),
+                  tracked_seed_limit)
+            : std::size_t(0);
         std::size_t recycled_probe_seeds = 0;
+        std::size_t tracked_probe_seeds = 0;
 
         const std::size_t required_successful_probes =
             aggregation_options_.require_all_probes
@@ -203,24 +359,53 @@ public:
                      : 0);
             const std::size_t recovered_capacity =
                 4*transformed_capacity;
-            for(std::size_t probe_index = 0;
-                probe_index < aggregation_options_.probe_count;
-                ++probe_index)
+            std::size_t successful_tracked_probes = 0;
+            const std::size_t scheduled_probe_count =
+                aggregation_options_.probe_count + tracked_seed_count;
+            for(std::size_t scheduled_probe_index = 0;
+                scheduled_probe_index < scheduled_probe_count;
+                ++scheduled_probe_index)
             {
+                const bool scheduled_tracked_seed =
+                    scheduled_probe_index < tracked_seed_count;
+                const std::size_t fresh_probe_index =
+                    scheduled_tracked_seed
+                    ? std::size_t(0)
+                    : scheduled_probe_index - tracked_seed_count;
                 const vector_type* probe_vector =
                     &initial_vector;
-                if(probe_index != 0)
+                bool tracked_seed = false;
+                if(scheduled_tracked_seed)
                 {
                     generate_probe(
-                        probe_index,
+                        aggregation_options_.probe_count +
+                            scheduled_probe_index,
+                        initial_vector,
+                        probe.get());
+                    tracked_seed = tracked_subspace_.make_seed(
+                        scheduled_probe_index,
+                        probe.get(),
+                        tracked_validation.accepted_indices,
+                        tracked_probe.get());
+                    probe_vector = tracked_seed
+                        ? &tracked_probe.get()
+                        : &probe.get();
+                    if(tracked_seed)
+                        ++tracked_probe_seeds;
+                }
+                else if(fresh_probe_index != 0)
+                {
+                    generate_probe(
+                        fresh_probe_index,
                         initial_vector,
                         probe.get());
                     probe_vector = &probe.get();
                 }
                 const bool recycled_seed =
-                    probe_index >= required_successful_probes &&
+                    !scheduled_tracked_seed &&
+                    fresh_probe_index >= required_successful_probes &&
                     recycled_subspace_.make_seed(
-                        probe_index,
+                        fresh_probe_index,
                         *probe_vector,
                         recycle_validation.accepted_indices,
                         recycled_probe.get());
@@ -336,7 +521,9 @@ public:
                             probe_result.coverage_complete)
                         {
                             ++successful_probes;
-                            if(!recycled_seed)
+                            if(tracked_seed)
+                                ++successful_tracked_probes;
+                            else if(!recycled_seed)
                                 ++successful_fresh_probes;
                             physical_subspace.add(
                                 probe_result,
@@ -349,7 +536,7 @@ public:
                             {
                                 append_retry_recovery(
                                     retry_recoveries,
-                                    probe_index,
+                                    scheduled_probe_index,
                                     solver_attempt_label,
                                     attempt_failures,
                                     health_diagnostic,
@@ -386,7 +573,7 @@ public:
                     }
                     append_probe_failure(
                         probe_failures,
-                        probe_index,
+                        scheduled_probe_index,
                         terminal_failure,
                         attempt_failures);
                 }
@@ -410,18 +597,20 @@ public:
                             no_convergence);
             scan_result.coverage_complete = accepted_probes;
             scan_result.scans_requested =
-                aggregation_options_.probe_count;
+                scheduled_probe_count;
             scan_result.scans_succeeded = successful_probes;
             std::ostringstream diagnostic;
             diagnostic
                 << "multiplicity probes: "
                 << successful_probes << "/"
-                << aggregation_options_.probe_count
+                << scheduled_probe_count
                 << " succeeded (minimum "
                 << required_successful_probes << "), "
                 << successful_fresh_probes
                 << " fresh probes succeeded (minimum "
                 << required_successful_probes << "), "
+                << successful_tracked_probes
+                << " tracked probes succeeded, "
                 << scan_result.eigenpairs.size()
                 << " independent physical eigenpairs";
             if(!probe_failures.empty())
@@ -438,8 +627,13 @@ public:
         result_type result = aggregate.finish();
         result.operator_calls +=
             recycle_validation.operator_calls;
+        result.operator_calls +=
+            tracked_validation.operator_calls;
         if(result.succeeded())
+        {
             recycled_subspace_.stage(recycle_candidates);
+            tracked_subspace_.stage(recycle_candidates);
+        }
         if(recycled_subspace_.enabled())
         {
             std::ostringstream recycling;
@@ -456,8 +650,47 @@ public:
                 ? recycling.str()
                 : result.diagnostic + "; " + recycling.str();
         }
+        if(tracked_subspace_.enabled())
+        {
+            std::ostringstream tracking_diagnostic;
+            tracking_diagnostic
+                << "invariant-subspace tracking: committed="
+                << tracked_subspace_.size()
+                << ", validation="
+                << (tracked_validation.accepted
+                        ? "accepted"
+                        : "rejected")
+                << ", residual="
+                << tracked_validation.residual_frobenius
+                << ", relative_residual="
+                << tracked_validation.relative_residual
+                << ", accepted_dimension="
+                << tracked_validation.accepted_indices.size()
+                << ", seeded_probes="
+                << tracked_probe_seeds
+                << ", staged_retained_columns="
+                << tracked_subspace_.pending_retained_columns();
+            if(tracked_subspace_.pending_overlap())
+            {
+                const auto& overlap =
+                    *tracked_subspace_.pending_overlap();
+                tracking_diagnostic
+                    << ", staged_overlap_rank="
+                    << overlap.numerical_rank
+                    << ", staged_dimension_gap="
+                    << overlap.dimension_gap
+                    << ", staged_max_angle="
+                    << overlap.maximum_angle;
+            }
+            result.diagnostic = result.diagnostic.empty()
+                ? tracking_diagnostic.str()
+                : result.diagnostic + "; " +
+                    tracking_diagnostic.str();
+        }
         return result;
     }
+
+public:
 
     std::size_t scan_count() const
     {
@@ -467,6 +700,18 @@ public:
     const std::vector<scan_definition_type>& scans() const
     {
         return scans_;
+    }
+
+    void set_aggregation_options(
+        aggregation_options_type aggregation_options)
+    {
+        aggregation_options_ = std::move(aggregation_options);
+        update_confirmation_union_options();
+    }
+
+    const aggregation_options_type& aggregation_options() const
+    {
+        return aggregation_options_;
     }
 
     void set_probe_generator(probe_generator_type probe_generator)
@@ -489,29 +734,64 @@ public:
         return recycled_subspace_.options();
     }
 
+    void set_tracking_options(tracking_options_type options)
+    {
+        tracked_subspace_.set_options(std::move(options));
+    }
+
+    const tracking_options_type& tracking_options() const
+    {
+        return tracked_subspace_.options();
+    }
+
     void begin_recycling_transaction() const
     {
         recycled_subspace_.begin_transaction();
+        tracked_subspace_.begin_transaction();
+        confirmation_union_.reset();
+        confirmation_transaction_active_ = true;
     }
 
     void commit_recycling_transaction() const
     {
         recycled_subspace_.commit_transaction();
+        tracked_subspace_.commit_transaction();
+        confirmation_union_.reset();
+        confirmation_transaction_active_ = false;
     }
 
     void rollback_recycling_transaction() const
     {
         recycled_subspace_.rollback_transaction();
+        tracked_subspace_.rollback_transaction();
+        confirmation_union_.reset();
+        confirmation_transaction_active_ = false;
     }
 
     void reset_recycled_subspace() const
     {
         recycled_subspace_.clear();
+        tracked_subspace_.clear();
+    }
+
+    void reset_recycled_ritz_subspace() const
+    {
+        recycled_subspace_.clear();
+    }
+
+    void reset_tracked_invariant_subspace() const
+    {
+        tracked_subspace_.clear();
     }
 
     std::size_t recycled_subspace_size() const
     {
         return recycled_subspace_.size();
+    }
+
+    std::size_t tracked_subspace_size() const
+    {
+        return tracked_subspace_.size();
     }
 
 private:
@@ -537,6 +817,25 @@ private:
     log_type* log_;
     probe_generator_type probe_generator_;
     mutable recycled_subspace_type recycled_subspace_;
+    mutable tracked_subspace_type tracked_subspace_;
+    mutable validated_spectrum_union<real_type> confirmation_union_;
+    mutable bool confirmation_transaction_active_ = false;
+
+    void update_confirmation_union_options()
+    {
+        typename validated_spectrum_union<real_type>::options_type options;
+        options.absolute_tolerance =
+            aggregation_options_.absolute_tolerance;
+        options.relative_tolerance =
+            aggregation_options_.relative_tolerance;
+        confirmation_union_.set_options(std::move(options));
+    }
+
+    void record_confirmation_spectrum(const result_type& result) const
+    {
+        if(confirmation_transaction_active_)
+            confirmation_union_.add(result);
+    }
 
     void generate_probe(
         std::size_t probe_index,
@@ -565,6 +864,8 @@ private:
         destination.operator_calls += source.operator_calls;
         destination.inner_solver_calls +=
             source.inner_solver_calls;
+        destination.coverage_recoveries +=
+            source.coverage_recoveries;
         destination.effective_subspace_dimension = std::max(
             destination.effective_subspace_dimension,
             source.effective_subspace_dimension);

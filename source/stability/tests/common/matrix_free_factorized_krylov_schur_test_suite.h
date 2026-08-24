@@ -541,6 +541,138 @@ void test_complex_pair_recovery(const std::string& label)
                 std::string::npos,
         label + " matrix-free scan reuses validated Ritz vectors: " +
             recycled_scan.diagnostic);
+
+    recycling_options.enabled = false;
+    scan_driver.set_recycling_options(recycling_options);
+    typename scan_type::tracking_options_type tracking_options;
+    tracking_options.enabled = true;
+    tracking_options.maximum_dimension = 4;
+    tracking_options.maximum_seed_vectors = 4;
+    tracking_options.seed_innovation_weight = real_type(0.2);
+    tracking_options.absolute_invariance_tolerance = real_type(1.0e-8);
+    tracking_options.relative_invariance_tolerance = real_type(1.0e-6);
+    scan_driver.set_tracking_options(tracking_options);
+
+    scan_driver.begin_recycling_transaction();
+    const auto tracking_prime = scan_driver.execute(*initial);
+    const auto tracking_confirmation =
+        tracking_prime.succeeded()
+        ? scan_driver.execute(*initial)
+        : typename scan_type::result_type{};
+    if(
+        tracking_prime.succeeded() &&
+        tracking_confirmation.succeeded())
+    {
+        scan_driver.commit_recycling_transaction();
+    }
+    else
+    {
+        scan_driver.rollback_recycling_transaction();
+    }
+    require(
+        tracking_prime.succeeded() &&
+            tracking_confirmation.succeeded() &&
+            tracking_confirmation.diagnostic.find(
+                "seeded_probes=0") == std::string::npos &&
+            scan_driver.tracked_subspace_size() > 1,
+        label +
+            " repeated confirmation sees staged invariant-subspace "
+            "seeds before commit: " +
+            tracking_confirmation.diagnostic);
+
+    scan_driver.begin_recycling_transaction();
+    const auto tracked_scan = scan_driver.execute(*initial);
+    if(tracked_scan.succeeded())
+        scan_driver.commit_recycling_transaction();
+    else
+        scan_driver.rollback_recycling_transaction();
+    require(
+        tracked_scan.succeeded() &&
+            tracked_scan.diagnostic.find(
+                "invariant-subspace tracking: committed=") !=
+                std::string::npos &&
+            tracked_scan.diagnostic.find("seeded_probes=0") ==
+                std::string::npos &&
+            tracked_scan.diagnostic.find(
+                "4 fresh probes succeeded (minimum 2)") !=
+                std::string::npos,
+        label +
+            " tracked probes supplement rather than replace discovery: " +
+            tracked_scan.diagnostic);
+
+    tracking_options.maximum_seed_vectors = 1;
+    tracking_options.coverage_recovery_maximum_seed_vectors = 4;
+    scan_driver.set_tracking_options(tracking_options);
+    scan_driver.begin_recycling_transaction();
+    const auto nominal_coverage_scan = scan_driver.execute(*initial);
+    if(nominal_coverage_scan.succeeded())
+        scan_driver.commit_recycling_transaction();
+    else
+        scan_driver.rollback_recycling_transaction();
+    require(
+        nominal_coverage_scan.succeeded() &&
+            nominal_coverage_scan.coverage_recoveries == 0 &&
+            nominal_coverage_scan.diagnostic.find(
+                "seeded_probes=2") != std::string::npos,
+        label +
+            " recovery seed cap adds no work to a covered scan: " +
+            nominal_coverage_scan.diagnostic);
+
+    scan_driver.begin_recycling_transaction();
+    const bool reconciliation_available =
+        scan_driver.classification_reconciliation_available();
+    const auto reconciliation_scan =
+        scan_driver.execute_classification_reconciliation(*initial, 1);
+    if(reconciliation_scan.succeeded())
+        scan_driver.commit_recycling_transaction();
+    else
+        scan_driver.rollback_recycling_transaction();
+    require(
+        reconciliation_available &&
+            reconciliation_scan.succeeded() &&
+            reconciliation_scan.coverage_recoveries == 1 &&
+            reconciliation_scan.diagnostic.find(
+                "tracked classification reconciliation with seed limit 4 "
+                "succeeded") != std::string::npos,
+        label +
+            " explicit classification reconciliation uses the expanded "
+            "tracked seed budget: " + reconciliation_scan.diagnostic);
+
+    auto undercoverage_options = scan_driver.aggregation_options();
+    const auto original_aggregation_options = undercoverage_options;
+    undercoverage_options.minimum_eigenpairs =
+        nominal_coverage_scan.eigenpairs.size() + 1;
+    scan_driver.set_aggregation_options(undercoverage_options);
+    scan_driver.begin_recycling_transaction();
+    const auto exhausted_coverage_recovery =
+        scan_driver.execute(*initial);
+    scan_driver.rollback_recycling_transaction();
+    require(
+        !exhausted_coverage_recovery.succeeded() &&
+            exhausted_coverage_recovery.coverage_recoveries == 1 &&
+            exhausted_coverage_recovery.diagnostic.find(
+                "tracked coverage recovery with seed limit 4 failed") !=
+                std::string::npos,
+        label +
+            " aggregate undercoverage triggers the bounded tracked "
+            "recovery pass: " +
+            exhausted_coverage_recovery.diagnostic);
+    scan_driver.set_aggregation_options(original_aggregation_options);
+    tracking_options.maximum_seed_vectors = 4;
+    tracking_options.coverage_recovery_maximum_seed_vectors = 0;
+    scan_driver.set_tracking_options(tracking_options);
+
+    const std::size_t tracked_dimension =
+        scan_driver.tracked_subspace_size();
+    scan_driver.reset_recycled_ritz_subspace();
+    require(
+        tracked_dimension > 0 &&
+            scan_driver.tracked_subspace_size() == tracked_dimension,
+        label + " legacy Ritz reset preserves tracked invariant subspace");
+    scan_driver.reset_recycled_subspace();
+    require(
+        scan_driver.tracked_subspace_size() == 0,
+        label + " full warm-start reset clears tracked invariant subspace");
 }
 
 template<class Backend>

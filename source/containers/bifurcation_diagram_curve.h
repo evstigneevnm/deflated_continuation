@@ -68,21 +68,13 @@ public:
     {
         if(!refs_set)
         {
-            vec_ops = vec_ops_;
-            vec_files = vec_files_;
-            log = log_;
-            nlin_op = nlin_op_;
-            newton = newton_;
-            helper_vectors_->get_refs(x0, x1);
-            vector_store.bind(vec_files, log);
-            interpolator.bind(vec_ops, &vector_store, nlin_op, newton, &x0, &x1);
-            intersection_search.bind(
-                vec_ops,
-                &interpolator,
-                &container,
-                &incomplete_segment_ids,
-                &x0,
-                &x1);
+            bind_main_refs(
+                vec_ops_,
+                vec_files_,
+                log_,
+                nlin_op_,
+                newton_,
+                helper_vectors_);
             refs_set = true;
             load_metadata_if_available();
             load_provenance_if_available();
@@ -110,16 +102,13 @@ public:
 //but may couse logical problems?
 //assume now that a HelperVectors class contains T_vec x0 and T_vec x1 and  can be accessed via reference.
 
-        helper_vectors_->get_refs(x0, x1);
-        vector_store.bind(vec_files, log);
-        interpolator.bind(vec_ops, &vector_store, nlin_op, newton, &x0, &x1);
-        intersection_search.bind(
-            vec_ops,
-            &interpolator,
-            &container,
-            &incomplete_segment_ids,
-            &x0,
-            &x1);
+        bind_main_refs(
+            vec_ops_,
+            vec_files_,
+            log_,
+            nlin_op_,
+            newton_,
+            helper_vectors_);
 //        std::cout << "x0 = " << x0 << " x1 = " << x1 << std::endl;
         set_directory(directory_);
         set_curve_number(curve_number_);
@@ -216,15 +205,15 @@ public:
 
 
 private:
-    VectorOperations* vec_ops;
-    VectorFileOperations* vec_files;
-    Log* log;
-    NonlinearOperator* nlin_op;
-    Newton* newton;
+    VectorOperations* vec_ops = nullptr;
+    VectorFileOperations* vec_files = nullptr;
+    Log* log = nullptr;
+    NonlinearOperator* nlin_op = nullptr;
+    Newton* newton = nullptr;
     std::string data_directory = "dat_files";
     int curve_number = 0;
     std::string full_path = ".";
-    unsigned int skip_output;
+    unsigned int skip_output = 10;
     std::string debug_f_name;
     std::string metadata_f_name;
     std::string provenance_f_name;
@@ -240,6 +229,37 @@ private:
     intersection_search_type intersection_search;
     curve_provenance provenance;
     bool provenance_metadata_available = false;
+
+    void bind_main_refs(
+        VectorOperations* vec_ops_,
+        VectorFileOperations* vec_files_,
+        Log* log_,
+        NonlinearOperator* nlin_op_,
+        Newton* newton_,
+        HelperVectors* helper_vectors_)
+    {
+        vec_ops = vec_ops_;
+        vec_files = vec_files_;
+        log = log_;
+        nlin_op = nlin_op_;
+        newton = newton_;
+        helper_vectors_->get_refs(x0, x1);
+        vector_store.bind(vec_files, log);
+        interpolator.bind(
+            vec_ops,
+            &vector_store,
+            nlin_op,
+            newton,
+            &x0,
+            &x1);
+        intersection_search.bind(
+            vec_ops,
+            &interpolator,
+            &container,
+            &incomplete_segment_ids,
+            &x0,
+            &x1);
+    }
 
     void mark_incomplete_segment(const uint64_t segment_id)
     {
@@ -433,6 +453,26 @@ public:
         load_metadata_if_available();
         load_provenance_if_available();
         load_symmetry_events_if_available();
+    }
+
+    void rebind_runtime_directory(
+        VectorOperations* vec_ops_,
+        VectorFileOperations* vec_files_,
+        Log* log_,
+        NonlinearOperator* nlin_op_,
+        Newton* newton_,
+        HelperVectors* helper_vectors_,
+        const std::string& data_directory_)
+    {
+        bind_main_refs(
+            vec_ops_,
+            vec_files_,
+            log_,
+            nlin_op_,
+            newton_,
+            helper_vectors_);
+        refs_set = true;
+        reset_output_directory(data_directory_);
     }
 
     void set_analytical_branch_provenance(
@@ -944,6 +984,27 @@ public:
         return read_saved_point(point, output);
     }
 
+    bool read_saved_solution_at_source_index(
+        const uint64_t source_point_index,
+        T_vec& output)
+    {
+        if(
+            source_point_index < container.size() &&
+            container[static_cast<std::size_t>(source_point_index)].
+                point_index == source_point_index)
+        {
+            return read_saved_point(
+                container[static_cast<std::size_t>(source_point_index)],
+                output);
+        }
+        for(const auto& point: container)
+        {
+            if(point.point_index == source_point_index)
+                return read_saved_point(point, output);
+        }
+        return false;
+    }
+
 private:
     b_d_container_t container;
     uint64_t global_id = 0; 
@@ -951,7 +1012,7 @@ private:
 
     T_vec x0;
     T_vec x1;
-    bool curve_open;
+    bool curve_open = false;
 
 
     //boost serialization

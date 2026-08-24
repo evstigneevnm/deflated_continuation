@@ -20,6 +20,7 @@ EVENT_STYLES = {
     "steady": ("D", "tab:red", "steady-state transition"),
     "hopf": ("^", "tab:purple", "Hopf transition"),
     "multiple": ("X", "black", "multiple transition"),
+    "topology": ("|", "tab:orange", "unresolved topology split"),
     "unknown": ("P", "tab:orange", "unclassified transition"),
 }
 
@@ -690,6 +691,39 @@ def stability_dimensions_for_rows(
     return dimensions
 
 
+def insert_stability_topology_breaks(
+    xs: list[float],
+    ys: list[float],
+    source_indices: list[int],
+    records: list[StabilityPlotRecord],
+) -> tuple[list[float], list[float], list[int]]:
+    break_sources = {
+        record.source_index
+        for record in records
+        if record.event_type == "topology"
+    }
+    if not break_sources:
+        return xs, ys, source_indices
+
+    broken_xs: list[float] = []
+    broken_ys: list[float] = []
+    broken_indices: list[int] = []
+    for x_value, y_value, source_index in zip(xs, ys, source_indices):
+        if (
+            source_index in break_sources
+            and broken_xs
+            and not math.isnan(x_value)
+            and not math.isnan(broken_xs[-1])
+        ):
+            broken_xs.append(math.nan)
+            broken_ys.append(math.nan)
+            broken_indices.append(source_index)
+        broken_xs.append(x_value)
+        broken_ys.append(y_value)
+        broken_indices.append(source_index)
+    return broken_xs, broken_ys, broken_indices
+
+
 def make_stability_color_mapping(
     plt,
     stability_curves: dict[str, list[StabilityPlotRecord]],
@@ -793,7 +827,7 @@ def plot_stability_events(
     if args.disable_bifurcation_markers:
         return
     for record in records:
-        if record.point_type != "bifurcation":
+        if record.point_type not in ("bifurcation", "topology_break"):
             continue
         value = event_norm_value(record, rows, norm_index)
         if value is None:
@@ -809,16 +843,20 @@ def plot_stability_events(
             and not args.disable_bifurcation_legend
             and event_type not in event_labels
         )
+        marker_style = {
+            "marker": marker,
+            "color": color,
+            "linewidths": 1.5 if marker == "|" else 0.6,
+        }
+        if marker != "|":
+            marker_style["edgecolors"] = "white"
         axis.scatter(
             [record.parameter],
             [value],
-            marker=marker,
-            color=color,
-            edgecolors="white",
-            linewidths=0.6,
             s=args.bifurcation_marker_size,
             zorder=7,
             label=label if show_label else None,
+            **marker_style,
         )
         event_labels.add(event_type)
 
@@ -851,6 +889,13 @@ def plot_branch(
             **branch_style,
         )
         return xs, ys
+
+    xs, ys, source_indices = insert_stability_topology_breaks(
+        xs,
+        ys,
+        source_indices,
+        stability_records,
+    )
 
     if stability_mapping["mode"] == "uniform":
         branch_style = dict(line_style(args.style))
@@ -1084,7 +1129,9 @@ def plot_curves(
         args,
     )
 
-    for axis, norm_index in zip(axes_flat, selected_norms):
+    for axis_index, (axis, norm_index) in enumerate(
+        zip(axes_flat, selected_norms)
+    ):
         plot_branches_on_axis(
             axis,
             curves,
@@ -1096,7 +1143,7 @@ def plot_curves(
         axis.set_ylabel(labels[norm_index])
         apply_axis_font_overrides(axis, args)
         axis.grid(True, alpha=0.3)
-        if not args.disable_legend:
+        if not args.disable_legend and axis_index == 0:
             handles, legend_labels = axis.get_legend_handles_labels()
             if handles:
                 axis.legend(

@@ -225,6 +225,9 @@ int main(int argc, char** argv)
         eigensolver.set_recycling_options(
             stability::analysis::
                 make_recycled_ritz_subspace_options(config));
+        eigensolver.set_tracking_options(
+            stability::analysis::
+                make_tracked_invariant_subspace_options(config));
 
         if(!command_line.quiet)
         {

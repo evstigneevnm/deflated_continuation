@@ -100,6 +100,8 @@ public:
     {
         result_type result;
         result.eigensolver_status = solver_result.status;
+        result.coverage_recoveries =
+            solver_result.coverage_recoveries;
         result.eigenpairs = std::move(solver_result.eigenpairs);
 
         if(solver_result.status !=

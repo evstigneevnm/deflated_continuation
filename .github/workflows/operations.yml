@@ -273,6 +273,8 @@ jobs:
         run: |
           export OMP_NUM_THREADS=8
           KS2D_BUILD="$BUILD_DIR/ks2d_cpu_omp"
+          make test_KS2D_stability_cli.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_KS2D_stability_cli.bin
           make KS2D_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
           timeout 180s ./"$KS2D_BUILD"/KS2D_stability_cpu_omp.bin "$KS2D_BUILD/ks2d_ci.json" --quiet
           python3 scripts/validate_stability_diagram.py "$KS2D_BUILD/project" --expected-curves 1 --min-points 10 --require-complete --require-plot-sidecar --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
@@ -340,10 +342,18 @@ jobs:
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/stability_bratu_operators/test_bratu_stability_operators_cpu_omp.bin
           make test_stability_analysis_pipeline_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_analysis"
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/stability_analysis/test_stability_analysis_pipeline_cpu_omp.bin
+          make test_source_parameter_path.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_source_parameter_path"
+          ./"$BUILD_DIR"/stability_source_parameter_path/test_source_parameter_path.bin
+          make test_source_parameter_state_marcher.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_source_parameter_state_marcher"
+          ./"$BUILD_DIR"/stability_source_parameter_state_marcher/test_source_parameter_state_marcher.bin
+          make test_classification_uncertainty_registry.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_uncertainty_registry"
+          ./"$BUILD_DIR"/stability_uncertainty_registry/test_classification_uncertainty_registry.bin
           make test_spectrum_scan_aggregator.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_scan_aggregation"
           ./"$BUILD_DIR"/stability_scan_aggregation/test_spectrum_scan_aggregator.bin
           make test_eigenvector_rank_aggregator_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_rank_aggregation"
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/stability_rank_aggregation/test_eigenvector_rank_aggregator_cpu_omp.bin
+          make test_tracked_invariant_subspace_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_invariant_subspace"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/stability_invariant_subspace/test_tracked_invariant_subspace_cpu_omp.bin
           make test_matrix_free_stability_configuration.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_scan_configuration"
           ./"$BUILD_DIR"/stability_scan_configuration/test_matrix_free_stability_configuration.bin
           make test_stability_continuation_interface_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_continuation_interface"
@@ -419,6 +429,8 @@ jobs:
           ./"$BUILD_DIR"/eigensolver_projected_recovery_cuda/test_projected_spectrum_recovery_cuda.bin auto
           make test_stability_analysis_pipeline_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_analysis_cuda"
           ./"$BUILD_DIR"/stability_analysis_cuda/test_stability_analysis_pipeline_cuda.bin auto
+          make test_tracked_invariant_subspace_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_invariant_subspace_cuda"
+          ./"$BUILD_DIR"/stability_invariant_subspace_cuda/test_tracked_invariant_subspace_cuda.bin auto
           make test_scalar_affine_inverse_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_scalar_affine_cuda"
           ./"$BUILD_DIR"/stability_scalar_affine_cuda/test_scalar_affine_inverse_cuda.bin auto
           make test_complex_affine_transformations_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_complex_affine_cuda"

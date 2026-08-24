@@ -190,6 +190,95 @@ void test_validation()
         "invalid recycled-subspace innovation rejected");
 
     invalid = config;
+    invalid.invariant_subspace_tracking.enabled = true;
+    invalid.invariant_subspace_tracking.maximum_seed_vectors = 0;
+    require_throws(
+        [&invalid]
+        {
+            stability::analysis::
+                validate_matrix_free_stability_config(invalid);
+        },
+        "zero tracked-subspace seed budget rejected");
+
+    invalid = config;
+    invalid.invariant_subspace_tracking.maximum_dimension = 4;
+    invalid.invariant_subspace_tracking.maximum_seed_vectors = 5;
+    require_throws(
+        [&invalid]
+        {
+            stability::analysis::
+                validate_matrix_free_stability_config(invalid);
+        },
+        "tracked-subspace seed budget above capacity rejected");
+
+    invalid = config;
+    invalid.invariant_subspace_tracking.maximum_dimension = 4;
+    invalid.invariant_subspace_tracking.
+        coverage_recovery_maximum_seed_vectors = 5;
+    require_throws(
+        [&invalid]
+        {
+            stability::analysis::
+                validate_matrix_free_stability_config(invalid);
+        },
+        "tracked-subspace recovery budget above capacity rejected");
+
+    invalid = config;
+    invalid.invariant_subspace_tracking.seed_innovation_weight = 1.5;
+    require_throws(
+        [&invalid]
+        {
+            stability::analysis::
+                validate_matrix_free_stability_config(invalid);
+        },
+        "invalid tracked-subspace innovation rejected");
+
+    invalid = config;
+    invalid.invariant_subspace_tracking.
+        minimum_retained_residual_ratio = 1.0;
+    require_throws(
+        [&invalid]
+        {
+            stability::analysis::
+                validate_matrix_free_stability_config(invalid);
+        },
+        "invalid tracked-subspace retention threshold rejected");
+
+    invalid = config;
+    invalid.invariant_subspace_tracking.eigenvalue_group_tolerance = 0.0;
+    require_throws(
+        [&invalid]
+        {
+            stability::analysis::
+                validate_matrix_free_stability_config(invalid);
+        },
+        "zero tracked-subspace eigenvalue group tolerance rejected");
+
+    config.invariant_subspace_tracking.enabled = true;
+    config.invariant_subspace_tracking.maximum_dimension = 13;
+    config.invariant_subspace_tracking.maximum_seed_vectors = 5;
+    config.invariant_subspace_tracking.
+        coverage_recovery_maximum_seed_vectors = 11;
+    config.invariant_subspace_tracking.
+        minimum_retained_residual_ratio = 0.075;
+    config.invariant_subspace_tracking.eigenvalue_group_tolerance = 2.5e-6;
+    const auto tracking_options =
+        stability::analysis::make_tracked_invariant_subspace_options(
+            config);
+    require(
+        tracking_options.enabled &&
+            tracking_options.maximum_dimension == 13 &&
+            tracking_options.maximum_seed_vectors == 5 &&
+            tracking_options.coverage_recovery_maximum_seed_vectors == 11 &&
+            std::abs(
+                tracking_options.minimum_retained_residual_ratio -
+                0.075) < 1.0e-14 &&
+            std::abs(
+                tracking_options.eigenvalue_group_tolerance -
+                2.5e-6) < 1.0e-14,
+        "tracked-subspace configuration maps to runtime options");
+
+    invalid = config;
     invalid.transformation.shifts.clear();
     require_throws(
         [&invalid]

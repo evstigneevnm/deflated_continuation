@@ -821,6 +821,32 @@ struct parameters
             }
         };
 
+        struct classification_uncertainty_registry_s
+        {
+            bool enabled;
+            std::string file_name;
+            std::size_t maximum_diagnostic_length;
+            bool retain_resolved;
+
+            void set_default()
+            {
+                enabled = true;
+                file_name = "stability_uncertainty_registry.json";
+                maximum_diagnostic_length = 16384;
+                retain_resolved = true;
+            }
+
+            void plot_all() const
+            {
+                std::cout << "||  |==enabled: " << enabled << std::endl;
+                std::cout << "||  |==file_name: " << file_name << std::endl;
+                std::cout << "||  |==maximum_diagnostic_length: "
+                          << maximum_diagnostic_length << std::endl;
+                std::cout << "||  |==retain_resolved: "
+                          << retain_resolved << std::endl;
+            }
+        };
+
         bool            linear_operator_stable_eigenvalues_left_halfplane;
         unsigned int    Krylov_subspace;
         unsigned int    desired_spectrum;
@@ -835,12 +861,19 @@ struct parameters
         unsigned int    transition_classification_confirmations;
         bool            confirm_regular_stability_points;
         bool            correct_stability_transitions_with_newton;
+        bool            recover_failed_transition_classification_with_newton;
+        bool            recover_failed_transition_newton_with_parameter_homotopy;
+        unsigned int    transition_newton_homotopy_maximum_subdivisions;
         unsigned int    transition_refinement_maximum_iterations;
         unsigned int    transition_refinement_maximum_subdivisions;
         T               transition_refinement_parameter_tolerance;
+        unsigned int    turning_point_guard_source_points;
+        bool            allow_source_path_topology_splits;
         unsigned int    symmetry_endpoint_guard_source_points;
         stability::analysis::matrix_free_stability_config<T>
                         matrix_free_eigensolver;
+        classification_uncertainty_registry_s
+                        classification_uncertainty_registry;
         linear_solver_s linear_solver;
         newton_s        newton;
 
@@ -859,11 +892,17 @@ struct parameters
             transition_classification_confirmations            = 2;
             confirm_regular_stability_points                   = false;
             correct_stability_transitions_with_newton          = false;
+            recover_failed_transition_classification_with_newton = true;
+            recover_failed_transition_newton_with_parameter_homotopy = true;
+            transition_newton_homotopy_maximum_subdivisions    = 64;
             transition_refinement_maximum_iterations           = 20;
             transition_refinement_maximum_subdivisions          = 8;
             transition_refinement_parameter_tolerance          = T(0);
+            turning_point_guard_source_points                   = 2;
+            allow_source_path_topology_splits                   = false;
             symmetry_endpoint_guard_source_points               = 0;
             matrix_free_eigensolver                            = {};
+            classification_uncertainty_registry.set_default();
             linear_solver.set_default();
             newton.set_default();
         }
@@ -902,6 +941,18 @@ struct parameters
             std::cout << "||==correct_stability_transitions_with_newton: "
                       << correct_stability_transitions_with_newton
                       << std::endl;
+            std::cout
+                << "||==recover_failed_transition_classification_with_newton: "
+                << recover_failed_transition_classification_with_newton
+                << std::endl;
+            std::cout
+                << "||==recover_failed_transition_newton_with_parameter_homotopy: "
+                << recover_failed_transition_newton_with_parameter_homotopy
+                << std::endl;
+            std::cout
+                << "||==transition_newton_homotopy_maximum_subdivisions: "
+                << transition_newton_homotopy_maximum_subdivisions
+                << std::endl;
             std::cout << "||==transition_refinement_maximum_iterations: "
                       << transition_refinement_maximum_iterations
                       << std::endl;
@@ -910,6 +961,12 @@ struct parameters
                       << std::endl;
             std::cout << "||==transition_refinement_parameter_tolerance: "
                       << transition_refinement_parameter_tolerance
+                      << std::endl;
+            std::cout << "||==turning_point_guard_source_points: "
+                      << turning_point_guard_source_points
+                      << std::endl;
+            std::cout << "||==allow_source_path_topology_splits: "
+                      << allow_source_path_topology_splits
                       << std::endl;
             std::cout << "||==symmetry_endpoint_guard_source_points: "
                       << symmetry_endpoint_guard_source_points
@@ -1022,7 +1079,40 @@ struct parameters
                     << config.recycling.
                            relative_residual_tolerance
                     << std::endl;
+                std::cout
+                    << "||  |==invariant_subspace_tracking: "
+                    << (config.invariant_subspace_tracking.enabled
+                            ? "enabled"
+                            : "disabled")
+                    << ", maximum_dimension = "
+                    << config.invariant_subspace_tracking.
+                           maximum_dimension
+                    << ", maximum_seed_vectors = "
+                    << config.invariant_subspace_tracking.
+                           maximum_seed_vectors
+                    << ", coverage_recovery_maximum_seed_vectors = "
+                    << config.invariant_subspace_tracking.
+                           coverage_recovery_maximum_seed_vectors
+                    << ", seed_innovation_weight = "
+                    << config.invariant_subspace_tracking.
+                           seed_innovation_weight
+                    << ", minimum_retained_residual_ratio = "
+                    << config.invariant_subspace_tracking.
+                           minimum_retained_residual_ratio
+                    << ", eigenvalue_group_tolerance = "
+                    << config.invariant_subspace_tracking.
+                           eigenvalue_group_tolerance
+                    << ", invariance_tolerances = "
+                    << config.invariant_subspace_tracking.
+                           absolute_invariance_tolerance
+                    << " "
+                    << config.invariant_subspace_tracking.
+                           relative_invariance_tolerance
+                    << std::endl;
             }
+            std::cout << "||==classification_uncertainty_registry: "
+                      << std::endl;
+            classification_uncertainty_registry.plot_all();
             std::cout << "||==linear_solver: " << std::endl;
             linear_solver.plot_all();
             std::cout << "||==newton: " << std::endl;

@@ -64,6 +64,7 @@ struct eigensolver_result
     std::size_t restarts = 0;
     std::size_t operator_calls = 0;
     std::size_t inner_solver_calls = 0;
+    std::size_t coverage_recoveries = 0;
     std::size_t effective_subspace_dimension = 0;
     std::size_t scans_requested = 1;
     std::size_t scans_succeeded = 0;

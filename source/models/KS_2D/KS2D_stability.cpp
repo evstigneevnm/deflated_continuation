@@ -25,6 +25,7 @@
 
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 #include <numerical_algos/lin_solvers/default_monitor.h>
+#include <numerical_algos/newton_solvers/newton_solver.h>
 #include <symmetry/finite_action_registry.h>
 #include <symmetry/finite_group_manifest.h>
 #include <symmetry/finite_quotient_adapter.h>
@@ -140,6 +141,32 @@ int main(int argc, char** argv)
             small_system_eigensolver_type
         >;
         using newton_monitor_type = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
+        using fallback_monitor_type = nmfd::solvers::monitor_krylov<
+            vec_ops_real,
+            log_t>;
+        using fallback_solver_type = nmfd::solvers::gmres<
+            vec_ops_real,
+            fallback_monitor_type,
+            log_t,
+            newton_operator_type,
+            newton_preconditioner_type>;
+        using fallback_system_operator_type =
+            nonlinear_operators::system_operator<
+                vec_ops_real,
+                nonlinear_operator_type,
+                newton_operator_type,
+                fallback_solver_type>;
+        using fallback_convergence_type =
+            nonlinear_operators::newton_method::convergence_strategy<
+                vec_ops_real,
+                nonlinear_operator_type,
+                log_t>;
+        using fallback_newton_type =
+            numerical_algos::newton_method::newton_solver<
+                vec_ops_real,
+                nonlinear_operator_type,
+                fallback_system_operator_type,
+                fallback_convergence_type>;
         using finite_actions_type = symmetry::finite_action_registry<vec_ops_real>;
         using identity_adapter_type = deflation::identity_symmetry_adapter<vec_ops_real>;
         using residual_translation_aligner_type =
@@ -253,6 +280,9 @@ int main(int argc, char** argv)
         matrix_free_eigensolver.set_recycling_options(
             stability::analysis::
                 make_recycled_ritz_subspace_options(config));
+        matrix_free_eigensolver.set_tracking_options(
+            stability::analysis::
+                make_tracked_invariant_subspace_options(config));
         auto paired_probe_base = std::make_shared<
             stability::analysis::detail::vector_workspace<
                 vec_ops_real>>(real_space.get());
@@ -310,6 +340,43 @@ int main(int argc, char** argv)
             config.small_system.prefer
         );
 
+        auto fallback_preconditioner =
+            std::make_shared<newton_preconditioner_type>(
+                &nonlinear_operator);
+        const auto fallback_solver_parameters =
+            stability::analysis::
+                make_matrix_free_inner_solver_parameters<
+                    typename fallback_solver_type::params>(config);
+        fallback_solver_type fallback_solver(
+            real_space,
+            !command_line.quiet && config.inner_solver.verbose
+                ? &linear_solver_log
+                : nullptr,
+            fallback_solver_parameters,
+            fallback_preconditioner);
+        auto* fallback_vector_operations = real_space.get();
+        auto* fallback_linear_operator = &newton_operator;
+        auto* fallback_linear_solver = &fallback_solver;
+        fallback_system_operator_type fallback_system_operator(
+            fallback_vector_operations,
+            fallback_linear_operator,
+            fallback_linear_solver);
+        auto* fallback_log = &log;
+        fallback_convergence_type fallback_convergence(
+            fallback_vector_operations,
+            fallback_log);
+        fallback_convergence.set_convergence_constants(
+            parameters.stability_continuation.newton.tolerance,
+            parameters.stability_continuation.newton.newton_max_it,
+            parameters.stability_continuation.newton.newton_wight,
+            parameters.stability_continuation.newton.
+                store_norms_history,
+            parameters.stability_continuation.newton.verbose);
+        fallback_newton_type fallback_newton(
+            real_space.get(),
+            &fallback_system_operator,
+            &fallback_convergence);
+
         if(!command_line.quiet)
         {
             std::cout << "Using KS2D stability backend: " << KS2D_BACKEND_NAME
@@ -331,9 +398,112 @@ int main(int argc, char** argv)
         );
         (void)finite_action_workspace;
         driver.set_transition_state_aligner(&quotient_adapter);
+        driver.set_transition_fallback_newton(&fallback_newton);
         driver.set_parameters();
-        if(!command_line.second_state_file.empty())
+        if(command_line.curve_transition)
         {
+            const auto transitions =
+                driver.execute_curve_transition_sequence(
+                    command_line.curve_transition_curve,
+                    command_line.curve_transition_lower_source,
+                    command_line.curve_transition_upper_source);
+            std::cout
+                << "Archive curve-transition sequence: curve="
+                << command_line.curve_transition_curve
+                << ", sources=["
+                << command_line.curve_transition_lower_source
+                << ','
+                << command_line.curve_transition_upper_source
+                << "], events=" << transitions.size() << '\n';
+            for(std::size_t index = 0;
+                index < transitions.size();
+                ++index)
+            {
+                const auto& transition = transitions[index];
+                std::cout
+                    << "  event[" << index << "]: lambda="
+                    << std::setprecision(17)
+                    << transition.parameter
+                    << ", before=("
+                    << transition.before_stability.unstable.real
+                    << ','
+                    << transition.before_stability.unstable.complex_pairs
+                    << "), after=("
+                    << transition.after_stability.unstable.real
+                    << ','
+                    << transition.after_stability.unstable.complex_pairs
+                    << "), iterations="
+                    << transition.iterations << '\n';
+            }
+            return EXIT_SUCCESS;
+        }
+        else if(command_line.newton_target_parameter_set)
+        {
+            const auto result =
+                driver.execute_single_newton_correction(
+                    command_line.state_file,
+                    static_cast<real>(command_line.state_parameter),
+                    static_cast<real>(
+                        command_line.newton_target_parameter));
+            std::cout
+                << "Fixed-parameter Newton replay: converged="
+                << (result.converged ? 1 : 0)
+                << ", fallback="
+                << (result.used_fallback ? 1 : 0)
+                << ", source_residual="
+                << std::setprecision(17)
+                << result.source_residual
+                << ", initial_target_residual="
+                << result.initial_target_residual
+                << ", final_target_residual="
+                << result.final_target_residual
+                << ", diagnostic="
+                << result.diagnostic << '\n';
+            if(!result.converged)
+                throw std::runtime_error(
+                    "fixed-parameter Newton replay failed");
+        }
+        else if(!command_line.second_state_file.empty())
+        {
+            if(command_line.transition_sequence)
+            {
+                const auto transitions =
+                    driver.execute_single_transition_sequence(
+                        command_line.state_file,
+                        static_cast<real>(
+                            command_line.state_parameter),
+                        command_line.second_state_file,
+                        static_cast<real>(
+                            command_line.second_state_parameter),
+                        command_line.confirm);
+                std::cout
+                    << "Two-state stability transition sequence: events="
+                    << transitions.size() << '\n';
+                for(std::size_t index = 0;
+                    index < transitions.size();
+                    ++index)
+                {
+                    const auto& transition = transitions[index];
+                    std::cout
+                        << "  event[" << index << "]: lambda="
+                        << std::setprecision(17)
+                        << transition.parameter
+                        << ", before=("
+                        << transition.before_stability.unstable.real
+                        << ','
+                        << transition.before_stability.unstable.
+                            complex_pairs
+                        << "), after=("
+                        << transition.after_stability.unstable.real
+                        << ','
+                        << transition.after_stability.unstable.
+                            complex_pairs
+                        << "), iterations="
+                        << transition.iterations << '\n';
+                }
+                return EXIT_SUCCESS;
+            }
+
             const auto result = driver.execute_single_transition(
                 command_line.state_file,
                 static_cast<real>(command_line.state_parameter),

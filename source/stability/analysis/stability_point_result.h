@@ -72,6 +72,12 @@ struct unstable_dimension
     }
 };
 
+struct unstable_dimension_observation
+{
+    unstable_dimension signature;
+    std::size_t occurrences = 0;
+};
+
 inline int unstable_subspace_dimension(
     const std::pair<int, int>& dimension)
 {
@@ -98,6 +104,9 @@ struct stability_point_result
     std::size_t unclassified_eigenvalues = 0;
     std::size_t unmatched_complex_eigenvalues = 0;
     std::size_t classification_attempts = 1;
+    std::size_t coverage_recoveries = 0;
+    std::vector<unstable_dimension_observation>
+        observed_unstable_dimensions;
     std::string diagnostic;
 
     bool classification_complete() const
