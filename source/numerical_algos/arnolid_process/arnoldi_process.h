@@ -16,7 +16,9 @@ namespace eigen_solvers
 {
 
 template<class VectorOperations, class MatrixOperations, class SystemOperator, class Log>
-class arnoldi_process
+class [[deprecated(
+    "numerical_algos::eigen_solvers::arnoldi_process is legacy; use "
+    "nmfd::solvers::krylov::arnoldi")]] arnoldi_process
 {
 public:
     typedef typename VectorOperations::scalar_type T;

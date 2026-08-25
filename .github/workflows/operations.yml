@@ -14,6 +14,13 @@ defaults:
     shell: bash
 
 jobs:
+  stability-reference-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate immutable stability references
+        run: python3 scripts/validate_stability_references.py
+
   cpu-vector-operations-var-prec:
     runs-on: ubuntu-latest
     steps:
@@ -310,7 +317,7 @@ jobs:
           ./"$BUILD_DIR"/lapack_wrap/test_lapack_wrap.bin
 
   eigensolver-foundation-cpu:
-    needs: [scfd-vector-operations-cpu, lapack-wrap-cpu]
+    needs: [scfd-vector-operations-cpu, lapack-wrap-cpu, stability-reference-contract]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -331,6 +338,8 @@ jobs:
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_report_data/test_matrix_market_report_data_cpu_omp.bin
       - name: Build and test eigensolver foundation
         run: |
+          make test_stability_model_adapter_contract.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_model_adapter_contract"
+          ./"$BUILD_DIR"/stability_model_adapter_contract/test_stability_model_adapter_contract.bin
           make test_host_small_dense_backend.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_dense"
           ./"$BUILD_DIR"/eigensolver_dense/test_host_small_dense_backend.bin
           make test_analytical_eigenproblems.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_analytical"

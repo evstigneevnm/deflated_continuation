@@ -222,12 +222,9 @@ int main(int argc, char** argv)
             !command_line.quiet && config.inner_solver.verbose
                 ? &linear_solver_log
                 : nullptr);
-        eigensolver.set_recycling_options(
-            stability::analysis::
-                make_recycled_ritz_subspace_options(config));
-        eigensolver.set_tracking_options(
-            stability::analysis::
-                make_tracked_invariant_subspace_options(config));
+        stability::analysis::configure_matrix_free_stability_reuse(
+            eigensolver,
+            config);
 
         if(!command_line.quiet)
         {

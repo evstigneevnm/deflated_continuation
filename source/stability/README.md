@@ -60,6 +60,34 @@ transition refinement, persistence, and restart. Bratu uses the
 matrix-free shifted pipeline in production and
 `host_dense_operator_eigensolver` as a LAPACK validation oracle.
 
+## Model Adapter Contract
+
+`model_adapter_contract.h` defines the compile-time boundary between a
+model and the stability implementation. The mandatory interfaces are:
+
+- a linearization provider with
+  `set_linearization_point(const vector_type&, scalar_type)`;
+- a real operator with
+  `apply(const vector_type&, vector_type&)`, returning either `void` or a
+  status convertible to `bool`;
+- for matrix-free transformed scans, a real affine inverse provider with
+  matching `scalar_type`, `vector_type`, and `health_type`, plus
+  `apply(jacobian_scale, identity_shift, rhs, solution)` and
+  `health(jacobian_scale, identity_shift)`;
+- an eigensolver adapter whose `execute(const vector_type&)` returns
+  `eigensolver_result<scalar_type>`.
+
+Probe randomization, affine-health detail, classification confirmation,
+recycling transactions, and quotient alignment are optional extensions.
+The stability layer detects those extensions without making them part of
+the nonlinear-operator contract. In particular, models expose only real
+arithmetic; complexification remains owned by the transformation layer.
+
+`configure_matrix_free_stability_reuse()` is the shared model-assembly
+entry point for Ritz recycling and invariant-subspace tracking. Probe
+generators and small-system fallback solvers remain model-specific because
+they encode physical constraints and multiplicity information.
+
 ## Configuration Contract
 
 The modern JSON configuration controls:
@@ -357,6 +385,22 @@ New or migrated models must not assemble those components. They should
 instantiate the modern analysis facade with a structured eigensolver
 adapter. Legacy files cannot be removed globally until KS2D,
 Kolmogorov-flow, overscreening, and periodic-orbit drivers are migrated.
+
+Top-level legacy entry points emit C++ deprecation diagnostics. A legacy
+target that cannot yet be changed may define
+`STABILITY_SUPPRESS_LEGACY_DEPRECATION_WARNINGS`; this is a compatibility
+switch, not permission for new code to depend on the old API.
+
+Migration is model-local: refactor a nonlinear operator to the current
+vector/backend contract, add its modern stability adapter and validation,
+then retire that model's old assembly. Stability-only ports of legacy
+CUDA-specific models are intentionally avoided.
+
+The immutable accepted KS1D and KS2D release identities and numerical
+summary counts are pinned in `data/reference/stability_regressions.json`.
+`scripts/validate_stability_references.py` also verifies every compact
+KS1D replay state byte-for-byte. Updating this lock requires publishing a
+new immutable reference asset and reviewing the numerical changes.
 
 ## Required Validation
 

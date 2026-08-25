@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <complex>
 #include <stability/Galerkin_projection.h>
+#include <stability/detail/legacy_api.h>
 #include <stability/detail/system_operator_dummy.h>
 
 /**
@@ -28,7 +29,9 @@ namespace IRAM
 {
 
 template<class VectorOperations, class MatrixOperations, class LapackOperations, class LinearOperator, class Log, class SystemOperator = ::stability::detail::system_operator_dummy<VectorOperations, LinearOperator> >
-class iram_process
+class STABILITY_LEGACY_API(
+    "stability::IRAM::iram_process is legacy; use the matrix-free "
+    "stability analysis and Krylov-Schur pipeline") iram_process
 {
 private:
     typedef typename VectorOperations::scalar_type  T;

@@ -6,6 +6,8 @@
 #include <stdexcept>
 #include <cmath>
 
+#include <stability/detail/legacy_api.h>
+
 namespace stability
 {
 
@@ -19,7 +21,9 @@ namespace stability
  * @tparam     Log                 { description }
  */
 template<class VectorOperations, class NonlinearOperator, class LinearOperator, class LinearSystemSolver, class Log>
-class system_operator_shift_inverse
+class STABILITY_LEGACY_API(
+    "system_operator_shift_inverse is legacy; use matrix-free "
+    "spectral transformations") system_operator_shift_inverse
 {
 public:
     typedef typename VectorOperations::scalar_type  T;

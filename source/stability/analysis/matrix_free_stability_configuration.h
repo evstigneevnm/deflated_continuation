@@ -551,6 +551,17 @@ make_tracked_invariant_subspace_options(
     return result;
 }
 
+template<class Eigensolver, class Real>
+void configure_matrix_free_stability_reuse(
+    Eigensolver& eigensolver,
+    const matrix_free_stability_config<Real>& config)
+{
+    eigensolver.set_recycling_options(
+        make_recycled_ritz_subspace_options(config));
+    eigensolver.set_tracking_options(
+        make_tracked_invariant_subspace_options(config));
+}
+
 } // namespace analysis
 } // namespace stability
 

@@ -11,6 +11,7 @@
 #include <common/scfd_backend_ext/complex.h>
 #include <nmfd/operations/product_vector_space.h>
 #include <nmfd/operations/scfd_complex_vector_bridge.h>
+#include <stability/model_adapter_contract.h>
 
 #include "affine_pencil_operator.h"
 #include "complexified_real_affine_preconditioner.h"
@@ -36,6 +37,23 @@ struct matrix_free_complex_factorization_types
     using complex_space_type = ComplexVectorSpace;
     using real_operator_type = RealOperator;
     using provider_type = RealAffineInverseProvider;
+
+    static_assert(
+        model_adapter::matrix_free_contract<
+            real_space_type,
+            real_operator_type,
+            provider_type>::real_operator,
+        "matrix-free stability real operator must implement "
+        "apply(const vector_type&, vector_type&) with a void or "
+        "boolean status result");
+    static_assert(
+        model_adapter::matrix_free_contract<
+            real_space_type,
+            real_operator_type,
+            provider_type>::affine_inverse_provider,
+        "matrix-free stability affine inverse provider must expose "
+        "matching scalar_type, vector_type, health_type, apply(), and "
+        "health() members");
     using product_space_type =
         nmfd::operations::two_block_vector_space<real_space_type>;
     using bridge_type =

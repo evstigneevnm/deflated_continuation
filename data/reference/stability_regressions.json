@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "latest_asset": "20260824-ks2d",
+  "assets": [
+    {
+      "version": "20260824",
+      "release_tag": "reference-data-20260824",
+      "file": "deflated-continuation-reference-data-20260824.tar.xz",
+      "sha256": "af40172d94e8f1127a148dace3c70c066e1292c67683f0f43175279954cefd92",
+      "size_bytes": 39627880,
+      "datasets": [
+        {
+          "path": "data/reference/KS1D/N128/stability_20260824/full",
+          "problem": "KS1D full Fourier space with SO(2) quotient handling",
+          "curves": 29,
+          "records": 8502,
+          "bifurcations": 81,
+          "steady_events": 41,
+          "hopf_events": 40,
+          "maximum_unstable_dimension": 10
+        },
+        {
+          "path": "data/reference/KS1D/N128/stability_20260824/symmetric",
+          "problem": "KS1D symmetric Fourier subspace",
+          "curves": 9,
+          "records": 5155,
+          "bifurcations": 39,
+          "steady_events": 32,
+          "hopf_events": 7,
+          "maximum_unstable_dimension": 4
+        }
+      ]
+    },
+    {
+      "version": "20260824-ks2d",
+      "release_tag": "reference-data-20260824-ks2d",
+      "file": "deflated-continuation-reference-data-20260824-ks2d.tar.xz",
+      "sha256": "127a61d91fa25d1f416064b3189d9dc2e207211920102fdbe1cef51d8701912e",
+      "size_bytes": 223212564,
+      "datasets": [
+        {
+          "path": "data/reference/KS2D/N256x256/symmetric_stability_20260824",
+          "problem": "KS2D inversion-odd symmetric Fourier formulation",
+          "curves": 36,
+          "records": 881,
+          "bifurcations": 188,
+          "steady_events": 108,
+          "hopf_events": 76,
+          "multiple_events": 4,
+          "topology_breaks": 2,
+          "maximum_unstable_dimension": 10
+        }
+      ]
+    }
+  ],
+  "compact_fixtures": [
+    {
+      "id": "ks1d-full-stability-replay",
+      "root": "source/models/KS_1D/tests/data/stability_replay",
+      "manifest": "manifest.json",
+      "manifest_sha256": "68f4210b0440054c706b0e0d6dcb2445a8b255c0c91e1a1d0136b8d3f1227567",
+      "states": 8,
+      "transitions": 3,
+      "files": {
+        "curve03_state058.dat": "81627d39411ab06b398e14af72cf80b7798cc6f9869a815fae9206e2bf3475cc",
+        "curve03_state059.dat": "1ed1fdc5b66f696196a6bcfe97e6549c6e69eec94c2263f13ee39658044d5ac6",
+        "curve19_state084.dat": "06b308c70092b448548aaa5e484325aafa2361dcfed0c9eeb39a427b55ff9c81",
+        "curve19_state085.dat": "255e7ff1ff6fc3ff1f0413268a30dcc4bb9e8bc99452586c248ff0632ff226cd",
+        "curve19_state086.dat": "c5af56a8ac489a04ef80062c5a54ed26a89617ca24ecbdddaf54e9354c386c52",
+        "curve24_state043.dat": "9d749034676676ec6fce03085b7524d5e7dd1f57af36b9b397c36167403c9375",
+        "curve24_state044.dat": "f9cbb8ba4296b694cd4e23eafe77ae9dbcf851988d8e38ae088e199bae81c209",
+        "curve24_state045.dat": "7983ef8580e6649a7afd025a5b2549148071c6d6f453babdca32697a904ac20f"
+      }
+    }
+  ]
+}

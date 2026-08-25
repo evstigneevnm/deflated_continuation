@@ -12,6 +12,8 @@
 #include <utility>
 #include <vector>
 
+#include <stability/model_adapter_contract.h>
+
 #include "detail/vector_workspace.h"
 #include "stability_point_result.h"
 
@@ -202,6 +204,21 @@ public:
     using scalar_type = typename VectorOperations::scalar_type;
     using vector_type = typename VectorOperations::vector_type;
     using result_type = stability_point_result<scalar_type>;
+
+    static_assert(
+        model_adapter::evaluator_contract<
+            VectorOperations,
+            LinearizationProvider,
+            EigensolverAdapter>::linearization_provider,
+        "stability linearization provider must implement "
+        "set_linearization_point(const vector_type&, scalar_type)");
+    static_assert(
+        model_adapter::evaluator_contract<
+            VectorOperations,
+            LinearizationProvider,
+            EigensolverAdapter>::eigensolver_adapter,
+        "stability eigensolver adapter must implement execute(const "
+        "vector_type&) returning eigensolver_result<scalar_type>");
 
     stability_evaluator(
         VectorOperations* vector_operations,

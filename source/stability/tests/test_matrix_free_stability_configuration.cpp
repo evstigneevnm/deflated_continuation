@@ -343,12 +343,68 @@ void test_validation()
         "small-system recovery rejects negative tolerance");
 }
 
+struct reuse_configuration_target
+{
+    using recycling_options_type =
+        stability::analysis::recycled_ritz_subspace_options<double>;
+    using tracking_options_type =
+        stability::tracking::
+            tracked_invariant_subspace_options<double>;
+
+    void set_recycling_options(recycling_options_type value)
+    {
+        recycling = value;
+        recycling_configured = true;
+    }
+
+    void set_tracking_options(tracking_options_type value)
+    {
+        tracking = value;
+        tracking_configured = true;
+    }
+
+    recycling_options_type recycling;
+    tracking_options_type tracking;
+    bool recycling_configured = false;
+    bool tracking_configured = false;
+};
+
+void test_reuse_configuration()
+{
+    stability::analysis::matrix_free_stability_config<double> config;
+    config.enabled = true;
+    config.transformation.shifts = {{0.25, 0.0}};
+    config.recycling.enabled = true;
+    config.recycling.maximum_vectors = 7;
+    config.invariant_subspace_tracking.enabled = true;
+    config.invariant_subspace_tracking.maximum_dimension = 9;
+    config.invariant_subspace_tracking.maximum_seed_vectors = 4;
+
+    reuse_configuration_target target;
+    stability::analysis::configure_matrix_free_stability_reuse(
+        target,
+        config);
+
+    require(
+        target.recycling_configured &&
+            target.recycling.enabled &&
+            target.recycling.maximum_vectors == 7,
+        "shared recycling configuration applied");
+    require(
+        target.tracking_configured &&
+            target.tracking.enabled &&
+            target.tracking.maximum_dimension == 9 &&
+            target.tracking.maximum_seed_vectors == 4,
+        "shared invariant-subspace configuration applied");
+}
+
 } // namespace
 
 int main()
 {
     test_factor_builders();
     test_validation();
+    test_reuse_configuration();
     std::cout
         << "Matrix-free stability configuration checks: "
         << checks << ", failures: " << failures << '\n';

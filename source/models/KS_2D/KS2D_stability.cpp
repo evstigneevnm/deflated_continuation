@@ -277,12 +277,9 @@ int main(int argc, char** argv)
             stability::analysis::make_spectrum_scan_aggregation_options(config),
             !command_line.quiet && config.inner_solver.verbose ? &linear_solver_log : nullptr
         );
-        matrix_free_eigensolver.set_recycling_options(
-            stability::analysis::
-                make_recycled_ritz_subspace_options(config));
-        matrix_free_eigensolver.set_tracking_options(
-            stability::analysis::
-                make_tracked_invariant_subspace_options(config));
+        stability::analysis::configure_matrix_free_stability_reuse(
+            matrix_free_eigensolver,
+            config);
         auto paired_probe_base = std::make_shared<
             stability::analysis::detail::vector_workspace<
                 vec_ops_real>>(real_space.get());

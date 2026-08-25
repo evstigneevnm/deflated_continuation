@@ -4,6 +4,18 @@ Large numerical references are distributed as immutable GitHub Release
 assets instead of being committed to Git history. The versioned asset index
 is [`index.json`](index.json).
 
+The accepted stability summaries and compact replay-file digests are pinned
+in [`stability_regressions.json`](stability_regressions.json). Validate that
+contract without downloading the large release assets:
+
+```bash
+python3 scripts/validate_stability_references.py
+```
+
+Updating an asset index entry does not update the accepted stability result.
+Any intentional numerical change must update the stability lock separately
+after the new bifurcation and stability diagrams have been reviewed.
+
 The archive preserves paths below `data/reference/`. It contains accepted
 KS1D bifurcation and stability projects, their configurations and logs, and
 the eigensolver characterization snapshots.

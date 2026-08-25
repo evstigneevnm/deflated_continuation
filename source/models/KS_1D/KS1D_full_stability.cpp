@@ -335,12 +335,9 @@ int main(int argc, char** argv)
             !command_line.quiet && config.inner_solver.verbose
                 ? &linear_solver_log
                 : nullptr);
-        matrix_free_eigensolver.set_recycling_options(
-            stability::analysis::
-                make_recycled_ritz_subspace_options(config));
-        matrix_free_eigensolver.set_tracking_options(
-            stability::analysis::
-                make_tracked_invariant_subspace_options(config));
+        stability::analysis::configure_matrix_free_stability_reuse(
+            matrix_free_eigensolver,
+            config);
         dense_lapack_type small_system_lapack;
         typename small_system_eigensolver_type::options_type
             small_system_options;
