@@ -64,6 +64,23 @@ def validate_fixture(path: Path, expected_size: int) -> None:
         raise RuntimeError(f"{path}: fixture contains a non-finite value")
 
 
+def transition_state_ids(
+    manifest: dict,
+    known_state_ids: set[str],
+) -> set[str]:
+    referenced: set[str] = set()
+    for transition in manifest["transitions"]:
+        for field in ("first_state", "second_state"):
+            state_id = transition.get(field)
+            if state_id not in known_state_ids:
+                raise RuntimeError(
+                    f"{transition.get('id', 'transition')}: unknown "
+                    f"{field} {state_id!r}"
+                )
+            referenced.add(state_id)
+    return referenced
+
+
 def run_replay(
     executable: Path,
     config: Path,
@@ -120,8 +137,12 @@ def main() -> int:
         state["path"] = state_path
         states[state["id"]] = state
 
-    checks = 0
-    for state in states.values():
+    transition_states = transition_state_ids(manifest, set(states))
+    validated_states: set[str] = set()
+    commands = 0
+    for state_id, state in states.items():
+        if state_id in transition_states:
+            continue
         output = run_replay(
             executable,
             config,
@@ -148,8 +169,10 @@ def main() -> int:
             state["unstable"],
             state["id"],
         )
-        checks += 1
+        validated_states.add(state_id)
+        commands += 1
 
+    transitions_checked = 0
     for transition in manifest["transitions"]:
         first = states[transition["first_state"]]
         second = states[transition["second_state"]]
@@ -196,12 +219,24 @@ def main() -> int:
             transition["after"],
             f"{transition['id']} after",
         )
-        checks += 1
+        validated_states.update(
+            (transition["first_state"], transition["second_state"])
+        )
+        transitions_checked += 1
+        commands += 1
+
+    missing_states = set(states) - validated_states
+    if missing_states:
+        raise RuntimeError(
+            "states were not validated by a standalone or transition "
+            f"replay: {sorted(missing_states)}"
+        )
 
     backend = args.device if args.device is not None else "host"
+    checks = len(validated_states) + transitions_checked
     print(
         "KS1D full stability replay PASSED: "
-        f"backend={backend}, checks={checks}"
+        f"backend={backend}, checks={checks}, commands={commands}"
     )
     return 0
 
