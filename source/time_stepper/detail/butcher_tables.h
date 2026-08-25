@@ -1,6 +1,7 @@
 #ifndef __TIME_STEPPER_BUTCHER_TABLES_H__
 #define __TIME_STEPPER_BUTCHER_TABLES_H__
 
+#include <algorithm>
 #include <vector>
 #include <cmath>
 #include <map>
@@ -20,39 +21,38 @@ struct tableu
     enum type {ERK, SDIRK, DIRK, IRK};
     using mat_t = std::vector<std::vector< long double> >;
     using vec_t = std::vector< long double>;
-    methods method;
+    methods method = EXPLICIT_EULER;
     tableu() = default;
-    tableu(const methods&& method_p, const mat_t&& A_p, const vec_t&& b_p, const vec_t&& c_p = {}, const vec_t&& b_hat_p = {}):
+    tableu(methods method_p, mat_t A_p, vec_t b_p, vec_t c_p = {}, vec_t b_hat_p = {}):
     method(method_p),
+    sz_(b_p.size()),
     A_(std::move(A_p)),
     b_(std::move(b_p)),
     c_(std::move(c_p)),
     b_hat_(std::move(b_hat_p)),
-    sz_(b_p.size()),
-    embeded_method_(b_hat_p.size()>0),
-    autonomous_(c_p.size()==0)
+    embeded_method_(!b_hat_.empty()),
+    autonomous_(c_.empty())
     {
-        
-        check_square_matrix();
+        validate();
         if(embeded_method_)
         {
             err_b_.resize(sz_);
-            for(int j=0;j<b_hat_.size();j++)
+            for(std::size_t j = 0; j < b_hat_.size(); ++j)
             {
                 err_b_[j] = b_[j] - b_hat_[j];
             }
         }
-        if(get_abs_diag() == 0)
+        if(is_zero(get_abs_diag()))
         {
             current_type_ = ERK;
         }
-        else if( equal_diag() )
-        {
-            current_type_ = SDIRK;
-        }
-        else if( get_upper_triang()>0 )
+        else if(!is_zero(get_upper_triang()))
         {
             current_type_ = IRK;
+        }
+        else if(equal_diag())
+        {
+            current_type_ = SDIRK;
         }
         else
         {
@@ -63,15 +63,15 @@ struct tableu
     tableu(const tableu&) = delete;
     tableu(tableu&& other_p):
     method(other_p.method),
+    sz_(other_p.sz_),
     A_(std::move(other_p.A_)),
     b_(std::move(other_p.b_)),
     c_(std::move(other_p.c_)),
     b_hat_(std::move(other_p.b_hat_)),
-    sz_(std::move(other_p.sz_)),
     err_b_(std::move(other_p.err_b_)),
-    embeded_method_(std::move(other_p.embeded_method_)),
-    autonomous_(std::move(other_p.autonomous_)),
-    current_type_(std::move(other_p.current_type_))
+    embeded_method_(other_p.embeded_method_),
+    autonomous_(other_p.autonomous_),
+    current_type_(other_p.current_type_)
     {}
 
     tableu& operator = (const tableu&) = delete;
@@ -108,6 +108,15 @@ struct tableu
     {
         return static_cast<T>(b_.at(k));
     }
+    template<class T>
+    T get_b_hat(size_t k)const
+    {
+        if(!embeded_method_)
+        {
+            throw std::logic_error("butcher_tables::tableu: can't obtain embedded weights for a non-embedded method.");
+        }
+        return static_cast<T>(b_hat_.at(k));
+    }
     template<class T>    
     T get_c(size_t j)const
     {
@@ -142,15 +151,20 @@ struct tableu
     }
 
 private:
-    size_t sz_;
+    size_t sz_ = 0;
     mat_t A_; //A_{j,k}:=A[j][k]
     vec_t b_;
     vec_t b_hat_;
     vec_t c_;
     vec_t err_b_;
-    bool embeded_method_;
-    bool autonomous_;
-    type current_type_;
+    bool embeded_method_ = false;
+    bool autonomous_ = true;
+    type current_type_ = ERK;
+
+    static bool is_zero(const long double value)
+    {
+        return std::abs(value) <= 16*std::numeric_limits<long double>::epsilon();
+    }
 
     long double get_abs_diag()const
     {
@@ -163,17 +177,16 @@ private:
     }
     bool equal_diag()const
     {
-        auto A00 = A_[0][0];
-        bool res = true;
-        for(size_t j = 0;j<sz_;j++)
+        const auto A00 = A_[0][0];
+        for(size_t j = 1; j < sz_; ++j)
         {
-            res = ( std::abs(A00-A_[j][j])>std::numeric_limits<long double>::epsilon() );
-            if(!res)
+            const auto scale = std::max<long double>(1, std::max(std::abs(A00), std::abs(A_[j][j])));
+            if(std::abs(A00-A_[j][j]) > 16*std::numeric_limits<long double>::epsilon()*scale)
             {
-                break;
+                return false;
             }
         }
-        return res;
+        return true;
     }
 
     long double get_upper_triang()const
@@ -189,14 +202,53 @@ private:
         return upper_tri;
     }
 
-    void check_square_matrix()
+    void validate()
     {
-        size_t n_rows = A_.size();
-        for(auto &x: A_)
+        if(sz_ == 0 || A_.size() != sz_)
         {
-            if(n_rows != x.size() )
+            throw std::logic_error("butcher_tables::tableu: A and b must define a non-empty table with matching dimensions.");
+        }
+        for(const auto &row: A_)
+        {
+            if(row.size() != sz_)
             {
                 throw std::logic_error("butcher_tables::tableu: provided A matrix is not square.");
+            }
+            for(const auto value: row)
+            {
+                if(!std::isfinite(value))
+                {
+                    throw std::logic_error("butcher_tables::tableu: A contains a non-finite coefficient.");
+                }
+            }
+        }
+        if(!c_.empty() && c_.size() != sz_)
+        {
+            throw std::logic_error("butcher_tables::tableu: c and b must have matching dimensions.");
+        }
+        if(!b_hat_.empty() && b_hat_.size() != sz_)
+        {
+            throw std::logic_error("butcher_tables::tableu: embedded and primary weights must have matching dimensions.");
+        }
+        for(const auto value: b_)
+        {
+            if(!std::isfinite(value))
+            {
+                throw std::logic_error("butcher_tables::tableu: b contains a non-finite coefficient.");
+            }
+        }
+        for(const auto value: c_)
+        {
+            if(!std::isfinite(value))
+            {
+                throw std::logic_error("butcher_tables::tableu: c contains a non-finite coefficient.");
+            }
+        }
+        for(const auto value: b_hat_)
+        {
+            if(!std::isfinite(value))
+            {
+                throw std::logic_error("butcher_tables::tableu: embedded weights contain a non-finite coefficient.");
             }
         }
     }
@@ -208,7 +260,7 @@ struct composite_tableu: public tableu
 {
     
     composite_tableu():tableu(){}
-    composite_tableu(const methods&& method_p, const tableu::mat_t&& A_e, const tableu::mat_t&& A_i, const tableu::vec_t&& b_e, const tableu::vec_t&& b_i, const tableu::vec_t&& c_e = {}, const tableu::vec_t&& c_i = {}, const tableu::vec_t&& b_hat_p_e = {}, const tableu::vec_t&& b_hat_p_i = {}):
+    composite_tableu(methods method_p, tableu::mat_t A_e, tableu::mat_t A_i, tableu::vec_t b_e, tableu::vec_t b_i, tableu::vec_t c_e = {}, tableu::vec_t c_i = {}, tableu::vec_t b_hat_p_e = {}, tableu::vec_t b_hat_p_i = {}):
     E{std::move(method_p), std::move(A_e), std::move(b_e), std::move(c_e), std::move(b_hat_p_e)},
     I{std::move(method_p), std::move(A_i), std::move(b_i), std::move(c_i), std::move(b_hat_p_i)}
     {
@@ -227,18 +279,18 @@ struct butcher_tables
 
     butcher_tables()
     {
-        tables.emplace("EE",std::move(set_table(EXPLICIT_EULER)));
-        tables.emplace("HE",std::move(set_table(HEUN_EULER)));
-        tables.emplace("RK33SSP",std::move(set_table(RK33SSP)) );
-        tables.emplace("RK43SSP",std::move(set_table(RK43SSP)) ); 
-        tables.emplace("RKDP45",std::move(set_table(RKDP45)) ); 
-        tables.emplace("RK64SSP",std::move(set_table(RK64SSP)) ); 
-        tables.emplace("IE",std::move(set_table(IMPLICIT_EULER)) ); 
-        tables.emplace("IM",std::move(set_table(IMPLICIT_MIDPOINT)) ); 
-        tables.emplace("CN",std::move(set_table(CRANK_NICOLSON)) ); 
-        tables.emplace("SDIRK2A1",std::move(set_table(SDIRK2A1)) ); 
-        tables.emplace("ESDIRK3A2",std::move(set_table(ESDIRK3A2)) ); 
-        tables.emplace("SDIRK3A3",std::move(set_table(SDIRK3A3)) ); 
+        tables.emplace("EE", EXPLICIT_EULER);
+        tables.emplace("HE", HEUN_EULER);
+        tables.emplace("RK33SSP", RK33SSP);
+        tables.emplace("RK43SSP", RK43SSP);
+        tables.emplace("RKDP45", RKDP45);
+        tables.emplace("RK64SSP", RK64SSP);
+        tables.emplace("IE", IMPLICIT_EULER);
+        tables.emplace("IM", IMPLICIT_MIDPOINT);
+        tables.emplace("CN", CRANK_NICOLSON);
+        tables.emplace("SDIRK2A1", SDIRK2A1);
+        tables.emplace("ESDIRK3A2", ESDIRK3A2);
+        tables.emplace("SDIRK3A3", SDIRK3A3);
     }
     tableu set_table(const methods& method_p) const
     {
@@ -293,8 +345,8 @@ struct butcher_tables
                 double gamma = 0.5*(2.0 - std::sqrt(2.0));
                 double b2 = (gamma*(-2+7*gamma-5*gamma*gamma+4*gamma*gamma*gamma))/(2*(2*gamma-1));
                 double b3 = (-2*gamma*gamma*(1-gamma+gamma*gamma))/(2*gamma-1);
-                double b1 = 2*gamma;
-                return std::move(tableu(ESDIRK3A2, {{0,0,0},{gamma, gamma,0},{(1-b1-gamma), b1, gamma}},{(1.0-b1-gamma), b1, gamma},{0, 2*gamma, 1},{(1-b2-b3),b2,b3} ) );
+                double b_middle = (1-2*gamma)/(4*gamma);
+                return std::move(tableu(ESDIRK3A2, {{0,0,0},{gamma, gamma,0},{(1-b_middle-gamma), b_middle, gamma}},{(1.0-b_middle-gamma), b_middle, gamma},{0, 2*gamma, 1},{(1-b2-b3),b2,b3} ) );
             }
             break;
         case SDIRK3A3: //DIRK.pdf, p77
@@ -316,14 +368,14 @@ struct butcher_tables
     }
     
     
-    tableu set_table_by_name(const std::string& name)
+    tableu set_table_by_name(const std::string& name) const
     {
-        auto cc = std::move(tables[name]);
-        if(cc.get_size()==0)
+        const auto found = tables.find(name);
+        if(found == tables.end())
         {
             throw std::logic_error("butcher_tables: non-existent table name provided.");
         }
-        return std::move(cc);
+        return set_table(found->second);
     }
 
     std::vector<std::string> get_list_of_table_names() const
@@ -337,7 +389,7 @@ struct butcher_tables
     }
 
 private:
-    std::map<std::string, tableu> tables;
+    std::map<std::string, methods> tables;
     
 
 };
@@ -349,10 +401,10 @@ struct composite_butcher_tables
 
     composite_butcher_tables()
     {
-        composite_tables.emplace("IMEX_EULER", set_table(IMEX_EULER) );
-        composite_tables.emplace("IMEX_TR2", set_table(IMEX_TR2) );
-        composite_tables.emplace("IMEX_ARS3", set_table(IMEX_ARS3) );
-        composite_tables.emplace("IMEX_AS2", set_table(IMEX_AS2) );
+        composite_tables.emplace("IMEX_EULER", IMEX_EULER);
+        composite_tables.emplace("IMEX_TR2", IMEX_TR2);
+        composite_tables.emplace("IMEX_ARS3", IMEX_ARS3);
+        composite_tables.emplace("IMEX_AS2", IMEX_AS2);
     }
 
     std::pair<tableu, tableu> set_table(const methods& method_p) const
@@ -395,14 +447,14 @@ struct composite_butcher_tables
     }
 
 
-    std::pair<tableu, tableu> set_table_by_name(const std::string& name)
+    std::pair<tableu, tableu> set_table_by_name(const std::string& name) const
     {
-        auto cc = std::move(composite_tables[name]);
-        if(cc.first.get_size()==0)
+        const auto found = composite_tables.find(name);
+        if(found == composite_tables.end())
         {
             throw std::logic_error("composite_butcher_tables: non-existent table name provided.");
         }
-        return std::move(cc);
+        return set_table(found->second);
     }
 
 
@@ -418,7 +470,7 @@ struct composite_butcher_tables
 
 
 private:
-    std::map< std::string, std::pair<tableu, tableu> > composite_tables;
+    std::map<std::string, methods> composite_tables;
 
 };
 

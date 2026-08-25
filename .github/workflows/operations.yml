@@ -63,6 +63,29 @@ jobs:
           make scfd_vector_operations_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cpu_float" REAL_TYPE=float
           ./"$BUILD_DIR"/scfd_cpu_float/test_scfd_vector_operations_cpu.bin
 
+  timestepper-foundation-cpu:
+    needs: [scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3
+          fi
+      - name: Build and test Runge-Kutta tableaus
+        run: |
+          make test_butcher_tableau_contract.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/timestepper_tableaus"
+          ./"$BUILD_DIR"/timestepper_tableaus/test_butcher_tableau_contract.bin
+      - name: Build and test semidiscrete contracts
+        run: |
+          make test_semidiscrete_problem_contract.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/semidiscrete_contracts"
+          ./"$BUILD_DIR"/semidiscrete_contracts/test_semidiscrete_problem_contract.bin
+
   continuation-core-cpu:
     needs: [scfd-vector-operations-cpu]
     runs-on: ubuntu-latest
