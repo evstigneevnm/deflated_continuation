@@ -277,6 +277,33 @@ public:
         assemble_reduced_rhs(u_hat, nonlin_hat, lambda, v);
     }
 
+    void linear_residual(const T_vec& u, const T lambda, T_vec& v) const
+    {
+        const auto up = access_type::data(u);
+        auto vp = access_type::data(v);
+        const T b = b_val;
+        access_type::for_each([=] __DEVICE_TAG__ (ordinal_type i)
+        {
+            const T k = static_cast<T>(i + 1);
+            const T k2 = k*k;
+            vp[i] = (lambda*(-k2) + b*k2*k2)*up[i];
+        }, static_cast<ordinal_type>(mode_count_));
+    }
+
+    void nonlinear_residual(const T_vec& u, const T lambda, T_vec& v)
+    {
+        reduced_to_complex(u, u_hat);
+        compute_nonlinearity(u_hat, physical_u, physical_ux, ux_hat, physical_nonlin, nonlin_hat);
+        const auto np = nonlin_hat.raw_ptr();
+        auto vp = access_type::data(v);
+        const T a = a_val;
+        access_type::for_each([=] __DEVICE_TAG__ (ordinal_type i)
+        {
+            const std::size_t mode = static_cast<std::size_t>(i) + 1;
+            vp[i] = lambda*a*complex_access_type::imag(np[mode]);
+        }, static_cast<ordinal_type>(mode_count_));
+    }
+
     void set_linearization_point(const T_vec& u_0_, const T lambda_0_)
     {
         vec_ops->assign(u_0_, u_0);

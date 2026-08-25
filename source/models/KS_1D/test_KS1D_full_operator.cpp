@@ -190,6 +190,38 @@ void fill_test_vectors(vec_ops_real& vec_ops, real_vec& u, real_vec& du)
     vec_ops.set(host_du.data(), du, host_du.size());
 }
 
+void test_residual_split(vec_ops_real& vec_ops, ks1d_t& ks)
+{
+    real_vec state;
+    real_vec direction_unused;
+    real_vec residual;
+    real_vec linear;
+    real_vec nonlinear;
+    real_vec split_sum;
+    vec_ops.init_vectors(state, direction_unused, residual, linear, nonlinear, split_sum);
+    vec_ops.start_use_vectors(state, direction_unused, residual, linear, nonlinear, split_sum);
+
+    fill_test_vectors(vec_ops, state, direction_unused);
+    const real lambda = real(5.25);
+    ks.F(state, lambda, residual);
+    ks.linear_residual(state, lambda, linear);
+    ks.nonlinear_residual(state, lambda, nonlinear);
+    vec_ops.assign_mul(real(1), linear, real(1), nonlinear, split_sum);
+
+    check_vector_close(
+        vec_ops,
+        split_sum,
+        residual,
+        real(5)*tolerance<real>(),
+        "full KS1D residual split identity");
+    check_condition(
+        vec_ops.norm_l2(nonlinear) > tolerance<real>(),
+        "full KS1D nonlinear residual is nonzero");
+
+    vec_ops.stop_use_vectors(state, direction_unused, residual, linear, nonlinear, split_sum);
+    vec_ops.free_vectors(state, direction_unused, residual, linear, nonlinear, split_sum);
+}
+
 void fill_reduced_low_mode_vectors(vec_ops_real& vec_ops, real_vec& u, real_vec& du)
 {
     std::vector<real> host_u(vec_ops.get_default_size(), real(0));
@@ -1764,6 +1796,7 @@ int main(int argc, char** argv)
     std::cout << "Testing full Fourier KS1D operator backend: " << KS1D_BACKEND_NAME << std::endl;
     test_zero_branch(vec_ops, ks);
     test_linear_spectrum(vec_ops, physical_size);
+    test_residual_split(vec_ops, ks);
     test_reduced_odd_subspace_consistency(vec_ops, reduced_vec_ops, ks, reduced_ks);
     test_jacobian_u(vec_ops, ks);
     test_jacobian_alpha(vec_ops, ks);

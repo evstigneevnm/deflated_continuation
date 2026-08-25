@@ -110,6 +110,9 @@ void run_case(
     vector_type state_epsilon;
     vector_type f_zero;
     vector_type f_state;
+    vector_type linear_state;
+    vector_type nonlinear_state;
+    vector_type split_state;
     vector_type f_perturbed;
     vector_type jacobian_direction;
     vector_type alpha_direction;
@@ -126,6 +129,9 @@ void run_case(
         state_epsilon,
         f_zero,
         f_state,
+        linear_state,
+        nonlinear_state,
+        split_state,
         f_perturbed,
         jacobian_direction,
         alpha_direction,
@@ -143,6 +149,9 @@ void run_case(
         state_epsilon,
         f_zero,
         f_state,
+        linear_state,
+        nonlinear_state,
+        split_state,
         f_perturbed,
         jacobian_direction,
         alpha_direction,
@@ -238,13 +247,29 @@ void run_case(
     operations.set(perturbed_host.data(), state_epsilon);
 
     ks2d.F(state, lambda, f_state);
+    ks2d.linear_residual(state, lambda, linear_state);
+    ks2d.nonlinear_residual(state, lambda, nonlinear_state);
+    operations.assign_mul(
+        scalar_type(1),
+        linear_state,
+        scalar_type(1),
+        nonlinear_state,
+        split_state);
+    std::vector<scalar_type> f_state_host(state_size);
+    std::vector<scalar_type> split_state_host(state_size);
+    operations.get(f_state, f_state_host.data());
+    operations.get(split_state, split_state_host.data());
+    result.check(
+        relative_error(split_state_host, f_state_host) < 2.0e-13,
+        message("linear plus nonlinear residual equals F"));
+    result.check(
+        operations.norm_l2(nonlinear_state) > 1.0e-12,
+        message("nonlinear residual is nonzero"));
     ks2d.set_linearization_point(state, lambda);
     ks2d.jacobian_u(direction, jacobian_direction);
     ks2d.F(state_epsilon, lambda, f_perturbed);
-    std::vector<scalar_type> f_state_host(state_size);
     std::vector<scalar_type> f_perturbed_host(state_size);
     std::vector<scalar_type> jacobian_host(state_size);
-    operations.get(f_state, f_state_host.data());
     operations.get(f_perturbed, f_perturbed_host.data());
     operations.get(jacobian_direction, jacobian_host.data());
     std::vector<scalar_type> finite_difference_host(state_size);
@@ -602,6 +627,9 @@ void run_case(
         state_epsilon,
         f_zero,
         f_state,
+        linear_state,
+        nonlinear_state,
+        split_state,
         f_perturbed,
         jacobian_direction,
         alpha_direction,
@@ -619,6 +647,9 @@ void run_case(
         state_epsilon,
         f_zero,
         f_state,
+        linear_state,
+        nonlinear_state,
+        split_state,
         f_perturbed,
         jacobian_direction,
         alpha_direction,

@@ -188,6 +188,21 @@ public:
         codec_.pack( output_hat_, output );
     }
 
+    void linear_residual( const vector_type &state, const scalar_type lambda, vector_type &output )
+    {
+        codec_.unpack( state, u_hat_ );
+        assemble_linear( u_hat_, lambda, output_hat_ );
+        codec_.pack( output_hat_, output );
+    }
+
+    void nonlinear_residual( const vector_type &state, const scalar_type lambda, vector_type &output )
+    {
+        codec_.unpack( state, u_hat_ );
+        compute_nonlinearity( u_hat_, u_gradient_sum_, nonlinear_hat_ );
+        assemble_nonlinear( nonlinear_hat_, lambda, output_hat_ );
+        codec_.pack( output_hat_, output );
+    }
+
     void set_linearization_point( const vector_type &state, const scalar_type lambda )
     {
         vector_operations_->assign( state, u0_state_ );
@@ -440,6 +455,51 @@ private:
 
 public:
     // Public because NVCC requires enclosing functions of extended device lambdas to be accessible.
+    void assemble_linear(
+        const spectral_field_type &state, const scalar_type lambda, spectral_field_type &output
+    ) const
+    {
+        const complex_type *state_values  = state.data();
+        complex_type       *output_values = output.data();
+        const scalar_type  *k_squared     = wavevectors_.k_squared().data();
+        const scalar_type   b             = b_;
+        const ordinal_type  count         = static_cast<ordinal_type>( complex_size() );
+        for_each_type       for_each;
+        for_each(
+            [=] __DEVICE_TAG__( const ordinal_type index ) {
+                const scalar_type k2     = k_squared[index];
+                const scalar_type linear = -lambda * k2 + b * k2 * k2;
+                output_values[index]     = complex_traits::make(
+                    linear * complex_traits::real( state_values[index] ),
+                    linear * complex_traits::imag( state_values[index] )
+                );
+            },
+            count
+        );
+        for_each.wait();
+    }
+
+    void assemble_nonlinear(
+        const spectral_field_type &nonlinearity, const scalar_type lambda, spectral_field_type &output
+    ) const
+    {
+        const complex_type *nonlinear_values = nonlinearity.data();
+        complex_type       *output_values    = output.data();
+        const scalar_type   nonlinear_scale = lambda * a_;
+        const ordinal_type  count           = static_cast<ordinal_type>( complex_size() );
+        for_each_type       for_each;
+        for_each(
+            [=] __DEVICE_TAG__( const ordinal_type index ) {
+                output_values[index] = complex_traits::make(
+                    nonlinear_scale * complex_traits::real( nonlinear_values[index] ),
+                    nonlinear_scale * complex_traits::imag( nonlinear_values[index] )
+                );
+            },
+            count
+        );
+        for_each.wait();
+    }
+
     void assemble(
         const spectral_field_type &state, const spectral_field_type &nonlinearity, const scalar_type lambda,
         const bool include_biharmonic, spectral_field_type &output

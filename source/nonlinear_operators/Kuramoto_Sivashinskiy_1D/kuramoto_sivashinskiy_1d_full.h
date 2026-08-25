@@ -169,6 +169,42 @@ public:
         assemble_reduced_rhs( u_hat, nonlin_hat, lambda, v );
     }
 
+    void linear_residual( const T_vec &u, const T lambda, T_vec &v ) const
+    {
+        const auto up = access_type::data( u );
+        auto       vp = access_type::data( v );
+        const T    b  = b_val;
+        access_type::for_each(
+            [=] __DEVICE_TAG__( ordinal_type i ) {
+                const T           k      = static_cast<T>( i + 1 );
+                const T           k2     = k * k;
+                const T           linear = lambda * ( -k2 ) + b * k2 * k2;
+                const std::size_t offset = 2 * static_cast<std::size_t>( i );
+                vp[offset]                = linear * up[offset];
+                vp[offset + 1]            = linear * up[offset + 1];
+            },
+            static_cast<ordinal_type>( mode_count_ )
+        );
+    }
+
+    void nonlinear_residual( const T_vec &u, const T lambda, T_vec &v )
+    {
+        reduced_to_complex( u, u_hat );
+        compute_nonlinearity_spectral( u_hat, nonlin_hat );
+        const auto np = nonlin_hat.raw_ptr();
+        auto       vp = access_type::data( v );
+        const T    a  = a_val;
+        access_type::for_each(
+            [=] __DEVICE_TAG__( ordinal_type i ) {
+                const std::size_t mode   = static_cast<std::size_t>( i ) + 1;
+                const std::size_t offset = 2 * static_cast<std::size_t>( i );
+                vp[offset] = lambda * a * complex_access_type::real( np[mode] );
+                vp[offset + 1] = lambda * a * complex_access_type::imag( np[mode] );
+            },
+            static_cast<ordinal_type>( mode_count_ )
+        );
+    }
+
     void set_linearization_point( const T_vec &u_0_, const T lambda_0_ )
     {
         vec_ops->assign( u_0_, u_0 );
