@@ -22,6 +22,8 @@
 #include <symmetry/linearization/projected_stability_linear_operator.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h>
+#include <nonlinear_operators/adjoint_jacobian_capability.h>
+#include <nonlinear_operators/tests/adjoint_jacobian_test.h>
 #include <nonlinear_operators/tests/linear_nonlinear_decomposition_test.h>
 #include <stability/eigensolvers/transformations/nonlinear_operator_real_affine_inverse_provider.h>
 #include <symmetry/linearization/projected_affine_inverse_provider.h>
@@ -248,6 +250,71 @@ void test_residual_jacobian_decomposition(vec_ops_real& vec_ops, ks1d_t& ks)
 
     vec_ops.stop_use_vectors(state, direction);
     vec_ops.free_vectors(state, direction);
+}
+
+void test_adjoint_jacobian(vec_ops_real& vec_ops, ks1d_t& ks)
+{
+    static_assert(
+        nonlinear_operators::has_jacobian_u_adjoint_v<ks1d_t>,
+        "full KS1D must provide an adjoint Jacobian action");
+    static_assert(
+        nonlinear_operators::has_component_jacobian_u_adjoint_v<ks1d_t>,
+        "full KS1D must provide component adjoint Jacobian actions");
+    static_assert(
+        nonlinear_operators::has_affine_preconditioner_adjoint_pair_v<ks1d_t>,
+        "full KS1D must provide an affine preconditioner adjoint pair");
+
+    real_vec state;
+    real_vec direction;
+    real_vec cotangent;
+    vec_ops.init_vectors(state, direction, cotangent);
+    vec_ops.start_use_vectors(state, direction, cotangent);
+    fill_test_vectors(vec_ops, state, direction);
+    std::vector<real> host_cotangent(vec_ops.get_default_size(), real(0));
+    for(std::size_t mode = 1; mode <= host_cotangent.size()/2; ++mode)
+    {
+        const std::size_t offset = 2*(mode - 1);
+        const real k = static_cast<real>(mode);
+        host_cotangent[offset] =
+            real(0.1)*static_cast<real>(static_cast<int>(mode%4) - 1)/
+            (k + real(0.25));
+        host_cotangent[offset + 1] =
+            real(0.08)*static_cast<real>((mode%2 == 0) ? 1 : -1)/
+            (k + real(0.75));
+    }
+    vec_ops.set(host_cotangent.data(), cotangent, host_cotangent.size());
+
+    nonlinear_operators::tests::check_adjoint_jacobian(
+        vec_ops,
+        ks,
+        state,
+        direction,
+        cotangent,
+        real(5.25),
+        std::is_same<real, float>::value ? real(3.0e-5) : real(3.0e-12),
+        [](const bool condition, const std::string& message)
+        {
+            check_condition(condition, message);
+        },
+        "full KS1D");
+    nonlinear_operators::tests::check_affine_preconditioner_adjoint(
+        vec_ops,
+        ks,
+        state,
+        direction,
+        cotangent,
+        real(5.25),
+        real(0.73),
+        real(1.91),
+        std::is_same<real, float>::value ? real(3.0e-5) : real(3.0e-12),
+        [](const bool condition, const std::string& message)
+        {
+            check_condition(condition, message);
+        },
+        "full KS1D");
+
+    vec_ops.stop_use_vectors(state, direction, cotangent);
+    vec_ops.free_vectors(state, direction, cotangent);
 }
 
 void fill_reduced_low_mode_vectors(vec_ops_real& vec_ops, real_vec& u, real_vec& du)
@@ -1826,6 +1893,7 @@ int main(int argc, char** argv)
     test_linear_spectrum(vec_ops, physical_size);
     test_residual_split(vec_ops, ks);
     test_residual_jacobian_decomposition(vec_ops, ks);
+    test_adjoint_jacobian(vec_ops, ks);
     test_reduced_odd_subspace_consistency(vec_ops, reduced_vec_ops, ks, reduced_ks);
     test_jacobian_u(vec_ops, ks);
     test_jacobian_alpha(vec_ops, ks);

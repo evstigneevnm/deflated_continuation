@@ -13,6 +13,8 @@
 
 #include <nonlinear_operators/bratu/bratu.h>
 #include <nonlinear_operators/bratu/linear_operator_bratu.h>
+#include <nonlinear_operators/adjoint_jacobian_capability.h>
+#include <nonlinear_operators/tests/adjoint_jacobian_test.h>
 #include <nonlinear_operators/tests/linear_nonlinear_decomposition_test.h>
 
 #include <stability/eigensolvers/host_dense_operator_eigensolver.h>
@@ -108,6 +110,7 @@ void test_residual_jacobian_decomposition(
         discretization);
     vector_workspace state(vector_space);
     vector_workspace direction(vector_space);
+    vector_workspace cotangent(vector_space);
     vector_workspace parameter_jacobian(vector_space);
     vector_workspace value_plus(vector_space);
     vector_workspace value_minus(vector_space);
@@ -116,15 +119,26 @@ void test_residual_jacobian_decomposition(
 
     std::vector<double> host_state(n);
     std::vector<double> host_direction(n);
+    std::vector<double> host_cotangent(n);
     for(std::size_t index = 0; index < n; ++index)
     {
         const double x = static_cast<double>(index + 1)/
             static_cast<double>(n + 1);
         host_state[index] = 0.1*std::sin(std::acos(-1.0)*x);
         host_direction[index] = 0.07*std::sin(2.0*std::acos(-1.0)*x);
+        host_cotangent[index] =
+            0.09*std::cos(3.0*std::acos(-1.0)*x) + 0.02*x;
     }
     vector_space.set(host_state.data(), state.get(), n);
     vector_space.set(host_direction.data(), direction.get(), n);
+    vector_space.set(host_cotangent.data(), cotangent.get(), n);
+
+    static_assert(
+        nonlinear_operators::has_jacobian_u_adjoint_v<problem_type>,
+        "Bratu must provide an adjoint Jacobian action");
+    static_assert(
+        nonlinear_operators::has_component_jacobian_u_adjoint_v<problem_type>,
+        "Bratu must provide component adjoint Jacobian actions");
 
     nonlinear_operators::tests::check_linear_nonlinear_decomposition(
         vector_space,
@@ -140,6 +154,20 @@ void test_residual_jacobian_decomposition(
         },
         label
     );
+
+    nonlinear_operators::tests::check_adjoint_jacobian(
+        vector_space,
+        problem,
+        state.get(),
+        direction.get(),
+        cotangent.get(),
+        parameter,
+        2.0e-13,
+        [](const bool condition, const std::string& message)
+        {
+            require(condition, message);
+        },
+        label);
 
     problem.F(
         state.get(),

@@ -249,7 +249,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends build-essential make python3 python3-numpy python3-matplotlib libboost-dev libboost-serialization-dev libfftw3-dev libopenblas-dev
           fi
-      - name: Build and test KS2D nonlinear operator
+      - name: Build and test KS2D nonlinear, Jacobian-adjoint, and preconditioner-adjoint operators
         run: |
           export OMP_NUM_THREADS=8
           KS2D_BUILD="$BUILD_DIR/ks2d_cpu_omp"
@@ -338,7 +338,7 @@ jobs:
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_matrix_market/test_matrix_market.bin
           make test_matrix_market_report_data_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/eigensolver_report_data"
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/eigensolver_report_data/test_matrix_market_report_data_cpu_omp.bin
-      - name: Build and test eigensolver foundation
+      - name: Build and test eigensolver, scalar adjoint, and affine-preconditioner foundations
         run: |
           make test_stability_model_adapter_contract.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/stability_model_adapter_contract"
           ./"$BUILD_DIR"/stability_model_adapter_contract/test_stability_model_adapter_contract.bin
@@ -418,7 +418,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - name: Build and test CUDA eigensolver foundations when available
+      - name: Build and test CUDA eigensolver and affine-preconditioner foundations when available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1; then
             echo "Skipping CUDA eigensolver recovery: nvidia-smi not found"
@@ -577,7 +577,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - name: Build and validate when CUDA is available
+      - name: Build and validate CUDA Fourier and KS2D adjoint operators when available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1; then
             echo "Skipping CUDA Fourier discretization: nvidia-smi not found"
@@ -632,7 +632,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev libfftw3-dev libopenblas-dev
           fi
-      - name: Build and validate symmetrized KS1D
+      - name: Build and validate symmetrized KS1D and its Jacobian/preconditioner adjoints
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
             KS1D_OMP_THREADS="$(nproc)"
@@ -678,7 +678,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev libfftw3-dev libopenblas-dev
           fi
-      - name: Build and validate full Fourier KS1D
+      - name: Build and validate full Fourier KS1D and its Jacobian/preconditioner adjoints
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
             KS1D_OMP_THREADS="$(nproc)"
@@ -995,7 +995,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - name: Build and validate when CUDA is available
+      - name: Build and validate CUDA KS1D Jacobian/preconditioner adjoints when available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1; then
             echo "Skipping CUDA KS1D: nvidia-smi not found"
@@ -1028,7 +1028,7 @@ jobs:
           timeout 120s ./"$KS1D_BUILD"/KS1D_full_bd_cuda.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet auto
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project_full" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
           make KS1D_full_stability_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
-          python3 scripts/test_ks1d_full_stability_replay.py --executable "$KS1D_BUILD/KS1D_full_stability_cuda.bin" --config json_project_files/KS1D_test_full.json --device auto
+          python3 scripts/test_ks1d_full_stability_replay.py --executable "$KS1D_BUILD/KS1D_full_stability_cuda.bin" --config json_project_files/KS1D_test_full.json --device auto --timeout "${KS1D_CUDA_REPLAY_TIMEOUT:-360}"
           timeout 120s ./"$KS1D_BUILD"/KS1D_full_stability_cuda.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet auto
           python3 scripts/validate_stability_diagram.py "$KS1D_BUILD/project_full" --expected-curves 1 --min-points 10 --require-complete --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
 

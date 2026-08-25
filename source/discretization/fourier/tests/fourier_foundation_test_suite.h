@@ -82,6 +82,42 @@ int run_fourier_foundation_tests(const std::string& backend_name)
     const scalar_type tolerance = 2.0e-11;
     test_report report;
 
+    const auto relative_duality_error = [](const scalar_type left, const scalar_type right)
+    {
+        return std::abs(left - right)/
+            std::max({scalar_type(1), std::abs(left), std::abs(right)});
+    };
+    const auto physical_inner_product = [&](const physical_field_type& left,
+                                            const physical_field_type& right)
+    {
+        std::vector<scalar_type> left_host(left.size());
+        std::vector<scalar_type> right_host(right.size());
+        copy_type()(static_cast<std::ptrdiff_t>(left.size()), left.data(), left_host.data());
+        copy_type()(static_cast<std::ptrdiff_t>(right.size()), right.data(), right_host.data());
+        scalar_type result = scalar_type(0);
+        for(std::size_t index = 0; index < left_host.size(); ++index)
+        {
+            result += left_host[index]*right_host[index];
+        }
+        return result;
+    };
+    const auto spectral_inner_product = [&](const spectral_field_type& left,
+                                            const spectral_field_type& right)
+    {
+        std::vector<complex_type> left_host(left.size());
+        std::vector<complex_type> right_host(right.size());
+        copy_type()(static_cast<std::ptrdiff_t>(left.size()), left.data(), left_host.data());
+        copy_type()(static_cast<std::ptrdiff_t>(right.size()), right.data(), right_host.data());
+        scalar_type result = scalar_type(0);
+        for(std::size_t index = 0; index < left_host.size(); ++index)
+        {
+            result +=
+                complex_traits::real(left_host[index])*complex_traits::real(right_host[index]) +
+                complex_traits::imag(left_host[index])*complex_traits::imag(right_host[index]);
+        }
+        return result;
+    };
+
     report.check(index_space.my() == ny/2 + 1, "R2C reduced y extent");
     report.check(index_space.complex_size() == nx*(ny/2 + 1), "R2C complex size");
     report.check(index_space.full_mean_zero_state_size() == nx*ny - 1, "full mean-zero state size");
@@ -121,6 +157,40 @@ int run_fourier_foundation_tests(const std::string& backend_name)
         report.near(restored_host[index], physical_host[index], tolerance, "normalized FFT round trip");
     }
 
+    physical_field_type physical_cotangent(physical_extent);
+    physical_field_type forward_adjoint_value(physical_extent);
+    spectral_field_type spectral_cotangent(index_space.spectral_extent());
+    spectral_field_type inverse_adjoint_value(index_space.spectral_extent());
+    std::vector<scalar_type> physical_cotangent_host(nx*ny);
+    for(std::size_t ix = 0; ix < nx; ++ix)
+    {
+        for(std::size_t iy = 0; iy < ny; ++iy)
+        {
+            physical_cotangent_host[ix*ny + iy] =
+                scalar_type(0.4)*std::cos(
+                    scalar_type(4)*pi*static_cast<scalar_type>(ix)/static_cast<scalar_type>(nx)) +
+                scalar_type(0.2)*std::sin(
+                    scalar_type(6)*pi*static_cast<scalar_type>(iy)/static_cast<scalar_type>(ny));
+        }
+    }
+    copy_type()(
+        static_cast<std::ptrdiff_t>(physical_cotangent_host.size()),
+        physical_cotangent_host.data(),
+        physical_cotangent.data());
+    transform.forward(physical_cotangent, spectral_cotangent);
+    transform.forward_adjoint(spectral_cotangent, forward_adjoint_value);
+    report.check(
+        relative_duality_error(
+            spectral_inner_product(spectrum, spectral_cotangent),
+            physical_inner_product(physical, forward_adjoint_value)) <= tolerance,
+        "normalized forward FFT adjoint duality");
+    transform.inverse_adjoint(physical_cotangent, inverse_adjoint_value);
+    report.check(
+        relative_duality_error(
+            physical_inner_product(restored, physical_cotangent),
+            spectral_inner_product(spectrum, inverse_adjoint_value)) <= tolerance,
+        "normalized inverse FFT adjoint duality");
+
     wavevector_table_2d<Backend, scalar_type> wavevectors(grid, index_space);
     spectral_field_type derivative_spectrum(index_space.spectral_extent());
     spectral_field_type laplacian_spectrum(index_space.spectral_extent());
@@ -158,6 +228,18 @@ int run_fourier_foundation_tests(const std::string& backend_name)
             report.near(recovered_operator_host[index], physical_host[index], tolerance, "inverse laplacian recovery");
         }
     }
+
+    spectral_field_type derivative_adjoint_spectrum(index_space.spectral_extent());
+    operations::derivative_adjoint<Backend>(
+        spectral_cotangent,
+        wavevectors,
+        0,
+        derivative_adjoint_spectrum);
+    report.check(
+        relative_duality_error(
+            spectral_inner_product(derivative_spectrum, spectral_cotangent),
+            spectral_inner_product(spectrum, derivative_adjoint_spectrum)) <= tolerance,
+        "spectral derivative adjoint duality");
 
     spectral_field_type filtered_spectrum(index_space.spectral_extent());
     std::vector<complex_type> filter_host(
@@ -220,6 +302,52 @@ int run_fourier_foundation_tests(const std::string& backend_name)
         );
     }
 
+    spectral_field_type product_left_adjoint(index_space.spectral_extent());
+    spectral_field_type product_right_adjoint(index_space.spectral_extent());
+    product_operation.apply_left_adjoint(
+        product_right_spectrum,
+        spectral_cotangent,
+        product_left_adjoint);
+    report.check(
+        relative_duality_error(
+            spectral_inner_product(product_spectrum, spectral_cotangent),
+            spectral_inner_product(product_left_spectrum, product_left_adjoint)) <= tolerance,
+        "pseudospectral product left adjoint duality");
+    product_operation.apply_right_adjoint(
+        product_left_spectrum,
+        spectral_cotangent,
+        product_right_adjoint);
+    report.check(
+        relative_duality_error(
+            spectral_inner_product(product_spectrum, spectral_cotangent),
+            spectral_inner_product(product_right_spectrum, product_right_adjoint)) <= tolerance,
+        "pseudospectral product right adjoint duality");
+
+    const auto check_codec_adjoint = [&](auto& codec,
+                                         auto& operations,
+                                         const auto& state,
+                                         auto& state_work,
+                                         const std::string& label)
+    {
+        spectral_field_type codec_spectrum(index_space.spectral_extent());
+        spectral_field_type codec_adjoint_spectrum(index_space.spectral_extent());
+        codec.unpack(state, codec_spectrum);
+        codec.unpack_adjoint(spectral_cotangent, state_work);
+        report.check(
+            relative_duality_error(
+                spectral_inner_product(codec_spectrum, spectral_cotangent),
+                operations.scalar_prod(state, state_work)) <= tolerance,
+            label + " unpack adjoint duality");
+
+        codec.pack(codec_spectrum, state_work);
+        codec.pack_adjoint(state, codec_adjoint_spectrum);
+        report.check(
+            relative_duality_error(
+                operations.scalar_prod(state_work, state),
+                spectral_inner_product(codec_spectrum, codec_adjoint_spectrum)) <= tolerance,
+            label + " pack adjoint duality");
+    };
+
     vector_operations_type full_operations(index_space.full_mean_zero_state_size());
     typename vector_operations_type::vector_type full_state;
     typename vector_operations_type::vector_type full_roundtrip;
@@ -234,6 +362,12 @@ int run_fourier_foundation_tests(const std::string& backend_name)
     full_operations.set(full_host.data(), full_state);
     full_codec.unpack(full_state, spectrum);
     full_codec.pack(spectrum, full_roundtrip);
+    check_codec_adjoint(
+        full_codec,
+        full_operations,
+        full_state,
+        full_roundtrip,
+        "full codec");
     std::vector<scalar_type> full_roundtrip_host(full_host.size());
     full_operations.get(full_roundtrip, full_roundtrip_host.data());
     for(std::size_t index = 0; index < full_host.size(); ++index)
@@ -275,6 +409,12 @@ int run_fourier_foundation_tests(const std::string& backend_name)
     translation_operations.set(translation_host.data(), translation_state);
     translation_codec.unpack(translation_state, spectrum);
     translation_codec.pack(spectrum, translation_roundtrip);
+    check_codec_adjoint(
+        translation_codec,
+        translation_operations,
+        translation_state,
+        translation_roundtrip,
+        "translation-equivariant codec");
     std::vector<scalar_type> translation_roundtrip_host(translation_host.size());
     translation_operations.get(translation_roundtrip, translation_roundtrip_host.data());
     for(std::size_t index = 0; index < translation_host.size(); ++index)
@@ -314,6 +454,12 @@ int run_fourier_foundation_tests(const std::string& backend_name)
     odd_operations.set(odd_host.data(), odd_state);
     odd_codec.unpack(odd_state, spectrum);
     odd_codec.pack(spectrum, odd_roundtrip);
+    check_codec_adjoint(
+        odd_codec,
+        odd_operations,
+        odd_state,
+        odd_roundtrip,
+        "odd codec");
     std::vector<scalar_type> odd_roundtrip_host(odd_host.size());
     odd_operations.get(odd_roundtrip, odd_roundtrip_host.data());
     for(std::size_t index = 0; index < odd_host.size(); ++index)

@@ -139,6 +139,11 @@ public:
         }, ordinal_type(1));
     }
 
+    void jacobian_u_adjoint(const T_vec& w, T_vec& dv)
+    {
+        jacobian_u(w, dv);
+    }
+
     void jacobian_alpha(T_vec& dv)
     {
         jacobian_alpha(u_0, alpha_0, dv);
@@ -170,6 +175,17 @@ public:
                 jacobian_scale*T(2)*u0p[0] +
                 identity_shift;
         }, ordinal_type(1));
+    }
+
+    void preconditioner_jacobian_affine_u_adjoint(
+        T_vec& rhs_to_solution,
+        const T jacobian_scale,
+        const T identity_shift) const
+    {
+        preconditioner_jacobian_affine_u(
+            rhs_to_solution,
+            jacobian_scale,
+            identity_shift);
     }
 
     void physical_solution(T_vec&, T_vec&)

@@ -217,6 +217,21 @@ public:
         apply_spatial_jacobian<detail::linear_nonlinear_terms::nonlinear>( du, dv );
     }
 
+    void jacobian_u_adjoint( const T_vec &w, T_vec &dv )
+    {
+        apply_spatial_jacobian_adjoint<detail::linear_nonlinear_terms::all>( w, dv );
+    }
+
+    void linear_jacobian_u_adjoint( const T_vec &w, T_vec &dv ) const
+    {
+        assemble_reduced_rhs<detail::linear_nonlinear_terms::linear>( w, nonlin_hat, lambda_0, dv );
+    }
+
+    void nonlinear_jacobian_u_adjoint( const T_vec &w, T_vec &dv )
+    {
+        apply_spatial_jacobian_adjoint<detail::linear_nonlinear_terms::nonlinear>( w, dv );
+    }
+
     void jacobian_alpha( T_vec &dv )
     {
         jacobian_alpha( u_0, lambda_0, dv );
@@ -356,6 +371,19 @@ public:
                 }
             },
             static_cast<ordinal_type>( mode_count_ )
+        );
+    }
+
+    void preconditioner_jacobian_affine_u_adjoint(
+        T_vec &rhs_to_solution,
+        const T jacobian_scale,
+        const T identity_shift
+    ) const
+    {
+        preconditioner_jacobian_affine_u(
+            rhs_to_solution,
+            jacobian_scale,
+            identity_shift
         );
     }
 
@@ -885,6 +913,122 @@ public:
             compute_jacobian_nonlinearity_spectral( u0_hat, du_hat, nonlin_hat );
         }
         assemble_reduced_rhs<Terms>( du, nonlin_hat, lambda_0, dv );
+    }
+
+    template <detail::linear_nonlinear_terms Terms>
+    void apply_spatial_jacobian_adjoint( const T_vec &w, T_vec &dv )
+    {
+        if constexpr ( detail::includes_nonlinear<Terms>() )
+        {
+            reduced_to_complex( w, du_hat );
+        }
+
+        const auto wp = access_type::data( w );
+        const auto up = u0_hat.raw_ptr();
+        const auto whp = du_hat.raw_ptr();
+        auto dvp = access_type::data( dv );
+        const int K = static_cast<int>( mode_count_ );
+        const T scale = T( 1 ) / static_cast<T>( physical_size_ );
+        const T a = a_val;
+        const T b = b_val;
+        const T lambda = lambda_0;
+        access_type::for_each(
+            [wp, up, whp, dvp, K, scale, a, b, lambda]
+            __DEVICE_TAG__( ordinal_type i ) {
+                const int r = static_cast<int>( i ) + 1;
+                T gradient_real = T( 0 );
+                T gradient_imag = T( 0 );
+                if constexpr ( detail::includes_nonlinear<Terms>() )
+                {
+                    for ( int m = 1; m <= K; ++m )
+                    {
+                        T derivative_real_re = T( 0 );
+                        T derivative_real_im = T( 0 );
+                        T derivative_imag_re = T( 0 );
+                        T derivative_imag_im = T( 0 );
+
+                        const int q_positive_p = m - r;
+                        if ( q_positive_p >= -K && q_positive_p <= K && q_positive_p != 0 )
+                        {
+                            const complex_type derivative = derivative_coeff(
+                                q_positive_p, mode_value( up, q_positive_p ) );
+                            const T derivative_re = complex_access_type::real( derivative );
+                            const T derivative_im = complex_access_type::imag( derivative );
+                            derivative_real_re += derivative_re;
+                            derivative_real_im += derivative_im;
+                            derivative_imag_re -= derivative_im;
+                            derivative_imag_im += derivative_re;
+                        }
+
+                        const int q_negative_p = m + r;
+                        if ( q_negative_p >= -K && q_negative_p <= K && q_negative_p != 0 )
+                        {
+                            const complex_type derivative = derivative_coeff(
+                                q_negative_p, mode_value( up, q_negative_p ) );
+                            const T derivative_re = complex_access_type::real( derivative );
+                            const T derivative_im = complex_access_type::imag( derivative );
+                            derivative_real_re += derivative_re;
+                            derivative_real_im += derivative_im;
+                            derivative_imag_re += derivative_im;
+                            derivative_imag_im -= derivative_re;
+                        }
+
+                        const int p_positive_q = m - r;
+                        if ( p_positive_q >= -K && p_positive_q <= K && p_positive_q != 0 )
+                        {
+                            const complex_type value = mode_value( up, p_positive_q );
+                            const T value_re = complex_access_type::real( value );
+                            const T value_im = complex_access_type::imag( value );
+                            const T wave = static_cast<T>( r );
+                            derivative_real_re -= wave*value_im;
+                            derivative_real_im += wave*value_re;
+                            derivative_imag_re -= wave*value_re;
+                            derivative_imag_im -= wave*value_im;
+                        }
+
+                        const int p_negative_q = m + r;
+                        if ( p_negative_q >= -K && p_negative_q <= K && p_negative_q != 0 )
+                        {
+                            const complex_type value = mode_value( up, p_negative_q );
+                            const T value_re = complex_access_type::real( value );
+                            const T value_im = complex_access_type::imag( value );
+                            const T wave = static_cast<T>( r );
+                            derivative_real_re += wave*value_im;
+                            derivative_real_im -= wave*value_re;
+                            derivative_imag_re -= wave*value_re;
+                            derivative_imag_im -= wave*value_im;
+                        }
+
+                        const T cotangent_re = complex_access_type::real( whp[m] );
+                        const T cotangent_im = complex_access_type::imag( whp[m] );
+                        gradient_real +=
+                            cotangent_re*derivative_real_re +
+                            cotangent_im*derivative_real_im;
+                        gradient_imag +=
+                            cotangent_re*derivative_imag_re +
+                            cotangent_im*derivative_imag_im;
+                    }
+                }
+
+                const std::size_t offset = 2*static_cast<std::size_t>( i );
+                T real_value = T( 0 );
+                T imag_value = T( 0 );
+                if constexpr ( detail::includes_linear<Terms>() )
+                {
+                    const T linear = ks1d_detail::linear_multiplier(
+                        static_cast<std::size_t>( r ), lambda, b );
+                    real_value += linear*wp[offset];
+                    imag_value += linear*wp[offset + 1];
+                }
+                if constexpr ( detail::includes_nonlinear<Terms>() )
+                {
+                    real_value += lambda*a*scale*gradient_real;
+                    imag_value += lambda*a*scale*gradient_imag;
+                }
+                dvp[offset] = real_value;
+                dvp[offset + 1] = imag_value;
+            },
+            static_cast<ordinal_type>( mode_count_ ) );
     }
 
     template <detail::linear_nonlinear_terms Terms>

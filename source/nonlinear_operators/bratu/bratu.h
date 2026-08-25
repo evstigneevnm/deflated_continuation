@@ -196,6 +196,101 @@ struct vector_access<VectorOperations, std::void_t<typename VectorOperations::fo
     }
 };
 
+template<class T, class InputPointer, class OutputPointer, bool Add>
+struct reaction_residual
+{
+    InputPointer input;
+    OutputPointer output;
+    T lambda;
+
+    template<class Ordinal>
+    __DEVICE_TAG__ void operator()(Ordinal index) const
+    {
+        const T reaction = lambda*bratu_detail::exp(input[index]);
+        if constexpr(Add)
+        {
+            output[index] += reaction;
+        }
+        else
+        {
+            output[index] = reaction;
+        }
+    }
+};
+
+template<class T, class StatePointer, class InputPointer, class OutputPointer, bool Add>
+struct reaction_jacobian
+{
+    StatePointer state;
+    InputPointer input;
+    OutputPointer output;
+    T lambda;
+
+    template<class Ordinal>
+    __DEVICE_TAG__ void operator()(Ordinal index) const
+    {
+        const T reaction = lambda*bratu_detail::exp(state[index])*input[index];
+        if constexpr(Add)
+        {
+            output[index] += reaction;
+        }
+        else
+        {
+            output[index] = reaction;
+        }
+    }
+};
+
+template<class T, class MatrixPointer, class StatePointer, class OutputPointer, class Ordinal>
+struct form_jacobian
+{
+    MatrixPointer matrix;
+    StatePointer state;
+    OutputPointer output;
+    T lambda;
+    Ordinal size;
+
+    __DEVICE_TAG__ void operator()(Ordinal index) const
+    {
+        const Ordinal row = index/size;
+        const Ordinal column = index - row*size;
+        T value = matrix[index];
+        if(row == column)
+        {
+            value += lambda*bratu_detail::exp(state[row]);
+        }
+        output[index] = value;
+    }
+};
+
+template<
+    class T,
+    class MatrixPointer,
+    class InputPointer,
+    class OutputPointer,
+    class Ordinal,
+    bool Transpose>
+struct dense_matvec
+{
+    MatrixPointer matrix;
+    InputPointer input;
+    OutputPointer output;
+    Ordinal size;
+
+    __DEVICE_TAG__ void operator()(Ordinal output_index) const
+    {
+        T sum = T(0);
+        for(Ordinal input_index = 0; input_index < size; ++input_index)
+        {
+            const Ordinal matrix_index = Transpose
+                ? input_index*size + output_index
+                : output_index*size + input_index;
+            sum += matrix[matrix_index]*input[input_index];
+        }
+        output[output_index] = sum;
+    }
+};
+
 } // namespace bratu_detail
 
 template<class VectorOperations, unsigned int BLOCK_SIZE_x = 64>
@@ -288,6 +383,21 @@ public:
         apply_spatial_jacobian<detail::linear_nonlinear_terms::nonlinear>(du, dv);
     }
 
+    void jacobian_u_adjoint(const T_vec& w, T_vec& dv) const
+    {
+        apply_spatial_jacobian_adjoint<detail::linear_nonlinear_terms::all>(w, dv);
+    }
+
+    void linear_jacobian_u_adjoint(const T_vec& w, T_vec& dv) const
+    {
+        apply_spatial_jacobian_adjoint<detail::linear_nonlinear_terms::linear>(w, dv);
+    }
+
+    void nonlinear_jacobian_u_adjoint(const T_vec& w, T_vec& dv) const
+    {
+        apply_spatial_jacobian_adjoint<detail::linear_nonlinear_terms::nonlinear>(w, dv);
+    }
+
     void jacobian_alpha(T_vec& dv)
     {
         jacobian_alpha(u_0, lambda_0, dv);
@@ -309,11 +419,11 @@ public:
 
     void solve_jacobian_system(T_vec& rhs_to_solution) const
     {
-        ensure_host_work();
-        vec_ops->get(jacobian_matrix, host_matrix_work.data(), interior_size*interior_size);
-        vec_ops->get(rhs_to_solution, host_rhs_work.data(), interior_size);
-        solve_dense_system(host_matrix_work, host_rhs_work);
-        vec_ops->set(host_rhs_work.data(), rhs_to_solution, interior_size);
+        solve_affine_jacobian_system(
+            rhs_to_solution,
+            T(1),
+            T(0),
+            false);
     }
 
     void preconditioner_jacobian_affine_u(
@@ -321,34 +431,23 @@ public:
         const T jacobian_scale,
         const T identity_shift) const
     {
-        ensure_host_work();
-        vec_ops->get(
-            jacobian_matrix,
-            host_matrix_work.data(),
-            interior_size*interior_size);
-        for(std::size_t row = 0; row < interior_size; ++row)
-        {
-            for(std::size_t col = 0; col < interior_size; ++col)
-            {
-                host_matrix_work[index(
-                    row,
-                    col,
-                    interior_size)] *= jacobian_scale;
-            }
-            host_matrix_work[index(
-                row,
-                row,
-                interior_size)] += identity_shift;
-        }
-        vec_ops->get(
+        solve_affine_jacobian_system(
             rhs_to_solution,
-            host_rhs_work.data(),
-            interior_size);
-        solve_dense_system(host_matrix_work, host_rhs_work);
-        vec_ops->set(
-            host_rhs_work.data(),
+            jacobian_scale,
+            identity_shift,
+            false);
+    }
+
+    void preconditioner_jacobian_affine_u_adjoint(
+        T_vec& rhs_to_solution,
+        const T jacobian_scale,
+        const T identity_shift) const
+    {
+        solve_affine_jacobian_system(
             rhs_to_solution,
-            interior_size);
+            jacobian_scale,
+            identity_shift,
+            true);
     }
 
     void physical_solution(T_vec&, T_vec&)
@@ -535,19 +634,13 @@ private:
         {
             const auto up = access_type::data(u);
             auto vp = access_type::data(v);
-            const T lambda_l = lambda;
-            access_type::for_each([up, vp, lambda_l] __DEVICE_TAG__ (ordinal_type i)
-            {
-                const T reaction = scaled_exponential(up[i], lambda_l);
-                if constexpr(detail::includes_linear<Terms>())
-                {
-                    vp[i] += reaction;
-                }
-                else
-                {
-                    vp[i] = reaction;
-                }
-            }, static_cast<ordinal_type>(interior_size));
+            access_type::for_each(
+                bratu_detail::reaction_residual<
+                    T,
+                    decltype(up),
+                    decltype(vp),
+                    detail::includes_linear<Terms>()>{up, vp, lambda},
+                static_cast<ordinal_type>(interior_size));
         }
     }
 
@@ -564,19 +657,38 @@ private:
             const auto u0p = access_type::data(u_0);
             const auto dup = access_type::data(du);
             auto dvp = access_type::data(dv);
-            const T lambda_l = lambda_0;
-            access_type::for_each([u0p, dup, dvp, lambda_l] __DEVICE_TAG__ (ordinal_type i)
-            {
-                const T reaction = scaled_exponential(u0p[i], lambda_l)*dup[i];
-                if constexpr(detail::includes_linear<Terms>())
-                {
-                    dvp[i] += reaction;
-                }
-                else
-                {
-                    dvp[i] = reaction;
-                }
-            }, static_cast<ordinal_type>(interior_size));
+            access_type::for_each(
+                bratu_detail::reaction_jacobian<
+                    T,
+                    decltype(u0p),
+                    decltype(dup),
+                    decltype(dvp),
+                    detail::includes_linear<Terms>()>{u0p, dup, dvp, lambda_0},
+                static_cast<ordinal_type>(interior_size));
+        }
+    }
+
+    template <detail::linear_nonlinear_terms Terms>
+    void apply_spatial_jacobian_adjoint(const T_vec& w, T_vec& dv) const
+    {
+        if constexpr(detail::includes_linear<Terms>())
+        {
+            matvec_transpose(d2_matrix, w, dv);
+        }
+
+        if constexpr(detail::includes_nonlinear<Terms>())
+        {
+            const auto u0p = access_type::data(u_0);
+            const auto wp = access_type::data(w);
+            auto dvp = access_type::data(dv);
+            access_type::for_each(
+                bratu_detail::reaction_jacobian<
+                    T,
+                    decltype(u0p),
+                    decltype(wp),
+                    decltype(dvp),
+                    detail::includes_linear<Terms>()>{u0p, wp, dvp, lambda_0},
+                static_cast<ordinal_type>(interior_size));
         }
     }
     T lambda_0 = T(0);
@@ -780,19 +892,15 @@ private:
         const auto d2p = access_type::data(d2_matrix);
         auto jp = access_type::data(jacobian_matrix);
         const auto u0p = access_type::data(u_0);
-        const T lambda_l = lambda_0;
         const ordinal_type n = static_cast<ordinal_type>(interior_size);
-        access_type::for_each([=] __DEVICE_TAG__ (ordinal_type idx)
-        {
-            const ordinal_type row = idx/n;
-            const ordinal_type col = idx - row*n;
-            T value = d2p[idx];
-            if(row == col)
-            {
-                value += scaled_exponential(u0p[row], lambda_l);
-            }
-            jp[idx] = value;
-        }, static_cast<ordinal_type>(interior_size*interior_size));
+        access_type::for_each(
+            bratu_detail::form_jacobian<
+                T,
+                decltype(d2p),
+                decltype(u0p),
+                decltype(jp),
+                ordinal_type>{d2p, u0p, jp, lambda_0, n},
+            static_cast<ordinal_type>(interior_size*interior_size));
     }
 
     void matvec(const T_vec& matrix, const T_vec& x, T_vec& y) const
@@ -801,15 +909,74 @@ private:
         const auto xp = access_type::data(x);
         auto yp = access_type::data(y);
         const ordinal_type n = static_cast<ordinal_type>(interior_size);
-        access_type::for_each([=] __DEVICE_TAG__ (ordinal_type row)
+        access_type::for_each(
+            bratu_detail::dense_matvec<
+                T,
+                decltype(mp),
+                decltype(xp),
+                decltype(yp),
+                ordinal_type,
+                false>{mp, xp, yp, n},
+            n);
+    }
+
+    void matvec_transpose(const T_vec& matrix, const T_vec& x, T_vec& y) const
+    {
+        const auto mp = access_type::data(matrix);
+        const auto xp = access_type::data(x);
+        auto yp = access_type::data(y);
+        const ordinal_type n = static_cast<ordinal_type>(interior_size);
+        access_type::for_each(
+            bratu_detail::dense_matvec<
+                T,
+                decltype(mp),
+                decltype(xp),
+                decltype(yp),
+                ordinal_type,
+                true>{mp, xp, yp, n},
+            n);
+    }
+
+    void solve_affine_jacobian_system(
+        T_vec& rhs_to_solution,
+        const T jacobian_scale,
+        const T identity_shift,
+        const bool transpose) const
+    {
+        ensure_host_work();
+        vec_ops->get(
+            jacobian_matrix,
+            host_matrix_work.data(),
+            interior_size*interior_size);
+        if(transpose)
         {
-            T sum = T(0);
-            for(ordinal_type col = 0; col < n; ++col)
+            for(std::size_t row = 0; row < interior_size; ++row)
             {
-                sum += mp[row*n + col]*xp[col];
+                for(std::size_t col = row + 1; col < interior_size; ++col)
+                {
+                    std::swap(
+                        host_matrix_work[index(row, col, interior_size)],
+                        host_matrix_work[index(col, row, interior_size)]);
+                }
             }
-            yp[row] = sum;
-        }, n);
+        }
+        for(T& value : host_matrix_work)
+        {
+            value *= jacobian_scale;
+        }
+        for(std::size_t row = 0; row < interior_size; ++row)
+        {
+            host_matrix_work[index(row, row, interior_size)] += identity_shift;
+        }
+        vec_ops->get(
+            rhs_to_solution,
+            host_rhs_work.data(),
+            interior_size);
+        solve_dense_system(host_matrix_work, host_rhs_work);
+        vec_ops->set(
+            host_rhs_work.data(),
+            rhs_to_solution,
+            interior_size);
     }
 
     void ensure_host_work() const

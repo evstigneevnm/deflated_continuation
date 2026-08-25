@@ -125,6 +125,62 @@ public:
         for_each.wait();
     }
 
+    template<class SpectralField>
+    void pack_adjoint(const vector_type& state, SpectralField& spectrum) const
+    {
+        require_sizes(state, spectrum);
+        complex_type* output = spectrum.data();
+        const scalar_type* input = state.raw_ptr();
+        const descriptor_type* descriptors = descriptors_.raw_ptr();
+        for_each_type for_each;
+        for_each(
+            [=] __DEVICE_TAG__ (const ordinal_type index)
+            {
+                output[index] = complex_traits::make(scalar_type(0), scalar_type(0));
+            },
+            static_cast<ordinal_type>(complex_size()));
+        for_each.wait();
+        for_each(
+            [=] __DEVICE_TAG__ (const ordinal_type descriptor_index)
+            {
+                const descriptor_type descriptor = descriptors[descriptor_index];
+                const scalar_type weight =
+                    descriptor.partner_index >= 0 ? scalar_type(0.5) : scalar_type(1);
+                const complex_type value = complex_traits::make(
+                    scalar_type(0), weight*input[descriptor.state_offset]);
+                output[descriptor.spectrum_index] = value;
+                if(descriptor.partner_index >= 0)
+                {
+                    output[descriptor.partner_index] = complex_traits::conj(value);
+                }
+            },
+            static_cast<ordinal_type>(descriptor_count_));
+        for_each.wait();
+    }
+
+    template<class SpectralField>
+    void unpack_adjoint(const SpectralField& spectrum, vector_type& state) const
+    {
+        require_sizes(state, spectrum);
+        const complex_type* input = spectrum.data();
+        scalar_type* output = state.raw_ptr();
+        const descriptor_type* descriptors = descriptors_.raw_ptr();
+        for_each_type for_each;
+        for_each(
+            [=] __DEVICE_TAG__ (const ordinal_type descriptor_index)
+            {
+                const descriptor_type descriptor = descriptors[descriptor_index];
+                scalar_type value = complex_traits::imag(input[descriptor.spectrum_index]);
+                if(descriptor.partner_index >= 0)
+                {
+                    value -= complex_traits::imag(input[descriptor.partner_index]);
+                }
+                output[descriptor.state_offset] = value;
+            },
+            static_cast<ordinal_type>(descriptor_count_));
+        for_each.wait();
+    }
+
 private:
     void initialize_descriptors()
     {

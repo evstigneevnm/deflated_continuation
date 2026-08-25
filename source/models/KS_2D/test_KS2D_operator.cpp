@@ -23,6 +23,8 @@
 #include <discretization/fourier/codecs/inversion_odd_field.h>
 #include <discretization/fourier/codecs/translation_equivariant_real_field.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/kuramoto_sivashinskiy_2d.h>
+#include <nonlinear_operators/adjoint_jacobian_capability.h>
+#include <nonlinear_operators/tests/adjoint_jacobian_test.h>
 #include <nonlinear_operators/tests/linear_nonlinear_decomposition_test.h>
 #include <symmetry/finite_action_registry.h>
 #include <symmetry/finite_quotient_adapter.h>
@@ -108,6 +110,7 @@ void run_case(
     vector_type zero;
     vector_type state;
     vector_type direction;
+    vector_type cotangent;
     vector_type state_epsilon;
     vector_type f_zero;
     vector_type f_state;
@@ -127,6 +130,7 @@ void run_case(
         zero,
         state,
         direction,
+        cotangent,
         state_epsilon,
         f_zero,
         f_state,
@@ -147,6 +151,7 @@ void run_case(
         zero,
         state,
         direction,
+        cotangent,
         state_epsilon,
         f_zero,
         f_state,
@@ -235,16 +240,21 @@ void run_case(
 
     std::vector<scalar_type> state_host(state_size);
     std::vector<scalar_type> direction_host(state_size);
+    std::vector<scalar_type> cotangent_host(state_size);
     std::vector<scalar_type> perturbed_host(state_size);
     for(std::size_t index = 0; index < state_size; ++index)
     {
         const scalar_type denominator = static_cast<scalar_type>((index + 1)*(index + 1)*(index + 1));
         state_host[index] = 0.05*std::sin(static_cast<scalar_type>(index + 1))/denominator;
         direction_host[index] = 0.03*std::cos(static_cast<scalar_type>(2*index + 1))/denominator;
+        cotangent_host[index] =
+            0.04*std::sin(static_cast<scalar_type>(3*index + 2))/
+            static_cast<scalar_type>((index + 1)*(index + 2));
         perturbed_host[index] = state_host[index] + epsilon*direction_host[index];
     }
     operations.set(state_host.data(), state);
     operations.set(direction_host.data(), direction);
+    operations.set(cotangent_host.data(), cotangent);
     operations.set(perturbed_host.data(), state_epsilon);
 
     ks2d.F(state, lambda, f_state);
@@ -312,6 +322,44 @@ void run_case(
         },
         "KS2D"
     );
+
+    static_assert(
+        nonlinear_operators::has_jacobian_u_adjoint_v<operator_type>,
+        "KS2D must provide an adjoint Jacobian action");
+    static_assert(
+        nonlinear_operators::has_component_jacobian_u_adjoint_v<operator_type>,
+        "KS2D must provide component adjoint Jacobian actions");
+    static_assert(
+        nonlinear_operators::has_affine_preconditioner_adjoint_pair_v<operator_type>,
+        "KS2D must provide an affine preconditioner adjoint pair");
+    nonlinear_operators::tests::check_adjoint_jacobian(
+        operations,
+        ks2d,
+        state,
+        direction,
+        cotangent,
+        lambda,
+        scalar_type(8.0e-12),
+        [&](const bool condition, const std::string& text)
+        {
+            result.check(condition, message(text));
+        },
+        "KS2D");
+    nonlinear_operators::tests::check_affine_preconditioner_adjoint(
+        operations,
+        ks2d,
+        state,
+        direction,
+        cotangent,
+        lambda,
+        scalar_type(0.7),
+        scalar_type(1.1),
+        scalar_type(8.0e-12),
+        [&](const bool condition, const std::string& text)
+        {
+            result.check(condition, message(text));
+        },
+        "KS2D");
 
     if(expect_translation_equivariance)
     {
@@ -640,6 +688,7 @@ void run_case(
         zero,
         state,
         direction,
+        cotangent,
         state_epsilon,
         f_zero,
         f_state,
@@ -660,6 +709,7 @@ void run_case(
         zero,
         state,
         direction,
+        cotangent,
         state_epsilon,
         f_zero,
         f_state,

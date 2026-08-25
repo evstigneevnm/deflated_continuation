@@ -219,6 +219,21 @@ public:
         apply_spatial_jacobian<detail::linear_nonlinear_terms::nonlinear>( direction, output );
     }
 
+    void jacobian_u_adjoint( const vector_type &cotangent, vector_type &output )
+    {
+        apply_spatial_jacobian_adjoint<detail::linear_nonlinear_terms::all>( cotangent, output );
+    }
+
+    void linear_jacobian_u_adjoint( const vector_type &cotangent, vector_type &output )
+    {
+        apply_spatial_jacobian_adjoint<detail::linear_nonlinear_terms::linear>( cotangent, output );
+    }
+
+    void nonlinear_jacobian_u_adjoint( const vector_type &cotangent, vector_type &output )
+    {
+        apply_spatial_jacobian_adjoint<detail::linear_nonlinear_terms::nonlinear>( cotangent, output );
+    }
+
     void jacobian_alpha( vector_type &output )
     {
         jacobian_alpha( u0_state_, lambda0_, output );
@@ -280,6 +295,13 @@ public:
         );
         for_each.wait();
         codec_.pack( preconditioner_hat_, rhs_to_solution );
+    }
+
+    void preconditioner_jacobian_affine_u_adjoint(
+        vector_type &rhs_to_solution, const scalar_type jacobian_scale, const scalar_type identity_shift
+    ) const
+    {
+        preconditioner_jacobian_affine_u( rhs_to_solution, jacobian_scale, identity_shift );
     }
 
     std::pair<scalar_type, scalar_type> preconditioner_jacobian_affine_diagonal_range(
@@ -496,6 +518,32 @@ private:
         }
         assemble<Terms, true>( du_hat_, nonlinear_hat_, lambda0_, output_hat_ );
         codec_.pack( output_hat_, output );
+    }
+
+    template <detail::linear_nonlinear_terms Terms>
+    void apply_spatial_jacobian_adjoint(
+        const vector_type &cotangent,
+        vector_type &output )
+    {
+        codec_.pack_adjoint( cotangent, output_hat_ );
+        if constexpr ( detail::includes_nonlinear<Terms>() )
+        {
+            product_.apply_left_adjoint(
+                u0_gradient_sum_, output_hat_, jacobian_product_1_ );
+            product_.apply_right_adjoint(
+                u0_hat_, output_hat_, jacobian_product_2_ );
+            discretization::fourier::operations::derivative_adjoint<backend_type>(
+                jacobian_product_2_, wavevectors_, 0, u_gradient_x_ );
+            discretization::fourier::operations::derivative_adjoint<backend_type>(
+                jacobian_product_2_, wavevectors_, 1, u_gradient_y_ );
+            discretization::fourier::operations::add_spectra<backend_type>(
+                u_gradient_x_, u_gradient_y_, nonlinear_hat_ );
+            discretization::fourier::operations::add_spectra<backend_type>(
+                jacobian_product_1_, nonlinear_hat_, du_hat_ );
+        }
+        assemble<Terms, true>(
+            output_hat_, du_hat_, lambda0_, u_hat_ );
+        codec_.unpack_adjoint( u_hat_, output );
     }
 
 public:

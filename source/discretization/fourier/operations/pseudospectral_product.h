@@ -77,7 +77,88 @@ public:
         dealiasing_.template apply<Backend>(product);
     }
 
+    void apply_left_adjoint(
+        const spectral_field_type& fixed_right,
+        const spectral_field_type& product_cotangent,
+        spectral_field_type& left_cotangent)
+    {
+        require_sizes(fixed_right, product_cotangent, left_cotangent);
+        copy_type()(
+            static_cast<std::ptrdiff_t>(fixed_right.size()),
+            fixed_right.data(),
+            filtered_right_.data());
+        copy_type()(
+            static_cast<std::ptrdiff_t>(product_cotangent.size()),
+            product_cotangent.data(),
+            filtered_left_.data());
+        dealiasing_.template apply<Backend>(filtered_right_);
+        dealiasing_.template apply<Backend>(filtered_left_);
+        transform_->inverse(filtered_right_, physical_right_);
+        transform_->forward_adjoint(filtered_left_, physical_product_);
+
+        const T* product_values = physical_product_.data();
+        const T* right_values = physical_right_.data();
+        T* left_values = physical_left_.data();
+        for_each_type for_each;
+        for_each(
+            [=] __DEVICE_TAG__ (const std::ptrdiff_t index)
+            {
+                left_values[index] = product_values[index]*right_values[index];
+            },
+            static_cast<std::ptrdiff_t>(physical_left_.size()));
+        for_each.wait();
+        transform_->inverse_adjoint(physical_left_, left_cotangent);
+        dealiasing_.template apply<Backend>(left_cotangent);
+    }
+
+    void apply_right_adjoint(
+        const spectral_field_type& fixed_left,
+        const spectral_field_type& product_cotangent,
+        spectral_field_type& right_cotangent)
+    {
+        require_sizes(fixed_left, product_cotangent, right_cotangent);
+        copy_type()(
+            static_cast<std::ptrdiff_t>(fixed_left.size()),
+            fixed_left.data(),
+            filtered_left_.data());
+        copy_type()(
+            static_cast<std::ptrdiff_t>(product_cotangent.size()),
+            product_cotangent.data(),
+            filtered_right_.data());
+        dealiasing_.template apply<Backend>(filtered_left_);
+        dealiasing_.template apply<Backend>(filtered_right_);
+        transform_->inverse(filtered_left_, physical_left_);
+        transform_->forward_adjoint(filtered_right_, physical_product_);
+
+        const T* product_values = physical_product_.data();
+        const T* left_values = physical_left_.data();
+        T* right_values = physical_right_.data();
+        for_each_type for_each;
+        for_each(
+            [=] __DEVICE_TAG__ (const std::ptrdiff_t index)
+            {
+                right_values[index] = product_values[index]*left_values[index];
+            },
+            static_cast<std::ptrdiff_t>(physical_right_.size()));
+        for_each.wait();
+        transform_->inverse_adjoint(physical_right_, right_cotangent);
+        dealiasing_.template apply<Backend>(right_cotangent);
+    }
+
 private:
+    void require_sizes(
+        const spectral_field_type& fixed,
+        const spectral_field_type& product_cotangent,
+        const spectral_field_type& factor_cotangent) const
+    {
+        if(fixed.size() != product_cotangent.size() ||
+           fixed.size() != factor_cotangent.size() ||
+           fixed.size() != transform_->complex_size())
+        {
+            throw std::invalid_argument("pseudospectral_product_2d adjoint spectrum size mismatch");
+        }
+    }
+
     static transform_type* require_transform(transform_type* transform)
     {
         if(transform == nullptr)

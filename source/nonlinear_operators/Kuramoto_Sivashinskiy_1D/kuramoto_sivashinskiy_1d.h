@@ -318,6 +318,21 @@ public:
         apply_spatial_jacobian<detail::linear_nonlinear_terms::nonlinear>(du, dv);
     }
 
+    void jacobian_u_adjoint(const T_vec& w, T_vec& dv)
+    {
+        apply_spatial_jacobian_adjoint<detail::linear_nonlinear_terms::all>(w, dv);
+    }
+
+    void linear_jacobian_u_adjoint(const T_vec& w, T_vec& dv) const
+    {
+        assemble_reduced_rhs<detail::linear_nonlinear_terms::linear>(w, nonlin_hat, lambda_0, dv);
+    }
+
+    void nonlinear_jacobian_u_adjoint(const T_vec& w, T_vec& dv)
+    {
+        apply_spatial_jacobian_adjoint<detail::linear_nonlinear_terms::nonlinear>(w, dv);
+    }
+
     void jacobian_alpha(T_vec& dv)
     {
         jacobian_alpha(u_0, lambda_0, dv);
@@ -395,6 +410,17 @@ public:
                 xp[i] /= diag;
             }
         }, static_cast<ordinal_type>(mode_count_));
+    }
+
+    void preconditioner_jacobian_affine_u_adjoint(
+        T_vec& rhs_to_solution,
+        const T jacobian_scale,
+        const T identity_shift) const
+    {
+        preconditioner_jacobian_affine_u(
+            rhs_to_solution,
+            jacobian_scale,
+            identity_shift);
     }
 
     std::pair<T, T>
@@ -727,6 +753,58 @@ public:
             compute_jacobian_nonlinearity(du_hat, nonlin_hat);
         }
         assemble_reduced_rhs<Terms>(du, nonlin_hat, lambda_0, dv);
+    }
+
+    template <detail::linear_nonlinear_terms Terms>
+    void apply_spatial_jacobian_adjoint(const T_vec& w, T_vec& dv)
+    {
+        if constexpr(detail::includes_nonlinear<Terms>())
+        {
+            reduced_to_complex(w, du_hat);
+            inverse_to_physical(du_hat, physical_out);
+            vec_ops->scale(static_cast<T>(physical_size_)/T(2), physical_out);
+
+            const auto qp = access_type::data(physical_out);
+            const auto u0p = access_type::data(physical_u);
+            const auto ux0p = access_type::data(physical_ux);
+            auto firstp = access_type::data(physical_du);
+            auto secondp = access_type::data(physical_dux);
+            access_type::for_each([=] __DEVICE_TAG__ (ordinal_type i)
+            {
+                firstp[i] = qp[i]*ux0p[i];
+                secondp[i] = qp[i]*u0p[i];
+            }, static_cast<ordinal_type>(physical_size_));
+            fft_plan.forward(access_type::data(physical_du), du_hat.raw_ptr());
+            fft_plan.forward(access_type::data(physical_dux), dux_hat.raw_ptr());
+        }
+
+        const auto wp = access_type::data(w);
+        const auto first_hat = du_hat.raw_ptr();
+        const auto second_hat = dux_hat.raw_ptr();
+        auto dvp = access_type::data(dv);
+        const T a = a_val;
+        const T b = b_val;
+        const T lambda = lambda_0;
+        const T inverse_size_twice = T(2)/static_cast<T>(physical_size_);
+        access_type::for_each(
+            [wp, first_hat, second_hat, dvp, a, b, lambda, inverse_size_twice]
+            __DEVICE_TAG__ (ordinal_type i)
+        {
+            const std::size_t mode = static_cast<std::size_t>(i) + 1;
+            T value = T(0);
+            if constexpr(detail::includes_linear<Terms>())
+            {
+                value += ks1d_detail::linear_multiplier(mode, lambda, b)*wp[i];
+            }
+            if constexpr(detail::includes_nonlinear<Terms>())
+            {
+                const T k = static_cast<T>(mode);
+                value += lambda*a*inverse_size_twice*(
+                    complex_access_type::imag(first_hat[mode]) -
+                    k*complex_access_type::real(second_hat[mode]));
+            }
+            dvp[i] = value;
+        }, static_cast<ordinal_type>(mode_count_));
     }
 
     template <detail::linear_nonlinear_terms Terms>
