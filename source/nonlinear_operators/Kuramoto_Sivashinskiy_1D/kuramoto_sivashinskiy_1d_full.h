@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h>
+#include <nonlinear_operators/detail/linear_nonlinear_terms.h>
 #include <symmetry/fourier/real_packed_fourier_slice_1d_adapter.h>
 
 namespace nonlinear_operators
@@ -157,52 +158,22 @@ public:
 
     T linear_multiplier( const std::size_t mode, const T lambda ) const
     {
-        const T k  = static_cast<T>( mode );
-        const T k2 = k * k;
-        return lambda * ( -k2 ) + b_val * k2 * k2;
+        return ks1d_detail::linear_multiplier( mode, lambda, b_val );
     }
 
     void F( const T_vec &u, const T lambda, T_vec &v )
     {
-        reduced_to_complex( u, u_hat );
-        compute_nonlinearity_spectral( u_hat, nonlin_hat );
-        assemble_reduced_rhs( u_hat, nonlin_hat, lambda, v );
+        evaluate_spatial_residual<detail::linear_nonlinear_terms::all>( u, lambda, v );
     }
 
     void linear_residual( const T_vec &u, const T lambda, T_vec &v ) const
     {
-        const auto up = access_type::data( u );
-        auto       vp = access_type::data( v );
-        const T    b  = b_val;
-        access_type::for_each(
-            [=] __DEVICE_TAG__( ordinal_type i ) {
-                const T           k      = static_cast<T>( i + 1 );
-                const T           k2     = k * k;
-                const T           linear = lambda * ( -k2 ) + b * k2 * k2;
-                const std::size_t offset = 2 * static_cast<std::size_t>( i );
-                vp[offset]                = linear * up[offset];
-                vp[offset + 1]            = linear * up[offset + 1];
-            },
-            static_cast<ordinal_type>( mode_count_ )
-        );
+        assemble_reduced_rhs<detail::linear_nonlinear_terms::linear>( u, nonlin_hat, lambda, v );
     }
 
     void nonlinear_residual( const T_vec &u, const T lambda, T_vec &v )
     {
-        reduced_to_complex( u, u_hat );
-        compute_nonlinearity_spectral( u_hat, nonlin_hat );
-        const auto np = nonlin_hat.raw_ptr();
-        auto       vp = access_type::data( v );
-        const T    a  = a_val;
-        access_type::for_each(
-            [=] __DEVICE_TAG__( ordinal_type i ) {
-                const std::size_t mode   = static_cast<std::size_t>( i ) + 1;
-                const std::size_t offset = 2 * static_cast<std::size_t>( i );
-                vp[offset] = lambda * a * complex_access_type::real( np[mode] );
-                vp[offset + 1] = lambda * a * complex_access_type::imag( np[mode] );
-            },
-            static_cast<ordinal_type>( mode_count_ )
-        );
+        evaluate_spatial_residual<detail::linear_nonlinear_terms::nonlinear>( u, lambda, v );
     }
 
     void set_linearization_point( const T_vec &u_0_, const T lambda_0_ )
@@ -233,9 +204,17 @@ public:
 
     void jacobian_u( const T_vec &du, T_vec &dv )
     {
-        reduced_to_complex( du, du_hat );
-        compute_jacobian_nonlinearity_spectral( u0_hat, du_hat, nonlin_hat );
-        assemble_reduced_rhs( du_hat, nonlin_hat, lambda_0, dv );
+        apply_spatial_jacobian<detail::linear_nonlinear_terms::all>( du, dv );
+    }
+
+    void linear_jacobian_u( const T_vec &du, T_vec &dv ) const
+    {
+        assemble_reduced_rhs<detail::linear_nonlinear_terms::linear>( du, nonlin_hat, lambda_0, dv );
+    }
+
+    void nonlinear_jacobian_u( const T_vec &du, T_vec &dv )
+    {
+        apply_spatial_jacobian<detail::linear_nonlinear_terms::nonlinear>( du, dv );
     }
 
     void jacobian_alpha( T_vec &dv )
@@ -252,7 +231,7 @@ public:
         auto       dvp = access_type::data( dv );
         const T    a   = a_val;
         access_type::for_each(
-            [=] __DEVICE_TAG__( ordinal_type i ) {
+            [up, np, dvp, a] __DEVICE_TAG__( ordinal_type i ) {
                 const std::size_t mode = static_cast<std::size_t>( i ) + 1;
                 const T           k    = static_cast<T>( mode );
                 const T           real_value =
@@ -341,7 +320,8 @@ public:
         const T pole_relative_tolerance =
             std::sqrt( std::numeric_limits<T>::epsilon() );
         access_type::for_each(
-            [=] __DEVICE_TAG__( ordinal_type i ) {
+            [xp, lambda, b, pole_relative_tolerance, jacobian_scale, identity_shift]
+            __DEVICE_TAG__( ordinal_type i ) {
                 const T k        = static_cast<T>( i + 1 );
                 const T k2       = k * k;
                 const T linear_term =
@@ -885,27 +865,58 @@ public:
         fft_plan.forward( access_type::data( physical_nonlinearity ), nonlinearity_spectrum.raw_ptr() );
     }
 
-    void assemble_reduced_rhs(
-        const complex_vector_type &source_spectrum, const complex_vector_type &nonlinear_spectrum, const T lambda,
-        T_vec &reduced_rhs
-    )
+    template <detail::linear_nonlinear_terms Terms>
+    void evaluate_spatial_residual( const T_vec &u, const T lambda, T_vec &v )
     {
-        const auto up = source_spectrum.raw_ptr();
+        if constexpr ( detail::includes_nonlinear<Terms>() )
+        {
+            reduced_to_complex( u, u_hat );
+            compute_nonlinearity_spectral( u_hat, nonlin_hat );
+        }
+        assemble_reduced_rhs<Terms>( u, nonlin_hat, lambda, v );
+    }
+
+    template <detail::linear_nonlinear_terms Terms>
+    void apply_spatial_jacobian( const T_vec &du, T_vec &dv )
+    {
+        if constexpr ( detail::includes_nonlinear<Terms>() )
+        {
+            reduced_to_complex( du, du_hat );
+            compute_jacobian_nonlinearity_spectral( u0_hat, du_hat, nonlin_hat );
+        }
+        assemble_reduced_rhs<Terms>( du, nonlin_hat, lambda_0, dv );
+    }
+
+    template <detail::linear_nonlinear_terms Terms>
+    void assemble_reduced_rhs(
+        const T_vec &source, const complex_vector_type &nonlinear_spectrum, const T lambda,
+        T_vec &reduced_rhs
+    ) const
+    {
+        const auto up = access_type::data( source );
         const auto np = nonlinear_spectrum.raw_ptr();
         auto       rp = access_type::data( reduced_rhs );
         const T    a  = a_val;
         const T    b  = b_val;
         access_type::for_each(
-            [=] __DEVICE_TAG__( ordinal_type i ) {
+            [up, np, rp, a, b, lambda] __DEVICE_TAG__( ordinal_type i ) {
                 const std::size_t mode   = static_cast<std::size_t>( i ) + 1;
-                const T           k      = static_cast<T>( mode );
-                const T           k2     = k * k;
-                const T           linear = lambda * ( -k2 ) + b * k2 * k2;
                 const std::size_t offset = 2 * static_cast<std::size_t>( i );
-                rp[offset] =
-                    linear * complex_access_type::real( up[mode] ) + lambda * a * complex_access_type::real( np[mode] );
-                rp[offset + 1] =
-                    linear * complex_access_type::imag( up[mode] ) + lambda * a * complex_access_type::imag( np[mode] );
+                T real_value = T( 0 );
+                T imag_value = T( 0 );
+                if constexpr ( detail::includes_linear<Terms>() )
+                {
+                    const T linear = ks1d_detail::linear_multiplier( mode, lambda, b );
+                    real_value += linear * up[offset];
+                    imag_value += linear * up[offset + 1];
+                }
+                if constexpr ( detail::includes_nonlinear<Terms>() )
+                {
+                    real_value += lambda * a * complex_access_type::real( np[mode] );
+                    imag_value += lambda * a * complex_access_type::imag( np[mode] );
+                }
+                rp[offset]     = real_value;
+                rp[offset + 1] = imag_value;
             },
             static_cast<ordinal_type>( mode_count_ )
         );

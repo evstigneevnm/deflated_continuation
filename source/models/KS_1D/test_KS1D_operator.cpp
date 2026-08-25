@@ -11,6 +11,7 @@
 #endif
 
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h>
+#include <nonlinear_operators/tests/linear_nonlinear_decomposition_test.h>
 #include <stability/eigensolvers/transformations/nonlinear_operator_real_affine_inverse_provider.h>
 #include <symmetry/finite_action_registry.h>
 #include <symmetry/fourier/real_packed_fourier_actions_1d.h>
@@ -243,6 +244,33 @@ void test_residual_split(vec_ops_real& vec_ops, ks1d_t& ks)
 
     vec_ops.stop_use_vectors(state, direction_unused, residual, linear, nonlinear, split_sum);
     vec_ops.free_vectors(state, direction_unused, residual, linear, nonlinear, split_sum);
+}
+
+void test_residual_jacobian_decomposition(vec_ops_real& vec_ops, ks1d_t& ks)
+{
+    real_vec state;
+    real_vec direction;
+    vec_ops.init_vectors(state, direction);
+    vec_ops.start_use_vectors(state, direction);
+    fill_test_vectors(vec_ops, state, direction);
+
+    nonlinear_operators::tests::check_linear_nonlinear_decomposition(
+        vec_ops,
+        ks,
+        state,
+        direction,
+        real(5.25),
+        fd_step<real>(),
+        real(20)*tolerance<real>(),
+        [](const bool condition, const std::string& message)
+        {
+            check_condition(condition, message);
+        },
+        "reduced KS1D"
+    );
+
+    vec_ops.stop_use_vectors(state, direction);
+    vec_ops.free_vectors(state, direction);
 }
 
 void test_jacobian_u(vec_ops_real& vec_ops, ks1d_t& ks)
@@ -552,6 +580,7 @@ int main(int argc, char** argv)
     test_linear_spectrum(vec_ops, physical_size);
     test_physical_oddness(vec_ops, ks);
     test_residual_split(vec_ops, ks);
+    test_residual_jacobian_decomposition(vec_ops, ks);
     test_jacobian_u(vec_ops, ks);
     test_jacobian_alpha(vec_ops, ks);
     test_preconditioner_at_zero(vec_ops, ks);

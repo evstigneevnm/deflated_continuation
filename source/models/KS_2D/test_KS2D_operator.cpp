@@ -23,6 +23,7 @@
 #include <discretization/fourier/codecs/inversion_odd_field.h>
 #include <discretization/fourier/codecs/translation_equivariant_real_field.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/kuramoto_sivashinskiy_2d.h>
+#include <nonlinear_operators/tests/linear_nonlinear_decomposition_test.h>
 #include <symmetry/finite_action_registry.h>
 #include <symmetry/finite_quotient_adapter.h>
 #include <symmetry/fourier/residual_translation_orbit_aligner_2d.h>
@@ -295,6 +296,21 @@ void run_case(
     result.check(
         relative_error(finite_difference_host, alpha_host) < 2.0e-8,
         message("parameter Jacobian finite-difference consistency")
+    );
+
+    nonlinear_operators::tests::check_linear_nonlinear_decomposition(
+        operations,
+        ks2d,
+        state,
+        direction,
+        lambda,
+        scalar_type(1.0e-6),
+        scalar_type(2.0e-7),
+        [&](const bool condition, const std::string& text)
+        {
+            result.check(condition, message(text));
+        },
+        "KS2D"
     );
 
     if(expect_translation_equivariance)

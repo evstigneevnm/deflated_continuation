@@ -13,6 +13,7 @@
 
 #include <nonlinear_operators/bratu/bratu.h>
 #include <nonlinear_operators/bratu/linear_operator_bratu.h>
+#include <nonlinear_operators/tests/linear_nonlinear_decomposition_test.h>
 
 #include <stability/eigensolvers/host_dense_operator_eigensolver.h>
 
@@ -91,6 +92,80 @@ double relative_error(
         workspace);
     return vector_space.norm_l2(workspace)/
         std::max(1.0, vector_space.norm_l2(expected));
+}
+
+void test_residual_jacobian_decomposition(
+    const problem_type::spatial_discretization discretization,
+    const std::string& label)
+{
+    constexpr std::size_t n = 31;
+    constexpr double parameter = 2.5;
+    constexpr double finite_difference_step = 1.0e-6;
+    vector_space_type vector_space(n);
+    problem_type problem(
+        n,
+        &vector_space,
+        discretization);
+    vector_workspace state(vector_space);
+    vector_workspace direction(vector_space);
+    vector_workspace parameter_jacobian(vector_space);
+    vector_workspace value_plus(vector_space);
+    vector_workspace value_minus(vector_space);
+    vector_workspace finite_difference(vector_space);
+    vector_workspace difference(vector_space);
+
+    std::vector<double> host_state(n);
+    std::vector<double> host_direction(n);
+    for(std::size_t index = 0; index < n; ++index)
+    {
+        const double x = static_cast<double>(index + 1)/
+            static_cast<double>(n + 1);
+        host_state[index] = 0.1*std::sin(std::acos(-1.0)*x);
+        host_direction[index] = 0.07*std::sin(2.0*std::acos(-1.0)*x);
+    }
+    vector_space.set(host_state.data(), state.get(), n);
+    vector_space.set(host_direction.data(), direction.get(), n);
+
+    nonlinear_operators::tests::check_linear_nonlinear_decomposition(
+        vector_space,
+        problem,
+        state.get(),
+        direction.get(),
+        parameter,
+        finite_difference_step,
+        2.0e-8,
+        [](const bool condition, const std::string& message)
+        {
+            require(condition, message);
+        },
+        label
+    );
+
+    problem.F(
+        state.get(),
+        parameter + finite_difference_step,
+        value_plus.get());
+    problem.F(
+        state.get(),
+        parameter - finite_difference_step,
+        value_minus.get());
+    vector_space.assign_mul(
+        1.0/(2.0*finite_difference_step),
+        value_plus.get(),
+        -1.0/(2.0*finite_difference_step),
+        value_minus.get(),
+        finite_difference.get());
+    problem.jacobian_alpha(
+        state.get(),
+        parameter,
+        parameter_jacobian.get());
+    require(
+        relative_error(
+            vector_space,
+            parameter_jacobian.get(),
+            finite_difference.get(),
+            difference.get()) < 2.0e-8,
+        "Bratu parameter Jacobian finite difference");
 }
 
 void test_fd3_affine_inverse_and_eigenvectors()
@@ -313,6 +388,12 @@ void test_branch_morse_index()
 
 int main()
 {
+    test_residual_jacobian_decomposition(
+        problem_type::spatial_discretization::fd3,
+        "Bratu FD3");
+    test_residual_jacobian_decomposition(
+        problem_type::spatial_discretization::chebyshev,
+        "Bratu Chebyshev");
     test_fd3_affine_inverse_and_eigenvectors();
     test_fd3_dense_spectrum();
     test_branch_morse_index();

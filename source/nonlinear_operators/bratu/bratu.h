@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <common/scalar_math.h>
+#include <nonlinear_operators/detail/linear_nonlinear_terms.h>
 #include <scfd/utils/device_tag.h>
 
 namespace nonlinear_operators
@@ -252,14 +253,17 @@ public:
 
     void F(const T_vec& u, const T lambda, T_vec& v)
     {
-        matvec(d2_matrix, u, v);
-        const auto up = access_type::data(u);
-        auto vp = access_type::data(v);
-        const T lambda_l = lambda;
-        access_type::for_each([=] __DEVICE_TAG__ (ordinal_type i)
-        {
-            vp[i] += lambda_l*bratu_detail::exp(up[i]);
-        }, static_cast<ordinal_type>(interior_size));
+        evaluate_spatial_residual<detail::linear_nonlinear_terms::all>(u, lambda, v);
+    }
+
+    void linear_residual(const T_vec& u, const T lambda, T_vec& v) const
+    {
+        evaluate_spatial_residual<detail::linear_nonlinear_terms::linear>(u, lambda, v);
+    }
+
+    void nonlinear_residual(const T_vec& u, const T lambda, T_vec& v) const
+    {
+        evaluate_spatial_residual<detail::linear_nonlinear_terms::nonlinear>(u, lambda, v);
     }
 
     void set_linearization_point(const T_vec& u_0_, const T lambda_0_)
@@ -271,7 +275,17 @@ public:
 
     void jacobian_u(const T_vec& du, T_vec& dv)
     {
-        matvec(jacobian_matrix, du, dv);
+        apply_spatial_jacobian<detail::linear_nonlinear_terms::all>(du, dv);
+    }
+
+    void linear_jacobian_u(const T_vec& du, T_vec& dv) const
+    {
+        apply_spatial_jacobian<detail::linear_nonlinear_terms::linear>(du, dv);
+    }
+
+    void nonlinear_jacobian_u(const T_vec& du, T_vec& dv) const
+    {
+        apply_spatial_jacobian<detail::linear_nonlinear_terms::nonlinear>(du, dv);
     }
 
     void jacobian_alpha(T_vec& dv)
@@ -500,6 +514,71 @@ private:
     T_vec u_0;
     T_vec d2_matrix;
     T_vec jacobian_matrix;
+
+    __DEVICE_TAG__ static T scaled_exponential(const T value, const T lambda)
+    {
+        return lambda*bratu_detail::exp(value);
+    }
+
+    template <detail::linear_nonlinear_terms Terms>
+    void evaluate_spatial_residual(
+        const T_vec& u,
+        const T lambda,
+        T_vec& v) const
+    {
+        if constexpr(detail::includes_linear<Terms>())
+        {
+            matvec(d2_matrix, u, v);
+        }
+
+        if constexpr(detail::includes_nonlinear<Terms>())
+        {
+            const auto up = access_type::data(u);
+            auto vp = access_type::data(v);
+            const T lambda_l = lambda;
+            access_type::for_each([up, vp, lambda_l] __DEVICE_TAG__ (ordinal_type i)
+            {
+                const T reaction = scaled_exponential(up[i], lambda_l);
+                if constexpr(detail::includes_linear<Terms>())
+                {
+                    vp[i] += reaction;
+                }
+                else
+                {
+                    vp[i] = reaction;
+                }
+            }, static_cast<ordinal_type>(interior_size));
+        }
+    }
+
+    template <detail::linear_nonlinear_terms Terms>
+    void apply_spatial_jacobian(const T_vec& du, T_vec& dv) const
+    {
+        if constexpr(detail::includes_linear<Terms>())
+        {
+            matvec(d2_matrix, du, dv);
+        }
+
+        if constexpr(detail::includes_nonlinear<Terms>())
+        {
+            const auto u0p = access_type::data(u_0);
+            const auto dup = access_type::data(du);
+            auto dvp = access_type::data(dv);
+            const T lambda_l = lambda_0;
+            access_type::for_each([u0p, dup, dvp, lambda_l] __DEVICE_TAG__ (ordinal_type i)
+            {
+                const T reaction = scaled_exponential(u0p[i], lambda_l)*dup[i];
+                if constexpr(detail::includes_linear<Terms>())
+                {
+                    dvp[i] += reaction;
+                }
+                else
+                {
+                    dvp[i] = reaction;
+                }
+            }, static_cast<ordinal_type>(interior_size));
+        }
+    }
     T lambda_0 = T(0);
     unsigned int random_profile_counter = 0;
     std::vector<T> interior_points;
@@ -710,7 +789,7 @@ private:
             T value = d2p[idx];
             if(row == col)
             {
-                value += lambda_l*bratu_detail::exp(u0p[row]);
+                value += scaled_exponential(u0p[row], lambda_l);
             }
             jp[idx] = value;
         }, static_cast<ordinal_type>(interior_size*interior_size));

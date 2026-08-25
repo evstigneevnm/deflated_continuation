@@ -24,6 +24,7 @@
 #include <discretization/fourier/periodic_grid.h>
 #include <discretization/fourier/r2c_index_space.h>
 #include <discretization/fourier/wavevector_table.h>
+#include <nonlinear_operators/detail/linear_nonlinear_terms.h>
 #include <scfd/utils/device_tag.h>
 #include <symmetry/fourier/periodic_affine_action_2d.h>
 #include <symmetry/generated_finite_group.h>
@@ -177,30 +178,22 @@ public:
         const scalar_type kx        = grid_.wave_number( 0, index_space_.signed_x_mode( ix ) );
         const scalar_type ky        = grid_.wave_number( 1, index_space_.y_mode( iy ) );
         const scalar_type k_squared = kx * kx + ky * ky;
-        return -lambda * k_squared + b_ * k_squared * k_squared;
+        return linear_symbol<true>( k_squared, lambda, b_ );
     }
 
     void F( const vector_type &state, const scalar_type lambda, vector_type &output )
     {
-        codec_.unpack( state, u_hat_ );
-        compute_nonlinearity( u_hat_, u_gradient_sum_, nonlinear_hat_ );
-        assemble( u_hat_, nonlinear_hat_, lambda, true, output_hat_ );
-        codec_.pack( output_hat_, output );
+        evaluate_spatial_residual<detail::linear_nonlinear_terms::all>( state, lambda, output );
     }
 
     void linear_residual( const vector_type &state, const scalar_type lambda, vector_type &output )
     {
-        codec_.unpack( state, u_hat_ );
-        assemble_linear( u_hat_, lambda, output_hat_ );
-        codec_.pack( output_hat_, output );
+        evaluate_spatial_residual<detail::linear_nonlinear_terms::linear>( state, lambda, output );
     }
 
     void nonlinear_residual( const vector_type &state, const scalar_type lambda, vector_type &output )
     {
-        codec_.unpack( state, u_hat_ );
-        compute_nonlinearity( u_hat_, u_gradient_sum_, nonlinear_hat_ );
-        assemble_nonlinear( nonlinear_hat_, lambda, output_hat_ );
-        codec_.pack( output_hat_, output );
+        evaluate_spatial_residual<detail::linear_nonlinear_terms::nonlinear>( state, lambda, output );
     }
 
     void set_linearization_point( const vector_type &state, const scalar_type lambda )
@@ -213,15 +206,17 @@ public:
 
     void jacobian_u( const vector_type &direction, vector_type &output )
     {
-        codec_.unpack( direction, du_hat_ );
-        compute_gradient_sum( du_hat_, du_gradient_sum_ );
-        product_.apply( du_hat_, u0_gradient_sum_, jacobian_product_1_ );
-        product_.apply( u0_hat_, du_gradient_sum_, jacobian_product_2_ );
-        discretization::fourier::operations::add_spectra<backend_type>(
-            jacobian_product_1_, jacobian_product_2_, nonlinear_hat_
-        );
-        assemble( du_hat_, nonlinear_hat_, lambda0_, true, output_hat_ );
-        codec_.pack( output_hat_, output );
+        apply_spatial_jacobian<detail::linear_nonlinear_terms::all>( direction, output );
+    }
+
+    void linear_jacobian_u( const vector_type &direction, vector_type &output )
+    {
+        apply_spatial_jacobian<detail::linear_nonlinear_terms::linear>( direction, output );
+    }
+
+    void nonlinear_jacobian_u( const vector_type &direction, vector_type &output )
+    {
+        apply_spatial_jacobian<detail::linear_nonlinear_terms::nonlinear>( direction, output );
     }
 
     void jacobian_alpha( vector_type &output )
@@ -233,7 +228,9 @@ public:
     {
         codec_.unpack( state, u_hat_ );
         compute_nonlinearity( u_hat_, u_gradient_sum_, nonlinear_hat_ );
-        assemble( u_hat_, nonlinear_hat_, scalar_type( 1 ), false, output_hat_ );
+        assemble<detail::linear_nonlinear_terms::all, false>(
+            u_hat_, nonlinear_hat_, scalar_type( 1 ), output_hat_
+        );
         codec_.pack( output_hat_, output );
     }
 
@@ -453,56 +450,62 @@ private:
         product_.apply( input, gradient_sum, nonlinearity );
     }
 
+    template <bool IncludeBiharmonic>
+    __DEVICE_TAG__ static scalar_type linear_symbol(
+        const scalar_type k_squared,
+        const scalar_type lambda,
+        const scalar_type biharmonic_scale
+    )
+    {
+        scalar_type value = -lambda * k_squared;
+        if constexpr ( IncludeBiharmonic )
+        {
+            value += biharmonic_scale * k_squared * k_squared;
+        }
+        return value;
+    }
+
+    template <detail::linear_nonlinear_terms Terms>
+    void evaluate_spatial_residual(
+        const vector_type &state,
+        const scalar_type lambda,
+        vector_type &output
+    )
+    {
+        codec_.unpack( state, u_hat_ );
+        if constexpr ( detail::includes_nonlinear<Terms>() )
+        {
+            compute_nonlinearity( u_hat_, u_gradient_sum_, nonlinear_hat_ );
+        }
+        assemble<Terms, true>( u_hat_, nonlinear_hat_, lambda, output_hat_ );
+        codec_.pack( output_hat_, output );
+    }
+
+    template <detail::linear_nonlinear_terms Terms>
+    void apply_spatial_jacobian( const vector_type &direction, vector_type &output )
+    {
+        codec_.unpack( direction, du_hat_ );
+        if constexpr ( detail::includes_nonlinear<Terms>() )
+        {
+            compute_gradient_sum( du_hat_, du_gradient_sum_ );
+            product_.apply( du_hat_, u0_gradient_sum_, jacobian_product_1_ );
+            product_.apply( u0_hat_, du_gradient_sum_, jacobian_product_2_ );
+            discretization::fourier::operations::add_spectra<backend_type>(
+                jacobian_product_1_, jacobian_product_2_, nonlinear_hat_
+            );
+        }
+        assemble<Terms, true>( du_hat_, nonlinear_hat_, lambda0_, output_hat_ );
+        codec_.pack( output_hat_, output );
+    }
+
 public:
     // Public because NVCC requires enclosing functions of extended device lambdas to be accessible.
-    void assemble_linear(
-        const spectral_field_type &state, const scalar_type lambda, spectral_field_type &output
-    ) const
-    {
-        const complex_type *state_values  = state.data();
-        complex_type       *output_values = output.data();
-        const scalar_type  *k_squared     = wavevectors_.k_squared().data();
-        const scalar_type   b             = b_;
-        const ordinal_type  count         = static_cast<ordinal_type>( complex_size() );
-        for_each_type       for_each;
-        for_each(
-            [=] __DEVICE_TAG__( const ordinal_type index ) {
-                const scalar_type k2     = k_squared[index];
-                const scalar_type linear = -lambda * k2 + b * k2 * k2;
-                output_values[index]     = complex_traits::make(
-                    linear * complex_traits::real( state_values[index] ),
-                    linear * complex_traits::imag( state_values[index] )
-                );
-            },
-            count
-        );
-        for_each.wait();
-    }
-
-    void assemble_nonlinear(
-        const spectral_field_type &nonlinearity, const scalar_type lambda, spectral_field_type &output
-    ) const
-    {
-        const complex_type *nonlinear_values = nonlinearity.data();
-        complex_type       *output_values    = output.data();
-        const scalar_type   nonlinear_scale = lambda * a_;
-        const ordinal_type  count           = static_cast<ordinal_type>( complex_size() );
-        for_each_type       for_each;
-        for_each(
-            [=] __DEVICE_TAG__( const ordinal_type index ) {
-                output_values[index] = complex_traits::make(
-                    nonlinear_scale * complex_traits::real( nonlinear_values[index] ),
-                    nonlinear_scale * complex_traits::imag( nonlinear_values[index] )
-                );
-            },
-            count
-        );
-        for_each.wait();
-    }
-
+    template <detail::linear_nonlinear_terms Terms, bool IncludeBiharmonic>
     void assemble(
-        const spectral_field_type &state, const spectral_field_type &nonlinearity, const scalar_type lambda,
-        const bool include_biharmonic, spectral_field_type &output
+        const spectral_field_type &state,
+        const spectral_field_type &nonlinearity,
+        const scalar_type lambda,
+        spectral_field_type &output
     ) const
     {
         const complex_type *state_values     = state.data();
@@ -514,15 +517,23 @@ public:
         const ordinal_type  count            = static_cast<ordinal_type>( complex_size() );
         for_each_type       for_each;
         for_each(
-            [=] __DEVICE_TAG__( const ordinal_type index ) {
-                const scalar_type k2     = k_squared[index];
-                const scalar_type linear = -lambda * k2 + ( include_biharmonic ? b * k2 * k2 : scalar_type( 0 ) );
-                output_values[index]     = complex_traits::make(
-                    lambda * a * complex_traits::real( nonlinear_values[index] ) +
-                        linear * complex_traits::real( state_values[index] ),
-                    lambda * a * complex_traits::imag( nonlinear_values[index] ) +
-                        linear * complex_traits::imag( state_values[index] )
-                );
+            [state_values, nonlinear_values, output_values, k_squared, a, b, lambda]
+            __DEVICE_TAG__( const ordinal_type index ) {
+                scalar_type real_value = scalar_type( 0 );
+                scalar_type imag_value = scalar_type( 0 );
+                if constexpr ( detail::includes_linear<Terms>() )
+                {
+                    const scalar_type linear = linear_symbol<IncludeBiharmonic>( k_squared[index], lambda, b );
+                    real_value += linear * complex_traits::real( state_values[index] );
+                    imag_value += linear * complex_traits::imag( state_values[index] );
+                }
+                if constexpr ( detail::includes_nonlinear<Terms>() )
+                {
+                    const scalar_type nonlinear_scale = lambda * a;
+                    real_value += nonlinear_scale * complex_traits::real( nonlinear_values[index] );
+                    imag_value += nonlinear_scale * complex_traits::imag( nonlinear_values[index] );
+                }
+                output_values[index] = complex_traits::make( real_value, imag_value );
             },
             count
         );
