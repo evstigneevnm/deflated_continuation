@@ -105,6 +105,25 @@ jobs:
           make test_explicit_rk_analytical.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/timestepper_explicit_rk"
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/timestepper_explicit_rk/test_explicit_rk_analytical.bin
 
+  timestepper-explicit-engine-cpu:
+    needs: [timestepper-foundation-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3
+          fi
+      - name: Build and test the SCFD OMP explicit RK engine
+        run: |
+          make test_explicit_rk_engine_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/timestepper_explicit_engine_cpu"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/timestepper_explicit_engine_cpu/test_explicit_rk_engine_cpu_omp.bin
+
   timestepper-implicit-rk-cpu:
     needs: [timestepper-foundation-cpu]
     runs-on: ubuntu-latest
@@ -606,6 +625,30 @@ jobs:
           ./"$BUILD_DIR"/scfd_cuda_double/test_scfd_vector_operations_cuda.bin auto
           make scfd_vector_operations_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cuda_float" REAL_TYPE=float
           ./"$BUILD_DIR"/scfd_cuda_float/test_scfd_vector_operations_cuda.bin auto
+
+  timestepper-explicit-engine-cuda:
+    needs: [scfd-vector-operations-cuda, timestepper-foundation-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Build and test the CUDA explicit RK engine when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA explicit RK engine: nvidia-smi not found"
+            exit 0
+          fi
+          if ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA explicit RK engine: no usable NVIDIA device was reported"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA explicit RK engine: nvcc not found"
+            exit 0
+          fi
+          make test_explicit_rk_engine_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/timestepper_explicit_engine_cuda"
+          ./"$BUILD_DIR"/timestepper_explicit_engine_cuda/test_explicit_rk_engine_cuda.bin auto
 
   scfd-vector-operations-hip:
     runs-on: ubuntu-latest

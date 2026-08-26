@@ -126,6 +126,7 @@ RESIDUAL_DECOMPOSITION_TEST_HEADER = source/nonlinear_operators/tests/linear_non
 ADJOINT_JACOBIAN_TEST_HEADERS = source/nonlinear_operators/adjoint_jacobian_capability.h source/nonlinear_operators/tests/adjoint_jacobian_test.h
 TIME_STEPPER_TABLEAU_HEADERS = source/time_stepper/detail/all_methods_enum.h source/time_stepper/detail/butcher_tables.h source/time_stepper/detail/tableau_order_conditions.h
 TIME_STEPPER_SEMIDISCRETE_HEADERS = source/time_stepper/semidiscrete/problem_traits.h source/time_stepper/semidiscrete/autonomous_spatial_problem.h source/time_stepper/semidiscrete/residual_assembly.h
+TIME_STEPPER_EXPLICIT_ENGINE_HEADERS = source/time_stepper/runge_kutta/stage_context.h source/time_stepper/runge_kutta/stage_workspace.h source/time_stepper/runge_kutta/step_result.h source/time_stepper/runge_kutta/explicit_rk_step.h source/time_stepper/semidiscrete/identity_mass_rate_provider.h $(TIME_STEPPER_TABLEAU_HEADERS) $(TIME_STEPPER_SEMIDISCRETE_HEADERS)
 TIME_STEPPER_TEST_COMMON_HEADERS = source/time_stepper/tests/common/test_context.h
 TIME_STEPPER_LEGACY_EXPLICIT_HEADERS = source/time_stepper/tests/common/legacy_fixed_step_runner.h source/time_stepper/explicit_time_step.h source/time_stepper/time_step_adaptation_constant.h source/time_stepper/detail/positive_preserving_dummy.h $(TIME_STEPPER_TABLEAU_HEADERS)
 TIME_STEPPER_LEGACY_IMPLICIT_HEADERS = source/time_stepper/tests/common/legacy_implicit_fixed_step_runner.h source/time_stepper/implicit_time_step.h source/time_stepper/system_operator.h source/time_stepper/convergence_strategy.h source/numerical_algos/newton_solvers/newton_solver.h $(TIME_STEPPER_LEGACY_EXPLICIT_HEADERS)
@@ -167,6 +168,12 @@ test_semidiscrete_problem_contract.bin: source/time_stepper/tests/test_semidiscr
 
 test_explicit_rk_analytical.bin: source/time_stepper/tests/test_explicit_rk_analytical.cpp $(TIME_STEPPER_TEST_COMMON_HEADERS) $(TIME_STEPPER_LEGACY_EXPLICIT_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/time_stepper/tests/test_explicit_rk_analytical.cpp $(OPENMP) -o $(BUILD_DIR)/test_explicit_rk_analytical.bin 2>$(RESULTS)
+
+test_explicit_rk_engine_cpu_omp.bin: source/time_stepper/tests/test_explicit_rk_engine_cpu_omp.cpp source/time_stepper/tests/common/explicit_rk_engine_test_suite.h $(TIME_STEPPER_TEST_COMMON_HEADERS) $(TIME_STEPPER_EXPLICIT_ENGINE_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) source/time_stepper/tests/test_explicit_rk_engine_cpu_omp.cpp $(OPENMP) -o $(BUILD_DIR)/test_explicit_rk_engine_cpu_omp.bin 2>$(RESULTS)
+
+test_explicit_rk_engine_cuda.bin: source/time_stepper/tests/test_explicit_rk_engine_cuda.cu source/time_stepper/tests/common/explicit_rk_engine_test_suite.h $(TIME_STEPPER_TEST_COMMON_HEADERS) $(TIME_STEPPER_EXPLICIT_ENGINE_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(ICUDA) $(IPROJECT) source/time_stepper/tests/test_explicit_rk_engine_cuda.cu $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/test_explicit_rk_engine_cuda.bin 2>$(RESULTS)
 
 test_implicit_rk_analytical.bin: source/time_stepper/tests/test_implicit_rk_analytical.cpp $(TIME_STEPPER_TEST_COMMON_HEADERS) $(TIME_STEPPER_LEGACY_IMPLICIT_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/time_stepper/tests/test_implicit_rk_analytical.cpp $(OPENMP) -o $(BUILD_DIR)/test_implicit_rk_analytical.bin 2>$(RESULTS)
