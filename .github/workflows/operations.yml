@@ -86,6 +86,82 @@ jobs:
           make test_semidiscrete_problem_contract.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/semidiscrete_contracts"
           ./"$BUILD_DIR"/semidiscrete_contracts/test_semidiscrete_problem_contract.bin
 
+  timestepper-explicit-rk-cpu:
+    needs: [timestepper-foundation-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3
+          fi
+      - name: Build and test explicit Runge-Kutta methods
+        run: |
+          make test_explicit_rk_analytical.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/timestepper_explicit_rk"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/timestepper_explicit_rk/test_explicit_rk_analytical.bin
+
+  timestepper-implicit-rk-cpu:
+    needs: [timestepper-foundation-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3
+          fi
+      - name: Build and test implicit Runge-Kutta methods
+        run: |
+          make test_implicit_rk_analytical.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/timestepper_implicit_rk"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/timestepper_implicit_rk/test_implicit_rk_analytical.bin
+
+  timestepper-dae-cpu:
+    needs: [timestepper-foundation-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3
+          fi
+      - name: Build and test singular-mass DAE contracts
+        run: |
+          make test_dae_analytical_contract.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/timestepper_dae"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/timestepper_dae/test_dae_analytical_contract.bin
+
+  timestepper-nonlinear-systems-cpu:
+    needs: [timestepper-foundation-cpu, timestepper-explicit-rk-cpu, timestepper-implicit-rk-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3
+          fi
+      - name: Build and test Lorenz, Rossler, and Van der Pol systems
+        run: |
+          make test_timestepper_nonlinear_regressions.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/timestepper_nonlinear_systems"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/timestepper_nonlinear_systems/test_timestepper_nonlinear_regressions.bin
+
   continuation-core-cpu:
     needs: [scfd-vector-operations-cpu]
     runs-on: ubuntu-latest
