@@ -17,7 +17,7 @@ public:
     using T = typename VectorOperations::scalar_type;
     using T_vec = typename VectorOperations::vector_type;
 private:
-    using parent_t = time_step_adaptation<VectorOperations, Log>;
+    using parent_t = time_step_adaptation<VectorOperations, Log, PositivePreservingCheck>;
 
 public:
     time_step_adaptation_error_control(VectorOperations* vec_ops_p, Log* log_p, std::pair<T,T> time_interval_p = {0.0,1.0},  T dt_p = 1.0, PositivePreservingCheck* positive_check_p = new detail::positive_preserving_dummy<VectorOperations>() ):
@@ -48,7 +48,7 @@ public:
     }
         
 
-    void set_parameters(const T relative_tolerance_p, const T absolute_tolerance_p, bool norm_control_ = false)
+    void set_parameters(const T relative_tolerance_p, const T absolute_tolerance_p, bool norm_control = false)
     {
         relative_tolerance_ = relative_tolerance_p;
         absolute_tolerance_ = absolute_tolerance_p;
@@ -57,6 +57,7 @@ public:
             throw std::logic_error("time_step_adaptation::set_parameters: relative_tolerance_ can't be zero.");
         }
         threshold_ = absolute_tolerance_/relative_tolerance_;
+        norm_control_ = norm_control;
     }
 
     //accepts initial conditions and initial tanget
@@ -205,6 +206,9 @@ private:
             {
                 dt_ = std::max(dt_min_, static_cast<T>(0.5)*dt_);    
             }
+            // execute() obtains the next trial through get_dt(), which reads
+            // dt_accepted_. Keep it synchronized until a trial is accepted.
+            dt_accepted_ = dt_;
         }
         else
         {

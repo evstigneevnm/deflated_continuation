@@ -11,6 +11,8 @@
 #include "all_methods_enum.h"
 
 
+namespace nmfd
+{
 namespace time_steppers
 {
 namespace detail
@@ -476,7 +478,7 @@ private:
 
 }
 
-std::string get_scheme_type_by_name(const std::string& name)
+inline std::string get_scheme_type_by_name(const std::string& name)
 {
     detail::butcher_tables bt;
     detail::composite_butcher_tables ct;  
@@ -516,8 +518,20 @@ std::string get_scheme_type_by_name(const std::string& name)
     return ret_type;
 }
 
-}
+} // namespace time_steppers
+} // namespace nmfd
 
-
+// One shared set of tables while the legacy steppers remain in use.
+namespace time_steppers
+{
+using nmfd::time_steppers::get_scheme_type_by_name;
+namespace detail
+{
+using nmfd::time_steppers::detail::tableu;
+using nmfd::time_steppers::detail::composite_tableu;
+using nmfd::time_steppers::detail::butcher_tables;
+using nmfd::time_steppers::detail::composite_butcher_tables;
+} // namespace detail
+} // namespace time_steppers
 
 #endif
