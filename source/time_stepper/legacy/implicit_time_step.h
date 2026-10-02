@@ -3,8 +3,8 @@
 
 
 #include <memory>
-#include <time_stepper/system_operator.h>
-#include <time_stepper/convergence_strategy.h>
+#include <time_stepper/legacy/system_operator.h>
+#include <time_stepper/legacy/convergence_strategy.h>
 #include <numerical_algos/newton_solvers/newton_solver.h>
 #include "generic_time_step.h"
 #include "detail/all_methods_enum.h"

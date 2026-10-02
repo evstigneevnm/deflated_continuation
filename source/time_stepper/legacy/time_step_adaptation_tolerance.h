@@ -4,8 +4,8 @@
 #include <cmath>
 #include <utility>
 #include <deque>
-#include <time_stepper/detail/positive_preserving_dummy.h>
-#include <time_stepper/time_step_adaptation.h>
+#include <time_stepper/legacy/detail/positive_preserving_dummy.h>
+#include <time_stepper/legacy/time_step_adaptation.h>
 
 
 namespace time_steppers

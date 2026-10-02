@@ -2,7 +2,7 @@
 #define __TIME_STEPPER_TIME_STEP_ADAPTATION_H__
 
 #include <utility>
-#include <time_stepper/detail/positive_preserving_dummy.h>
+#include <time_stepper/legacy/detail/positive_preserving_dummy.h>
 
 namespace time_steppers
 {

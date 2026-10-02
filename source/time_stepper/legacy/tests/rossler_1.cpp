@@ -18,10 +18,10 @@
 #include <common/file_operations.h>
 #include <common/scfd_serial_cpu_vector_operations.h>
 
-#include <time_stepper/time_step_adaptation_constant.h>
-#include <time_stepper/time_step_adaptation_error_control.h>
-#include <time_stepper/explicit_time_step.h>
-#include <time_stepper/time_stepper.h>
+#include <time_stepper/legacy/time_step_adaptation_constant.h>
+#include <time_stepper/legacy/time_step_adaptation_error_control.h>
+#include <time_stepper/legacy/explicit_time_step.h>
+#include <time_stepper/legacy/time_stepper.h>
 
 
 namespace nonlinear_operators

@@ -4,10 +4,10 @@
 #include <array>
 #include <vector>
 #include <algorithm>
-#include <time_stepper/time_stepper.h>
+#include <time_stepper/legacy/time_stepper.h>
 #include "detail/glued_nonlinear_operator_and_multiple_jacobian.h"
-#include <time_stepper/detail/all_methods_enum.h>
-#include <time_stepper/detail/positive_preserving_dummy.h>
+#include <time_stepper/legacy/detail/all_methods_enum.h>
+#include <time_stepper/legacy/detail/positive_preserving_dummy.h>
 
 
 namespace time_steppers

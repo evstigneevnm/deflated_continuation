@@ -85,6 +85,7 @@ OPENMP = -fopenmp -lpthread
 NVOPENMP = -Xcompiler $(OPENMP)
 CONTRIB_SCFD = source/contrib/scfd
 CONTRIB_NMFD_LINSOLVERS = source/contrib/nmfd-linsolvers
+CONTRIB_NMFD_NEWTON = source/contrib/nmfd-newton
 COMMON_NMFD_OPERATIONS = source/common/NMFD-operations
 
 G++ = $(GCC_ROOT_PATH)/g++
@@ -93,6 +94,7 @@ G++FLAGS = -std=$(CPPSTD) $(TARGET_GCC)
 ICUDA = -I$(CUDA_ROOT_PATH)/include
 IPROJECT = -I $(COMMON_NMFD_OPERATIONS) -I source/ -I $(CONTRIB_SCFD)/include
 INMFD_LINSOLVERS = -I $(CONTRIB_NMFD_LINSOLVERS)/include
+INMFD_NEWTON = -I $(CONTRIB_NMFD_NEWTON)/include
 IBOOST = -I$(BOOST_ROOT_PATH)/include
 HIGH_PRECISION_BLAS1_CUDA_HEADERS = source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita.h source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_type.h source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl.cuh source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_functions.cuh source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_shmem.cuh
 HIGH_PRECISION_BLAS1_HIP_HEADERS = source/common/NMFD-operations/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita.h
@@ -911,8 +913,25 @@ abc_flow_lyapunov_exponents: source/models/abc_flow/abc_flow_lyapunov_exponents.
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_lyapunov_exponents.cpp $(BUILD_DIR)/abc_flow_ker.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(LIBS2) -o $(BUILD_DIR)/abc_flow_lyapunov_exponents.bin 2>$(RESULTS)
 
 
-test_butcher_tables: source/time_stepper/tests/butcher_tables.cpp
-	$(G++) $(G++FLAGS) $(IPROJECT) source/time_stepper/tests/butcher_tables.cpp -o $(BUILD_DIR)/test_butcher_tables.bin 2>$(RESULTS)
+TIME_STEPPER_HEADERS = $(wildcard source/time_stepper/runge_kutta/*.h source/time_stepper/integration/*.h source/time_stepper/detail/*.h)
+TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS = $(wildcard source/time_stepper/tests/explicit_*_problem.h)
+TIME_STEPPER_VECTOR_WRAP_HEADER = $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/vector_wrap.h
+
+test_rk_tables_%.bin: source/time_stepper/tests/test_butcher_tables_%.cpp source/time_stepper/tests/table_order_checks.h $(TIME_STEPPER_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $< -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_explicit_%_cpu.bin: source/time_stepper/tests/test_explicit_%.cpp $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_explicit_%_cpu_omp.bin: source/time_stepper/tests/test_explicit_%.cpp $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_explicit_%_cuda.bin: source/time_stepper/tests/test_explicit_%.cpp $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_explicit_$*_cuda.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_explicit_$*_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_butcher_tables: source/time_stepper/legacy/tests/butcher_tables.cpp
+	$(G++) $(G++FLAGS) $(IPROJECT) source/time_stepper/legacy/tests/butcher_tables.cpp -o $(BUILD_DIR)/test_butcher_tables.bin 2>$(RESULTS)
 
 #overscreening breakdown
 ob_ker: source/nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.cu
@@ -959,12 +978,12 @@ ob_json:
 
 # test small problems time stepper:
 test_vdp_time_stepping:
-	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/time_stepper/tests/vdp_1.cpp $(OPENMP) -o $(BUILD_DIR)/test_vdp.bin 2>$(RESULTS)
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/time_stepper/legacy/tests/vdp_1.cpp $(OPENMP) -o $(BUILD_DIR)/test_vdp.bin 2>$(RESULTS)
 test_rossler_time_stepping:
-	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/time_stepper/tests/rossler_1.cpp $(OPENMP) -o $(BUILD_DIR)/test_rossler.bin 2>$(RESULTS)
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/time_stepper/legacy/tests/rossler_1.cpp $(OPENMP) -o $(BUILD_DIR)/test_rossler.bin 2>$(RESULTS)
 
 test_lorentz_time_stepping:
-	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/time_stepper/tests/lorentz.cpp $(OPENMP) -o $(BUILD_DIR)/test_lorentz.bin 2>$(RESULTS)
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/time_stepper/legacy/tests/lorentz.cpp $(OPENMP) -o $(BUILD_DIR)/test_lorentz.bin 2>$(RESULTS)
 # test periodic orbits:
 test_rossler_to_section:
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_to_section.cpp $(OPENMP) -o $(BUILD_DIR)/test_rossler_to_section.bin 2>$(RESULTS)

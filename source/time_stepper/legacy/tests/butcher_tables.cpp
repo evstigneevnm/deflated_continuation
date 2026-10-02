@@ -1,6 +1,6 @@
 #include <iostream>
-#include <time_stepper/detail/all_methods_enum.h>
-#include <time_stepper/detail/butcher_tables.h>
+#include <time_stepper/legacy/detail/all_methods_enum.h>
+#include <time_stepper/legacy/detail/butcher_tables.h>
 
 
 int main(int argc, char const *argv[])
