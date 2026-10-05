@@ -18,9 +18,9 @@
 #include <common/file_operations.h>
 #include <common/scfd_serial_cpu_vector_operations.h>
 
-#include <time_stepper/time_step_adaptation_constant.h>
-#include <time_stepper/time_step_adaptation_error_control.h>
-#include <time_stepper/explicit_time_step.h>
+#include <time_stepper/legacy/time_step_adaptation_constant.h>
+#include <time_stepper/legacy/time_step_adaptation_error_control.h>
+#include <time_stepper/legacy/explicit_time_step.h>
 #include <periodic_orbit/time_stepper_to_section.h>
 #include <periodic_orbit/hyperplane.h>
 #include "rossler_operator.h"

@@ -5,7 +5,7 @@
 #include <vector>
 #include <stdexcept>
 #include <type_traits>
-#include <time_stepper/detail/all_methods_enum.h>
+#include <time_stepper/legacy/detail/all_methods_enum.h>
 #include <periodic_orbit/hyperplane.h>
 #include <periodic_orbit/poincare_map_operator.h>
 #include <periodic_orbit/glued_poincare_map_linear_operator.h>

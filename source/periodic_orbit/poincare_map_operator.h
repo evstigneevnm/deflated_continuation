@@ -1,8 +1,8 @@
 #ifndef __PERIODIC_ORBIT_POINCARE_MAP_OPERATOR_H__
 #define __PERIODIC_ORBIT_POINCARE_MAP_OPERATOR_H__
 
-#include <time_stepper/detail/all_methods_enum.h>
-#include <time_stepper/detail/positive_preserving_dummy.h>
+#include <time_stepper/legacy/detail/all_methods_enum.h>
+#include <time_stepper/legacy/detail/positive_preserving_dummy.h>
 #include "time_stepper_to_section.h"
 
 

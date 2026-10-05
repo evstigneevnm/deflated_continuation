@@ -2,7 +2,7 @@
 #define __PERIODIC_ORBIT_SYSTEM_OPERATOR_SINGLE_SECTION_H__
 
 #include <vector>
-#include <time_stepper/detail/all_methods_enum.h>
+#include <time_stepper/legacy/detail/all_methods_enum.h>
 #include <periodic_orbit/hyperplane.h>
 #include <periodic_orbit/poincare_map_operator.h>
 #include <periodic_orbit/glued_poincare_map_linear_operator.h>

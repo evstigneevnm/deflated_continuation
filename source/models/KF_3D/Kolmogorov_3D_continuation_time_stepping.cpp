@@ -38,18 +38,18 @@
 #include <common/gpu_file_operations.h>
 #include <common/gpu_vector_operations.h>
 
-#include <time_stepper/detail/butcher_tables.h>
+#include <time_stepper/legacy/detail/butcher_tables.h>
 
-#include <time_stepper/time_step_adaptation_tolerance.h>
-#include <time_stepper/time_step_adaptation_error_control.h>
-#include <time_stepper/time_step_adaptation_constant.h>
-#include <time_stepper/generic_time_step.h>
-#include <time_stepper/explicit_time_step.h>
-#include <time_stepper/explicit_implicit_time_step.h>
-#include <time_stepper/implicit_time_step.h>
-#include <time_stepper/distance_to_points.h>
-#include <time_stepper/external_management_save_solution.h>
-#include <time_stepper/time_stepper.h>
+#include <time_stepper/legacy/time_step_adaptation_tolerance.h>
+#include <time_stepper/legacy/time_step_adaptation_error_control.h>
+#include <time_stepper/legacy/time_step_adaptation_constant.h>
+#include <time_stepper/legacy/generic_time_step.h>
+#include <time_stepper/legacy/explicit_time_step.h>
+#include <time_stepper/legacy/explicit_implicit_time_step.h>
+#include <time_stepper/legacy/implicit_time_step.h>
+#include <time_stepper/legacy/distance_to_points.h>
+#include <time_stepper/legacy/external_management_save_solution.h>
+#include <time_stepper/legacy/time_stepper.h>
 
 
 

@@ -4,7 +4,7 @@
 
 #include <utility>
 #include <tuple>
-#include <time_stepper/time_stepper.h>
+#include <time_stepper/legacy/time_stepper.h>
 
 namespace periodic_orbit
 {

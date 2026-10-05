@@ -14,6 +14,128 @@ defaults:
     shell: bash
 
 jobs:
+  timestepper-tables-explicit-cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Check explicit table coefficients and order
+        run: |
+          make test_rk_tables_explicit.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/tables_explicit"
+          ./"$BUILD_DIR"/tables_explicit/test_rk_tables_explicit.bin
+
+  timestepper-tables-implicit-cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Check implicit table coefficients and order
+        run: |
+          make test_rk_tables_implicit.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/tables_implicit"
+          ./"$BUILD_DIR"/tables_implicit/test_rk_tables_implicit.bin
+
+  timestepper-explicit-rk-cpu:
+    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Test explicit rk on serial and OMP
+        run: |
+          make test_explicit_rk_cpu.bin test_explicit_rk_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_rk"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rk/test_explicit_rk_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rk/test_explicit_rk_cpu_omp.bin
+
+  timestepper-explicit-lorenz-cpu:
+    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Test explicit lorenz on serial and OMP
+        run: |
+          make test_explicit_lorenz_cpu.bin test_explicit_lorenz_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_lorenz"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_lorenz/test_explicit_lorenz_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_lorenz/test_explicit_lorenz_cpu_omp.bin
+
+  timestepper-explicit-rossler-cpu:
+    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Test explicit rossler on serial and OMP
+        run: |
+          make test_explicit_rossler_cpu.bin test_explicit_rossler_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_rossler"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rossler/test_explicit_rossler_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rossler/test_explicit_rossler_cpu_omp.bin
+
+  timestepper-explicit-vdp-cpu:
+    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Test explicit vdp on serial and OMP
+        run: |
+          make test_explicit_vdp_cpu.bin test_explicit_vdp_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_vdp"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_vdp/test_explicit_vdp_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_vdp/test_explicit_vdp_cpu_omp.bin
+
+  timestepper-explicit-cuda:
+    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Test explicit RK when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping explicit CUDA RK: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping explicit CUDA RK: nvcc unavailable"
+            exit 0
+          fi
+          for test in rk lorenz rossler vdp; do
+            make "test_explicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_cuda" REAL_TYPE=double
+            ./"$BUILD_DIR"/explicit_cuda/"test_explicit_${test}_cuda.bin"
+          done
+
   stability-reference-contract:
     runs-on: ubuntu-latest
     steps:

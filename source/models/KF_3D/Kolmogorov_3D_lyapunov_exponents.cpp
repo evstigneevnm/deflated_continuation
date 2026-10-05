@@ -19,10 +19,10 @@
 
 #include <nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D.h>
 
-#include <time_stepper/time_step_adaptation_constant.h>
-#include <time_stepper/time_step_adaptation_error_control.h>
-#include <time_stepper/explicit_time_step.h>
-#include <time_stepper/lyapunov_exponents.h>
+#include <time_stepper/legacy/time_step_adaptation_constant.h>
+#include <time_stepper/legacy/time_step_adaptation_error_control.h>
+#include <time_stepper/legacy/explicit_time_step.h>
+#include <time_stepper/legacy/lyapunov_exponents.h>
 
 #include <common/gpu_file_operations.h>
 #include <common/gpu_vector_operations.h>

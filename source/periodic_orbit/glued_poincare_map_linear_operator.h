@@ -1,10 +1,10 @@
 #ifndef __PERIODIC_ORBIT_GLUED_POINCARE_MAP_LINEAR_OPERATOR_H__
 #define __PERIODIC_ORBIT_GLUED_POINCARE_MAP_LINEAR_OPERATOR_H__
 
-#include <time_stepper/time_stepper.h>
+#include <time_stepper/legacy/time_stepper.h>
 #include "detail/glued_nonlinear_operator_and_jacobian.h"
-#include <time_stepper/detail/all_methods_enum.h>
-#include <time_stepper/detail/positive_preserving_dummy.h>
+#include <time_stepper/legacy/detail/all_methods_enum.h>
+#include <time_stepper/legacy/detail/positive_preserving_dummy.h>
 namespace periodic_orbit
 {
 

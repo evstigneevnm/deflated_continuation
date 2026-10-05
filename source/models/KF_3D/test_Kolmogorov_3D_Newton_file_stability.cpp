@@ -33,9 +33,9 @@
 #include <stability/IRAM/iram_process.hpp>
 #include <stability/stability_analysis.hpp>
 
-#include <time_stepper/time_step_adaptation_error_control.h>
-#include <time_stepper/explicit_time_step.h>
-#include <time_stepper/time_stepper.h>
+#include <time_stepper/legacy/time_step_adaptation_error_control.h>
+#include <time_stepper/legacy/explicit_time_step.h>
+#include <time_stepper/legacy/time_stepper.h>
 
 
 #define Blocks_x_ 32

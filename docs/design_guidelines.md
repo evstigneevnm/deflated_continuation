@@ -197,13 +197,17 @@ Here `f_I` is the full RHS for fully implicit stages, or the implicit part for I
 class problem //minimum problem class methods for implicit method. Only one `apply` method either with (in, out)
 {
   // ...  
-  void set_affine_shift(alpha); // implements `alpha` affine shift in the residual.
-  void apply(in, out); // returns the whole residual G(u) as `problem.apply(in, out);` as a mapping `in|-G->out`.
-  void set_previous_state(u_prev); //sets `u_prev` for the calculation of the residual.
-  void set_known_rhs(r); // sets the known `r` vector that can be substituted for the BDF.
-  void set_time(t_in); // this for non-autonomous problems, void for autonomous.
-  void set_linearization_point(in); // fixes the point where linearization should be implemented.
-  auto jacobian = get_jacobi_operator(); // returns a thing structure containg the jacobian.
+  void set_affine_shift(scalar_type alpha); // implements `alpha` affine shift in the residual.
+  void apply(const vector_type& in, vector_type& out); // returns the whole residual G(u) as `problem.apply(in, out);` as a mapping `in|-G->out`.
+  // void set_previous_state(u_prev); //sets `u_prev` for the calculation of the residual.
+  vector_type& previous_state(); // fills the previous state vector `u_prev`
+  const vector_type& previous_state() const;
+  // void set_known_rhs(r); // sets the known `r` vector that can be substituted for the BDF.
+  vector_type& known_rhs(); // fills `r`
+  const vector_type& known_rhs() const;
+  void set_time(scalar_type time); // this for non-autonomous problems, void for autonomous.
+  void set_linearization_point(const vector_type& in); // fixes the point where linearization should be implemented.
+  jacobi_operator_type jacobian = get_jacobi_operator(); // returns a thing structure containg the jacobian.
   // ... 
 };
 ```

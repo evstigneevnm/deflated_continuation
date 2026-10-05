@@ -27,10 +27,10 @@
 #include <common/gpu_file_operations.h>
 #include <common/gpu_vector_operations.h>
 
-#include <time_stepper/time_step_adaptation_error_control.h>
-#include <time_stepper/explicit_time_step.h>
-#include <time_stepper/time_stepper.h>
-#include <time_stepper/distance_to_points.h>
+#include <time_stepper/legacy/time_step_adaptation_error_control.h>
+#include <time_stepper/legacy/explicit_time_step.h>
+#include <time_stepper/legacy/time_stepper.h>
+#include <time_stepper/legacy/distance_to_points.h>
 
 
 int main(int argc, char const *argv[])

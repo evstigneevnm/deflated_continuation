@@ -11,6 +11,7 @@
 #include <vector>
 
 #include <scfd/arrays/array.h>
+#include <scfd/static_vec/vec.h>
 #include <scfd/utils/device_tag.h>
 
 #include <common/scfd_backend_ext/arg_reduce.h>
@@ -20,6 +21,50 @@
 
 #include <nmfd/operations/blas1/high_precision/compensated_reduction.h>
 #include <nmfd/operations/vector_space_base.h>
+
+namespace nmfd
+{
+namespace operations
+{
+namespace detail
+{
+
+// Namespace-level types can be passed to CUDA kernels.
+template<class VectorOperations, class Transform, std::size_t N>
+struct scfd_transform_max_kernel
+{
+    using scalar_type = typename VectorOperations::scalar_type;
+    using norm_type = typename VectorOperations::norm_type;
+    using ordinal_type = typename VectorOperations::ordinal_type;
+    Transform transform;
+    scfd::static_vec::vec<const scalar_type*, N> inputs;
+    norm_type* output;
+
+    template<std::size_t... I>
+    __DEVICE_TAG__ norm_type evaluate(ordinal_type i, std::index_sequence<I...>) const
+    {
+        return transform(inputs[I][i]...);
+    }
+    __DEVICE_TAG__ void operator()(ordinal_type i) const
+    {
+        output[i] = evaluate(i, std::make_index_sequence<N>{});
+    }
+};
+
+template<class T>
+struct scfd_transform_max_op
+{
+    __DEVICE_TAG__ T operator()(T a, T b) const
+    {
+        if (a != a) return a;
+        if (b != b) return b;
+        return a > b ? a : b;
+    }
+};
+
+}
+}
+}
 
 template<class Backend, class T, class Ordinal = std::ptrdiff_t>
 class scfd_vector_operations :
@@ -442,6 +487,29 @@ public:
     norm_type norm_l_inf(const vector_type& x) const override
     {
         return norm_inf(x);
+    }
+
+    // Elementwise scalar mapping followed by maximum; empty -> -inf, NaNs propagate.
+    // The mapping must be const-callable on the backend and return a real scalar.
+    template<class Transform, class... Vectors>
+    norm_type transform_reduce_max(const Transform& transform, const Vectors&... vectors) const
+    {
+        static_assert(sizeof...(Vectors) > 0, "Transform reduction requires at least one vector");
+        static_assert((std::is_same_v<Vectors, vector_type> && ...), "Transform reduction vector type mismatch");
+        static_assert(std::is_convertible_v<decltype(transform((*vectors.raw_ptr())...)), norm_type>,
+            "Transform reduction requires a real scalar result");
+        if (((get_size(vectors) != sz_) || ...))
+            throw std::invalid_argument("Transform reduction: vector size mismatch");
+        const auto identity = -std::numeric_limits<norm_type>::infinity();
+        if (sz_ == 0) return identity;
+        using kernel_type = nmfd::operations::detail::scfd_transform_max_kernel<scfd_vector_operations, Transform, sizeof...(Vectors)>;
+        kernel_type kernel{transform, {}, helper_real_.raw_ptr()};
+        std::size_t index = 0;
+        ((kernel.inputs[index++] = vectors.raw_ptr()), ...);
+        for_each_(kernel, static_cast<ordinal_type>(sz_));
+        for_each_.wait();
+        return reduce_type()(static_cast<ordinal_type>(sz_), helper_real_.raw_ptr(), identity,
+            nmfd::operations::detail::scfd_transform_max_op<norm_type>{});
     }
 
     norm_type normalize(vector_type& x) const
