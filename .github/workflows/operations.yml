@@ -78,6 +78,52 @@ jobs:
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_lorenz/test_explicit_lorenz_cpu.bin
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_lorenz/test_explicit_lorenz_cpu_omp.bin
 
+  timestepper-lorenz-simulation-python-cpu:
+    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-lorenz-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU and Python dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends python3-numpy python3-scipy python3-matplotlib
+          fi
+      - name: Compare Lorenz trajectories with SciPy RK45 and RK23
+        run: |
+          SIMULATION_BUILD="$BUILD_DIR/lorenz_simulation"
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            PYTHON=/usr/bin/python3
+          else
+            PYTHON=python3
+            if ! "$PYTHON" -c 'import numpy, scipy, matplotlib' >/dev/null 2>&1; then
+              PYTHON="$HOME/anaconda3/bin/python"
+            fi
+          fi
+          export MPLCONFIGDIR="$SIMULATION_BUILD/matplotlib"
+          "$PYTHON" source/time_stepper/tests/test_compare_explicit_lorenz_simulation.py
+          make test_explicit_lorenz_simulation_cpu.bin test_explicit_lorenz_simulation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$SIMULATION_BUILD"
+          for backend in cpu cpu_omp; do
+            for method in DOPRI54 BS32; do
+              TRAJECTORY="$SIMULATION_BUILD/lorenz_${backend}_${method}.dat"
+              OMP_NUM_THREADS=8 "$SIMULATION_BUILD/test_explicit_lorenz_simulation_${backend}.bin" 1 "$TRAJECTORY" "$method"
+              "$PYTHON" source/time_stepper/tests/compare_explicit_lorenz_simulation.py "$TRAJECTORY"
+            done
+          done
+      - name: Save trajectories, comparisons, and plots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: timestepper-lorenz-simulation
+          path: |
+            ${{ env.BUILD_DIR }}/lorenz_simulation/*.dat
+            ${{ env.BUILD_DIR }}/lorenz_simulation/*.json
+            ${{ env.BUILD_DIR }}/lorenz_simulation/*.png
+
   timestepper-explicit-rossler-cpu:
     needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
     runs-on: ubuntu-latest
@@ -134,6 +180,100 @@ jobs:
           for test in rk lorenz rossler vdp; do
             make "test_explicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_cuda" REAL_TYPE=double
             ./"$BUILD_DIR"/explicit_cuda/"test_explicit_${test}_cuda.bin"
+          done
+
+  timestepper-dense-output-rk-cpu:
+    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-rk-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Verify rk dense output on serial and OMP
+        run: |
+          make test_explicit_dense_output_cpu.bin test_explicit_dense_output_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dense_rk"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_rk/test_explicit_dense_output_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_rk/test_explicit_dense_output_cpu_omp.bin
+
+  timestepper-dense-output-lorenz-cpu:
+    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-rk-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Verify lorenz dense output on serial and OMP
+        run: |
+          make test_explicit_lorenz_dense_output_cpu.bin test_explicit_lorenz_dense_output_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dense_lorenz"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_lorenz/test_explicit_lorenz_dense_output_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_lorenz/test_explicit_lorenz_dense_output_cpu_omp.bin
+
+  timestepper-dense-output-rossler-cpu:
+    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-rk-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Verify rossler dense output on serial and OMP
+        run: |
+          make test_explicit_rossler_dense_output_cpu.bin test_explicit_rossler_dense_output_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dense_rossler"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_rossler/test_explicit_rossler_dense_output_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_rossler/test_explicit_rossler_dense_output_cpu_omp.bin
+
+  timestepper-dense-output-vdp-cpu:
+    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-rk-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Verify vdp dense output on serial and OMP
+        run: |
+          make test_explicit_vdp_dense_output_cpu.bin test_explicit_vdp_dense_output_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dense_vdp"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_vdp/test_explicit_vdp_dense_output_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_vdp/test_explicit_vdp_dense_output_cpu_omp.bin
+
+  timestepper-dense-output-cuda:
+    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-cuda]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify dense output when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA dense output: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA dense output: nvcc unavailable"
+            exit 0
+          fi
+          for test in dense_output lorenz_dense_output rossler_dense_output vdp_dense_output; do
+            make "test_explicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dense_cuda" REAL_TYPE=double
+            ./"$BUILD_DIR"/dense_cuda/"test_explicit_${test}_cuda.bin"
           done
 
   stability-reference-contract:

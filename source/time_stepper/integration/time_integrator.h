@@ -33,13 +33,24 @@ public:
     void set_time_interval(scalar_type start, scalar_type end)
     {
         if (!std::isfinite(start) || !std::isfinite(end) || !std::isfinite(end-start))
+        {
             throw std::invalid_argument("Invalid integration interval");
+        }
         start_ = start;
         end_ = end;
     }
-    integration_status get_status() const { return status_; }
-    scalar_type get_final_time() const { return time_; }
-    std::size_t get_steps() const { return steps_; }
+    integration_status get_status() const 
+    { 
+        return status_; 
+    }
+    scalar_type get_final_time() const 
+    { 
+        return time_; 
+    }
+    std::size_t get_steps() const 
+    { 
+        return steps_; 
+    }
 
     void apply(const vector_type& in, vector_type& out)
     {
@@ -53,18 +64,27 @@ public:
         operations_.assign(candidate, out);
         const auto& current = out;
         if (!operations_.check_is_valid_number(current))
-        { status_ = integration_status::step_failure; return; }
+        { 
+            status_ = integration_status::step_failure; return; 
+        }
         while (time_ != end_)
         {
             if (steps_ == params_.maximum_steps)
-            { status_ = integration_status::attempt_limit_reached; return; }
+            { 
+                status_ = integration_status::attempt_limit_reached; return; 
+            }
             step_.set_time(time_);
             step_.set_target_time(end_);
             step_.apply(current, candidate);
             if (step_.get_status() != single_step_status::converged)
-            { status_ = integration_status::step_failure; return; }
+            { 
+                status_ = integration_status::step_failure; return; 
+            }
             auto next_time = time_+step_.get_dt();
-            if (step_.get_dt() == end_-time_) next_time = end_;
+            if (step_.get_dt() == end_-time_)
+            {
+                next_time = end_;
+            }
             const auto trial_time = next_time;
             bool modified = false;
             if constexpr (!std::is_same_v<ExternalManagement, detail::no_external_operations>)
@@ -91,7 +111,8 @@ public:
             operations_.assign(candidate, out);
             time_ = next_time;
             ++steps_;
-            if (status_ != integration_status::running) return;
+            if (status_ != integration_status::running) 
+                return;
         }
         status_ = integration_status::completed;
     }

@@ -377,6 +377,12 @@ struct continuous_integration
 };
 ```
 
+Dense output is optional at compile time: disabling it must remove its vector
+storage and extra RHS evaluations. RK extension coefficients belong to the table;
+evaluation belongs to the step method. Report the actual interpolation order,
+including any lower-order fallback. External managers may borrow the step method
+to obtain its pending view; the integrator and problem need no extra callbacks.
+
 The `time_step_adaptation` methods will select a particular time step size depending on the local parameters/errors, possible globalization etc.
 the general class name is as follows: `time_step_adaptation_{*}`, where `{*}` describes the underlying mechanism in time step adaptation. For example `time_step_adaptation_matlab`, `time_step_adaptation_regulation`, `time_step_adaptation_globalization`, `time_step_adaptation_constant_step` etc.
 

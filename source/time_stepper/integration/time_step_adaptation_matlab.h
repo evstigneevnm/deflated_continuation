@@ -34,16 +34,25 @@ public:
         const scalar_type values[] = {p.relative_tolerance, p.absolute_tolerance,
             p.initial_step, p.minimum_step, p.maximum_step};
         for (const auto value : values)
+        {
             if (!std::isfinite(value) || value <= 0)
+            {
                 throw std::invalid_argument("Adaptive-step parameters must be positive and finite");
+            }
+        }
         if (p.minimum_step > p.maximum_step)
+        {
             throw std::invalid_argument("Inverted adaptive-step bounds");
+        }
         reset();
     }
     scalar_type initialize(scalar_type, const vector_type&, scalar_type dt = -1)
     {
         reset();
-        if (dt > 0) dt_ = std::clamp(dt, params_.minimum_step, params_.maximum_step);
+        if (dt > 0) 
+        {
+            dt_ = std::clamp(dt, params_.minimum_step, params_.maximum_step);
+        }
         return dt_;
     }
     void reset()
@@ -58,7 +67,10 @@ public:
         const vector_type& out, scalar_type& dt_next, unsigned int error_order = 0,
         const vector_type* error = nullptr)
     {
-        if (!error || !error_order) return adaptation_status::failed;
+        if (!error || !error_order)
+        {
+            return adaptation_status::failed;
+        }
         const detail::scaled_error_mapping<scalar_type> mapping{params_.absolute_tolerance / params_.relative_tolerance};
         const auto err = operations_.transform_reduce_max(mapping, *error, in, out) / params_.relative_tolerance;
         const auto h = std::abs(dt_used);
@@ -88,13 +100,21 @@ public:
     void update(adaptation_status outcome, scalar_type, scalar_type h, const vector_type&)
     {
         if (outcome == adaptation_status::accepted_modified)
+        {
             dt_ = std::clamp(std::min(dt_, std::abs(h)), params_.minimum_step, params_.maximum_step);
-        if (outcome != adaptation_status::rejected) rejected_ = false;
+        }
+        if (outcome != adaptation_status::rejected)
+        {
+            rejected_ = false;
+        }
     }
     adaptation_status reject_step(scalar_type dt_used)
     {
         const auto h = std::abs(dt_used);
-        if (h <= params_.minimum_step) return adaptation_status::failed;
+        if (h <= params_.minimum_step) 
+        {
+            return adaptation_status::failed;
+        }
         dt_ = std::max(params_.minimum_step, scalar_type(.5) * h);
         rejected_ = true;
         return adaptation_status::rejected;
