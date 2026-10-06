@@ -7,6 +7,7 @@
 #include <nmfd/detail/vector_wrap.h>
 #include <time_stepper/detail/status.h>
 #include <time_stepper/runge_kutta/butcher_tables.h>
+#include <time_stepper/runge_kutta/continuous_integration.h>
 
 namespace nmfd
 {
@@ -16,24 +17,48 @@ namespace runge_kutta
 {
 namespace detail
 {
-template<class Problem, class T, class = void> struct has_set_time : std::false_type {};
-template<class Problem, class T> struct has_set_time<Problem, T,
-    std::void_t<decltype(std::declval<Problem&>().set_time(std::declval<T>()))>> : std::true_type {};
-template<class Problem, class Vector, class = void> struct has_apply : std::false_type {};
-template<class Problem, class Vector> struct has_apply<Problem, Vector,
+template<class Problem, class T, class = void>
+struct has_set_time : std::false_type
+{
+};
+
+template<class Problem, class T>
+struct has_set_time<Problem, T,
+    std::void_t<decltype(std::declval<Problem&>().set_time(std::declval<T>()))>> : std::true_type
+{
+};
+
+template<class Problem, class Vector, class = void>
+struct has_apply : std::false_type
+{
+};
+
+template<class Problem, class Vector>
+struct has_apply<Problem, Vector,
     std::void_t<decltype(std::declval<Problem&>().apply(
-        std::declval<const Vector&>(), std::declval<Vector&>()))>> : std::true_type {};
-template<class Adaptation, class = void> struct has_error_requirement : std::false_type {};
-template<class Adaptation> struct has_error_requirement<Adaptation,
-    std::void_t<decltype(std::declval<const Adaptation&>().requires_error_estimate())>> : std::true_type {};
+        std::declval<const Vector&>(), std::declval<Vector&>()))>> : std::true_type
+{
+};
+
+template<class Adaptation, class = void>
+struct has_error_requirement : std::false_type
+{
+};
+
+template<class Adaptation>
+struct has_error_requirement<Adaptation,
+    std::void_t<decltype(std::declval<const Adaptation&>().requires_error_estimate())>> : std::true_type
+{
+};
 }
 
-template<class VectorOperations, class Problem, class TimeStepAdaptation>
+template<class VectorOperations, class Problem, class TimeStepAdaptation, bool DenseOutput = false>
 class explicit_time_step
 {
 public:
     using scalar_type = typename VectorOperations::scalar_type;
     using vector_type = typename VectorOperations::vector_type;
+
     struct params
     {
         std::string method = "DOPRI54";
@@ -46,13 +71,21 @@ public:
         TimeStepAdaptation& adaptation, const params& p = {}):
         operations_(operations), problem_(problem), adaptation_(adaptation), params_(p),
         table_(make_butcher_table(p.method)), work_(operations),
-        error_(operations, table_.is_embedded())
+        error_(operations, table_.is_embedded()), dense_(operations, !table_.has_dense_output())
     {
         if (table_.type() != butcher_table::scheme_type::explicit_rk)
+        {
             throw std::invalid_argument("Explicit RK cannot execute an implicit table");
-        if (p.maximum_attempts == 0) throw std::invalid_argument("Empty RK attempt budget");
+        }
+        if (p.maximum_attempts == 0)
+        {
+            throw std::invalid_argument("Empty RK attempt budget");
+        }
         work_.start_use();
-        if (table_.is_embedded()) error_.start_use();
+        if (table_.is_embedded())
+        {
+            error_.start_use();
+        }
         stages_.reserve(table_.size());
         for (std::size_t i = 0; i < table_.size(); ++i)
         {
@@ -60,38 +93,94 @@ public:
             stages_.back().start_use();
         }
     }
+
     void set_time(scalar_type time)
     {
-        if (pending_) throw std::logic_error("Finalize the pending RK step first");
-        if (!std::isfinite(time)) throw std::invalid_argument("Nonfinite RK time");
+        if (pending_)
+        {
+            throw std::logic_error("Finalize the pending RK step first");
+        }
+        if (!std::isfinite(time))
+        {
+            throw std::invalid_argument("Nonfinite RK time");
+        }
         time_ = time;
     }
+
     void set_target_time(scalar_type target)
     {
-        if (pending_) throw std::logic_error("Finalize the pending RK step first");
-        if (!std::isfinite(target)) throw std::invalid_argument("Nonfinite RK target");
+        if (pending_)
+        {
+            throw std::logic_error("Finalize the pending RK step first");
+        }
+        if (!std::isfinite(target))
+        {
+            throw std::invalid_argument("Nonfinite RK target");
+        }
         target_ = target;
     }
-    scalar_type get_dt() const { return dt_; }
-    single_step_status get_status() const { return status_; }
-    unsigned int get_attempts() const { return attempts_; }
-    const butcher_table& table() const { return table_; }
+
+    scalar_type get_dt() const
+    {
+        return dt_;
+    }
+
+    single_step_status get_status() const
+    {
+        return status_;
+    }
+
+    unsigned int get_attempts() const
+    {
+        return attempts_;
+    }
+
+    const butcher_table& table() const
+    {
+        return table_;
+    }
+
+    unsigned int dense_output_order() const
+    {
+        return DenseOutput ? (table_.has_dense_output() ? table_.dense_order() : std::min(3u, table_.order())) : 0;
+    }
+
+    template<bool Enabled = DenseOutput, std::enable_if_t<Enabled && DenseOutput, int> = 0>
+    continuous_integration<explicit_time_step> get_continuous_integration() const
+    {
+        if (!pending_)
+        {
+            throw std::logic_error("No pending RK dense output");
+        }
+        return {*this, generation_}; // continuous_integration<explicit_time_step>(const SingleStepMethod& owner, std::size_t generation)
+    }
+
     const vector_type& error_estimate() const
     {
-        if (!pending_ || !table_.is_embedded()) throw std::logic_error("No pending RK error estimate");
+        if (!pending_ || !table_.is_embedded())
+        {
+            throw std::logic_error("No pending RK error estimate");
+        }
         return *error_;
     }
+
     void reset()
     {
         adaptation_.reset();
         initialized_ = pending_ = false;
+        ++generation_;
         dt_ = 0;
         attempts_ = 0;
         status_ = single_step_status::converged;
     }
+
     void apply(const vector_type& in, vector_type& out)
     {
-        if (pending_) throw std::logic_error("Finalize the pending RK step first");
+        if (pending_)
+        {
+            throw std::logic_error("Finalize the pending RK step first");
+        }
+        ++generation_;
         if constexpr (detail::has_error_requirement<TimeStepAdaptation>::value)
         {
             if (adaptation_.requires_error_estimate() && !table_.is_embedded())
@@ -100,7 +189,11 @@ public:
                 return;
             }
         }
-        if (!initialized_) { adaptation_.initialize(time_, in); initialized_ = true; }
+        if (!initialized_)
+        {
+            adaptation_.initialize(time_, in);
+            initialized_ = true;
+        }
         status_ = single_step_status::attempt_limit_reached;
         for (attempts_ = 0; attempts_ < params_.maximum_attempts;)
         {
@@ -108,13 +201,19 @@ public:
             const auto proposed = adaptation_.get_dt();
             const auto remaining = target_ - time_;
             dt_ = std::copysign(std::min(proposed, std::abs(remaining)), remaining);
-            if (!std::isfinite(proposed) || proposed <= 0 || !std::isfinite(dt_) || time_+dt_ == time_)
-            { status_ = single_step_status::step_size_underflow; return; }
+            if (!std::isfinite(proposed) || proposed <= 0 || !std::isfinite(dt_) || time_ + dt_ == time_)
+            {
+                status_ = single_step_status::step_size_underflow;
+                return;
+            }
             if (!compute(in))
             {
                 // No assessment/callback may inspect an invalid numerical candidate.
                 if (adaptation_.reject_step(dt_) != adaptation_status::rejected)
-                { status_ = single_step_status::failed_nonfinite; return; }
+                {
+                    status_ = single_step_status::failed_nonfinite;
+                    return;
+                }
                 adaptation_.update(adaptation_status::rejected, time_, dt_, in);
                 continue;
             }
@@ -123,6 +222,29 @@ public:
                 table_.error_order(), table_.is_embedded() ? &*error_ : nullptr);
             if (decision == adaptation_status::accepted)
             {
+                if constexpr (DenseOutput)
+                {
+                    if (!table_.has_dense_output())
+                    {
+                        if constexpr (detail::has_set_time<Problem, scalar_type>::value)
+                        {
+                            problem_.set_time(time_ + dt_);
+                        }
+                        problem_.apply(*work_, *dense_.endpoint_rate);
+                        if (!operations_.check_is_valid_number(*dense_.endpoint_rate))
+                        {
+                            if (adaptation_.reject_step(dt_) != adaptation_status::rejected)
+                            {
+                                status_ = single_step_status::failed_nonfinite;
+                                return;
+                            }
+                            adaptation_.update(adaptation_status::rejected, time_, dt_, in);
+                            continue;
+                        }
+                    }
+                    // Snapshot before copying the candidate: step.apply(x, x) is supported.
+                    operations_.assign(in, *dense_.previous);
+                }
                 operations_.assign(*work_, out);
                 status_ = single_step_status::converged;
                 pending_ = true;
@@ -130,15 +252,25 @@ public:
             }
             adaptation_.update(decision, time_, dt_, in);
             if (decision != adaptation_status::rejected)
-            { status_ = single_step_status::failed_minimum_dt; return; }
+            {
+                status_ = single_step_status::failed_minimum_dt;
+                return;
+            }
         }
     }
+
     void finalize(adaptation_status outcome, scalar_type committed_time, const vector_type& state)
     {
-        if (!pending_) throw std::logic_error("No RK candidate to finalize");
-        const auto elapsed = committed_time-time_;
-        if (!std::isfinite(committed_time) || elapsed*dt_ < 0 || std::abs(elapsed) > std::abs(dt_)*scalar_type(1.00000001))
+        if (!pending_)
+        {
+            throw std::logic_error("No RK candidate to finalize");
+        }
+        const auto elapsed = committed_time - time_;
+        if (!std::isfinite(committed_time) || elapsed * dt_ < 0 ||
+            std::abs(elapsed) > std::abs(dt_) * scalar_type(1.00000001))
+        {
             throw std::invalid_argument("Committed time is outside the pending RK step");
+        }
         adaptation_.update(outcome, committed_time, elapsed, state);
         pending_ = false;
     }
@@ -152,10 +284,57 @@ private:
     butcher_table table_;
     vector_wrap_type work_, error_;
     std::vector<vector_wrap_type> stages_;
+    detail::dense_storage<VectorOperations, DenseOutput> dense_;
+    std::size_t generation_ = 0;
     scalar_type time_ = 0, target_ = 1, dt_ = 0;
     unsigned int attempts_ = 0;
     bool initialized_ = false, pending_ = false;
     single_step_status status_ = single_step_status::converged;
+
+    friend class continuous_integration<explicit_time_step>;
+
+    scalar_type evaluate_dense(scalar_type theta, vector_type& out, std::size_t generation) const
+    {
+        static_assert(DenseOutput, "Dense output is disabled");
+        if (!pending_ || generation != generation_)
+        {
+            throw std::logic_error("Expired RK dense output");
+        }
+        if (!std::isfinite(theta) || theta < 0 || theta > 1)
+        {
+            throw std::invalid_argument("Dense-output theta must be in [0,1]");
+        }
+        if (theta == 0)
+        {
+            operations_.assign(*dense_.previous, out);
+        }
+        else if (theta == 1)
+        {
+            operations_.assign(*work_, out);
+        }
+        else if (table_.has_dense_output())
+        {
+            operations_.assign(*dense_.previous, out);
+            for (std::size_t i = 0; i < table_.size(); ++i)
+            {
+                const auto weight = static_cast<scalar_type>(table_.dense_b(i, theta));
+                if (weight != 0)
+                {
+                    operations_.add_mul(dt_ * weight, *stages_[i], out);
+                }
+            }
+        }
+        else
+        {
+            const auto a = theta * theta * (3 - 2 * theta),
+                b = theta * (1 - theta) * (1 - theta),
+                c = -theta * theta * (1 - theta);
+            operations_.assign_mul(1 - a, *dense_.previous, a, *work_, out);
+            operations_.add_mul(dt_ * b, *stages_[0], out);
+            operations_.add_mul(dt_ * c, *dense_.endpoint_rate, out);
+        }
+        return time_ + theta * dt_;
+    }
 
     bool compute(const vector_type& in)
     {
@@ -164,22 +343,38 @@ private:
         {
             operations_.assign(in, work);
             for (std::size_t j = 0; j < i; ++j)
-                if (table_.a(i,j) != 0)
-                    operations_.add_mul(dt_*static_cast<scalar_type>(table_.a(i,j)), *stages_[j], work);
+            {
+                if (table_.a(i, j) != 0)
+                {
+                    operations_.add_mul(dt_ * static_cast<scalar_type>(table_.a(i, j)), *stages_[j], work);
+                }
+            }
             if constexpr (detail::has_set_time<Problem, scalar_type>::value)
-                problem_.set_time(time_+dt_*static_cast<scalar_type>(table_.c(i)));
+            {
+                problem_.set_time(time_ + dt_ * static_cast<scalar_type>(table_.c(i)));
+            }
             problem_.apply(work, *stages_[i]);
-            if (!operations_.check_is_valid_number(*stages_[i])) return false;
+            if (!operations_.check_is_valid_number(*stages_[i]))
+            {
+                return false;
+            }
         }
         // All derivatives are retained; the last stage state can become the candidate.
         operations_.assign(in, work);
-        if (table_.is_embedded()) operations_.assign_scalar(scalar_type(0), *error_);
+        if (table_.is_embedded())
+        {
+            operations_.assign_scalar(scalar_type(0), *error_);
+        }
         for (std::size_t i = 0; i < table_.size(); ++i)
         {
             if (table_.b(i) != 0)
-                operations_.add_mul(dt_*static_cast<scalar_type>(table_.b(i)), *stages_[i], work);
+            {
+                operations_.add_mul(dt_ * static_cast<scalar_type>(table_.b(i)), *stages_[i], work);
+            }
             if (table_.is_embedded() && table_.error_b(i) != 0)
-                operations_.add_mul(dt_*static_cast<scalar_type>(table_.error_b(i)), *stages_[i], *error_);
+            {
+                operations_.add_mul(dt_ * static_cast<scalar_type>(table_.error_b(i)), *stages_[i], *error_);
+            }
         }
         return operations_.check_is_valid_number(work) &&
             (!table_.is_embedded() || operations_.check_is_valid_number(*error_));
