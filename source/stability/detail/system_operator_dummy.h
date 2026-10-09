@@ -7,36 +7,37 @@ namespace stability
 {
 namespace detail
 {
-template<class VectorOperations, class LinearOperator>
+template <class VectorOperations, class LinearOperator>
 class system_operator_dummy
 {
     using T_vec = typename VectorOperations::vector_type;
 
 public:
-    system_operator_dummy(VectorOperations* vec_ops_p, LinearOperator* lin_op_p):
-    vec_ops_(vec_ops_p), lin_op_(lin_op_p), target_("LM")
-    {}
-    ~system_operator_dummy()
-    {}
-    
-    bool solve(const T_vec& v_in, T_vec& v_out)const
+    system_operator_dummy( VectorOperations *vec_ops_p, LinearOperator *lin_op_p )
+        : vec_ops_( vec_ops_p ), lin_op_( lin_op_p ), target_( "LM" )
     {
-        return lin_op_->apply(v_in, v_out);
-        
     }
-    std::string target_eigs()const
+    ~system_operator_dummy()
+    {
+    }
+
+    bool solve( const T_vec &v_in, T_vec &v_out ) const
+    {
+        return lin_op_->apply( v_in, v_out );
+    }
+    std::string target_eigs() const
     {
         return target_;
     }
-    void set_target_eigs(const std::string& target_p)
+    void set_target_eigs( const std::string &target_p )
     {
         target_ = target_p;
     }
 
 private:
-    VectorOperations* vec_ops_;
-    LinearOperator* lin_op_;
-    std::string target_;
+    VectorOperations *vec_ops_;
+    LinearOperator   *lin_op_;
+    std::string       target_;
 };
 
 }

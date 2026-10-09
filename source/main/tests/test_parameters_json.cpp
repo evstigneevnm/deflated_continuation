@@ -12,730 +12,512 @@
 namespace
 {
 
-template<class T>
-bool close_value(const T& left, const T& right)
+template <class T>
+bool close_value( const T &left, const T &right )
 {
-    const T scale = std::max<T>(T(1), std::max<T>(std::abs(left), std::abs(right)));
-    return std::abs(left - right) <= T(64)*std::numeric_limits<T>::epsilon()*scale;
+    const T scale = std::max<T>( T( 1 ), std::max<T>( std::abs( left ), std::abs( right ) ) );
+    return std::abs( left - right ) <= T( 64 ) * std::numeric_limits<T>::epsilon() * scale;
 }
 
-void require(bool condition, const std::string& message)
+void require( bool condition, const std::string &message )
 {
-    if(!condition)
+    if ( !condition )
     {
-        throw std::runtime_error(message);
+        throw std::runtime_error( message );
     }
 }
 
-template<class T>
-void verify_full_configuration(const std::string& file_name)
+template <class T>
+void verify_full_configuration( const std::string &file_name )
 {
-    const auto parameters = main_classes::read_parameters_json<T>(file_name);
-    require(parameters.nvidia_pci_id == -1, "gpu_pci_id");
-    require(parameters.use_high_precision_reduction, "use_high_precision_reduction");
-    require(parameters.path_to_project == "./build/KS1D_test_full/", "path_to_project");
-    require(parameters.bifurcaiton_diagram_file_name == "bifurcation_diagram.dat", "diagram file");
+    const auto parameters = main_classes::read_parameters_json<T>( file_name );
+    require( parameters.nvidia_pci_id == -1, "gpu_pci_id" );
+    require( parameters.use_high_precision_reduction, "use_high_precision_reduction" );
+    require( parameters.path_to_project == "./build/KS1D_test_full/", "path_to_project" );
+    require( parameters.bifurcaiton_diagram_file_name == "bifurcation_diagram.dat", "diagram file" );
 
-    const auto& continuation = parameters.deflation_continuation;
-    require(continuation.continuation_steps == 5000, "maximum_continuation_steps");
-    require(close_value(continuation.step_size, T(0.02)), "step_size");
-    require(close_value(continuation.max_step_size, T(0.25)), "max_step_size");
-    require(continuation.initial_direciton == -1, "initial_direciton");
-    require(continuation.deflation_knots.size() == 54, "deflation_knots");
-    require(continuation.add_analytical_solution_to_diagram, "analytical branch flag");
-    require(continuation.analytical_solution_branches.empty(), "analytical branch selection");
+    const auto &continuation = parameters.deflation_continuation;
+    require( continuation.continuation_steps == 5000, "maximum_continuation_steps" );
+    require( close_value( continuation.step_size, T( 0.02 ) ), "step_size" );
+    require( close_value( continuation.max_step_size, T( 0.25 ) ), "max_step_size" );
+    require( continuation.initial_direciton == -1, "initial_direciton" );
+    require( continuation.deflation_knots.size() == 54, "deflation_knots" );
+    require( continuation.add_analytical_solution_to_diagram, "analytical branch flag" );
+    require( continuation.analytical_solution_branches.empty(), "analytical branch selection" );
 
-    require(continuation.restart_policy.knot_relocation.enabled, "knot relocation");
-    require(continuation.restart_policy.knot_relocation.candidate_count == 12, "relocation candidates");
-    const auto& manual_overrides =
-        continuation.restart_policy.knot_relocation.manual_overrides;
-    require(manual_overrides.size() == 2, "manual knot overrides");
-    const auto require_override =
-        [&manual_overrides](T requested, T effective, const std::string& message)
-        {
-            const auto override_it = std::find_if(
-                manual_overrides.begin(),
-                manual_overrides.end(),
-                [requested](const auto& knot_override)
-                {
-                    return close_value(knot_override.requested, requested);
-                });
-            require(override_it != manual_overrides.end(), message + " requested knot");
-            require(close_value(override_it->effective, effective), message + " effective knot");
-        };
-    require_override(T(4), T(4.01), "primary bifurcation override");
-    require_override(T(100), T(101), "terminal pole override");
+    require( continuation.restart_policy.knot_relocation.enabled, "knot relocation" );
+    require( continuation.restart_policy.knot_relocation.candidate_count == 12, "relocation candidates" );
+    const auto &manual_overrides = continuation.restart_policy.knot_relocation.manual_overrides;
+    require( manual_overrides.size() == 2, "manual knot overrides" );
+    const auto require_override = [&manual_overrides]( T requested, T effective, const std::string &message ) {
+        const auto override_it =
+            std::find_if( manual_overrides.begin(), manual_overrides.end(), [requested]( const auto &knot_override ) {
+                return close_value( knot_override.requested, requested );
+            } );
+        require( override_it != manual_overrides.end(), message + " requested knot" );
+        require( close_value( override_it->effective, effective ), message + " effective knot" );
+    };
+    require_override( T( 4 ), T( 4.01 ), "primary bifurcation override" );
+    require_override( T( 100 ), T( 101 ), "terminal pole override" );
+    require( continuation.restart_policy.seed_schedule.enabled, "deterministic seed schedule" );
+    require( continuation.restart_policy.preserve_partial_curves, "partial curve preservation" );
+    require( continuation.restart_policy.failed_candidate_registry.enabled, "persistent failed-candidate registry" );
+    require( continuation.restart_policy.recovery_registry.enabled, "continuation recovery registry" );
     require(
-        continuation.restart_policy.seed_schedule.enabled,
-        "deterministic seed schedule");
+        !continuation.restart_policy.recovery_registry.process_before_deflation, "automatic recovery remains opt-in"
+    );
+    require( continuation.restart_policy.topology_registry.enabled, "branch topology registry" );
     require(
-        continuation.restart_policy.preserve_partial_curves,
-        "partial curve preservation");
+        close_value( continuation.restart_policy.topology_registry.minimum_tangent_line_similarity, T( 0.9 ) ),
+        "topology tangent threshold"
+    );
+    require( continuation.continuation_parameter_bounds.enabled, "explicit continuation bounds" );
+    require( close_value( continuation.continuation_parameter_bounds.minimum, T( 1 ) ), "continuation minimum" );
     require(
-        continuation.restart_policy.failed_candidate_registry.enabled,
-        "persistent failed-candidate registry");
+        close_value( continuation.continuation_parameter_bounds.maximum, T( 110 ) ), "continuation requested maximum"
+    );
     require(
-        continuation.restart_policy.recovery_registry.enabled,
-        "continuation recovery registry");
+        continuation.continuation_parameter_bounds.resolve_with_knot_registry, "continuation bound registry resolution"
+    );
     require(
-        !continuation.restart_policy.recovery_registry.process_before_deflation,
-        "automatic recovery remains opt-in");
+        continuation.boundary_refinement_policy.preserve_last_converged_point, "transactional boundary refinement"
+    );
+    require( continuation.branch_intersection_policy.detect_forward_approach, "forward branch detection" );
     require(
-        continuation.restart_policy.topology_registry.enabled,
-        "branch topology registry");
+        continuation.branch_intersection_policy.forward_distance_extrapolation_power == 2, "forward extrapolation power"
+    );
     require(
-        close_value(
-            continuation.restart_policy.topology_registry.
-                minimum_tangent_line_similarity,
-            T(0.9)),
-        "topology tangent threshold");
+        continuation.branch_intersection_policy.localize_analytical_targets, "analytical target localization default"
+    );
     require(
-        continuation.continuation_parameter_bounds.enabled,
-        "explicit continuation bounds");
-    require(
-        close_value(
-            continuation.continuation_parameter_bounds.minimum,
-            T(1)),
-        "continuation minimum");
-    require(
-        close_value(
-            continuation.continuation_parameter_bounds.maximum,
-            T(110)),
-        "continuation requested maximum");
-    require(
-        continuation.continuation_parameter_bounds
-            .resolve_with_knot_registry,
-        "continuation bound registry resolution");
-    require(
-        continuation.boundary_refinement_policy
-            .preserve_last_converged_point,
-        "transactional boundary refinement");
-    require(continuation.branch_intersection_policy.detect_forward_approach, "forward branch detection");
-    require(continuation.branch_intersection_policy.forward_distance_extrapolation_power == 2,
-            "forward extrapolation power");
-    require(
-        continuation.branch_intersection_policy.localize_analytical_targets,
-        "analytical target localization default");
-    require(
-        close_value(
-            continuation.branch_intersection_policy.
-                analytical_target_parameter_tolerance,
-            T(1.0e-7)),
-        "analytical target parameter tolerance default");
-    require(continuation.self_intersection_policy.enabled, "self intersection");
-    require(continuation.isotropy_transition_policy.maximum_order == 16, "isotropy order");
-    require(continuation.predictor_chart_policy.enforce, "predictor chart enforcement");
-    require(continuation.corrector_retry_policy.maximum_retries == 8, "corrector retries");
-    require(continuation.progress_monitor_policy.enabled, "progress monitor");
-    require(!continuation.linear_solver_extended.verbose, "extended solver verbosity");
-    require(close_value(continuation.newton_extended_deflation.newton_wight, T(0.5)),
-            "deflation Newton weight");
+        close_value( continuation.branch_intersection_policy.analytical_target_parameter_tolerance, T( 1.0e-7 ) ),
+        "analytical target parameter tolerance default"
+    );
+    require( continuation.self_intersection_policy.enabled, "self intersection" );
+    require( continuation.isotropy_transition_policy.maximum_order == 16, "isotropy order" );
+    require( continuation.predictor_chart_policy.enforce, "predictor chart enforcement" );
+    require( continuation.corrector_retry_policy.maximum_retries == 8, "corrector retries" );
+    require( continuation.progress_monitor_policy.enabled, "progress monitor" );
+    require( !continuation.linear_solver_extended.verbose, "extended solver verbosity" );
+    require( close_value( continuation.newton_extended_deflation.newton_wight, T( 0.5 ) ), "deflation Newton weight" );
 
-    require(parameters.nonlinear_operator.N_size.size() == 1, "nonlinear dimensions size");
-    const std::size_t nonlinear_dimension =
-        parameters.nonlinear_operator.N_size.front();
+    require( parameters.nonlinear_operator.N_size.size() == 1, "nonlinear dimensions size" );
+    const std::size_t nonlinear_dimension = parameters.nonlinear_operator.N_size.front();
     require(
-        nonlinear_dimension >= 32 &&
-            (nonlinear_dimension & (nonlinear_dimension - 1)) == 0,
-        "nonlinear dimension");
-    require(parameters.nonlinear_operator.problem_real_parameters_vector.size() == 2,
-            "problem real parameters");
-    require(!parameters.stability_continuation.linear_solver.verbose,
-            "stability solver verbosity");
+        nonlinear_dimension >= 32 && ( nonlinear_dimension & ( nonlinear_dimension - 1 ) ) == 0, "nonlinear dimension"
+    );
+    require( parameters.nonlinear_operator.problem_real_parameters_vector.size() == 2, "problem real parameters" );
+    require( !parameters.stability_continuation.linear_solver.verbose, "stability solver verbosity" );
     require(
-        close_value(
-            parameters.stability_continuation.
-                stability_boundary_tolerance,
-            T(1.0e-7)),
-        "stability boundary tolerance default");
+        close_value( parameters.stability_continuation.stability_boundary_tolerance, T( 1.0e-7 ) ),
+        "stability boundary tolerance default"
+    );
     require(
-        close_value(
-            parameters.stability_continuation.
-                real_eigenvalue_tolerance,
-            T(1.0e-7)),
-        "real eigenvalue tolerance default");
+        close_value( parameters.stability_continuation.real_eigenvalue_tolerance, T( 1.0e-7 ) ),
+        "real eigenvalue tolerance default"
+    );
     require(
-        close_value(
-            parameters.stability_continuation.
-                conjugate_pair_tolerance,
-            T(1.0e-6)),
-        "conjugate-pair tolerance default");
+        close_value( parameters.stability_continuation.conjugate_pair_tolerance, T( 1.0e-6 ) ),
+        "conjugate-pair tolerance default"
+    );
+    require( parameters.stability_continuation.require_converged_eigenpairs, "require converged eigenpairs default" );
     require(
-        parameters.stability_continuation.
-            require_converged_eigenpairs,
-        "require converged eigenpairs default");
+        parameters.stability_continuation.require_complete_scan_coverage, "require complete scan coverage default"
+    );
     require(
-        parameters.stability_continuation.
-            require_complete_scan_coverage,
-        "require complete scan coverage default");
+        parameters.stability_continuation.spectrum_classification_retries == 2, "spectrum classification retry default"
+    );
     require(
-        parameters.stability_continuation.
-            spectrum_classification_retries == 2,
-        "spectrum classification retry default");
+        parameters.stability_continuation.transition_classification_confirmations == 2,
+        "transition classification confirmation count"
+    );
     require(
-        parameters.stability_continuation.
-            transition_classification_confirmations == 2,
-        "transition classification confirmation count");
+        !parameters.stability_continuation.confirm_regular_stability_points, "regular stability confirmation default"
+    );
     require(
-        !parameters.stability_continuation.
-            confirm_regular_stability_points,
-        "regular stability confirmation default");
+        parameters.stability_continuation.recover_failed_transition_classification_with_newton,
+        "failed transition classification Newton recovery default"
+    );
     require(
-        parameters.stability_continuation.
-            recover_failed_transition_classification_with_newton,
-        "failed transition classification Newton recovery default");
+        parameters.stability_continuation.recover_failed_transition_newton_with_parameter_homotopy &&
+            parameters.stability_continuation.transition_newton_homotopy_maximum_subdivisions == 64,
+        "failed transition Newton homotopy defaults"
+    );
     require(
-        parameters.stability_continuation.
-            recover_failed_transition_newton_with_parameter_homotopy &&
-        parameters.stability_continuation.
-            transition_newton_homotopy_maximum_subdivisions == 64,
-        "failed transition Newton homotopy defaults");
+        parameters.stability_continuation.transition_refinement_maximum_iterations == 20,
+        "transition refinement maximum iterations"
+    );
     require(
-        parameters.stability_continuation.
-            transition_refinement_maximum_iterations == 20,
-        "transition refinement maximum iterations");
+        parameters.stability_continuation.transition_refinement_maximum_subdivisions == 8,
+        "transition refinement maximum subdivisions"
+    );
     require(
-        parameters.stability_continuation.
-            transition_refinement_maximum_subdivisions == 8,
-        "transition refinement maximum subdivisions");
+        close_value( parameters.stability_continuation.transition_refinement_parameter_tolerance, T( 1.0e-8 ) ),
+        "transition refinement parameter tolerance"
+    );
     require(
-        close_value(
-            parameters.stability_continuation.
-                transition_refinement_parameter_tolerance,
-            T(1.0e-8)),
-        "transition refinement parameter tolerance");
+        parameters.stability_continuation.turning_point_guard_source_points == 2, "turning-point source guard default"
+    );
     require(
-        parameters.stability_continuation.
-            turning_point_guard_source_points == 2,
-        "turning-point source guard default");
+        !parameters.stability_continuation.allow_source_path_topology_splits,
+        "source-path topology splitting remains opt-in"
+    );
     require(
-        !parameters.stability_continuation.
-            allow_source_path_topology_splits,
-        "source-path topology splitting remains opt-in");
+        parameters.stability_continuation.symmetry_endpoint_guard_source_points == 50,
+        "symmetry endpoint source-point guard"
+    );
     require(
-        parameters.stability_continuation.
-            symmetry_endpoint_guard_source_points == 50,
-        "symmetry endpoint source-point guard");
+        parameters.stability_continuation.classification_uncertainty_registry.enabled,
+        "classification uncertainty registry default enabled"
+    );
     require(
-        parameters.stability_continuation.
-            classification_uncertainty_registry.enabled,
-        "classification uncertainty registry default enabled");
-    require(
-        parameters.stability_continuation.
-            classification_uncertainty_registry.file_name ==
-                "stability_uncertainty_registry.json",
-        "classification uncertainty registry default file");
+        parameters.stability_continuation.classification_uncertainty_registry.file_name ==
+            "stability_uncertainty_registry.json",
+        "classification uncertainty registry default file"
+    );
 }
 
-template<class T>
-void verify_optional_policy_defaults(const std::string& file_name)
+template <class T>
+void verify_optional_policy_defaults( const std::string &file_name )
 {
-    auto json = main_classes::read_json(file_name);
-    auto& continuation_json = json.at("deflation_continuation");
-    continuation_json.erase("restart_policy");
-    continuation_json.erase("branch_intersection_policy");
-    continuation_json.erase("self_intersection_policy");
-    continuation_json.erase("isotropy_transition_policy");
-    continuation_json.erase("predictor_chart_policy");
-    continuation_json.erase("corrector_retry_policy");
-    continuation_json.erase("progress_monitor_policy");
-    continuation_json.erase("continuation_parameter_bounds");
-    continuation_json.erase("boundary_refinement_policy");
-    auto& stability_json = json.at("stability_continuation");
-    stability_json.erase("correct_stability_transitions_with_newton");
-    stability_json.erase(
-        "recover_failed_transition_classification_with_newton");
-    stability_json.erase(
-        "recover_failed_transition_newton_with_parameter_homotopy");
-    stability_json.erase(
-        "transition_newton_homotopy_maximum_subdivisions");
-    stability_json.erase("transition_refinement_maximum_iterations");
-    stability_json.erase("transition_refinement_parameter_tolerance");
-    stability_json.erase("transition_classification_confirmations");
-    stability_json.erase("turning_point_guard_source_points");
-    stability_json.erase("symmetry_endpoint_guard_source_points");
-    stability_json.erase("classification_uncertainty_registry");
+    auto  json              = main_classes::read_json( file_name );
+    auto &continuation_json = json.at( "deflation_continuation" );
+    continuation_json.erase( "restart_policy" );
+    continuation_json.erase( "branch_intersection_policy" );
+    continuation_json.erase( "self_intersection_policy" );
+    continuation_json.erase( "isotropy_transition_policy" );
+    continuation_json.erase( "predictor_chart_policy" );
+    continuation_json.erase( "corrector_retry_policy" );
+    continuation_json.erase( "progress_monitor_policy" );
+    continuation_json.erase( "continuation_parameter_bounds" );
+    continuation_json.erase( "boundary_refinement_policy" );
+    auto &stability_json = json.at( "stability_continuation" );
+    stability_json.erase( "correct_stability_transitions_with_newton" );
+    stability_json.erase( "recover_failed_transition_classification_with_newton" );
+    stability_json.erase( "recover_failed_transition_newton_with_parameter_homotopy" );
+    stability_json.erase( "transition_newton_homotopy_maximum_subdivisions" );
+    stability_json.erase( "transition_refinement_maximum_iterations" );
+    stability_json.erase( "transition_refinement_parameter_tolerance" );
+    stability_json.erase( "transition_classification_confirmations" );
+    stability_json.erase( "turning_point_guard_source_points" );
+    stability_json.erase( "symmetry_endpoint_guard_source_points" );
+    stability_json.erase( "classification_uncertainty_registry" );
 
-    const auto parameters = json.get<main_classes::parameters<T>>();
-    const auto& continuation = parameters.deflation_continuation;
-    require(!continuation.restart_policy.allow_incomplete_restart_intersections,
-            "restart default");
-    require(!continuation.restart_policy.knot_relocation.enabled,
-            "knot relocation default");
-    require(!continuation.restart_policy.seed_schedule.enabled,
-            "seed schedule default");
-    require(continuation.restart_policy.preserve_partial_curves,
-            "partial preservation default");
-    require(continuation.restart_policy.failed_candidate_registry.enabled,
-            "failed registry default");
-    require(continuation.restart_policy.recovery_registry.enabled,
-            "recovery registry default");
-    require(continuation.restart_policy.topology_registry.enabled,
-            "topology registry default");
-    require(!continuation.continuation_parameter_bounds.enabled,
-            "continuation bounds default");
+    const auto  parameters   = json.get<main_classes::parameters<T>>();
+    const auto &continuation = parameters.deflation_continuation;
+    require( !continuation.restart_policy.allow_incomplete_restart_intersections, "restart default" );
+    require( !continuation.restart_policy.knot_relocation.enabled, "knot relocation default" );
+    require( !continuation.restart_policy.seed_schedule.enabled, "seed schedule default" );
+    require( continuation.restart_policy.preserve_partial_curves, "partial preservation default" );
+    require( continuation.restart_policy.failed_candidate_registry.enabled, "failed registry default" );
+    require( continuation.restart_policy.recovery_registry.enabled, "recovery registry default" );
+    require( continuation.restart_policy.topology_registry.enabled, "topology registry default" );
+    require( !continuation.continuation_parameter_bounds.enabled, "continuation bounds default" );
+    require( continuation.boundary_refinement_policy.preserve_last_converged_point, "boundary transaction default" );
+    require( !continuation.branch_intersection_policy.enabled, "branch intersection default" );
+    require( !continuation.self_intersection_policy.enabled, "self intersection default" );
+    require( !continuation.isotropy_transition_policy.enabled, "isotropy transition default" );
+    require( continuation.predictor_chart_policy.enabled, "predictor chart default" );
+    require( continuation.predictor_chart_policy.enforce, "predictor chart enforcement default" );
     require(
-        continuation.boundary_refinement_policy
-            .preserve_last_converged_point,
-        "boundary transaction default");
-    require(!continuation.branch_intersection_policy.enabled,
-            "branch intersection default");
-    require(!continuation.self_intersection_policy.enabled,
-            "self intersection default");
-    require(!continuation.isotropy_transition_policy.enabled,
-            "isotropy transition default");
-    require(continuation.predictor_chart_policy.enabled,
-            "predictor chart default");
-    require(continuation.predictor_chart_policy.enforce,
-            "predictor chart enforcement default");
-    require(continuation.corrector_retry_policy.maximum_retries ==
-                continuation.continuation_fail_attempts,
-            "legacy corrector retry fallback");
-    require(continuation.corrector_retry_policy.successes_before_growth == 6,
-            "legacy corrector growth fallback");
-    require(!continuation.progress_monitor_policy.enabled,
-            "progress monitor default");
-    const auto& stability = parameters.stability_continuation;
+        continuation.corrector_retry_policy.maximum_retries == continuation.continuation_fail_attempts,
+        "legacy corrector retry fallback"
+    );
+    require( continuation.corrector_retry_policy.successes_before_growth == 6, "legacy corrector growth fallback" );
+    require( !continuation.progress_monitor_policy.enabled, "progress monitor default" );
+    const auto &stability = parameters.stability_continuation;
+    require( !stability.correct_stability_transitions_with_newton, "secant stability transition refinement default" );
     require(
-        !stability.correct_stability_transitions_with_newton,
-        "secant stability transition refinement default");
+        stability.recover_failed_transition_classification_with_newton,
+        "failed transition classification Newton recovery default"
+    );
     require(
-        stability.
-            recover_failed_transition_classification_with_newton,
-        "failed transition classification Newton recovery default");
+        stability.recover_failed_transition_newton_with_parameter_homotopy &&
+            stability.transition_newton_homotopy_maximum_subdivisions == 64,
+        "failed transition Newton homotopy defaults"
+    );
     require(
-        stability.
-            recover_failed_transition_newton_with_parameter_homotopy &&
-        stability.transition_newton_homotopy_maximum_subdivisions == 64,
-        "failed transition Newton homotopy defaults");
+        stability.transition_refinement_maximum_iterations == 20, "transition refinement maximum iterations default"
+    );
     require(
-        stability.transition_refinement_maximum_iterations == 20,
-        "transition refinement maximum iterations default");
+        stability.transition_refinement_maximum_subdivisions == 8, "transition refinement maximum subdivisions default"
+    );
     require(
-        stability.transition_refinement_maximum_subdivisions == 8,
-        "transition refinement maximum subdivisions default");
-    require(
-        close_value(
-            stability.transition_refinement_parameter_tolerance,
-            T(0)),
-        "transition refinement parameter tolerance default");
-    require(
-        stability.turning_point_guard_source_points == 2,
-        "turning-point source guard default");
-    require(
-        !stability.allow_source_path_topology_splits,
-        "source-path topology split default");
-    require(
-        stability.symmetry_endpoint_guard_source_points == 0,
-        "symmetry endpoint source-point guard default");
-    require(
-        stability.spectrum_classification_retries == 2,
-        "spectrum classification retry default");
-    require(
-        stability.transition_classification_confirmations == 2,
-        "transition classification confirmation default");
+        close_value( stability.transition_refinement_parameter_tolerance, T( 0 ) ),
+        "transition refinement parameter tolerance default"
+    );
+    require( stability.turning_point_guard_source_points == 2, "turning-point source guard default" );
+    require( !stability.allow_source_path_topology_splits, "source-path topology split default" );
+    require( stability.symmetry_endpoint_guard_source_points == 0, "symmetry endpoint source-point guard default" );
+    require( stability.spectrum_classification_retries == 2, "spectrum classification retry default" );
+    require( stability.transition_classification_confirmations == 2, "transition classification confirmation default" );
     require(
         stability.classification_uncertainty_registry.enabled &&
-            stability.classification_uncertainty_registry.
-                maximum_diagnostic_length == 16384 &&
-            stability.classification_uncertainty_registry.
-                retain_resolved,
-        "classification uncertainty registry defaults");
+            stability.classification_uncertainty_registry.maximum_diagnostic_length == 16384 &&
+            stability.classification_uncertainty_registry.retain_resolved,
+        "classification uncertainty registry defaults"
+    );
 }
 
-template<class T>
-void verify_stability_classifier_overrides(const std::string& file_name)
+template <class T>
+void verify_stability_classifier_overrides( const std::string &file_name )
 {
-    auto json = main_classes::read_json(file_name);
-    auto& stability_json = json.at("stability_continuation");
-    stability_json["stability_boundary_tolerance"] = 2.5e-5;
-    stability_json["real_eigenvalue_tolerance"] = 3.5e-6;
-    stability_json["conjugate_pair_tolerance"] = 4.5e-4;
-    stability_json["require_converged_eigenpairs"] = false;
-    stability_json["require_nonempty_spectrum"] = false;
-    stability_json["require_complete_scan_coverage"] = false;
-    stability_json["spectrum_classification_retries"] = 4;
-    stability_json["transition_classification_confirmations"] = 3;
-    stability_json["confirm_regular_stability_points"] = true;
-    stability_json["correct_stability_transitions_with_newton"] =
-        false;
-    stability_json[
-        "recover_failed_transition_classification_with_newton"] =
-            false;
-    stability_json[
-        "recover_failed_transition_newton_with_parameter_homotopy"] =
-            false;
-    stability_json[
-        "transition_newton_homotopy_maximum_subdivisions"] = 32;
-    stability_json["transition_refinement_maximum_iterations"] = 37;
-    stability_json["transition_refinement_maximum_subdivisions"] = 6;
-    stability_json["transition_refinement_parameter_tolerance"] =
-        7.5e-9;
-    stability_json["turning_point_guard_source_points"] = 7;
-    stability_json["allow_source_path_topology_splits"] = true;
-    stability_json["symmetry_endpoint_guard_source_points"] = 31;
-    stability_json["classification_uncertainty_registry"] = {
-        {"enabled", true},
-        {"file_name", "custom_uncertainties.json"},
-        {"maximum_diagnostic_length", 2048},
-        {"retain_resolved", false}
+    auto  json                                                                 = main_classes::read_json( file_name );
+    auto &stability_json                                                       = json.at( "stability_continuation" );
+    stability_json["stability_boundary_tolerance"]                             = 2.5e-5;
+    stability_json["real_eigenvalue_tolerance"]                                = 3.5e-6;
+    stability_json["conjugate_pair_tolerance"]                                 = 4.5e-4;
+    stability_json["require_converged_eigenpairs"]                             = false;
+    stability_json["require_nonempty_spectrum"]                                = false;
+    stability_json["require_complete_scan_coverage"]                           = false;
+    stability_json["spectrum_classification_retries"]                          = 4;
+    stability_json["transition_classification_confirmations"]                  = 3;
+    stability_json["confirm_regular_stability_points"]                         = true;
+    stability_json["correct_stability_transitions_with_newton"]                = false;
+    stability_json["recover_failed_transition_classification_with_newton"]     = false;
+    stability_json["recover_failed_transition_newton_with_parameter_homotopy"] = false;
+    stability_json["transition_newton_homotopy_maximum_subdivisions"]          = 32;
+    stability_json["transition_refinement_maximum_iterations"]                 = 37;
+    stability_json["transition_refinement_maximum_subdivisions"]               = 6;
+    stability_json["transition_refinement_parameter_tolerance"]                = 7.5e-9;
+    stability_json["turning_point_guard_source_points"]                        = 7;
+    stability_json["allow_source_path_topology_splits"]                        = true;
+    stability_json["symmetry_endpoint_guard_source_points"]                    = 31;
+    stability_json["classification_uncertainty_registry"]                      = {
+        { "enabled", true },
+        { "file_name", "custom_uncertainties.json" },
+        { "maximum_diagnostic_length", 2048 },
+        { "retain_resolved", false }
     };
 
-    const auto parameters =
-        json.get<main_classes::parameters<T>>();
-    const auto& stability = parameters.stability_continuation;
+    const auto  parameters = json.get<main_classes::parameters<T>>();
+    const auto &stability  = parameters.stability_continuation;
     require(
-        close_value(
-            stability.stability_boundary_tolerance,
-            T(2.5e-5)),
-        "stability boundary tolerance override");
+        close_value( stability.stability_boundary_tolerance, T( 2.5e-5 ) ), "stability boundary tolerance override"
+    );
+    require( close_value( stability.real_eigenvalue_tolerance, T( 3.5e-6 ) ), "real eigenvalue tolerance override" );
+    require( close_value( stability.conjugate_pair_tolerance, T( 4.5e-4 ) ), "conjugate-pair tolerance override" );
+    require( !stability.require_converged_eigenpairs, "require converged eigenpairs override" );
+    require( !stability.require_nonempty_spectrum, "require nonempty spectrum override" );
+    require( !stability.require_complete_scan_coverage, "require complete scan coverage override" );
+    require( stability.spectrum_classification_retries == 4, "spectrum classification retry override" );
     require(
-        close_value(
-            stability.real_eigenvalue_tolerance,
-            T(3.5e-6)),
-        "real eigenvalue tolerance override");
+        stability.transition_classification_confirmations == 3, "transition classification confirmation override"
+    );
+    require( stability.confirm_regular_stability_points, "regular stability confirmation override" );
+    require( !stability.correct_stability_transitions_with_newton, "stability transition refinement override" );
     require(
-        close_value(
-            stability.conjugate_pair_tolerance,
-            T(4.5e-4)),
-        "conjugate-pair tolerance override");
+        !stability.recover_failed_transition_classification_with_newton,
+        "failed transition classification Newton recovery override"
+    );
     require(
-        !stability.require_converged_eigenpairs,
-        "require converged eigenpairs override");
+        !stability.recover_failed_transition_newton_with_parameter_homotopy &&
+            stability.transition_newton_homotopy_maximum_subdivisions == 32,
+        "failed transition Newton homotopy overrides"
+    );
     require(
-        !stability.require_nonempty_spectrum,
-        "require nonempty spectrum override");
+        stability.transition_refinement_maximum_iterations == 37, "stability transition maximum iterations override"
+    );
     require(
-        !stability.require_complete_scan_coverage,
-        "require complete scan coverage override");
+        stability.transition_refinement_maximum_subdivisions == 6, "stability transition maximum subdivisions override"
+    );
     require(
-        stability.spectrum_classification_retries == 4,
-        "spectrum classification retry override");
-    require(
-        stability.transition_classification_confirmations == 3,
-        "transition classification confirmation override");
-    require(
-        stability.confirm_regular_stability_points,
-        "regular stability confirmation override");
-    require(
-        !stability.correct_stability_transitions_with_newton,
-        "stability transition refinement override");
-    require(
-        !stability.
-            recover_failed_transition_classification_with_newton,
-        "failed transition classification Newton recovery override");
-    require(
-        !stability.
-             recover_failed_transition_newton_with_parameter_homotopy &&
-        stability.transition_newton_homotopy_maximum_subdivisions == 32,
-        "failed transition Newton homotopy overrides");
-    require(
-        stability.transition_refinement_maximum_iterations == 37,
-        "stability transition maximum iterations override");
-    require(
-        stability.transition_refinement_maximum_subdivisions == 6,
-        "stability transition maximum subdivisions override");
-    require(
-        close_value(
-            stability.transition_refinement_parameter_tolerance,
-            T(7.5e-9)),
-        "stability transition parameter tolerance override");
-    require(
-        stability.turning_point_guard_source_points == 7,
-        "turning-point source guard override");
-    require(
-        stability.allow_source_path_topology_splits,
-        "source-path topology split override");
-    require(
-        stability.symmetry_endpoint_guard_source_points == 31,
-        "symmetry endpoint source-point guard override");
+        close_value( stability.transition_refinement_parameter_tolerance, T( 7.5e-9 ) ),
+        "stability transition parameter tolerance override"
+    );
+    require( stability.turning_point_guard_source_points == 7, "turning-point source guard override" );
+    require( stability.allow_source_path_topology_splits, "source-path topology split override" );
+    require( stability.symmetry_endpoint_guard_source_points == 31, "symmetry endpoint source-point guard override" );
     require(
         stability.classification_uncertainty_registry.enabled &&
-            stability.classification_uncertainty_registry.file_name ==
-                "custom_uncertainties.json" &&
-            stability.classification_uncertainty_registry.
-                maximum_diagnostic_length == 2048 &&
-            !stability.classification_uncertainty_registry.
-                retain_resolved,
-        "classification uncertainty registry overrides");
+            stability.classification_uncertainty_registry.file_name == "custom_uncertainties.json" &&
+            stability.classification_uncertainty_registry.maximum_diagnostic_length == 2048 &&
+            !stability.classification_uncertainty_registry.retain_resolved,
+        "classification uncertainty registry overrides"
+    );
 }
 
-template<class T>
-void verify_matrix_free_stability_configuration(
-    const std::string& file_name)
+template <class T>
+void verify_matrix_free_stability_configuration( const std::string &file_name )
 {
-    auto json = main_classes::read_json(file_name);
-    auto& stability_json = json.at("stability_continuation");
+    auto  json                                = main_classes::read_json( file_name );
+    auto &stability_json                      = json.at( "stability_continuation" );
     stability_json["matrix_free_eigensolver"] = {
-        {"enabled", true},
-        {"linearization_scale", -1.0},
-        {"transformation", {
-            {"type", "explicit_euler"},
-            {"step", 0.125},
-            {"repetitions", 4},
-            {"shifts", {
-                {0.25, 1.5},
-                {
-                    {"real", -0.5},
-                    {"imaginary", 3.0}
-                }
-            }}
-        }},
-        {"outer", {
-            {"desired_eigenvalues", 8},
-            {"krylov_dimension", 30},
-            {"restart_dimension", 14},
-            {"maximum_restarts", 25},
-            {"relative_tolerance", 2.0e-9}
-        }},
-        {"recovery", {
-            {"relative_basis_tolerance", 3.0e-10},
-            {"orthogonalization_passes", 3},
-            {"relative_residual_tolerance", 4.0e-9},
-            {"minimum_converged_eigenpairs", 5}
-        }},
-        {"inner_solver", {
-            {"basis_size", 18},
-            {"batch_size", 6},
-            {"preconditioner_side", "R"},
-            {"basis_retry_sizes", {36, 72}},
-            {"relative_tolerance", 5.0e-11},
-            {"maximum_iterations", 120},
-            {"verbose", true}
-        }},
-        {"retry", {
-            {"enabled", true},
-            {"maximum_shift_retries", 4},
-            {"initial_shift_perturbation", 0.075},
-            {"perturbation_growth", 1.5},
-            {"preconditioner_pole_absolute_tolerance", 9.0e-12},
-            {"preconditioner_pole_relative_tolerance", 2.0e-8}
-        }},
-        {"aggregation", {
-            {"absolute_tolerance", 6.0e-8},
-            {"minimum_successful_scans", 2},
-            {"minimum_eigenpairs", 7},
-            {"require_all_scans", false},
-            {"probe_count", 3},
-            {"minimum_successful_probes", 2},
-            {"require_all_probes", false},
-            {"eigenvector_independence_tolerance", 8.0e-7},
-            {"eigenvector_orthogonalization_passes", 3}
-        }},
-        {"recycling", {
-            {"enabled", true},
-            {"maximum_vectors", 21},
-            {"innovation_weight", 0.2},
-            {"absolute_residual_tolerance", 3.0e-8},
-            {"relative_residual_tolerance", 0.15}
-        }},
-        {"invariant_subspace_tracking", {
-            {"enabled", true},
-            {"maximum_dimension", 23},
-            {"maximum_seed_vectors", 7},
-            {"coverage_recovery_maximum_seed_vectors", 19},
-            {"orthogonalization_passes", 3},
-            {"seed_innovation_weight", 0.125},
-            {"dependence_tolerance", 2.0e-7},
-            {"minimum_retained_residual_ratio", 0.04},
-            {"absolute_invariance_tolerance", 4.0e-8},
-            {"relative_invariance_tolerance", 0.075},
-            {"real_eigenvalue_tolerance", 5.0e-8},
-            {"eigenvalue_group_tolerance", 8.0e-7},
-            {"principal_angle_rank_tolerance", 6.0e-7}
-        }},
-        {"small_system", {
-            {"enabled", true},
-            {"maximum_dimension", 192},
-            {"prefer", true},
-            {"absolute_residual_tolerance", 7.0e-10},
-            {"relative_residual_tolerance", 9.0e-9}
-        }}
+        { "enabled", true },
+        { "linearization_scale", -1.0 },
+        { "transformation",
+          { { "type", "explicit_euler" },
+            { "step", 0.125 },
+            { "repetitions", 4 },
+            { "shifts", { { 0.25, 1.5 }, { { "real", -0.5 }, { "imaginary", 3.0 } } } } } },
+        { "outer",
+          { { "desired_eigenvalues", 8 },
+            { "krylov_dimension", 30 },
+            { "restart_dimension", 14 },
+            { "maximum_restarts", 25 },
+            { "relative_tolerance", 2.0e-9 } } },
+        { "recovery",
+          { { "relative_basis_tolerance", 3.0e-10 },
+            { "orthogonalization_passes", 3 },
+            { "relative_residual_tolerance", 4.0e-9 },
+            { "minimum_converged_eigenpairs", 5 } } },
+        { "inner_solver",
+          { { "basis_size", 18 },
+            { "batch_size", 6 },
+            { "preconditioner_side", "R" },
+            { "basis_retry_sizes", { 36, 72 } },
+            { "relative_tolerance", 5.0e-11 },
+            { "maximum_iterations", 120 },
+            { "verbose", true } } },
+        { "retry",
+          { { "enabled", true },
+            { "maximum_shift_retries", 4 },
+            { "initial_shift_perturbation", 0.075 },
+            { "perturbation_growth", 1.5 },
+            { "preconditioner_pole_absolute_tolerance", 9.0e-12 },
+            { "preconditioner_pole_relative_tolerance", 2.0e-8 } } },
+        { "aggregation",
+          { { "absolute_tolerance", 6.0e-8 },
+            { "minimum_successful_scans", 2 },
+            { "minimum_eigenpairs", 7 },
+            { "require_all_scans", false },
+            { "probe_count", 3 },
+            { "minimum_successful_probes", 2 },
+            { "require_all_probes", false },
+            { "eigenvector_independence_tolerance", 8.0e-7 },
+            { "eigenvector_orthogonalization_passes", 3 } } },
+        { "recycling",
+          { { "enabled", true },
+            { "maximum_vectors", 21 },
+            { "innovation_weight", 0.2 },
+            { "absolute_residual_tolerance", 3.0e-8 },
+            { "relative_residual_tolerance", 0.15 } } },
+        { "invariant_subspace_tracking",
+          { { "enabled", true },
+            { "maximum_dimension", 23 },
+            { "maximum_seed_vectors", 7 },
+            { "coverage_recovery_maximum_seed_vectors", 19 },
+            { "orthogonalization_passes", 3 },
+            { "seed_innovation_weight", 0.125 },
+            { "dependence_tolerance", 2.0e-7 },
+            { "minimum_retained_residual_ratio", 0.04 },
+            { "absolute_invariance_tolerance", 4.0e-8 },
+            { "relative_invariance_tolerance", 0.075 },
+            { "real_eigenvalue_tolerance", 5.0e-8 },
+            { "eigenvalue_group_tolerance", 8.0e-7 },
+            { "principal_angle_rank_tolerance", 6.0e-7 } } },
+        { "small_system",
+          { { "enabled", true },
+            { "maximum_dimension", 192 },
+            { "prefer", true },
+            { "absolute_residual_tolerance", 7.0e-10 },
+            { "relative_residual_tolerance", 9.0e-9 } } }
     };
 
-    const auto parameters =
-        json.get<main_classes::parameters<T>>();
-    const auto& config =
-        parameters.stability_continuation.
-            matrix_free_eigensolver;
-    require(config.enabled, "matrix-free eigensolver enabled");
+    const auto  parameters = json.get<main_classes::parameters<T>>();
+    const auto &config     = parameters.stability_continuation.matrix_free_eigensolver;
+    require( config.enabled, "matrix-free eigensolver enabled" );
+    require( close_value( config.linearization_scale, T( -1 ) ), "matrix-free linearization scale" );
     require(
-        close_value(config.linearization_scale, T(-1)),
-        "matrix-free linearization scale");
+        config.transformation.type == stability::analysis::matrix_free_spectral_transformation::explicit_euler,
+        "matrix-free transformation"
+    );
     require(
-        config.transformation.type ==
-            stability::analysis::
-                matrix_free_spectral_transformation::
-                    explicit_euler,
-        "matrix-free transformation");
+        close_value( config.transformation.step, T( 0.125 ) ) && config.transformation.repetitions == 4,
+        "matrix-free transformation parameters"
+    );
     require(
-        close_value(config.transformation.step, T(0.125)) &&
-            config.transformation.repetitions == 4,
-        "matrix-free transformation parameters");
+        config.transformation.shifts.size() == 2 && close_value( config.transformation.shifts[0].real(), T( 0.25 ) ) &&
+            close_value( config.transformation.shifts[0].imag(), T( 1.5 ) ) &&
+            close_value( config.transformation.shifts[1].real(), T( -0.5 ) ) &&
+            close_value( config.transformation.shifts[1].imag(), T( 3.0 ) ),
+        "matrix-free complex shifts"
+    );
     require(
-        config.transformation.shifts.size() == 2 &&
-            close_value(
-                config.transformation.shifts[0].real(),
-                T(0.25)) &&
-            close_value(
-                config.transformation.shifts[0].imag(),
-                T(1.5)) &&
-            close_value(
-                config.transformation.shifts[1].real(),
-                T(-0.5)) &&
-            close_value(
-                config.transformation.shifts[1].imag(),
-                T(3.0)),
-        "matrix-free complex shifts");
+        config.outer.desired_eigenvalues == 8 && config.outer.krylov_dimension == 30 &&
+            config.outer.restart_dimension == 14 && config.outer.maximum_restarts == 25 &&
+            close_value( config.outer.relative_tolerance, T( 2.0e-9 ) ),
+        "matrix-free outer solver"
+    );
     require(
-        config.outer.desired_eigenvalues == 8 &&
-            config.outer.krylov_dimension == 30 &&
-            config.outer.restart_dimension == 14 &&
-            config.outer.maximum_restarts == 25 &&
-            close_value(
-                config.outer.relative_tolerance,
-                T(2.0e-9)),
-        "matrix-free outer solver");
-    require(
-        close_value(
-            config.recovery.relative_basis_tolerance,
-            T(3.0e-10)) &&
+        close_value( config.recovery.relative_basis_tolerance, T( 3.0e-10 ) ) &&
             config.recovery.orthogonalization_passes == 3 &&
-            close_value(
-                config.recovery.relative_residual_tolerance,
-                T(4.0e-9)) &&
+            close_value( config.recovery.relative_residual_tolerance, T( 4.0e-9 ) ) &&
             config.recovery.minimum_converged_eigenpairs == 5,
-        "matrix-free recovery");
+        "matrix-free recovery"
+    );
     require(
-        config.inner_solver.basis_size == 18 &&
-            config.inner_solver.batch_size == 6 &&
+        config.inner_solver.basis_size == 18 && config.inner_solver.batch_size == 6 &&
             config.inner_solver.preconditioner_side == 'R' &&
-            config.inner_solver.basis_retry_sizes ==
-                std::vector<unsigned int>({36, 72}) &&
-            close_value(
-                config.inner_solver.relative_tolerance,
-                T(5.0e-11)) &&
-            config.inner_solver.maximum_iterations == 120 &&
-            config.inner_solver.verbose,
-        "matrix-free inner solver");
+            config.inner_solver.basis_retry_sizes == std::vector<unsigned int>( { 36, 72 } ) &&
+            close_value( config.inner_solver.relative_tolerance, T( 5.0e-11 ) ) &&
+            config.inner_solver.maximum_iterations == 120 && config.inner_solver.verbose,
+        "matrix-free inner solver"
+    );
     require(
-        config.retry.enabled &&
-            config.retry.maximum_shift_retries == 4 &&
-            close_value(
-                config.retry.initial_shift_perturbation,
-                T(0.075)) &&
-            close_value(
-                config.retry.perturbation_growth,
-                T(1.5)) &&
-            close_value(
-                config.retry.
-                    preconditioner_pole_absolute_tolerance,
-                T(9.0e-12)) &&
-            close_value(
-                config.retry.
-                    preconditioner_pole_relative_tolerance,
-                T(2.0e-8)),
-        "matrix-free retry policy");
+        config.retry.enabled && config.retry.maximum_shift_retries == 4 &&
+            close_value( config.retry.initial_shift_perturbation, T( 0.075 ) ) &&
+            close_value( config.retry.perturbation_growth, T( 1.5 ) ) &&
+            close_value( config.retry.preconditioner_pole_absolute_tolerance, T( 9.0e-12 ) ) &&
+            close_value( config.retry.preconditioner_pole_relative_tolerance, T( 2.0e-8 ) ),
+        "matrix-free retry policy"
+    );
     require(
-        config.small_system.enabled &&
-            config.small_system.maximum_dimension == 192 &&
-            config.small_system.prefer &&
-            close_value(
-                config.small_system.absolute_residual_tolerance,
-                T(7.0e-10)) &&
-            close_value(
-                config.small_system.relative_residual_tolerance,
-                T(9.0e-9)),
-        "small-system eigensolver policy");
+        config.small_system.enabled && config.small_system.maximum_dimension == 192 && config.small_system.prefer &&
+            close_value( config.small_system.absolute_residual_tolerance, T( 7.0e-10 ) ) &&
+            close_value( config.small_system.relative_residual_tolerance, T( 9.0e-9 ) ),
+        "small-system eigensolver policy"
+    );
     require(
-        close_value(
-            config.aggregation.absolute_tolerance,
-            T(6.0e-8)) &&
-            config.aggregation.minimum_successful_scans == 2 &&
-            config.aggregation.minimum_eigenpairs == 7 &&
-            !config.aggregation.require_all_scans &&
-            config.aggregation.probe_count == 3 &&
-            config.aggregation.minimum_successful_probes == 2 &&
-            !config.aggregation.require_all_probes &&
-            close_value(
-                config.aggregation.
-                    eigenvector_independence_tolerance,
-                T(8.0e-7)) &&
-            config.aggregation.
-                eigenvector_orthogonalization_passes == 3,
-        "matrix-free aggregation");
+        close_value( config.aggregation.absolute_tolerance, T( 6.0e-8 ) ) &&
+            config.aggregation.minimum_successful_scans == 2 && config.aggregation.minimum_eigenpairs == 7 &&
+            !config.aggregation.require_all_scans && config.aggregation.probe_count == 3 &&
+            config.aggregation.minimum_successful_probes == 2 && !config.aggregation.require_all_probes &&
+            close_value( config.aggregation.eigenvector_independence_tolerance, T( 8.0e-7 ) ) &&
+            config.aggregation.eigenvector_orthogonalization_passes == 3,
+        "matrix-free aggregation"
+    );
     require(
-        config.recycling.enabled &&
-            config.recycling.maximum_vectors == 21 &&
-            close_value(
-                config.recycling.innovation_weight,
-                T(0.2)) &&
-            close_value(
-                config.recycling.absolute_residual_tolerance,
-                T(3.0e-8)) &&
-            close_value(
-                config.recycling.relative_residual_tolerance,
-                T(0.15)),
-        "matrix-free Ritz-subspace recycling");
+        config.recycling.enabled && config.recycling.maximum_vectors == 21 &&
+            close_value( config.recycling.innovation_weight, T( 0.2 ) ) &&
+            close_value( config.recycling.absolute_residual_tolerance, T( 3.0e-8 ) ) &&
+            close_value( config.recycling.relative_residual_tolerance, T( 0.15 ) ),
+        "matrix-free Ritz-subspace recycling"
+    );
     require(
-        config.invariant_subspace_tracking.enabled &&
-            config.invariant_subspace_tracking.maximum_dimension == 23 &&
+        config.invariant_subspace_tracking.enabled && config.invariant_subspace_tracking.maximum_dimension == 23 &&
             config.invariant_subspace_tracking.maximum_seed_vectors == 7 &&
-            config.invariant_subspace_tracking.
-                coverage_recovery_maximum_seed_vectors == 19 &&
+            config.invariant_subspace_tracking.coverage_recovery_maximum_seed_vectors == 19 &&
             config.invariant_subspace_tracking.orthogonalization_passes == 3 &&
-            close_value(
-                config.invariant_subspace_tracking.seed_innovation_weight,
-                T(0.125)) &&
-            close_value(
-                config.invariant_subspace_tracking.dependence_tolerance,
-                T(2.0e-7)) &&
-            close_value(
-                config.invariant_subspace_tracking.
-                    minimum_retained_residual_ratio,
-                T(0.04)) &&
-            close_value(
-                config.invariant_subspace_tracking.
-                    absolute_invariance_tolerance,
-                T(4.0e-8)) &&
-            close_value(
-                config.invariant_subspace_tracking.
-                    relative_invariance_tolerance,
-                T(0.075)) &&
-            close_value(
-                config.invariant_subspace_tracking.
-                    real_eigenvalue_tolerance,
-                T(5.0e-8)) &&
-            close_value(
-                config.invariant_subspace_tracking.
-                    eigenvalue_group_tolerance,
-                T(8.0e-7)) &&
-            close_value(
-                config.invariant_subspace_tracking.
-                    principal_angle_rank_tolerance,
-                T(6.0e-7)),
-        "matrix-free invariant-subspace tracking");
+            close_value( config.invariant_subspace_tracking.seed_innovation_weight, T( 0.125 ) ) &&
+            close_value( config.invariant_subspace_tracking.dependence_tolerance, T( 2.0e-7 ) ) &&
+            close_value( config.invariant_subspace_tracking.minimum_retained_residual_ratio, T( 0.04 ) ) &&
+            close_value( config.invariant_subspace_tracking.absolute_invariance_tolerance, T( 4.0e-8 ) ) &&
+            close_value( config.invariant_subspace_tracking.relative_invariance_tolerance, T( 0.075 ) ) &&
+            close_value( config.invariant_subspace_tracking.real_eigenvalue_tolerance, T( 5.0e-8 ) ) &&
+            close_value( config.invariant_subspace_tracking.eigenvalue_group_tolerance, T( 8.0e-7 ) ) &&
+            close_value( config.invariant_subspace_tracking.principal_angle_rank_tolerance, T( 6.0e-7 ) ),
+        "matrix-free invariant-subspace tracking"
+    );
 }
 
 }
 
-int main(int argc, char** argv)
+int main( int argc, char **argv )
 {
-    const std::string file_name = argc > 1
-        ? argv[1]
-        : "json_project_files/KS1D_test_full.json";
+    const std::string file_name = argc > 1 ? argv[1] : "json_project_files/KS1D_test_full.json";
     try
     {
-        verify_full_configuration<double>(file_name);
-        verify_full_configuration<float>(file_name);
-        verify_optional_policy_defaults<double>(file_name);
-        verify_optional_policy_defaults<float>(file_name);
-        verify_stability_classifier_overrides<double>(file_name);
-        verify_stability_classifier_overrides<float>(file_name);
-        verify_matrix_free_stability_configuration<double>(file_name);
-        verify_matrix_free_stability_configuration<float>(file_name);
+        verify_full_configuration<double>( file_name );
+        verify_full_configuration<float>( file_name );
+        verify_optional_policy_defaults<double>( file_name );
+        verify_optional_policy_defaults<float>( file_name );
+        verify_stability_classifier_overrides<double>( file_name );
+        verify_stability_classifier_overrides<float>( file_name );
+        verify_matrix_free_stability_configuration<double>( file_name );
+        verify_matrix_free_stability_configuration<float>( file_name );
     }
-    catch(const std::exception& error)
+    catch ( const std::exception &error )
     {
         std::cerr << "FAILED: " << error.what() << '\n';
         return 1;

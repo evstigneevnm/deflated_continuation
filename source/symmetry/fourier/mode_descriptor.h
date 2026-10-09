@@ -59,7 +59,7 @@ class translation_direction
     static_assert( Dim > 0, "translation_direction requires Dim > 0" );
 
 public:
-    using real_type = Real;
+    using real_type    = Real;
     using storage_type = std::array<Real, Dim>;
 
     translation_direction() = default;

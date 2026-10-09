@@ -18,75 +18,71 @@
 #define __SCFD_MONITOR_KRYLOV_H__
 
 #ifdef SCFD_ENABLE_NLOHMANN
-#include <nlohmann/json.hpp>
+#    include <nlohmann/json.hpp>
 #endif
 #include "default_monitor.h"
 
 namespace numerical_algos
 {
-namespace lin_solvers 
+namespace lin_solvers
 {
 
-template<class VectorOperations, class Log>
-class monitor_krylov: public default_monitor<VectorOperations,Log>
+template <class VectorOperations, class Log>
+class monitor_krylov : public default_monitor<VectorOperations, Log>
 {
 private:
     using parent_t = default_monitor<VectorOperations, Log>;
-    using T = typename VectorOperations::scalar_type;
+    using T        = typename VectorOperations::scalar_type;
+
 protected:
     using parent_t::convergence_history_;
-public:    
+
+public:
     using parent_t::iters_performed;
     using log_type = typename parent_t::logged_obj_type;
-    using parent_t::resid_norm_out;
     using parent_t::converged;
+    using parent_t::resid_norm_out;
     using parent_t::tol_out;
 
     struct params : public parent_t::params
     {
-        params(const std::string &log_prefix = "") : parent_t::params(log_prefix, "monitor_krylov::")
+        params( const std::string &log_prefix = "" ) : parent_t::params( log_prefix, "monitor_krylov::" )
         {
         }
-        #ifdef SCFD_ENABLE_NLOHMANN
-        void from_json(const nlohmann::json& j)
+#ifdef SCFD_ENABLE_NLOHMANN
+        void from_json( const nlohmann::json &j )
         {
-            parent_t::params::from_json(j);
+            parent_t::params::from_json( j );
         }
         nlohmann::json to_json() const
         {
             return parent_t::params::to_json();
         }
-        #endif
+#endif
     };
 
-    monitor_krylov(const VectorOperations &vec_ops, 
-                    Log *log = NULL, 
-                    const params &prms = params() ):
-    parent_t(vec_ops, log, prms)
-    {}
+    monitor_krylov( const VectorOperations &vec_ops, Log *log = NULL, const params &prms = params() )
+        : parent_t( vec_ops, log, prms )
+    {
+    }
 
-    bool check_finished_by_ritz_estimate(const T& ritz_val)
+    bool check_finished_by_ritz_estimate( const T &ritz_val )
     {
         parent_t::resid_norm_ = ritz_val;
         parent_t::check_valid_norm();
-        log_type::info_f("iter = %d", iters_performed() );
-        log_type::info_f("resid norm = %0.6e tol = %0.6e", resid_norm_out(), tol_out() );
-        if (parent_t::prms_.save_convergence_history)
+        log_type::info_f( "iter = %d", iters_performed() );
+        log_type::info_f( "resid norm = %0.6e tol = %0.6e", resid_norm_out(), tol_out() );
+        if ( parent_t::prms_.save_convergence_history )
         {
             convergence_history_.emplace_back( iters_performed(), resid_norm_out() );
         }
         return converged();
-
     }
-
-
 };
 
 
-
 }
 }
-
 
 
 #endif

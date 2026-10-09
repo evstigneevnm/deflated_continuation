@@ -25,9 +25,9 @@ enum class curve_endpoint_reason
     knot_interpolation_failure
 };
 
-inline const char* to_string(curve_endpoint_reason reason)
+inline const char *to_string( curve_endpoint_reason reason )
 {
-    switch(reason)
+    switch ( reason )
     {
     case curve_endpoint_reason::none:
         return "none";
@@ -63,69 +63,62 @@ inline const char* to_string(curve_endpoint_reason reason)
     return "none";
 }
 
-inline curve_endpoint_reason curve_endpoint_reason_from_string(const std::string& value)
+inline curve_endpoint_reason curve_endpoint_reason_from_string( const std::string &value )
 {
-    if(value == "boundary_min")
+    if ( value == "boundary_min" )
         return curve_endpoint_reason::boundary_min;
-    if(value == "boundary_max")
+    if ( value == "boundary_max" )
         return curve_endpoint_reason::boundary_max;
-    if(value == "boundary_min_approximate")
+    if ( value == "boundary_min_approximate" )
         return curve_endpoint_reason::boundary_min_approximate;
-    if(value == "boundary_max_approximate")
+    if ( value == "boundary_max_approximate" )
         return curve_endpoint_reason::boundary_max_approximate;
-    if(value == "known_branch")
+    if ( value == "known_branch" )
         return curve_endpoint_reason::known_branch;
-    if(value == "analytical_branch")
+    if ( value == "analytical_branch" )
         return curve_endpoint_reason::analytical_branch;
-    if(value == "symmetry_intersection")
+    if ( value == "symmetry_intersection" )
         return curve_endpoint_reason::symmetry_intersection;
-    if(value == "closed_return")
+    if ( value == "closed_return" )
         return curve_endpoint_reason::closed_return;
-    if(value == "self_intersection")
+    if ( value == "self_intersection" )
         return curve_endpoint_reason::self_intersection;
-    if(value == "max_steps")
+    if ( value == "max_steps" )
         return curve_endpoint_reason::max_steps;
-    if(value == "no_progress")
+    if ( value == "no_progress" )
         return curve_endpoint_reason::no_progress;
-    if(value == "unresolved_branch_intersection")
+    if ( value == "unresolved_branch_intersection" )
         return curve_endpoint_reason::unresolved_branch_intersection;
-    if(value == "hard_failure")
+    if ( value == "hard_failure" )
         return curve_endpoint_reason::hard_failure;
-    if(value == "knot_interpolation_failure")
+    if ( value == "knot_interpolation_failure" )
         return curve_endpoint_reason::knot_interpolation_failure;
     return curve_endpoint_reason::none;
 }
 
-inline bool is_incomplete_endpoint(curve_endpoint_reason reason)
+inline bool is_incomplete_endpoint( curve_endpoint_reason reason )
 {
-    return reason == curve_endpoint_reason::max_steps ||
-           reason == curve_endpoint_reason::no_progress ||
+    return reason == curve_endpoint_reason::max_steps || reason == curve_endpoint_reason::no_progress ||
            reason == curve_endpoint_reason::unresolved_branch_intersection ||
-           reason == curve_endpoint_reason::hard_failure ||
-           reason == curve_endpoint_reason::knot_interpolation_failure;
+           reason == curve_endpoint_reason::hard_failure || reason == curve_endpoint_reason::knot_interpolation_failure;
 }
 
-inline bool is_terminal_endpoint(curve_endpoint_reason reason)
+inline bool is_terminal_endpoint( curve_endpoint_reason reason )
 {
     return reason != curve_endpoint_reason::none;
 }
 
-inline bool is_parameter_boundary_endpoint(
-    curve_endpoint_reason reason)
+inline bool is_parameter_boundary_endpoint( curve_endpoint_reason reason )
 {
-    return reason == curve_endpoint_reason::boundary_min ||
-           reason == curve_endpoint_reason::boundary_max ||
+    return reason == curve_endpoint_reason::boundary_min || reason == curve_endpoint_reason::boundary_max ||
            reason == curve_endpoint_reason::boundary_min_approximate ||
            reason == curve_endpoint_reason::boundary_max_approximate;
 }
 
-inline bool is_stability_refinement_barrier(
-    curve_endpoint_reason reason)
+inline bool is_stability_refinement_barrier( curve_endpoint_reason reason )
 {
-    return reason == curve_endpoint_reason::known_branch ||
-           reason == curve_endpoint_reason::analytical_branch ||
-           reason == curve_endpoint_reason::symmetry_intersection ||
-           reason == curve_endpoint_reason::closed_return ||
+    return reason == curve_endpoint_reason::known_branch || reason == curve_endpoint_reason::analytical_branch ||
+           reason == curve_endpoint_reason::symmetry_intersection || reason == curve_endpoint_reason::closed_return ||
            reason == curve_endpoint_reason::self_intersection;
 }
 

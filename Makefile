@@ -151,6 +151,15 @@ LFFTW = -lfftw3 -lfftw3f
 ISUITESPARSE ?=
 LUMFPACK ?= -lumfpack
 
+CLANG_FORMAT ?= clang-format-21
+.PHONY: format format-check
+
+format:
+	CLANG_FORMAT="$(CLANG_FORMAT)" bash scripts/format_cpp.sh
+
+format-check:
+	CLANG_FORMAT="$(CLANG_FORMAT)" bash scripts/format_cpp.sh --check
+
 #clean
 clean:
 	rm -f $(BUILD_DIR)/*.bin $(BUILD_DIR)/*.o $(RESULTS)

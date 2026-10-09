@@ -15,37 +15,34 @@ namespace fourier
 namespace operations
 {
 
-template<class Backend, class SpectralField, class WavevectorTable>
-void inverse_laplacian(const SpectralField& input, const WavevectorTable& wavevectors, SpectralField& output)
+template <class Backend, class SpectralField, class WavevectorTable>
+void inverse_laplacian( const SpectralField &input, const WavevectorTable &wavevectors, SpectralField &output )
 {
-    using complex_type = typename SpectralField::value_type;
-    using traits = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
-    using scalar_type = typename traits::real_type;
+    using complex_type  = typename SpectralField::value_type;
+    using traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using scalar_type   = typename traits::real_type;
     using for_each_type = typename Backend::template for_each_type<std::ptrdiff_t>;
-    if(input.size() != output.size() || input.size() != wavevectors.index_space().complex_size())
+    if ( input.size() != output.size() || input.size() != wavevectors.index_space().complex_size() )
     {
-        throw std::invalid_argument("Fourier inverse laplacian argument mismatch");
+        throw std::invalid_argument( "Fourier inverse laplacian argument mismatch" );
     }
 
-    const complex_type* source = input.data();
-    complex_type* destination = output.data();
-    const scalar_type* k_squared = wavevectors.k_squared().data();
-    for_each_type for_each;
+    const complex_type *source      = input.data();
+    complex_type       *destination = output.data();
+    const scalar_type  *k_squared   = wavevectors.k_squared().data();
+    for_each_type       for_each;
     for_each(
-        [=] __DEVICE_TAG__ (const std::ptrdiff_t index)
-        {
-            if(k_squared[index] == scalar_type(0))
+        [=] __DEVICE_TAG__( const std::ptrdiff_t index ) {
+            if ( k_squared[index] == scalar_type( 0 ) )
             {
-                destination[index] = traits::make(scalar_type(0), scalar_type(0));
+                destination[index] = traits::make( scalar_type( 0 ), scalar_type( 0 ) );
                 return;
             }
-            const scalar_type multiplier = -scalar_type(1)/k_squared[index];
-            destination[index] = traits::make(
-                multiplier*traits::real(source[index]),
-                multiplier*traits::imag(source[index])
-            );
+            const scalar_type multiplier = -scalar_type( 1 ) / k_squared[index];
+            destination[index] =
+                traits::make( multiplier * traits::real( source[index] ), multiplier * traits::imag( source[index] ) );
         },
-        static_cast<std::ptrdiff_t>(input.size())
+        static_cast<std::ptrdiff_t>( input.size() )
     );
     for_each.wait();
 }

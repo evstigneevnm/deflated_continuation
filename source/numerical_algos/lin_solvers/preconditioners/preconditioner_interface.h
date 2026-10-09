@@ -8,32 +8,32 @@
 
 namespace numerical_algos
 {
-namespace preconditioners 
+namespace preconditioners
 {
 
+using numerical_algos::detail::algo_hierarchy_creator;
 using numerical_algos::detail::algo_params_hierarchy;
 using numerical_algos::detail::algo_utils_hierarchy;
-using numerical_algos::detail::algo_hierarchy_creator;
 
 template <class VectorSpace, class LinearOperator>
 class preconditioner_interface
 {
 public:
     using vector_space_type = VectorSpace;
-    using vector_type = typename VectorSpace::vector_type;
-    using operator_type = LinearOperator;
-    
-    virtual ~preconditioner_interface() 
+    using vector_type       = typename VectorSpace::vector_type;
+    using operator_type     = LinearOperator;
+
+    virtual ~preconditioner_interface()
     {
     }
-    virtual void set_operator(std::shared_ptr<const operator_type> op) = 0;
-    virtual void apply(const vector_type &rhs, vector_type &x) const = 0;
+    virtual void set_operator( std::shared_ptr<const operator_type> op ) = 0;
+    virtual void apply( const vector_type &rhs, vector_type &x ) const   = 0;
     /// inplace version for preconditioner interface
-    virtual void apply(vector_type &x) const = 0;
+    virtual void apply( vector_type &x ) const = 0;
 };
 
 
-}  // preconditioners
-}  // numerical_algos
+} // preconditioners
+} // numerical_algos
 
 #endif

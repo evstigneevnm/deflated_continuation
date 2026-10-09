@@ -20,65 +20,57 @@ struct vector_operations
 
 struct vector_file_operations
 {
-    void write_vector(
-        const std::string& file_name,
-        const vector_operations::vector_type& vector)
+    void write_vector( const std::string &file_name, const vector_operations::vector_type &vector )
     {
-        std::ofstream output(file_name);
-        for(const double value : vector)
+        std::ofstream output( file_name );
+        for ( const double value : vector )
             output << value << '\n';
     }
 
-    void read_vector(
-        const std::string&,
-        vector_operations::vector_type&)
+    void read_vector( const std::string &, vector_operations::vector_type & )
     {
     }
 };
 
 struct null_log
 {
-    template<class... Args>
-    void info_f(const char*, Args&&...)
+    template <class... Args>
+    void info_f( const char *, Args &&... )
     {
     }
 
-    template<class... Args>
-    void warning_f(const char*, Args&&...)
+    template <class... Args>
+    void warning_f( const char *, Args &&... )
     {
     }
 };
 
-using diagram_type = container::stability_diagram<
-    vector_operations,
-    vector_file_operations,
-    null_log>;
+using diagram_type = container::stability_diagram<vector_operations, vector_file_operations, null_log>;
 
 struct throwing_diagram
 {
-    template<class Archive>
-    void serialize(Archive&, const unsigned int)
+    template <class Archive>
+    void serialize( Archive &, const unsigned int )
     {
-        throw std::runtime_error("intentional serialization failure");
+        throw std::runtime_error( "intentional serialization failure" );
     }
 };
 
-void require(bool condition, const std::string& message)
+void require( bool condition, const std::string &message )
 {
-    if(!condition)
-        throw std::runtime_error(message);
+    if ( !condition )
+        throw std::runtime_error( message );
 }
 
-std::vector<std::string> data_lines(
-    const std::filesystem::path& file_name)
+std::vector<std::string> data_lines( const std::filesystem::path &file_name )
 {
-    std::ifstream input(file_name);
+    std::ifstream            input( file_name );
     std::vector<std::string> lines;
-    std::string line;
-    while(std::getline(input, line))
+    std::string              line;
+    while ( std::getline( input, line ) )
     {
-        if(!line.empty() && line.front() != '#')
-            lines.push_back(line);
+        if ( !line.empty() && line.front() != '#' )
+            lines.push_back( line );
     }
     return lines;
 }
@@ -87,259 +79,173 @@ std::vector<std::string> data_lines(
 
 int main()
 {
-    const auto unique_id =
-        std::chrono::high_resolution_clock::now()
-            .time_since_epoch().count();
-    const auto project_path =
-        std::filesystem::temp_directory_path()/
-        ("deflated_continuation_stability_archive_" +
-         std::to_string(unique_id));
-    const auto archive_path =
-        project_path/"stability_diagram.dat";
+    const auto unique_id    = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    const auto project_path = std::filesystem::temp_directory_path() /
+                              ( "deflated_continuation_stability_archive_" + std::to_string( unique_id ) );
+    const auto archive_path = project_path / "stability_diagram.dat";
 
-    vector_operations vector_ops;
+    vector_operations      vector_ops;
     vector_file_operations file_ops;
-    null_log log;
+    null_log               log;
 
     try
     {
-        std::filesystem::create_directory(project_path);
+        std::filesystem::create_directory( project_path );
 
-        diagram_type source(
-            &vector_ops,
-            &file_ops,
-            &log,
-            project_path.string());
-        source.open_curve(0);
-        source.add_with_plot_data(
-            1.0,
-            0,
-            0,
-            3,
-            {0.25, 1.5},
-            {0, 0},
-            {0, 0});
-        source.add_with_plot_data(
-            2.0,
-            1,
-            0,
-            7,
-            {0.5, 2.5},
-            {1, 0},
-            {1, 0});
+        diagram_type source( &vector_ops, &file_ops, &log, project_path.string() );
+        source.open_curve( 0 );
+        source.add_with_plot_data( 1.0, 0, 0, 3, { 0.25, 1.5 }, { 0, 0 }, { 0, 0 } );
+        source.add_with_plot_data( 2.0, 1, 0, 7, { 0.5, 2.5 }, { 1, 0 }, { 1, 0 } );
         require(
-            source.update_regular_point_dimension(3, {0, 1}),
-            "pending regular stability point can be revised");
+            source.update_regular_point_dimension( 3, { 0, 1 } ), "pending regular stability point can be revised"
+        );
         source.close_curve();
 
-        require(source.curve_count() == 1, "source curve count");
+        require( source.curve_count() == 1, "source curve count" );
         require(
-            !std::filesystem::exists(
-                project_path/"0"/"debug_curve_stability.dat.tmp"),
-            "curve output leaves no temporary file");
+            !std::filesystem::exists( project_path / "0" / "debug_curve_stability.dat.tmp" ),
+            "curve output leaves no temporary file"
+        );
         require(
-            std::filesystem::is_regular_file(
-                project_path/"0"/
-                    "debug_curve_stability_plot.dat") &&
-                !std::filesystem::exists(
-                    project_path/"0"/
-                        "debug_curve_stability_plot.dat.tmp"),
-            "plot sidecar is committed transactionally");
-        const auto plot_lines = data_lines(
-            project_path/"0"/"debug_curve_stability_plot.dat");
+            std::filesystem::is_regular_file( project_path / "0" / "debug_curve_stability_plot.dat" ) &&
+                !std::filesystem::exists( project_path / "0" / "debug_curve_stability_plot.dat.tmp" ),
+            "plot sidecar is committed transactionally"
+        );
+        const auto plot_lines = data_lines( project_path / "0" / "debug_curve_stability_plot.dat" );
         require(
             plot_lines.size() == 2 &&
                 plot_lines[0].find(
                     "3 1 unstable 0 1 0 1 0 1 none 0 2 "
-                    "0.25 1.5") == 0 &&
+                    "0.25 1.5"
+                ) == 0 &&
                 plot_lines[1].find(
                     "7 2 unstable 1 0 1 0 1 0 none 0 2 "
-                    "0.5 2.5") == 0,
-            "plot sidecar records source indices and norms");
-        const auto source_points =
-            source.get_curve_points_vector(0);
-        require(source_points.size() == 2, "source point count");
+                    "0.5 2.5"
+                ) == 0,
+            "plot sidecar records source indices and norms"
+        );
+        const auto source_points = source.get_curve_points_vector( 0 );
+        require( source_points.size() == 2, "source point count" );
         require(
-            source_points[0].point_type == "unstable" &&
-                source_points[0].unstable_dim_C == 1 &&
+            source_points[0].point_type == "unstable" && source_points[0].unstable_dim_C == 1 &&
                 source_points[1].point_type == "unstable",
-            "source point classification revision");
+            "source point classification revision"
+        );
 
-        const auto saved = container::save_diagram_archive(
-            archive_path.string(),
-            source);
-        require(saved.succeeded(), "initial archive save");
-        require(
-            !std::filesystem::exists(
-                archive_path.string() + ".tmp"),
-            "archive save leaves no temporary file");
+        const auto saved = container::save_diagram_archive( archive_path.string(), source );
+        require( saved.succeeded(), "initial archive save" );
+        require( !std::filesystem::exists( archive_path.string() + ".tmp" ), "archive save leaves no temporary file" );
 
         throwing_diagram invalid;
-        const auto failed_save = container::save_diagram_archive(
-            archive_path.string(),
-            invalid);
+        const auto       failed_save = container::save_diagram_archive( archive_path.string(), invalid );
         require(
-            failed_save.status ==
-                container::diagram_archive_status::archive_failed,
-            "failed serialization reports archive failure");
+            failed_save.status == container::diagram_archive_status::archive_failed,
+            "failed serialization reports archive failure"
+        );
         require(
-            std::filesystem::is_regular_file(archive_path) &&
-                !std::filesystem::exists(
-                    archive_path.string() + ".tmp"),
-            "failed serialization preserves committed archive");
+            std::filesystem::is_regular_file( archive_path ) &&
+                !std::filesystem::exists( archive_path.string() + ".tmp" ),
+            "failed serialization preserves committed archive"
+        );
 
-        diagram_type restored(
-            &vector_ops,
-            &file_ops,
-            &log,
-            project_path.string());
-        const auto loaded = container::load_diagram_archive(
-            archive_path.string(),
-            restored);
-        require(loaded.succeeded(), "archive load");
-        require(restored.curve_count() == 1, "restored curve count");
-        require(
-            restored.get_curve_points_vector(0).size() == 2,
-            "restored point count");
+        diagram_type restored( &vector_ops, &file_ops, &log, project_path.string() );
+        const auto   loaded = container::load_diagram_archive( archive_path.string(), restored );
+        require( loaded.succeeded(), "archive load" );
+        require( restored.curve_count() == 1, "restored curve count" );
+        require( restored.get_curve_points_vector( 0 ).size() == 2, "restored point count" );
 
-        restored.open_curve(1);
-        restored.add(3.0, 0, 1);
+        restored.open_curve( 1 );
+        restored.add( 3.0, 0, 1 );
         restored.close_curve();
-        require(restored.curve_count() == 2, "restart append count");
-        const auto appended =
-            restored.get_curve_points_vector(1);
+        require( restored.curve_count() == 2, "restart append count" );
+        const auto appended = restored.get_curve_points_vector( 1 );
         require(
-            appended.size() == 1 &&
-                appended[0].point_type == "unstable" &&
-                appended[0].unstable_dim_C == 1,
-            "restart append record");
+            appended.size() == 1 && appended[0].point_type == "unstable" && appended[0].unstable_dim_C == 1,
+            "restart append record"
+        );
 
-        restored.open_curve(2);
-        const vector_operations::vector_type bifurcation_state{
-            1.0,
-            2.0};
-        restored.add_with_plot_data(
-            4.0,
-            1,
-            0,
-            11,
-            {3.0, 4.0},
-            {0, 0},
-            {1, 0},
-            bifurcation_state);
-        const auto pending_file = project_path/"2"/"s1";
-        require(
-            std::filesystem::is_regular_file(pending_file),
-            "transactional vector was written");
+        restored.open_curve( 2 );
+        const vector_operations::vector_type bifurcation_state{ 1.0, 2.0 };
+        restored.add_with_plot_data( 4.0, 1, 0, 11, { 3.0, 4.0 }, { 0, 0 }, { 1, 0 }, bifurcation_state );
+        const auto pending_file = project_path / "2" / "s1";
+        require( std::filesystem::is_regular_file( pending_file ), "transactional vector was written" );
         restored.abandon_curve();
         require(
-            !std::filesystem::exists(pending_file) &&
-                !std::filesystem::exists(
-                    project_path/"2"/
-                        "debug_curve_stability_plot.dat") &&
+            !std::filesystem::exists( pending_file ) &&
+                !std::filesystem::exists( project_path / "2" / "debug_curve_stability_plot.dat" ) &&
                 restored.curve_count() == 2,
-            "aborted curve removes pending vectors");
+            "aborted curve removes pending vectors"
+        );
 
-        restored.open_curve(2);
-        restored.add_with_plot_data(
-            4.0,
-            1,
-            0,
-            11,
-            {3.0, 4.0},
-            {0, 0},
-            {1, 0},
-            bifurcation_state);
+        restored.open_curve( 2 );
+        restored.add_with_plot_data( 4.0, 1, 0, 11, { 3.0, 4.0 }, { 0, 0 }, { 1, 0 }, bifurcation_state );
         restored.close_curve();
-        const auto event_lines = data_lines(
-            project_path/"2"/"debug_curve_stability_plot.dat");
+        const auto event_lines = data_lines( project_path / "2" / "debug_curve_stability_plot.dat" );
         require(
-            event_lines.size() == 1 &&
-                event_lines[0].find(
-                    "11 4 bifurcation 1 0 0 0 1 0 steady 1 2 "
-                    "3 4") == 0,
-            "plot sidecar stores refined steady event metadata");
+            event_lines.size() == 1 && event_lines[0].find(
+                                           "11 4 bifurcation 1 0 0 0 1 0 steady 1 2 "
+                                           "3 4"
+                                       ) == 0,
+            "plot sidecar stores refined steady event metadata"
+        );
 
-        restored.open_curve(3);
-        const vector_operations::vector_type topology_left{5.0, 6.0};
-        const vector_operations::vector_type topology_right{7.0, 8.0};
+        restored.open_curve( 3 );
+        const vector_operations::vector_type topology_left{ 5.0, 6.0 };
+        const vector_operations::vector_type topology_right{ 7.0, 8.0 };
         restored.add_topology_break_with_plot_data(
-            4.5,
-            20,
-            21,
-            4.4,
-            4.5,
-            0.25,
-            {5.0, 6.0},
-            {1, 0},
-            {2, 0},
-            topology_left,
-            topology_right);
+            4.5, 20, 21, 4.4, 4.5, 0.25, { 5.0, 6.0 }, { 1, 0 }, { 2, 0 }, topology_left, topology_right
+        );
         restored.close_curve();
         require(
-            std::filesystem::is_regular_file(project_path/"3"/"s1") &&
-                std::filesystem::is_regular_file(
-                    project_path/"3"/"s1_right"),
-            "topology break preserves both reconstructed states");
-        const auto topology_plot_lines = data_lines(
-            project_path/"3"/"debug_curve_stability_plot.dat");
+            std::filesystem::is_regular_file( project_path / "3" / "s1" ) &&
+                std::filesystem::is_regular_file( project_path / "3" / "s1_right" ),
+            "topology break preserves both reconstructed states"
+        );
+        const auto topology_plot_lines = data_lines( project_path / "3" / "debug_curve_stability_plot.dat" );
         require(
-            topology_plot_lines.size() == 1 &&
-                topology_plot_lines[0].find(
-                    "21 4.5 topology_break 2 0 1 0 2 0 topology 1 2 "
-                    "5 6") == 0,
-            "plot sidecar marks a topology split");
-        const auto topology_lines = data_lines(
-            project_path/"3"/"debug_curve_stability_topology.dat");
+            topology_plot_lines.size() == 1 && topology_plot_lines[0].find(
+                                                   "21 4.5 topology_break 2 0 1 0 2 0 topology 1 2 "
+                                                   "5 6"
+                                               ) == 0,
+            "plot sidecar marks a topology split"
+        );
+        const auto topology_lines = data_lines( project_path / "3" / "debug_curve_stability_topology.dat" );
         require(
-            topology_lines.size() == 1 &&
-                topology_lines[0].find(
-                    "1 20 21 4.4000000000000004 4.5 4.5 0.25 "
-                    "1 0 2 0 s1 s1_right") == 0,
-            "topology sidecar records the source bracket and state files");
-        const auto topology_points =
-            restored.get_curve_points_vector(3);
+            topology_lines.size() == 1 && topology_lines[0].find(
+                                              "1 20 21 4.4000000000000004 4.5 4.5 0.25 "
+                                              "1 0 2 0 s1 s1_right"
+                                          ) == 0,
+            "topology sidecar records the source bracket and state files"
+        );
+        const auto topology_points = restored.get_curve_points_vector( 3 );
         require(
-            topology_points.size() == 1 &&
-                topology_points[0].point_type == "topology_break",
-            "topology break survives the stability archive model");
+            topology_points.size() == 1 && topology_points[0].point_type == "topology_break",
+            "topology break survives the stability archive model"
+        );
 
-        restored.open_curve(4);
+        restored.open_curve( 4 );
         restored.add_topology_break_with_plot_data(
-            5.5,
-            30,
-            31,
-            5.4,
-            5.5,
-            0.5,
-            {7.0},
-            {2, 0},
-            {3, 0},
-            topology_left,
-            topology_right);
+            5.5, 30, 31, 5.4, 5.5, 0.5, { 7.0 }, { 2, 0 }, { 3, 0 }, topology_left, topology_right
+        );
         restored.abandon_curve();
         require(
-            !std::filesystem::exists(project_path/"4"/"s1") &&
-                !std::filesystem::exists(
-                    project_path/"4"/"s1_right") &&
-                !std::filesystem::exists(
-                    project_path/"4"/
-                        "debug_curve_stability_topology.dat"),
-            "aborted topology split removes both pending states");
+            !std::filesystem::exists( project_path / "4" / "s1" ) &&
+                !std::filesystem::exists( project_path / "4" / "s1_right" ) &&
+                !std::filesystem::exists( project_path / "4" / "debug_curve_stability_topology.dat" ),
+            "aborted topology split removes both pending states"
+        );
 
-        const auto resaved = container::save_diagram_archive(
-            archive_path.string(),
-            restored);
-        require(resaved.succeeded(), "restart archive save");
+        const auto resaved = container::save_diagram_archive( archive_path.string(), restored );
+        require( resaved.succeeded(), "restart archive save" );
     }
-    catch(const std::exception& error)
+    catch ( const std::exception &error )
     {
-        std::filesystem::remove_all(project_path);
+        std::filesystem::remove_all( project_path );
         std::cerr << "FAILED: " << error.what() << '\n';
         return 1;
     }
 
-    std::filesystem::remove_all(project_path);
+    std::filesystem::remove_all( project_path );
     std::cout << "PASSED\n";
     return 0;
 }

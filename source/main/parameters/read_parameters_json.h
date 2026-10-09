@@ -10,38 +10,37 @@
 namespace main_classes
 {
 
-inline nlohmann::json read_json(const std::string& project_file_name)
+inline nlohmann::json read_json( const std::string &project_file_name )
 {
     try
     {
-        std::ifstream file(project_file_name);
-        if(!file)
+        std::ifstream file( project_file_name );
+        if ( !file )
         {
-            throw std::runtime_error("Failed to open file " + project_file_name + " for reading");
+            throw std::runtime_error( "Failed to open file " + project_file_name + " for reading" );
         }
         nlohmann::json json;
         file >> json;
         return json;
     }
-    catch(const nlohmann::json::exception& exception)
+    catch ( const nlohmann::json::exception &exception )
     {
-        std::throw_with_nested(
-            std::runtime_error{"json path: " + project_file_name + "\n" + exception.what()});
+        std::throw_with_nested( std::runtime_error{ "json path: " + project_file_name + "\n" + exception.what() } );
     }
 }
 
-template<class T>
-parameters<T> read_parameters_json(const std::string& project_file_name)
+template <class T>
+parameters<T> read_parameters_json( const std::string &project_file_name )
 {
     try
     {
-        return read_json(project_file_name).template get<parameters<T>>();
+        return read_json( project_file_name ).template get<parameters<T>>();
     }
-    catch(const std::exception& exception)
+    catch ( const std::exception &exception )
     {
         std::throw_with_nested(
-            std::runtime_error{
-                "failed to read parameters JSON file: " + project_file_name + "\n" + exception.what()});
+            std::runtime_error{ "failed to read parameters JSON file: " + project_file_name + "\n" + exception.what() }
+        );
     }
 }
 

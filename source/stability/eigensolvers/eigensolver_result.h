@@ -23,9 +23,9 @@ enum class eigensolver_status
     dense_solver_failure
 };
 
-inline const char* eigensolver_status_name(eigensolver_status status)
+inline const char *eigensolver_status_name( eigensolver_status status )
 {
-    switch(status)
+    switch ( status )
     {
     case eigensolver_status::success:
         return "success";
@@ -45,31 +45,31 @@ inline const char* eigensolver_status_name(eigensolver_status status)
     return "unknown";
 }
 
-template<class Real>
+template <class Real>
 struct eigenpair_estimate
 {
     std::complex<Real> value{};
-    Real residual = std::numeric_limits<Real>::quiet_NaN();
-    Real relative_residual = std::numeric_limits<Real>::quiet_NaN();
-    bool converged = false;
-    std::size_t projected_index = 0;
+    Real               residual          = std::numeric_limits<Real>::quiet_NaN();
+    Real               relative_residual = std::numeric_limits<Real>::quiet_NaN();
+    bool               converged         = false;
+    std::size_t        projected_index   = 0;
 };
 
-template<class Real>
+template <class Real>
 struct eigensolver_result
 {
-    eigensolver_status status = eigensolver_status::invalid_input;
+    eigensolver_status                    status = eigensolver_status::invalid_input;
     std::vector<eigenpair_estimate<Real>> eigenpairs;
-    std::size_t iterations = 0;
-    std::size_t restarts = 0;
-    std::size_t operator_calls = 0;
-    std::size_t inner_solver_calls = 0;
-    std::size_t coverage_recoveries = 0;
-    std::size_t effective_subspace_dimension = 0;
-    std::size_t scans_requested = 1;
-    std::size_t scans_succeeded = 0;
-    bool coverage_complete = true;
-    std::string diagnostic;
+    std::size_t                           iterations                   = 0;
+    std::size_t                           restarts                     = 0;
+    std::size_t                           operator_calls               = 0;
+    std::size_t                           inner_solver_calls           = 0;
+    std::size_t                           coverage_recoveries          = 0;
+    std::size_t                           effective_subspace_dimension = 0;
+    std::size_t                           scans_requested              = 1;
+    std::size_t                           scans_succeeded              = 0;
+    bool                                  coverage_complete            = true;
+    std::string                           diagnostic;
 
     bool succeeded() const
     {

@@ -21,8 +21,8 @@ class vector_valued_phase_functional
 
 public:
     using complex_type = Complex;
-    using traits_type = common::scfd_backend_ext::complex_value_traits<complex_type>;
-    using real_type = typename traits_type::real_type;
+    using traits_type  = common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using real_type    = typename traits_type::real_type;
 
     vector_valued_phase_functional() = default;
 
@@ -84,22 +84,20 @@ public:
     }
 
 private:
-    std::size_t components_ = 0;
+    std::size_t                             components_ = 0;
     std::array<complex_type, MaxComponents> eta_{};
 };
 
 template <class Complex>
-__DEVICE_TAG__ typename common::scfd_backend_ext::complex_value_traits<Complex>::real_type scalar_phase_value(
-    const Complex &coefficient
-)
+__DEVICE_TAG__ typename common::scfd_backend_ext::complex_value_traits<Complex>::real_type
+scalar_phase_value( const Complex &coefficient )
 {
     return common::scfd_backend_ext::complex_value_traits<Complex>::imag( coefficient );
 }
 
 template <class Complex>
-__DEVICE_TAG__ typename common::scfd_backend_ext::complex_value_traits<Complex>::real_type scalar_phase_real_part(
-    const Complex &coefficient
-)
+__DEVICE_TAG__ typename common::scfd_backend_ext::complex_value_traits<Complex>::real_type
+scalar_phase_real_part( const Complex &coefficient )
 {
     return common::scfd_backend_ext::complex_value_traits<Complex>::real( coefficient );
 }

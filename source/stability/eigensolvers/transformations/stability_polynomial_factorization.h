@@ -15,30 +15,20 @@ namespace eigensolvers
 namespace transformations
 {
 
-template<class Real>
-std::vector<complex_affine_factor<Real>> euler_denominator_factors(
-    Real step,
-    std::size_t repetitions,
-    const std::complex<Real>& shift)
+template <class Real>
+std::vector<complex_affine_factor<Real>>
+euler_denominator_factors( Real step, std::size_t repetitions, const std::complex<Real> &shift )
 {
     return polynomial_denominator_factors<Real>(
-        explicit_euler_stability_polynomial<Real>(),
-        step,
-        repetitions,
-        shift);
+        explicit_euler_stability_polynomial<Real>(), step, repetitions, shift
+    );
 }
 
-template<class Real>
-std::vector<complex_affine_factor<Real>> rk4_denominator_factors(
-    Real step,
-    std::size_t repetitions,
-    const std::complex<Real>& shift)
+template <class Real>
+std::vector<complex_affine_factor<Real>>
+rk4_denominator_factors( Real step, std::size_t repetitions, const std::complex<Real> &shift )
 {
-    return polynomial_denominator_factors<Real>(
-        classical_rk4_stability_polynomial<Real>(),
-        step,
-        repetitions,
-        shift);
+    return polynomial_denominator_factors<Real>( classical_rk4_stability_polynomial<Real>(), step, repetitions, shift );
 }
 
 } // namespace transformations

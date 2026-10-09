@@ -12,39 +12,34 @@
 namespace nonlinear_operators
 {
 
-template<class VectorOperations, class NonlinearOperator, class LinearOperator> 
+template <class VectorOperations, class NonlinearOperator, class LinearOperator>
 class preconditioner_TG_homotopy
 {
 public:
-    typedef typename VectorOperations::scalar_type  T;
-    typedef typename VectorOperations::vector_type  T_vec;
+    typedef typename VectorOperations::scalar_type T;
+    typedef typename VectorOperations::vector_type T_vec;
 
-    preconditioner_TG_homotopy(NonlinearOperator*& nonlin_op_):
-    nonlin_op(nonlin_op_)
+    preconditioner_TG_homotopy( NonlinearOperator *&nonlin_op_ ) : nonlin_op( nonlin_op_ )
     {
-
     }
 
     ~preconditioner_TG_homotopy()
     {
-
-    }
-    
-    void set_operator(const LinearOperator *op_)const
-    {
-        lin_op = (LinearOperator*)op_;
     }
 
-    void apply(T_vec& x)const
+    void set_operator( const LinearOperator *op_ ) const
     {
-        nonlin_op->preconditioner_jacobian_u_homotopy(x);
+        lin_op = (LinearOperator *)op_;
+    }
+
+    void apply( T_vec &x ) const
+    {
+        nonlin_op->preconditioner_jacobian_u_homotopy( x );
     }
 
 private:
-    NonlinearOperator* nonlin_op;
-    mutable const LinearOperator* lin_op;
-
-    
+    NonlinearOperator            *nonlin_op;
+    mutable const LinearOperator *lin_op;
 };
 
 

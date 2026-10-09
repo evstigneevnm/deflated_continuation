@@ -24,76 +24,76 @@ namespace file_operations
 namespace detail
 {
 
-template<class Vector>
-auto vector_at(Vector& vec, size_t i) -> decltype(vec(i))
+template <class Vector>
+auto vector_at( Vector &vec, size_t i ) -> decltype( vec( i ) )
 {
-    return vec(i);
+    return vec( i );
 }
 
-template<class Vector>
-auto vector_at(Vector& vec, size_t i) -> decltype(vec[i])
+template <class Vector>
+auto vector_at( Vector &vec, size_t i ) -> decltype( vec[i] )
 {
     return vec[i];
 }
 
-template<class Vector>
-auto vector_at(const Vector& vec, size_t i) -> decltype(vec(i))
+template <class Vector>
+auto vector_at( const Vector &vec, size_t i ) -> decltype( vec( i ) )
 {
-    return vec(i);
+    return vec( i );
 }
 
-template<class Vector>
-auto vector_at(const Vector& vec, size_t i) -> decltype(vec[i])
+template <class Vector>
+auto vector_at( const Vector &vec, size_t i ) -> decltype( vec[i] )
 {
     return vec[i];
 }
 
-template<class Matrix>
-auto matrix_at(Matrix& matrix, size_t i, size_t j, size_t) -> decltype(matrix(i, j))
+template <class Matrix>
+auto matrix_at( Matrix &matrix, size_t i, size_t j, size_t ) -> decltype( matrix( i, j ) )
 {
-    return matrix(i, j);
+    return matrix( i, j );
 }
 
-template<class Matrix>
-auto matrix_at(Matrix& matrix, size_t i, size_t j, size_t rows) -> decltype(matrix[I2_R(i, j, rows)])
+template <class Matrix>
+auto matrix_at( Matrix &matrix, size_t i, size_t j, size_t rows ) -> decltype( matrix[I2_R( i, j, rows )] )
 {
-    return matrix[I2_R(i, j, rows)];
+    return matrix[I2_R( i, j, rows )];
 }
 
-template<class Matrix>
-auto matrix_at(const Matrix& matrix, size_t i, size_t j, size_t) -> decltype(matrix(i, j))
+template <class Matrix>
+auto matrix_at( const Matrix &matrix, size_t i, size_t j, size_t ) -> decltype( matrix( i, j ) )
 {
-    return matrix(i, j);
+    return matrix( i, j );
 }
 
-template<class Matrix>
-auto matrix_at(const Matrix& matrix, size_t i, size_t j, size_t rows) -> decltype(matrix[I2_R(i, j, rows)])
+template <class Matrix>
+auto matrix_at( const Matrix &matrix, size_t i, size_t j, size_t rows ) -> decltype( matrix[I2_R( i, j, rows )] )
 {
-    return matrix[I2_R(i, j, rows)];
+    return matrix[I2_R( i, j, rows )];
 }
 
 } // namespace detail
 
 
-
-std::vector<std::string> match_file_names(const std::string& path, const std::string& regex_mask)
+std::vector<std::string> match_file_names( const std::string &path, const std::string &regex_mask )
 {
-    std::regex rx(regex_mask);
+    std::regex rx( regex_mask );
 
-    const std::filesystem::path current_folder{path};
+    const std::filesystem::path current_folder{ path };
 
     std::vector<std::string> matched_file_names;
 
-    for(auto const& dir_entry: std::filesystem::directory_iterator{current_folder})
+    for ( auto const &dir_entry : std::filesystem::directory_iterator{ current_folder } )
     {
         std::string path_and_file_name( dir_entry.path() );
 
-        std::ptrdiff_t number_of_matches = std::distance( std::sregex_iterator(path_and_file_name.begin(), path_and_file_name.end(), rx ), std::sregex_iterator() );
-        if(number_of_matches > 0)
+        std::ptrdiff_t number_of_matches = std::distance(
+            std::sregex_iterator( path_and_file_name.begin(), path_and_file_name.end(), rx ), std::sregex_iterator()
+        );
+        if ( number_of_matches > 0 )
         {
-            matched_file_names.push_back(path_and_file_name);
+            matched_file_names.push_back( path_and_file_name );
         }
-
     }
     std::sort( matched_file_names.begin(), matched_file_names.end() );
 
@@ -101,18 +101,20 @@ std::vector<std::string> match_file_names(const std::string& path, const std::st
 }
 
 
-
-
 template <class T, class T_vec>
-void write_2_vectors_by_side(const std::string &f_name, size_t N, const T_vec& vec1,  const T_vec& vec2, unsigned int prec=16, char sep = ' ')
+void write_2_vectors_by_side(
+    const std::string &f_name, size_t N, const T_vec &vec1, const T_vec &vec2, unsigned int prec = 16, char sep = ' '
+)
 {
-    std::ofstream f(f_name.c_str(), std::ofstream::out);
-    if (!f) throw std::runtime_error("print_vector: error while opening file " + f_name);
+    std::ofstream f( f_name.c_str(), std::ofstream::out );
+    if ( !f )
+        throw std::runtime_error( "print_vector: error while opening file " + f_name );
 
-    for (size_t i = 0; i < N; ++i)
+    for ( size_t i = 0; i < N; ++i )
     {
-        if (!(f << std::scientific << std::setprecision(prec) << detail::vector_at(vec1, i) << sep << detail::vector_at(vec2, i) <<  std::endl))
-            throw std::runtime_error("print_vector: error while writing to file " + f_name);
+        if ( !( f << std::scientific << std::setprecision( prec ) << detail::vector_at( vec1, i ) << sep
+                  << detail::vector_at( vec2, i ) << std::endl ) )
+            throw std::runtime_error( "print_vector: error while writing to file " + f_name );
     }
 
     f.close();
@@ -120,48 +122,50 @@ void write_2_vectors_by_side(const std::string &f_name, size_t N, const T_vec& v
 
 
 template <class T>
-void write_vector(const std::string &f_name, size_t N, const T *vec, unsigned int prec=19)
+void write_vector( const std::string &f_name, size_t N, const T *vec, unsigned int prec = 19 )
 {
-        std::ofstream f(f_name.c_str(), std::ofstream::out);
-        if (!f) throw std::runtime_error("print_vector: error while opening file " + f_name);
+    std::ofstream f( f_name.c_str(), std::ofstream::out );
+    if ( !f )
+        throw std::runtime_error( "print_vector: error while opening file " + f_name );
 
-        for (size_t i = 0; i < N; ++i)
-        {
-            if (!(f << std::scientific << std::setprecision(prec) << detail::vector_at(vec, i) <<  std::endl))
-                throw std::runtime_error("print_vector: error while writing to file " + f_name);
-        }
+    for ( size_t i = 0; i < N; ++i )
+    {
+        if ( !( f << std::scientific << std::setprecision( prec ) << detail::vector_at( vec, i ) << std::endl ) )
+            throw std::runtime_error( "print_vector: error while writing to file " + f_name );
+    }
 
-        f.close();
+    f.close();
 }
 template <class T, class Vector>
-void write_vector(const std::string &f_name, size_t N, const Vector& vec, unsigned int prec=19)
+void write_vector( const std::string &f_name, size_t N, const Vector &vec, unsigned int prec = 19 )
 {
-        std::ofstream f(f_name.c_str(), std::ofstream::out);
-        if (!f) throw std::runtime_error("print_vector: error while opening file " + f_name);
+    std::ofstream f( f_name.c_str(), std::ofstream::out );
+    if ( !f )
+        throw std::runtime_error( "print_vector: error while opening file " + f_name );
 
-        for (size_t i = 0; i < N; ++i)
-        {
-            if (!(f << std::scientific << std::setprecision(prec) << detail::vector_at(vec, i) <<  std::endl))
-                throw std::runtime_error("print_vector: error while writing to file " + f_name);
-        }
+    for ( size_t i = 0; i < N; ++i )
+    {
+        if ( !( f << std::scientific << std::setprecision( prec ) << detail::vector_at( vec, i ) << std::endl ) )
+            throw std::runtime_error( "print_vector: error while writing to file " + f_name );
+    }
 
-        f.close();
+    f.close();
 }
 
 template <class T_mat>
-void write_matrix(const std::string &f_name, size_t Row, size_t Col, const T_mat& matrix, unsigned int prec=19)
+void write_matrix( const std::string &f_name, size_t Row, size_t Col, const T_mat &matrix, unsigned int prec = 19 )
 {
-    std::ofstream f(f_name.c_str(), std::ofstream::out);
-    if (!f) throw std::runtime_error("print_matrix: error while opening file " + f_name);
-    for (size_t i = 0; i<Row; i++)
+    std::ofstream f( f_name.c_str(), std::ofstream::out );
+    if ( !f )
+        throw std::runtime_error( "print_matrix: error while opening file " + f_name );
+    for ( size_t i = 0; i < Row; i++ )
     {
-        for(size_t j=0;j<Col;j++)
+        for ( size_t j = 0; j < Col; j++ )
         {
-            if(j<Col-1)
-                f << std::scientific << std::setprecision(prec) << detail::matrix_at(matrix, i, j, Row) << " ";
+            if ( j < Col - 1 )
+                f << std::scientific << std::setprecision( prec ) << detail::matrix_at( matrix, i, j, Row ) << " ";
             else
-                f << std::scientific << std::setprecision(prec) << detail::matrix_at(matrix, i, j, Row);
-
+                f << std::scientific << std::setprecision( prec ) << detail::matrix_at( matrix, i, j, Row );
         }
         f << std::endl;
     }
@@ -169,23 +173,24 @@ void write_matrix(const std::string &f_name, size_t Row, size_t Col, const T_mat
     f.close();
 }
 
-inline std::pair<size_t, size_t> read_matrix_size(const std::string &f_name)
+inline std::pair<size_t, size_t> read_matrix_size( const std::string &f_name )
 {
 
-    std::ifstream f(f_name.c_str(), std::ifstream::in);
-    if (!f) throw std::runtime_error("read_matrix_size: error while opening file " + f_name);
+    std::ifstream f( f_name.c_str(), std::ifstream::in );
+    if ( !f )
+        throw std::runtime_error( "read_matrix_size: error while opening file " + f_name );
     std::string line;
-    size_t matrix_size_rows = 0;
-    size_t matrix_size_cols = 0;
-    bool check_cols = true;
+    size_t      matrix_size_rows = 0;
+    size_t      matrix_size_cols = 0;
+    bool        check_cols       = true;
 
-    while ( std::getline(f, line) )
+    while ( std::getline( f, line ) )
     {
-        if(check_cols)
+        if ( check_cols )
         {
-            std::istringstream line_stream(line);
-            std::string entry;
-            while(line_stream >> entry)
+            std::istringstream line_stream( line );
+            std::string        entry;
+            while ( line_stream >> entry )
             {
                 ++matrix_size_cols;
             }
@@ -194,82 +199,88 @@ inline std::pair<size_t, size_t> read_matrix_size(const std::string &f_name)
         ++matrix_size_rows;
     }
     f.close();
-    return {matrix_size_rows, matrix_size_cols};
+    return { matrix_size_rows, matrix_size_cols };
 }
 
-size_t read_matrix_size_square(const std::string &f_name)
+size_t read_matrix_size_square( const std::string &f_name )
 {
 
-    auto res = read_matrix_size(f_name);
-    if (res.first == res.second)
+    auto res = read_matrix_size( f_name );
+    if ( res.first == res.second )
         return res.first;
     else
     {
-        throw std::runtime_error("requested square matrix, but marix is rectangular");
+        throw std::runtime_error( "requested square matrix, but marix is rectangular" );
         return 0;
     }
-
 }
 
 template <class T, class T_mat>
-void read_matrix(const std::string &f_name,  size_t Row, size_t Col, T_mat& matrix){
-    std::ifstream f(f_name.c_str(), std::ifstream::in);
-    if (!f) throw std::runtime_error("read_matrix: error while opening file " + f_name);
-    for (size_t i = 0; i<Row; i++)
+void read_matrix( const std::string &f_name, size_t Row, size_t Col, T_mat &matrix )
+{
+    std::ifstream f( f_name.c_str(), std::ifstream::in );
+    if ( !f )
+        throw std::runtime_error( "read_matrix: error while opening file " + f_name );
+    for ( size_t i = 0; i < Row; i++ )
     {
-        for(size_t j=0;j<Col;j++)
+        for ( size_t j = 0; j < Col; j++ )
         {
             // double val=0;
             // fscanf(stream, "%le",&val);
             // matrix[I2(i,j,Row)]=(real)val;
             T val;
             f >> val;
-            detail::matrix_at(matrix, i, j, Row)= static_cast<T>(val);
+            detail::matrix_at( matrix, i, j, Row ) = static_cast<T>( val );
         }
-
     }
 
     f.close();
 }
 
 template <class T>
-int read_vector(const std::string &f_name,  size_t N,  T *vec){
+int read_vector( const std::string &f_name, size_t N, T *vec )
+{
 
-    std::ifstream f(f_name.c_str(), std::ifstream::in);
-    if (!f) throw std::runtime_error("read_vector: error while opening file " + f_name);
-    for (size_t i = 0; i<N; i++)
+    std::ifstream f( f_name.c_str(), std::ifstream::in );
+    if ( !f )
+        throw std::runtime_error( "read_vector: error while opening file " + f_name );
+    for ( size_t i = 0; i < N; i++ )
     {
         T val;
         f >> val;
-        detail::vector_at(vec, i)= static_cast<T>(val);
+        detail::vector_at( vec, i ) = static_cast<T>( val );
     }
     f.close();
     return 0;
 }
 
 template <class T, class Vector>
-int read_vector(const std::string &f_name,  size_t N,  Vector& vec){
+int read_vector( const std::string &f_name, size_t N, Vector &vec )
+{
 
-    std::ifstream f(f_name.c_str(), std::ifstream::in);
-    if (!f) throw std::runtime_error("read_vector: error while opening file " + f_name);
-    for (size_t i = 0; i<N; i++)
+    std::ifstream f( f_name.c_str(), std::ifstream::in );
+    if ( !f )
+        throw std::runtime_error( "read_vector: error while opening file " + f_name );
+    for ( size_t i = 0; i < N; i++ )
     {
         T val;
         f >> val;
-        detail::vector_at(vec, i)= static_cast<T>(val);
+        detail::vector_at( vec, i ) = static_cast<T>( val );
     }
     f.close();
     return 0;
 }
 
 
-inline size_t read_vector_size(const std::string &f_name){
+inline size_t read_vector_size( const std::string &f_name )
+{
 
-    std::ifstream f(f_name.c_str(), std::ifstream::in);
-    if (!f) throw std::runtime_error("read_vector: error while opening file " + f_name);
+    std::ifstream f( f_name.c_str(), std::ifstream::in );
+    if ( !f )
+        throw std::runtime_error( "read_vector: error while opening file " + f_name );
     std::string line;
-    size_t vector_size=0;
-    while (std::getline(f, line))
+    size_t      vector_size = 0;
+    while ( std::getline( f, line ) )
     {
         vector_size++;
     }

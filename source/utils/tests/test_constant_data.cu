@@ -26,25 +26,25 @@ struct t_test
 void test_init();
 void test_test();
 
-DEFINE_CONSTANT_BUFFER(t_test, buf)
+DEFINE_CONSTANT_BUFFER( t_test, buf )
 
 __global__ void ker_test()
 {
-    printf("device test1: buf().x = %d\n", buf().x);
+    printf( "device test1: buf().x = %d\n", buf().x );
 }
 
 int main()
 {
-    t_test  test;
+    t_test test;
     test.x = 152;
 
-    utils::init_cuda(0);
+    utils::init_cuda( 0 );
 
-    COPY_TO_CONSTANT_BUFFER(buf, test);
+    COPY_TO_CONSTANT_BUFFER( buf, test );
     test_init();
 
-    printf("host test1: buf().x = %d\n", buf().x);
-    ker_test<<<1,1>>>();
+    printf( "host test1: buf().x = %d\n", buf().x );
+    ker_test<<<1, 1>>>();
     cudaDeviceSynchronize();
 
     test_test();

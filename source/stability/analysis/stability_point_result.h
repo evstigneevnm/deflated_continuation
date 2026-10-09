@@ -27,10 +27,9 @@ enum class spectrum_classification_status
     invalid_input
 };
 
-inline const char* spectrum_classification_status_name(
-    spectrum_classification_status status)
+inline const char *spectrum_classification_status_name( spectrum_classification_status status )
 {
-    switch(status)
+    switch ( status )
     {
     case spectrum_classification_status::complete:
         return "complete";
@@ -46,82 +45,71 @@ inline const char* spectrum_classification_status_name(
 
 struct unstable_dimension
 {
-    int real = 0;
+    int real          = 0;
     int complex_pairs = 0;
 
     int real_subspace_dimension() const
     {
-        return real + 2*complex_pairs;
+        return real + 2 * complex_pairs;
     }
 
-    bool operator==(const unstable_dimension& other) const
+    bool operator==( const unstable_dimension &other ) const
     {
-        return
-            real == other.real &&
-            complex_pairs == other.complex_pairs;
+        return real == other.real && complex_pairs == other.complex_pairs;
     }
 
-    bool operator!=(const unstable_dimension& other) const
+    bool operator!=( const unstable_dimension &other ) const
     {
-        return !(*this == other);
+        return !( *this == other );
     }
 
     std::pair<int, int> as_pair() const
     {
-        return {real, complex_pairs};
+        return { real, complex_pairs };
     }
 };
 
 struct unstable_dimension_observation
 {
     unstable_dimension signature;
-    std::size_t occurrences = 0;
+    std::size_t        occurrences = 0;
 };
 
-inline int unstable_subspace_dimension(
-    const std::pair<int, int>& dimension)
+inline int unstable_subspace_dimension( const std::pair<int, int> &dimension )
 {
-    return dimension.first + 2*dimension.second;
+    return dimension.first + 2 * dimension.second;
 }
 
-template<class Real>
+template <class Real>
 struct stability_point_result
 {
-    using real_type = Real;
+    using real_type      = Real;
     using eigenpair_type = eigensolvers::eigenpair_estimate<Real>;
 
-    eigensolvers::eigensolver_status eigensolver_status =
-        eigensolvers::eigensolver_status::invalid_input;
-    spectrum_classification_status classification_status =
-        spectrum_classification_status::invalid_input;
-    std::vector<eigenpair_type> eigenpairs;
+    eigensolvers::eigensolver_status eigensolver_status    = eigensolvers::eigensolver_status::invalid_input;
+    spectrum_classification_status   classification_status = spectrum_classification_status::invalid_input;
+    std::vector<eigenpair_type>      eigenpairs;
 
-    unstable_dimension unstable;
-    int stable_real = 0;
-    int stable_complex_pairs = 0;
-    int neutral_real = 0;
-    int neutral_complex_pairs = 0;
-    std::size_t unclassified_eigenvalues = 0;
-    std::size_t unmatched_complex_eigenvalues = 0;
-    std::size_t classification_attempts = 1;
-    std::size_t coverage_recoveries = 0;
-    std::vector<unstable_dimension_observation>
-        observed_unstable_dimensions;
-    std::string diagnostic;
+    unstable_dimension                          unstable;
+    int                                         stable_real                   = 0;
+    int                                         stable_complex_pairs          = 0;
+    int                                         neutral_real                  = 0;
+    int                                         neutral_complex_pairs         = 0;
+    std::size_t                                 unclassified_eigenvalues      = 0;
+    std::size_t                                 unmatched_complex_eigenvalues = 0;
+    std::size_t                                 classification_attempts       = 1;
+    std::size_t                                 coverage_recoveries           = 0;
+    std::vector<unstable_dimension_observation> observed_unstable_dimensions;
+    std::string                                 diagnostic;
 
     bool classification_complete() const
     {
-        return
-            classification_status ==
-            spectrum_classification_status::complete;
+        return classification_status == spectrum_classification_status::complete;
     }
 
     bool succeeded() const
     {
-        return
-            eigensolver_status ==
-                eigensolvers::eigensolver_status::success &&
-            classification_complete();
+        return eigensolver_status == eigensolvers::eigensolver_status::success && classification_complete();
     }
 
     std::pair<int, int> unstable_dimension_pair() const

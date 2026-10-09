@@ -13,39 +13,30 @@ namespace eigensolvers
 namespace transformations
 {
 
-template<class RealAffineInverseProvider>
+template <class RealAffineInverseProvider>
 class scaled_real_affine_inverse_provider
 {
 public:
     using provider_type = RealAffineInverseProvider;
-    using scalar_type = typename provider_type::scalar_type;
-    using vector_type = typename provider_type::vector_type;
-    using health_type = typename provider_type::health_type;
+    using scalar_type   = typename provider_type::scalar_type;
+    using vector_type   = typename provider_type::vector_type;
+    using health_type   = typename provider_type::health_type;
 
-    scaled_real_affine_inverse_provider(
-        std::shared_ptr<const provider_type> provider,
-        scalar_type scale)
-        : provider_(std::move(provider)),
-          scale_(scale)
+    scaled_real_affine_inverse_provider( std::shared_ptr<const provider_type> provider, scalar_type scale )
+        : provider_( std::move( provider ) ), scale_( scale )
     {
-        if(!provider_)
-            throw std::invalid_argument(
-                "scaled affine inverse requires a provider");
+        if ( !provider_ )
+            throw std::invalid_argument( "scaled affine inverse requires a provider" );
     }
 
     bool apply(
-        scalar_type operator_scale,
-        scalar_type identity_shift,
-        const vector_type& right_hand_side,
-        vector_type& solution) const
+        scalar_type operator_scale, scalar_type identity_shift, const vector_type &right_hand_side,
+        vector_type &solution
+    ) const
     {
         ++apply_calls_;
-        const bool succeeded = provider_->apply(
-            operator_scale*scale_,
-            identity_shift,
-            right_hand_side,
-            solution);
-        if(!succeeded)
+        const bool succeeded = provider_->apply( operator_scale * scale_, identity_shift, right_hand_side, solution );
+        if ( !succeeded )
             ++failed_applications_;
         return succeeded;
     }
@@ -55,7 +46,7 @@ public:
         return scale_;
     }
 
-    const provider_type& provider() const
+    const provider_type &provider() const
     {
         return *provider_;
     }
@@ -70,20 +61,16 @@ public:
         return failed_applications_;
     }
 
-    health_type health(
-        scalar_type operator_scale,
-        scalar_type identity_shift) const
+    health_type health( scalar_type operator_scale, scalar_type identity_shift ) const
     {
-        return provider_->health(
-            operator_scale*scale_,
-            identity_shift);
+        return provider_->health( operator_scale * scale_, identity_shift );
     }
 
 private:
     std::shared_ptr<const provider_type> provider_;
-    scalar_type scale_;
-    mutable std::size_t apply_calls_ = 0;
-    mutable std::size_t failed_applications_ = 0;
+    scalar_type                          scale_;
+    mutable std::size_t                  apply_calls_         = 0;
+    mutable std::size_t                  failed_applications_ = 0;
 };
 
 } // namespace transformations

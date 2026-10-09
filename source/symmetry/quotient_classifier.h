@@ -28,11 +28,11 @@ inline const char *quotient_solution_kind_name( const quotient_solution_kind kin
 template <class Real>
 struct quotient_residual_report
 {
-    Real projected_residual_norm = Real{};
-    Real full_residual_norm = Real{};
-    Real projected_tolerance = Real{};
-    Real full_tolerance = Real{};
-    quotient_solution_kind kind = quotient_solution_kind::not_converged;
+    Real                   projected_residual_norm = Real{};
+    Real                   full_residual_norm      = Real{};
+    Real                   projected_tolerance     = Real{};
+    Real                   full_tolerance          = Real{};
+    quotient_solution_kind kind                    = quotient_solution_kind::not_converged;
 
     bool quotient_converged() const
     {
@@ -58,9 +58,9 @@ quotient_residual_report<Real> classify_quotient_residual(
 {
     quotient_residual_report<Real> report;
     report.projected_residual_norm = projected_residual_norm;
-    report.full_residual_norm = full_residual_norm;
-    report.projected_tolerance = projected_tolerance;
-    report.full_tolerance = full_tolerance;
+    report.full_residual_norm      = full_residual_norm;
+    report.projected_tolerance     = projected_tolerance;
+    report.full_tolerance          = full_tolerance;
 
     if ( projected_residual_norm > projected_tolerance )
     {

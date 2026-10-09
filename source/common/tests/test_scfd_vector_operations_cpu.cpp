@@ -17,54 +17,41 @@ namespace
 
 struct scfd_vector_access
 {
-    template<class VecOps>
+    template <class VecOps>
     void write(
-        VecOps& vec_ops,
-        typename VecOps::vector_type& dst,
-        const std::vector<typename VecOps::scalar_type>& src) const
+        VecOps &vec_ops, typename VecOps::vector_type &dst, const std::vector<typename VecOps::scalar_type> &src
+    ) const
     {
-        vec_ops.set(src.data(), dst, src.size());
+        vec_ops.set( src.data(), dst, src.size() );
     }
 
-    template<class VecOps>
-    std::vector<typename VecOps::scalar_type> read(
-        VecOps& vec_ops,
-        const typename VecOps::vector_type& src,
-        std::size_t n) const
+    template <class VecOps>
+    std::vector<typename VecOps::scalar_type>
+    read( VecOps &vec_ops, const typename VecOps::vector_type &src, std::size_t n ) const
     {
-        std::vector<typename VecOps::scalar_type> host(n);
-        vec_ops.get(src, host.data(), n);
+        std::vector<typename VecOps::scalar_type> host( n );
+        vec_ops.get( src, host.data(), n );
         return host;
     }
 };
 
-template<class Backend, class T>
+template <class Backend, class T>
 void run_scfd_type(
-    const std::string& label,
-    const std::vector<std::size_t>& sizes,
-    vector_operations_tests::test_report& report)
+    const std::string &label, const std::vector<std::size_t> &sizes, vector_operations_tests::test_report &report
+)
 {
-    for(const auto n : sizes)
+    for ( const auto n : sizes )
     {
-        scfd_vector_operations<Backend, T> vec_ops(n);
+        scfd_vector_operations<Backend, T> vec_ops( n );
         vector_operations_tests::run_vector_operations_template_tests(
-            vec_ops,
-            scfd_vector_access{},
-            n,
-            label + " n=" + std::to_string(n),
-            report);
+            vec_ops, scfd_vector_access{}, n, label + " n=" + std::to_string( n ), report
+        );
         vector_operations_tests::run_nmfd_vector_space_interface_tests(
-            vec_ops,
-            scfd_vector_access{},
-            n,
-            label + " n=" + std::to_string(n),
-            report);
+            vec_ops, scfd_vector_access{}, n, label + " n=" + std::to_string( n ), report
+        );
         vector_operations_tests::run_scfd_vector_operations_high_precision_tests(
-            vec_ops,
-            scfd_vector_access{},
-            n,
-            label + " n=" + std::to_string(n),
-            report);
+            vec_ops, scfd_vector_access{}, n, label + " n=" + std::to_string( n ), report
+        );
     }
 }
 
@@ -74,18 +61,18 @@ int main()
 {
     vector_operations_tests::test_report report;
 
-    using real = SCALAR_TYPE;
+    using real           = SCALAR_TYPE;
     using serial_complex = common::scfd_backend_ext::complex_t<scfd::backend::serial_cpu, real>;
-    using omp_complex = common::scfd_backend_ext::complex_t<scfd::backend::omp, real>;
+    using omp_complex    = common::scfd_backend_ext::complex_t<scfd::backend::omp, real>;
 
-    const std::vector<std::size_t> sizes = {1, 2, 7, 31, 32, 33, 64, 1025, 4097};
-    run_scfd_type<scfd::backend::serial_cpu, real>("SCFD serial real", sizes, report);
-    run_scfd_type<scfd::backend::serial_cpu, serial_complex>("SCFD serial complex", sizes, report);
-    run_scfd_type<scfd::backend::omp, real>("SCFD OMP real", sizes, report);
-    run_scfd_type<scfd::backend::omp, omp_complex>("SCFD OMP complex", sizes, report);
+    const std::vector<std::size_t> sizes = { 1, 2, 7, 31, 32, 33, 64, 1025, 4097 };
+    run_scfd_type<scfd::backend::serial_cpu, real>( "SCFD serial real", sizes, report );
+    run_scfd_type<scfd::backend::serial_cpu, serial_complex>( "SCFD serial complex", sizes, report );
+    run_scfd_type<scfd::backend::omp, real>( "SCFD OMP real", sizes, report );
+    run_scfd_type<scfd::backend::omp, omp_complex>( "SCFD OMP complex", sizes, report );
 
     std::cout << "Checks: " << report.checks << ", failures: " << report.failures << std::endl;
-    if(report.failures == 0)
+    if ( report.failures == 0 )
     {
         std::cout << "PASSED" << std::endl;
         return EXIT_SUCCESS;

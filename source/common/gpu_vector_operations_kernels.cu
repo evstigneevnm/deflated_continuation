@@ -3,5 +3,5 @@
 
 template struct gpu_vector_operations<float>;
 template struct gpu_vector_operations<double>;
-template struct gpu_vector_operations< thrust::complex<float> >;
-template struct gpu_vector_operations< thrust::complex<double> >;
+template struct gpu_vector_operations<thrust::complex<float>>;
+template struct gpu_vector_operations<thrust::complex<double>>;

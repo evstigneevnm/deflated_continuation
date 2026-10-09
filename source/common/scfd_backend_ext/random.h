@@ -12,16 +12,18 @@ namespace common
 namespace scfd_backend_ext
 {
 
-template<class Backend, class T, class Ordinal>
+template <class Backend, class T, class Ordinal>
 struct random_fill
 {
-    template<class ForEach>
-    static void uniform01(ForEach& for_each, Ordinal size, T* output, std::size_t seed)
+    template <class ForEach>
+    static void uniform01( ForEach &for_each, Ordinal size, T *output, std::size_t seed )
     {
-        for_each([=] __DEVICE_TAG__ (Ordinal i)
-        {
-            output[i] = scalar_traits<Backend, T>::random_scalar(static_cast<std::size_t>(i), seed);
-        }, size);
+        for_each(
+            [=] __DEVICE_TAG__( Ordinal i ) {
+                output[i] = scalar_traits<Backend, T>::random_scalar( static_cast<std::size_t>( i ), seed );
+            },
+            size
+        );
         for_each.wait();
     }
 };

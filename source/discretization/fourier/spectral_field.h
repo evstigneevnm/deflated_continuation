@@ -8,10 +8,10 @@ namespace discretization
 namespace fourier
 {
 
-template<class Backend, class T, std::size_t Dimension>
+template <class Backend, class T, std::size_t Dimension>
 using physical_field = discretization::common::component_field<Backend, T, Dimension>;
 
-template<class Backend, class Complex, std::size_t Dimension>
+template <class Backend, class Complex, std::size_t Dimension>
 using spectral_field = discretization::common::component_field<Backend, Complex, Dimension>;
 
 } // namespace fourier

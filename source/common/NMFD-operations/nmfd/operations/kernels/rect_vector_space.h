@@ -16,48 +16,48 @@ namespace kernels
 template <class IdxND, class Scalar, class VectorType, class ArrayNdType, int TensorDim>
 struct shur_prod
 {
-    VectorType x, y;
+    VectorType  x, y;
     ArrayNdType z;
 
-    __DEVICE_TAG__ void operator()(const IdxND idx) const
+    __DEVICE_TAG__ void operator()( const IdxND idx ) const
     {
-        Scalar local_sum = Scalar(0);
-        for(int i = 0; i < TensorDim; i++)
+        Scalar local_sum = Scalar( 0 );
+        for ( int i = 0; i < TensorDim; i++ )
         {
-            local_sum += x(idx, i) * y(idx, i);
+            local_sum += x( idx, i ) * y( idx, i );
         }
-        z(idx) = local_sum;
+        z( idx ) = local_sum;
     }
 };
 
 template <class IdxND, class Scalar, class VectorType, class ArrayNdType, int TensorDim>
 struct sum
 {
-    VectorType x;
+    VectorType  x;
     ArrayNdType z;
 
-    __DEVICE_TAG__ void operator()(const IdxND idx) const
+    __DEVICE_TAG__ void operator()( const IdxND idx ) const
     {
-        Scalar local_sum = Scalar(0);
-        for(int i = 0; i < TensorDim; i++)
+        Scalar local_sum = Scalar( 0 );
+        for ( int i = 0; i < TensorDim; i++ )
         {
-            local_sum += x(idx, i);
+            local_sum += x( idx, i );
         }
-        z(idx) = local_sum;
+        z( idx ) = local_sum;
     }
 };
 
 template <class IdxND, class Scalar, class VectorType, int TensorDim>
 struct assign_scalar
 {
-    Scalar      s;
-    VectorType  x;
+    Scalar     s;
+    VectorType x;
 
-    __DEVICE_TAG__ void operator()(const IdxND idx) const
+    __DEVICE_TAG__ void operator()( const IdxND idx ) const
     {
-        for(int i = 0; i < TensorDim; i++)
+        for ( int i = 0; i < TensorDim; i++ )
         {
-            x(idx, i) = s;
+            x( idx, i ) = s;
         }
     }
 };
@@ -65,14 +65,14 @@ struct assign_scalar
 template <class IdxND, class Scalar, class VectorType, int TensorDim>
 struct add_mul_scalar
 {
-    Scalar s, mul_x;
-    VectorType    x;
+    Scalar     s, mul_x;
+    VectorType x;
 
-    __DEVICE_TAG__ void operator()(const IdxND idx) const
+    __DEVICE_TAG__ void operator()( const IdxND idx ) const
     {
-        for(int i = 0; i < TensorDim; i++)
+        for ( int i = 0; i < TensorDim; i++ )
         {
-            x(idx, i) = mul_x * x(idx, i) + s;
+            x( idx, i ) = mul_x * x( idx, i ) + s;
         }
     }
 };
@@ -84,11 +84,11 @@ struct scale
     Scalar     s;
     VectorType x;
 
-    __DEVICE_TAG__ void operator()(const IdxND idx) const
+    __DEVICE_TAG__ void operator()( const IdxND idx ) const
     {
-        for(int i = 0; i < TensorDim; i++)
+        for ( int i = 0; i < TensorDim; i++ )
         {
-            x(idx, i) = s * x(idx, i);
+            x( idx, i ) = s * x( idx, i );
         }
     }
 };
@@ -98,11 +98,11 @@ struct assign
 {
     VectorType x, y;
 
-    __DEVICE_TAG__ void operator()(const IdxND idx) const
+    __DEVICE_TAG__ void operator()( const IdxND idx ) const
     {
-        for(int i = 0; i < TensorDim; i++)
+        for ( int i = 0; i < TensorDim; i++ )
         {
-            y(idx, i) = x(idx, i);
+            y( idx, i ) = x( idx, i );
         }
     }
 };
@@ -110,14 +110,14 @@ struct assign
 template <class IdxND, class Scalar, class VectorType, int TensorDim>
 struct assign_lin_1_comb
 {
-    Scalar    mul_x;
+    Scalar     mul_x;
     VectorType x, y;
 
-    __DEVICE_TAG__ void operator()(const IdxND idx) const
+    __DEVICE_TAG__ void operator()( const IdxND idx ) const
     {
-        for(int i = 0; i < TensorDim; i++)
+        for ( int i = 0; i < TensorDim; i++ )
         {
-            y(idx, i) = mul_x * x(idx, i);
+            y( idx, i ) = mul_x * x( idx, i );
         }
     }
 };
@@ -125,14 +125,14 @@ struct assign_lin_1_comb
 template <class IdxND, class Scalar, class VectorType, int TensorDim>
 struct assign_lin_2_comb
 {
-    Scalar    mul_x, mul_y;
+    Scalar     mul_x, mul_y;
     VectorType x, y, z;
 
-    __DEVICE_TAG__ void operator()(const IdxND idx) const
+    __DEVICE_TAG__ void operator()( const IdxND idx ) const
     {
-        for(int i = 0; i < TensorDim; i++)
+        for ( int i = 0; i < TensorDim; i++ )
         {
-            z(idx, i) = mul_x * x(idx, i) + mul_y * y(idx, i);
+            z( idx, i ) = mul_x * x( idx, i ) + mul_y * y( idx, i );
         }
     }
 };
@@ -140,19 +140,19 @@ struct assign_lin_2_comb
 template <class IdxND, class Scalar, class VectorType, int TensorDim>
 struct add_lin_comb
 {
-    Scalar    mul_x;
-    Scalar    mul_y;
+    Scalar     mul_x;
+    Scalar     mul_y;
     VectorType x, y;
 
-    __DEVICE_TAG__ void operator()(const IdxND idx) const
+    __DEVICE_TAG__ void operator()( const IdxND idx ) const
     {
-        for(int i = 0; i < TensorDim; i++)
+        for ( int i = 0; i < TensorDim; i++ )
         {
-            y(idx, i) = mul_x * x(idx, i) + mul_y * y(idx, i);
+            y( idx, i ) = mul_x * x( idx, i ) + mul_y * y( idx, i );
         }
     }
 };
 
-}// namespace kernels
+} // namespace kernels
 
 #endif

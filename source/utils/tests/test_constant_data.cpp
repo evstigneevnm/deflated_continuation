@@ -22,16 +22,16 @@ struct t_test
     int x;
 };
 
-DEFINE_CONSTANT_BUFFER(t_test, buf)
+DEFINE_CONSTANT_BUFFER( t_test, buf )
 
 int main()
 {
-    t_test  test;
+    t_test test;
     test.x = 193;
 
-    COPY_TO_CONSTANT_BUFFER(buf, test);
+    COPY_TO_CONSTANT_BUFFER( buf, test );
 
-    printf("buf().x = %d\n", buf().x);
+    printf( "buf().x = %d\n", buf().x );
 
     return 0;
 }

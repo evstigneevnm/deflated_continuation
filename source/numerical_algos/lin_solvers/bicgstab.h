@@ -36,192 +36,235 @@ using numerical_algos::detail::vectors_arr_wrap_static;
 //Monitor concept:
 //TODO
 
-template<class LinearOperator,class Preconditioner,
-         class VectorOperations,class Monitor,class Log>
-class bicgstab : public iter_solver_base<LinearOperator, Preconditioner,
-                                         VectorOperations, Monitor, Log>
+template <class LinearOperator, class Preconditioner, class VectorOperations, class Monitor, class Log>
+class bicgstab : public iter_solver_base<LinearOperator, Preconditioner, VectorOperations, Monitor, Log>
 {
 public:
-    typedef typename VectorOperations::scalar_type  scalar_type;
-    typedef typename VectorOperations::vector_type  vector_type;
-    typedef LinearOperator                          linear_operator_type;
-    typedef Preconditioner                          preconditioner_type;
-    typedef VectorOperations                        vector_operations_type;
-    typedef Monitor                                 monitor_type;
-    typedef Log                                     log_type;
-
+    typedef typename VectorOperations::scalar_type scalar_type;
+    typedef typename VectorOperations::vector_type vector_type;
+    typedef LinearOperator                         linear_operator_type;
+    typedef Preconditioner                         preconditioner_type;
+    typedef VectorOperations                       vector_operations_type;
+    typedef Monitor                                monitor_type;
+    typedef Log                                    log_type;
 
 
 private:
-    typedef scalar_type                                         T;
-    typedef iter_solver_base<LinearOperator,Preconditioner,
-                             VectorOperations,Monitor,Log>      parent_t;
+    typedef scalar_type                                                                      T;
+    typedef iter_solver_base<LinearOperator, Preconditioner, VectorOperations, Monitor, Log> parent_t;
     using logged_obj_t = typename parent_t::logged_obj_t;
-    typedef vectors_arr_wrap_static<VectorOperations,7>         bufs_arr_t;
-    typedef typename bufs_arr_t::vectors_arr_use_wrap_type      bufs_arr_use_wrap_t;
-    typedef detail::monitor_call_wrap<VectorOperations,
-                                      Monitor>                  monitor_call_wrap_t;
+    typedef vectors_arr_wrap_static<VectorOperations, 7>         bufs_arr_t;
+    typedef typename bufs_arr_t::vectors_arr_use_wrap_type       bufs_arr_use_wrap_t;
+    typedef detail::monitor_call_wrap<VectorOperations, Monitor> monitor_call_wrap_t;
 
 
-    mutable bufs_arr_t   bufs;
-    vector_type          &ri, &r_, &pi, &s, &t, &nu_i,
-                         &nonprecond_ri;
+    mutable bufs_arr_t bufs;
+    vector_type       &ri, &r_, &pi, &s, &t, &nu_i, &nonprecond_ri;
 
-    bool                 use_precond_resid_;
-    int                  resid_recalc_freq_;
+    bool         use_precond_resid_;
+    int          resid_recalc_freq_;
     scalar_type *some_vec;
 
 protected:
     using parent_t::monitor_;
-    using parent_t::vec_ops_;
     using parent_t::prec_;
+    using parent_t::vec_ops_;
 
 public:
-    bicgstab(const vector_operations_type *vec_ops,
-             Log *log = NULL, int obj_log_lev = 0) :
-        parent_t(vec_ops, log, obj_log_lev, "bicgstab::"),
-        bufs(vec_ops),
-        ri(bufs[0]),r_(bufs[1]),pi(bufs[2]),
-        s(bufs[3]),t(bufs[4]),nu_i(bufs[5]),
-        nonprecond_ri(bufs[6]), use_precond_resid_(true),
-        resid_recalc_freq_(0)
+    bicgstab( const vector_operations_type *vec_ops, Log *log = NULL, int obj_log_lev = 0 )
+        : parent_t( vec_ops, log, obj_log_lev, "bicgstab::" ), bufs( vec_ops ), ri( bufs[0] ), r_( bufs[1] ),
+          pi( bufs[2] ), s( bufs[3] ), t( bufs[4] ), nu_i( bufs[5] ), nonprecond_ri( bufs[6] ),
+          use_precond_resid_( true ), resid_recalc_freq_( 0 )
     {
         bufs.init();
-        int sz=vec_ops->get_vector_size();
-        some_vec=(scalar_type*)malloc(sizeof(scalar_type)*sz);
-        if(some_vec==NULL)
-            throw std::runtime_error("bicgstab: failed to allocate memory");;
+        int sz   = vec_ops->get_vector_size();
+        some_vec = (scalar_type *)malloc( sizeof( scalar_type ) * sz );
+        if ( some_vec == NULL )
+            throw std::runtime_error( "bicgstab: failed to allocate memory" );
+        ;
     }
-    ~bicgstab(){
-        free(some_vec);
+    ~bicgstab()
+    {
+        free( some_vec );
     }
 
 
-    void set_use_precond_resid(bool use_precond_resid)
+    void set_use_precond_resid( bool use_precond_resid )
     {
         use_precond_resid_ = use_precond_resid;
     }
-    void set_resid_recalc_freq(int resid_recalc_freq)
+    void set_resid_recalc_freq( int resid_recalc_freq )
     {
         resid_recalc_freq_ = resid_recalc_freq;
     }
 
-    virtual bool    solve(const linear_operator_type &A, const vector_type &b,
-                          vector_type &x)const
+    virtual bool solve( const linear_operator_type &A, const vector_type &b, vector_type &x ) const
     {
-        if (prec_ != NULL){
-            prec_->set_operator(&A);
+        if ( prec_ != NULL )
+        {
+            prec_->set_operator( &A );
         }
 
-        bufs_arr_use_wrap_t     use_wrap(bufs);
+        bufs_arr_use_wrap_t use_wrap( bufs );
         use_wrap.start_use_all();
 
-        monitor_call_wrap_t     monitor_wrap(monitor_);
-        if (use_precond_resid_) {
-            vec_ops_->assign(b, ri);
-            if (prec_ != NULL) prec_->apply(ri);
-            monitor_wrap.start(ri);
-        } else {
-            monitor_wrap.start(b);
+        monitor_call_wrap_t monitor_wrap( monitor_ );
+        if ( use_precond_resid_ )
+        {
+            vec_ops_->assign( b, ri );
+            if ( prec_ != NULL )
+                prec_->apply( ri );
+            monitor_wrap.start( ri );
+        }
+        else
+        {
+            monitor_wrap.start( b );
         }
 
-        vector_type             *checked_ri;
-        if (use_precond_resid_) {
+        vector_type *checked_ri;
+        if ( use_precond_resid_ )
+        {
             checked_ri = &ri;
-        } else {
+        }
+        else
+        {
             checked_ri = &nonprecond_ri;
         }
 
         //ri := P*b - P*A*x0;
-        A.apply(x, ri);                               //ri := A*x0
-        vec_ops_->add_mul(T(1), b, -T(1), ri);        //ri := -ri + b = -A*x0 + b
-        if (!use_precond_resid_) vec_ops_->assign(ri, nonprecond_ri);
-        if (prec_ != NULL) prec_->apply(ri);          //ri := P*ri = -P*A*x0 + P*b
+        A.apply( x, ri );                            //ri := A*x0
+        vec_ops_->add_mul( T( 1 ), b, -T( 1 ), ri ); //ri := -ri + b = -A*x0 + b
+        if ( !use_precond_resid_ )
+            vec_ops_->assign( ri, nonprecond_ri );
+        if ( prec_ != NULL )
+            prec_->apply( ri ); //ri := P*ri = -P*A*x0 + P*b
         //r_ := ri;
-        vec_ops_->assign(ri, r_);
+        vec_ops_->assign( ri, r_ );
 
-        T   rho_i_1(1), alpha(1), omega_i_1(1);
+        T rho_i_1( 1 ), alpha( 1 ), omega_i_1( 1 );
 
-        vec_ops_->assign_scalar(T(0), nu_i);
-        vec_ops_->assign_scalar(T(0), pi);
+        vec_ops_->assign_scalar( T( 0 ), nu_i );
+        vec_ops_->assign_scalar( T( 0 ), pi );
 
         bool not_valid_coeff_faced = false;
 
-        while (!monitor_.check_finished(x, *checked_ri))
+        while ( !monitor_.check_finished( x, *checked_ri ) )
         {
             //nu_i, pi, ri are nu_{i-1}, p_{i-1}, r_{i-1}
-            T   rho_i = vec_ops_->scalar_prod(ri, r_),
-                beta = (rho_i/rho_i_1)*(alpha/omega_i_1);
-            if (std::isnan(beta)) { logged_obj_t::info_f("solve: stop iterations because beta is ind"); not_valid_coeff_faced = true; break; }
-            if (std::isinf(beta)) { logged_obj_t::info_f("solve: stop iterations because beta is inf"); not_valid_coeff_faced = true; break; }
+            T rho_i = vec_ops_->scalar_prod( ri, r_ ), beta = ( rho_i / rho_i_1 ) * ( alpha / omega_i_1 );
+            if ( std::isnan( beta ) )
+            {
+                logged_obj_t::info_f( "solve: stop iterations because beta is ind" );
+                not_valid_coeff_faced = true;
+                break;
+            }
+            if ( std::isinf( beta ) )
+            {
+                logged_obj_t::info_f( "solve: stop iterations because beta is inf" );
+                not_valid_coeff_faced = true;
+                break;
+            }
 
             //pi := ri - beta*omega_{i_1}*nu_i + beta*p_{i-1}
-            vec_ops_->add_mul(T(1), ri, -beta*omega_i_1, nu_i, beta, pi);
+            vec_ops_->add_mul( T( 1 ), ri, -beta * omega_i_1, nu_i, beta, pi );
             //pi now is pi
             //nu_i := P*A*pi
-            A.apply(pi, nu_i);
-            if (!use_precond_resid_) {
+            A.apply( pi, nu_i );
+            if ( !use_precond_resid_ )
+            {
                 //use t as buffer 4 nonprecond nu_i
-                vec_ops_->assign(nu_i, t);
+                vec_ops_->assign( nu_i, t );
             }
-            if (prec_ != NULL) prec_->apply(nu_i);
+            if ( prec_ != NULL )
+                prec_->apply( nu_i );
             //nu_i now is nu_i
 
-            alpha = rho_i/vec_ops_->scalar_prod(nu_i, r_);
-            if (std::isnan(alpha)) { logged_obj_t::info_f("solve: stop iterations because alpha is nan"); not_valid_coeff_faced = true; break; }
-            if (std::isinf(alpha)) { logged_obj_t::info_f("solve: stop iterations because alpha is inf"); not_valid_coeff_faced = true; break; }
+            alpha = rho_i / vec_ops_->scalar_prod( nu_i, r_ );
+            if ( std::isnan( alpha ) )
+            {
+                logged_obj_t::info_f( "solve: stop iterations because alpha is nan" );
+                not_valid_coeff_faced = true;
+                break;
+            }
+            if ( std::isinf( alpha ) )
+            {
+                logged_obj_t::info_f( "solve: stop iterations because alpha is inf" );
+                not_valid_coeff_faced = true;
+                break;
+            }
 
             //s := ri - alpha*nu_i
-            vec_ops_->assign_mul(T(1), ri, -alpha, nu_i, s);
-            if (!use_precond_resid_) {
+            vec_ops_->assign_mul( T( 1 ), ri, -alpha, nu_i, s );
+            if ( !use_precond_resid_ )
+            {
                 //NOTE t here is nonpreconditioned nu_i
-                vec_ops_->add_mul(-alpha, t, T(1), nonprecond_ri);
+                vec_ops_->add_mul( -alpha, t, T( 1 ), nonprecond_ri );
                 //nonprecond_ri here is nonpreconditioned s
             }
 
             //theta := P*A*pi
-            A.apply(s, t);
-            if (!use_precond_resid_) {
+            A.apply( s, t );
+            if ( !use_precond_resid_ )
+            {
                 //use ri as buffer 4 nonprecond t
-                vec_ops_->assign(t, ri);
+                vec_ops_->assign( t, ri );
             }
-            if (prec_ != NULL) prec_->apply(t);
+            if ( prec_ != NULL )
+                prec_->apply( t );
 
-            T omega_i = vec_ops_->scalar_prod(t, s)/vec_ops_->scalar_prod(t, t);
-            if (std::isnan(omega_i)) { logged_obj_t::info_f("solve: stop iterations because omega_i is nan"); not_valid_coeff_faced = true; break; }
-            if (std::isinf(omega_i)) { logged_obj_t::info_f("solve: stop iterations because omega_i is inf"); not_valid_coeff_faced = true; break; }
+            T omega_i = vec_ops_->scalar_prod( t, s ) / vec_ops_->scalar_prod( t, t );
+            if ( std::isnan( omega_i ) )
+            {
+                logged_obj_t::info_f( "solve: stop iterations because omega_i is nan" );
+                not_valid_coeff_faced = true;
+                break;
+            }
+            if ( std::isinf( omega_i ) )
+            {
+                logged_obj_t::info_f( "solve: stop iterations because omega_i is inf" );
+                not_valid_coeff_faced = true;
+                break;
+            }
 
             //x := x + alpha*pi + omega_i*s
-            vec_ops_->add_mul(alpha, pi, omega_i, s, T(1), x);
+            vec_ops_->add_mul( alpha, pi, omega_i, s, T( 1 ), x );
 
-            if ((resid_recalc_freq_ == 0)||((monitor_.iters_performed()+1) % resid_recalc_freq_ != 0)) {
-                if (!use_precond_resid_) {
+            if ( ( resid_recalc_freq_ == 0 ) || ( ( monitor_.iters_performed() + 1 ) % resid_recalc_freq_ != 0 ) )
+            {
+                if ( !use_precond_resid_ )
+                {
                     //NOTE ri here is nonpreconditioned t
                     //NOTE nonprecond_ri here is nonpreconditioned s
-                    vec_ops_->add_mul(-omega_i, ri, T(1), nonprecond_ri);
+                    vec_ops_->add_mul( -omega_i, ri, T( 1 ), nonprecond_ri );
                     //nonprecond_ri now is nonpreconditioned ri
                 }
 
                 //ri := s - omega_i*t
-                vec_ops_->assign_mul(T(1), s, -omega_i, t, ri);
+                vec_ops_->assign_mul( T( 1 ), s, -omega_i, t, ri );
                 //ri now is ri
-            } else {
-                logged_obj_t::info_f("solve: iter = %d recalc real residual", monitor_.iters_performed());
+            }
+            else
+            {
+                logged_obj_t::info_f( "solve: iter = %d recalc real residual", monitor_.iters_performed() );
 
                 //ri := P*b - P*A*x0;
-                A.apply(x, ri);                                                //ri := A*x
-                vec_ops_->add_mul(T(1), b, -T(1), ri);                         //ri := -ri + b = -A*x + b
-                if (!use_precond_resid_) vec_ops_->assign(ri, nonprecond_ri);
-                if (prec_ != NULL) prec_->apply(ri);                           //ri := P*ri = -P*A*x + P*b
+                A.apply( x, ri );                            //ri := A*x
+                vec_ops_->add_mul( T( 1 ), b, -T( 1 ), ri ); //ri := -ri + b = -A*x + b
+                if ( !use_precond_resid_ )
+                    vec_ops_->assign( ri, nonprecond_ri );
+                if ( prec_ != NULL )
+                    prec_->apply( ri ); //ri := P*ri = -P*A*x + P*b
             }
 
-            omega_i_1 = omega_i; rho_i_1 = rho_i;
+            omega_i_1 = omega_i;
+            rho_i_1   = rho_i;
             ++monitor_;
         }
 
-        if (monitor_.out_min_resid_norm()) vec_ops_->assign(monitor_.min_resid_norm_x(), x);
+        if ( monitor_.out_min_resid_norm() )
+            vec_ops_->assign( monitor_.min_resid_norm_x(), x );
 
-        if (not_valid_coeff_faced)
+        if ( not_valid_coeff_faced )
             return true;
         else
             return monitor_.converged();

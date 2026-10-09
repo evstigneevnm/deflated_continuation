@@ -15,7 +15,8 @@ public:
     {
     }
 
-    explicit cusolver_wrap( cublas_wrap *cublas ) : scfd::cusolver_wrap( static_cast<scfd::cublas_wrap *>( cublas ), false )
+    explicit cusolver_wrap( cublas_wrap *cublas )
+        : scfd::cusolver_wrap( static_cast<scfd::cublas_wrap *>( cublas ), false )
     {
     }
 

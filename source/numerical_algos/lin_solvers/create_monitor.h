@@ -22,20 +22,18 @@
 
 namespace numerical_algos
 {
-namespace lin_solvers 
+namespace lin_solvers
 {
 
-template<class VectorOperations,class Log>
-default_monitor<VectorOperations,Log>*   
-create_monitor(const boost::property_tree::ptree &cfg, Log *log = NULL, int obj_log_lev = 0)
+template <class VectorOperations, class Log>
+default_monitor<VectorOperations, Log> *
+create_monitor( const boost::property_tree::ptree &cfg, Log *log = NULL, int obj_log_lev = 0 )
 {
-    T               rel_tol = cfg.get<T>("rel_tol", T(1e-6f)),
-                    abs_tol = cfg.get<T>("abs_tol", T(0.f));
-    int             max_iters_num = cfg.get<int>("max_iters_num", 100), 
-                    min_iters_num = cfg.get<int>("min_iters_num", 0);
-    bool            out_min_resid_norm = cfg.get<bool>("out_min_resid_norm", false);
+    T    rel_tol = cfg.get<T>( "rel_tol", T( 1e-6f ) ), abs_tol = cfg.get<T>( "abs_tol", T( 0.f ) );
+    int  max_iters_num = cfg.get<int>( "max_iters_num", 100 ), min_iters_num = cfg.get<int>( "min_iters_num", 0 );
+    bool out_min_resid_norm = cfg.get<bool>( "out_min_resid_norm", false );
 
-    return new default_monitor(log, obj_log_lev, rel_tol, abs_tol, max_iters_num, min_iters_num, out_min_resid_norm);
+    return new default_monitor( log, obj_log_lev, rel_tol, abs_tol, max_iters_num, min_iters_num, out_min_resid_norm );
 }
 
 }

@@ -44,145 +44,149 @@
 #include "circle_test_curve_container.h"
 
 
-
-int main(int argc, char const *argv[])
+int main( int argc, char const *argv[] )
 {
-    
-    if((argc!=4)&&(argc!=5))
+
+    if ( ( argc != 4 ) && ( argc != 5 ) )
     {
-        printf("Usage: %s lambda_0 dS S [cuda_device]\n   lambda_0 - starting parameter\n   dS - continuation step\n   S - number of continuation steps\n   cuda_device - optional SCFD selector: auto, best_mem, dev_num:N, pci_id:N, manual, or plain device number\n",argv[0]);
+        printf(
+            "Usage: %s lambda_0 dS S [cuda_device]\n   lambda_0 - starting parameter\n   dS - continuation step\n   S "
+            "- number of continuation steps\n   cuda_device - optional SCFD selector: auto, best_mem, dev_num:N, "
+            "pci_id:N, manual, or plain device number\n",
+            argv[0]
+        );
         return 0;
     }
-    size_t Nx = 1; //size of the vector variable. 1 in this case
-    real lambda0 = atof(argv[1]);
-    real dS = atof(argv[2]);
-    unsigned int S = atoi(argv[3]);
+    size_t       Nx      = 1; //size of the vector variable. 1 in this case
+    real         lambda0 = atof( argv[1] );
+    real         dS      = atof( argv[2] );
+    unsigned int S       = atoi( argv[3] );
 
 
-
-
-
-    std::string cuda_selector = (argc == 5) ? argv[4] : "auto";
-    int cuda_device = -1;
+    std::string cuda_selector = ( argc == 5 ) ? argv[4] : "auto";
+    int         cuda_device   = -1;
     try
     {
-        cuda_device = common::init_cuda_from_scfd_selector(cuda_selector);
+        cuda_device = common::init_cuda_from_scfd_selector( cuda_selector );
     }
-    catch(const std::exception& e)
+    catch ( const std::exception &e )
     {
-        fprintf(stderr, "Failed to initialize CUDA device selector '%s': %s\n", cuda_selector.c_str(), e.what());
+        fprintf( stderr, "Failed to initialize CUDA device selector '%s': %s\n", cuda_selector.c_str(), e.what() );
         return 2;
     }
-    printf("Using CUDA device %i\n", cuda_device);
-    real norm_wight = std::sqrt(real(Nx));
-    real Rad = 1.0;
-
+    printf( "Using CUDA device %i\n", cuda_device );
+    real norm_wight = std::sqrt( real( Nx ) );
+    real Rad        = 1.0;
 
 
     //linsolver control
     unsigned int lin_solver_max_it = 1500;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 1;
-    real lin_solver_tol = 5.0e-3; //relative tolerance wrt rhs vector. For Krylov-Newton method can be set low
-    
+    unsigned int basis_sz          = 1;
+    real         lin_solver_tol = 5.0e-3; //relative tolerance wrt rhs vector. For Krylov-Newton method can be set low
+
     //newton control
-    unsigned int newton_def_max_it = 350;
+    unsigned int newton_def_max_it  = 350;
     unsigned int newton_def_cont_it = 100;
-    real newton_def_tol = std::max(real(1.0e-9), real(10)*std::numeric_limits<real>::epsilon());
-    real newton_cont_tol = std::max(real(1.0e-9), real(10)*std::numeric_limits<real>::epsilon());
-    real newton_interp_tol = std::max(real(1.0e-9), real(10)*std::numeric_limits<real>::epsilon());
+    real         newton_def_tol     = std::max( real( 1.0e-9 ), real( 10 ) * std::numeric_limits<real>::epsilon() );
+    real         newton_cont_tol    = std::max( real( 1.0e-9 ), real( 10 ) * std::numeric_limits<real>::epsilon() );
+    real         newton_interp_tol  = std::max( real( 1.0e-9 ), real( 10 ) * std::numeric_limits<real>::epsilon() );
 
 
-    vec_ops_real *vec_ops_R = new vec_ops_real(Nx);
+    vec_ops_real *vec_ops_R = new vec_ops_real( Nx );
 
-    circle_t *CIRCLE = new circle_t(Rad, Nx, vec_ops_R);
-    log_t *log = new log_t();
-    lin_op_t *Ax = new lin_op_t(CIRCLE);
-    prec_t *prec = new prec_t(CIRCLE);
+    circle_t  *CIRCLE = new circle_t( Rad, Nx, vec_ops_R );
+    log_t     *log    = new log_t();
+    lin_op_t  *Ax     = new lin_op_t( CIRCLE );
+    prec_t    *prec   = new prec_t( CIRCLE );
     monitor_t *mon;
-    monitor_t *mon_orig; 
+    monitor_t *mon_orig;
     //setup deflation system
-    sherman_morrison_linear_system_solve_t *SM = new sherman_morrison_linear_system_solve_t(prec, vec_ops_R, log);
-    mon = &SM->get_linsolver_handle()->monitor();
-    mon->init(lin_solver_tol, real(0), lin_solver_max_it);
-    mon->set_save_convergence_history(true);
-    mon->set_divide_out_norms_by_rel_base(true);
+    sherman_morrison_linear_system_solve_t *SM = new sherman_morrison_linear_system_solve_t( prec, vec_ops_R, log );
+    mon                                        = &SM->get_linsolver_handle()->monitor();
+    mon->init( lin_solver_tol, real( 0 ), lin_solver_max_it );
+    mon->set_save_convergence_history( true );
+    mon->set_divide_out_norms_by_rel_base( true );
     mon->out_min_resid_norm();
     //SM->get_linsolver_handle()->set_use_precond_resid(use_precond_resid);
     //SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
     //SM->get_linsolver_handle()->set_basis_size(basis_sz);
-    SM->is_small_alpha(false);
+    SM->is_small_alpha( false );
 
-    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops_R, log, newton_def_tol, newton_def_max_it, real(1), true );
-    sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops_R, 50, norm_wight);
-    system_operator_def_t *system_operator_def = new system_operator_def_t(vec_ops_R, Ax, SM, sol_storage_def);
-    newton_def_t *newton_def = new newton_def_t(vec_ops_R, system_operator_def, conv_newton_def);
+    convergence_newton_def_t *conv_newton_def =
+        new convergence_newton_def_t( vec_ops_R, log, newton_def_tol, newton_def_max_it, real( 1 ), true );
+    sol_storage_def_t     *sol_storage_def     = new sol_storage_def_t( vec_ops_R, 50, norm_wight );
+    system_operator_def_t *system_operator_def = new system_operator_def_t( vec_ops_R, Ax, SM, sol_storage_def );
+    newton_def_t          *newton_def          = new newton_def_t( vec_ops_R, system_operator_def, conv_newton_def );
 
     //setup linear system:
     mon_orig = &SM->get_linsolver_handle_original()->monitor();
-    mon_orig->init(lin_solver_tol, real(0), lin_solver_max_it);
-    mon_orig->set_save_convergence_history(true);
-    mon_orig->set_divide_out_norms_by_rel_base(true);
+    mon_orig->init( lin_solver_tol, real( 0 ), lin_solver_max_it );
+    mon_orig->set_save_convergence_history( true );
+    mon_orig->set_divide_out_norms_by_rel_base( true );
     mon_orig->out_min_resid_norm();
     //SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
     //SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
-    //SM->get_linsolver_handle_original()->set_basis_size(basis_sz);    
-    convergence_newton_t *conv_newton = new convergence_newton_t(vec_ops_R, log, newton_cont_tol, newton_def_max_it, real(1) );
-    system_operator_t *system_operator = new system_operator_t(vec_ops_R, Ax, SM);
-    newton_t *newton = new newton_t(vec_ops_R, system_operator, conv_newton);
+    //SM->get_linsolver_handle_original()->set_basis_size(basis_sz);
+    convergence_newton_t *conv_newton =
+        new convergence_newton_t( vec_ops_R, log, newton_cont_tol, newton_def_max_it, real( 1 ) );
+    system_operator_t *system_operator = new system_operator_t( vec_ops_R, Ax, SM );
+    newton_t          *newton          = new newton_t( vec_ops_R, system_operator, conv_newton );
 
     //setup continuation system:
-    const real dS_max = std::max(dS, real(0.25));
-    const real step_ds_m = real(0.25);
-    const real step_ds_p = real(0.25);
+    const real         dS_max             = std::max( dS, real( 0.25 ) );
+    const real         step_ds_m          = real( 0.25 );
+    const real         step_ds_p          = real( 0.25 );
     const unsigned int predictor_attempts = 4;
-    predictor_cont_t* predict = new predictor_cont_t(vec_ops_R, log);
-    predict->set_steps(dS, dS_max, step_ds_m, step_ds_p, predictor_attempts);
-    system_operator_cont_t* system_operator_cont = new system_operator_cont_t(vec_ops_R, log, Ax, SM);
-    convergence_newton_cont_t *conv_newton_cont = new convergence_newton_cont_t(vec_ops_R, log, newton_cont_tol, newton_def_cont_it, real(1), true);
-    newton_cont_t* newton_cont = new newton_cont_t(vec_ops_R, system_operator_cont, conv_newton_cont);
-    advance_step_cont_t* continuation_step = new advance_step_cont_t(vec_ops_R, log, system_operator_cont, newton_cont, newton, predict, conv_newton_cont);
-    tangent_0_cont_t* init_tangent = new tangent_0_cont_t(vec_ops_R, log, newton, Ax, SM);
-  
+    predictor_cont_t  *predict            = new predictor_cont_t( vec_ops_R, log );
+    predict->set_steps( dS, dS_max, step_ds_m, step_ds_p, predictor_attempts );
+    system_operator_cont_t    *system_operator_cont = new system_operator_cont_t( vec_ops_R, log, Ax, SM );
+    convergence_newton_cont_t *conv_newton_cont =
+        new convergence_newton_cont_t( vec_ops_R, log, newton_cont_tol, newton_def_cont_it, real( 1 ), true );
+    newton_cont_t       *newton_cont = new newton_cont_t( vec_ops_R, system_operator_cont, conv_newton_cont );
+    advance_step_cont_t *continuation_step =
+        new advance_step_cont_t( vec_ops_R, log, system_operator_cont, newton_cont, newton, predict, conv_newton_cont );
+    tangent_0_cont_t *init_tangent = new tangent_0_cont_t( vec_ops_R, log, newton, Ax, SM );
+
     //setup container of curves
-    knots_t deflation_knots;
-    curve_storage_t* curve_storage = new curve_storage_t(vec_ops_R, log, newton, CIRCLE, &deflation_knots);
+    knots_t          deflation_knots;
+    curve_storage_t *curve_storage = new curve_storage_t( vec_ops_R, log, newton, CIRCLE, &deflation_knots );
 
     //deflation operator
-    deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R, log, newton_def, 5);
+    deflation_operator_t *deflation_op = new deflation_operator_t( vec_ops_R, log, newton_def, 5 );
 
-    
-    deflation_op->execute_all(lambda0, CIRCLE, sol_storage_def);
+
+    deflation_op->execute_all( lambda0, CIRCLE, sol_storage_def );
     //deflation_op->find_solution(lambda0, CIRCLE, sol_storage_def);
-    
+
     real_vec x0;
-    vec_ops_R->init_vector(x0); vec_ops_R->start_use_vector(x0);
-    
-    std::vector<real> xl_host(Nx);
-    bool have_solution = false;
-    for(auto &x: *sol_storage_def)
-    {        
-        if(!have_solution)
+    vec_ops_R->init_vector( x0 );
+    vec_ops_R->start_use_vector( x0 );
+
+    std::vector<real> xl_host( Nx );
+    bool              have_solution = false;
+    for ( auto &x : *sol_storage_def )
+    {
+        if ( !have_solution )
         {
-            vec_ops_R->assign((real_vec&)x, x0);
+            vec_ops_R->assign( (real_vec &)x, x0 );
             have_solution = true;
         }
-        vec_ops_R->get((real_vec&)x, xl_host.data());
+        vec_ops_R->get( (real_vec &)x, xl_host.data() );
         std::cout << "\n solution value: " << xl_host[0] << "\n";
     }
-    if(!have_solution)
+    if ( !have_solution )
     {
-        throw std::runtime_error("circle_test_curve_container: deflation did not return a solution to continue.");
+        throw std::runtime_error( "circle_test_curve_container: deflation did not return a solution to continue." );
     }
-    
 
-    
+
     //x0 = sol_storage_def[0];
 
     // unsigned int p=0;
     // for(auto &x: *sol_storage_def)
-    // {        
+    // {
     //     KS2D->physical_solution((real_im_vec&)x, u_out_ph);
     //     std::ostringstream stringStream;
     //     stringStream << "u_out_" << (p++) << ".dat";
@@ -192,16 +196,26 @@ int main(int argc, char const *argv[])
     real_vec x0_s, x1, x1_s, x1_p, d_x, f, xxx, xxx1;
     real_vec x0p, x_1_g;
 
-    vec_ops_R->init_vector(x1_p); vec_ops_R->start_use_vector(x1_p);
-    vec_ops_R->init_vector(x0_s); vec_ops_R->start_use_vector(x0_s);
-    vec_ops_R->init_vector(x1); vec_ops_R->start_use_vector(x1);
-    vec_ops_R->init_vector(x1_s); vec_ops_R->start_use_vector(x1_s);
-    vec_ops_R->init_vector(d_x); vec_ops_R->start_use_vector(d_x);
-    vec_ops_R->init_vector(f); vec_ops_R->start_use_vector(f);
-    vec_ops_R->init_vector(xxx); vec_ops_R->start_use_vector(xxx);
-    vec_ops_R->init_vector(xxx1); vec_ops_R->start_use_vector(xxx1);
-    vec_ops_R->init_vector(x0p); vec_ops_R->start_use_vector(x0p);
-    vec_ops_R->init_vector(x_1_g); vec_ops_R->start_use_vector(x_1_g);    
+    vec_ops_R->init_vector( x1_p );
+    vec_ops_R->start_use_vector( x1_p );
+    vec_ops_R->init_vector( x0_s );
+    vec_ops_R->start_use_vector( x0_s );
+    vec_ops_R->init_vector( x1 );
+    vec_ops_R->start_use_vector( x1 );
+    vec_ops_R->init_vector( x1_s );
+    vec_ops_R->start_use_vector( x1_s );
+    vec_ops_R->init_vector( d_x );
+    vec_ops_R->start_use_vector( d_x );
+    vec_ops_R->init_vector( f );
+    vec_ops_R->start_use_vector( f );
+    vec_ops_R->init_vector( xxx );
+    vec_ops_R->start_use_vector( xxx );
+    vec_ops_R->init_vector( xxx1 );
+    vec_ops_R->start_use_vector( xxx1 );
+    vec_ops_R->init_vector( x0p );
+    vec_ops_R->start_use_vector( x0p );
+    vec_ops_R->init_vector( x_1_g );
+    vec_ops_R->start_use_vector( x_1_g );
 
     // x0 = (*sol_storage_def)[0].get_ref();
     // printf("solutions in container = %i\n",sol_storage_def->get_size());
@@ -212,56 +226,68 @@ int main(int argc, char const *argv[])
     real d_lambda;
     real lambda_0p, lambda_1_g;
 
-    
+
     //lambda0 = real(0);//std::sqrt(real(2))*0.5;
     //vec_ops_R->assign_scalar(real(-0.707214), x0);
 
-    init_tangent->execute(CIRCLE, -1, x0, lambda0, x0_s, lambda0_s);
+    init_tangent->execute( CIRCLE, -1, x0, lambda0, x0_s, lambda0_s );
     real norm = 1;
 
-    std::vector<real> x_host(Nx);
-    std::vector<real> xp_host(Nx);
-    vec_ops_R->get(x0, xp_host.data());
-    std::ofstream file_diag("diagram.dat", std::ofstream::out);
-    
+    std::vector<real> x_host( Nx );
+    std::vector<real> xp_host( Nx );
+    vec_ops_R->get( x0, xp_host.data() );
+    std::ofstream file_diag( "diagram.dat", std::ofstream::out );
+
     file_diag << lambda0 << " " << xp_host[0] << " " << lambda0 << " " << xp_host[0] << std::endl;
 
-    for(unsigned int s=0;s<S;s++)
+    for ( unsigned int s = 0; s < S; s++ )
     {
-        continuation_step->solve(CIRCLE, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
+        continuation_step->solve( CIRCLE, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s );
         //to check predicted values:
-        predict->apply(x0p, lambda_0p, x_1_g, lambda_1_g);
-        vec_ops_R->get(x0p, xp_host.data());
+        predict->apply( x0p, lambda_0p, x_1_g, lambda_1_g );
+        vec_ops_R->get( x0p, xp_host.data() );
 
-        vec_ops_R->assign(x1, x0);
-        vec_ops_R->assign(x1_s, x0_s);
-        lambda0 = lambda1;
+        vec_ops_R->assign( x1, x0 );
+        vec_ops_R->assign( x1_s, x0_s );
+        lambda0   = lambda1;
         lambda0_s = lambda1_s;
 
-        vec_ops_R->get(x1, x_host.data());
+        vec_ops_R->get( x1, x_host.data() );
 
 
-        file_diag << lambda_0p << " " << xp_host[0] << " " << lambda1 << " " << x_host[0] << std::endl; //vec_ops_R->norm_l2(x1)
-        std::flush(file_diag);
+        file_diag << lambda_0p << " " << xp_host[0] << " " << lambda1 << " " << x_host[0]
+                  << std::endl; //vec_ops_R->norm_l2(x1)
+        std::flush( file_diag );
     }
     file_diag.close();
 
-    CIRCLE->F(x1, lambda1, f);
-    norm = vec_ops_R->norm_l2(f);
-    printf("\n===(%le, %le)===\n", lambda1, norm);
+    CIRCLE->F( x1, lambda1, f );
+    norm = vec_ops_R->norm_l2( f );
+    printf( "\n===(%le, %le)===\n", lambda1, norm );
 
 
-    vec_ops_R->stop_use_vector(x0); vec_ops_R->free_vector(x0);
-    vec_ops_R->stop_use_vector(x0_s); vec_ops_R->free_vector(x0_s);
-    vec_ops_R->stop_use_vector(x1_p); vec_ops_R->free_vector(x1_p);
-    vec_ops_R->stop_use_vector(x1); vec_ops_R->free_vector(x1);
-    vec_ops_R->stop_use_vector(x1_s); vec_ops_R->free_vector(x1_s);
-    vec_ops_R->stop_use_vector(d_x); vec_ops_R->free_vector(d_x);
-    vec_ops_R->stop_use_vector(f); vec_ops_R->free_vector(f);
-    vec_ops_R->stop_use_vector(xxx); vec_ops_R->free_vector(xxx);
-    vec_ops_R->stop_use_vector(xxx1); vec_ops_R->free_vector(xxx1);
-    vec_ops_R->stop_use_vector(x_1_g); vec_ops_R->free_vector(x_1_g);
-    vec_ops_R->stop_use_vector(x0p); vec_ops_R->free_vector(x0p);
+    vec_ops_R->stop_use_vector( x0 );
+    vec_ops_R->free_vector( x0 );
+    vec_ops_R->stop_use_vector( x0_s );
+    vec_ops_R->free_vector( x0_s );
+    vec_ops_R->stop_use_vector( x1_p );
+    vec_ops_R->free_vector( x1_p );
+    vec_ops_R->stop_use_vector( x1 );
+    vec_ops_R->free_vector( x1 );
+    vec_ops_R->stop_use_vector( x1_s );
+    vec_ops_R->free_vector( x1_s );
+    vec_ops_R->stop_use_vector( d_x );
+    vec_ops_R->free_vector( d_x );
+    vec_ops_R->stop_use_vector( f );
+    vec_ops_R->free_vector( f );
+    vec_ops_R->stop_use_vector( xxx );
+    vec_ops_R->free_vector( xxx );
+    vec_ops_R->stop_use_vector( xxx1 );
+    vec_ops_R->free_vector( xxx1 );
+    vec_ops_R->stop_use_vector( x_1_g );
+    vec_ops_R->free_vector( x_1_g );
+    vec_ops_R->stop_use_vector( x0p );
+    vec_ops_R->free_vector( x0p );
 
     delete init_tangent;
     delete continuation_step;

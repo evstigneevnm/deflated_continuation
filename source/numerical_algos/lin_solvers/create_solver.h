@@ -25,22 +25,23 @@
 
 namespace numerical_algos
 {
-namespace lin_solvers 
+namespace lin_solvers
 {
 
-template<class LinearOperator,class Preconditioner,class VectorOperations,
-         bool ManualVerifySize,class Log>
-solver_base<LinearOperator,Preconditioner,VectorOperations,ManualVerifySize,default_monitor,Log>*
-create_solver(const boost::property_tree::ptree &cfg, Log *log = NULL, int obj_log_lev = 0)
+template <class LinearOperator, class Preconditioner, class VectorOperations, bool ManualVerifySize, class Log>
+solver_base<LinearOperator, Preconditioner, VectorOperations, ManualVerifySize, default_monitor, Log> *
+create_solver( const boost::property_tree::ptree &cfg, Log *log = NULL, int obj_log_lev = 0 )
 {
-    std::string     lin_solver_type_name = cfg.get<std::string>("lin_solver_type_name"),
+    std::string lin_solver_type_name = cfg.get<std::string>( "lin_solver_type_name" ),
 
-    if (lin_solver_type_name == "CGS") {
-        return new cgs<LinearOperator,Preconditioner,VectorOperations,
-                      ManualVerifySize,default_monitor,Log>(log, obj_log_lev);
-    } else throw std::runtime_error("create_solver: unsupported lin_solver_type_name: " + 
-                                    lin_solver_type_name);
-    create_monitor(cfg.get_child("monitor"), log, obj_log_lev);
+                if ( lin_solver_type_name == "CGS" )
+    {
+        return new cgs<LinearOperator, Preconditioner, VectorOperations, ManualVerifySize, default_monitor, Log>(
+            log, obj_log_lev
+        );
+    }
+    else throw std::runtime_error( "create_solver: unsupported lin_solver_type_name: " + lin_solver_type_name );
+    create_monitor( cfg.get_child( "monitor" ), log, obj_log_lev );
 }
 
 

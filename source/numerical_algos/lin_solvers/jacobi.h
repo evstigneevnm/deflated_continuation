@@ -23,7 +23,7 @@
 
 namespace numerical_algos
 {
-namespace lin_solvers 
+namespace lin_solvers
 {
 
 using numerical_algos::detail::vectors_arr_wrap_static;
@@ -36,77 +36,74 @@ using numerical_algos::detail::vectors_arr_wrap_static;
 //Monitor concept:
 //TODO
 
-template<class LinearOperator,class Preconditioner,
-         class VectorOperations,class Monitor,class Log>
-class jacobi : public iter_solver_base<LinearOperator,Preconditioner,
-                                       VectorOperations,Monitor,Log>
+template <class LinearOperator, class Preconditioner, class VectorOperations, class Monitor, class Log>
+class jacobi : public iter_solver_base<LinearOperator, Preconditioner, VectorOperations, Monitor, Log>
 {
 public:
-    typedef typename VectorOperations::scalar_type  scalar_type;
-    typedef typename VectorOperations::vector_type  vector_type;
-    typedef LinearOperator                          linear_operator_type;
-    typedef Preconditioner                          preconditioner_type;
-    typedef VectorOperations                        vector_operations_type;
-    typedef Monitor                                 monitor_type;
-    typedef Log                                     log_type;
+    typedef typename VectorOperations::scalar_type scalar_type;
+    typedef typename VectorOperations::vector_type vector_type;
+    typedef LinearOperator                         linear_operator_type;
+    typedef Preconditioner                         preconditioner_type;
+    typedef VectorOperations                       vector_operations_type;
+    typedef Monitor                                monitor_type;
+    typedef Log                                    log_type;
 
 private:
-    typedef scalar_type                                         T;
-    typedef iter_solver_base<LinearOperator,Preconditioner,
-                             VectorOperations,Monitor,Log>      parent_t;
+    typedef scalar_type                                                                      T;
+    typedef iter_solver_base<LinearOperator, Preconditioner, VectorOperations, Monitor, Log> parent_t;
     using logged_obj_t = typename parent_t::logged_obj_t;
-    typedef vectors_arr_wrap_static<VectorOperations,1>         bufs_arr_t;
-    typedef typename bufs_arr_t::vectors_arr_use_wrap_type      bufs_arr_use_wrap_t;
-    typedef detail::monitor_call_wrap<VectorOperations,
-                                      Monitor>                  monitor_call_wrap_t;
+    typedef vectors_arr_wrap_static<VectorOperations, 1>         bufs_arr_t;
+    typedef typename bufs_arr_t::vectors_arr_use_wrap_type       bufs_arr_use_wrap_t;
+    typedef detail::monitor_call_wrap<VectorOperations, Monitor> monitor_call_wrap_t;
 
 
-    mutable bufs_arr_t   bufs;
-    vector_type          &ri;
+    mutable bufs_arr_t bufs;
+    vector_type       &ri;
 
 protected:
     using parent_t::monitor_;
-    using parent_t::vec_ops_;
     using parent_t::prec_;
+    using parent_t::vec_ops_;
 
 public:
-    jacobi(const vector_operations_type *vec_ops, 
-           Log *log = NULL, int obj_log_lev = 0) : 
-        parent_t(vec_ops, log, obj_log_lev, "jacobi::"),
-        bufs(vec_ops), ri(bufs[0])
+    jacobi( const vector_operations_type *vec_ops, Log *log = NULL, int obj_log_lev = 0 )
+        : parent_t( vec_ops, log, obj_log_lev, "jacobi::" ), bufs( vec_ops ), ri( bufs[0] )
     {
         bufs.init();
     }
 
-    virtual bool    solve(const linear_operator_type &A, const vector_type &b, 
-                          vector_type &x)const
+    virtual bool solve( const linear_operator_type &A, const vector_type &b, vector_type &x ) const
     {
-        if (prec_ != NULL) prec_->set_operator(&A);
-        
-        bufs_arr_use_wrap_t     use_wrap(bufs);
+        if ( prec_ != NULL )
+            prec_->set_operator( &A );
+
+        bufs_arr_use_wrap_t use_wrap( bufs );
         use_wrap.start_use_all();
 
-        monitor_call_wrap_t     monitor_wrap(monitor_);
-        monitor_wrap.start(b);
+        monitor_call_wrap_t monitor_wrap( monitor_ );
+        monitor_wrap.start( b );
 
         //ri := b - A*x0;
-        A.apply(x, ri);                                 //ri := A*x0
-        vec_ops_->add_mul(T(1.f), b, -T(1.f), ri);      //ri := -ri + b = -A*x0 + b
+        A.apply( x, ri );                                //ri := A*x0
+        vec_ops_->add_mul( T( 1.f ), b, -T( 1.f ), ri ); //ri := -ri + b = -A*x0 + b
 
-        while (!monitor_.check_finished(x, ri)) {
-            if (prec_ != NULL) prec_->apply(ri);            //r{i-1} := P*r{i-1}
+        while ( !monitor_.check_finished( x, ri ) )
+        {
+            if ( prec_ != NULL )
+                prec_->apply( ri ); //r{i-1} := P*r{i-1}
 
             //xi := x{i-1} + r{i-1}
-            vec_ops_->add_mul(T(1.f), ri, T(1.f), x);
-            
+            vec_ops_->add_mul( T( 1.f ), ri, T( 1.f ), x );
+
             //ri := b - A*xi;
-            A.apply(x, ri);                             //ri := A*xi
-            vec_ops_->add_mul(T(1.f), b, -T(1.f), ri);  //ri := -ri + b = -A*xi + b
+            A.apply( x, ri );                                //ri := A*xi
+            vec_ops_->add_mul( T( 1.f ), b, -T( 1.f ), ri ); //ri := -ri + b = -A*xi + b
 
             ++monitor_;
         }
-        
-        if (monitor_.out_min_resid_norm()) vec_ops_->assign(monitor_.min_resid_norm_x(), x);
+
+        if ( monitor_.out_min_resid_norm() )
+            vec_ops_->assign( monitor_.min_resid_norm_x(), x );
 
         return monitor_.converged();
     }

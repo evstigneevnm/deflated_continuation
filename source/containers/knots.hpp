@@ -2,12 +2,10 @@
 #define __KNOTS_HPP__
 
 
-
 /**
 *   Class that contains knots that are used to perform deflation and continuation check of itersections.
 *
 */
-
 
 
 #include <string>
@@ -17,57 +15,57 @@
 #include <algorithm>
 
 
-
 namespace container
 {
- 
 
-template<class T> 
-class knots  //contains knots at which deflation is considered
+
+template <class T>
+class knots //contains knots at which deflation is considered
 {
 private:
-    typedef typename std::vector<T> container_t;
-    typedef typename container_t::iterator iterator_t;
+    typedef typename std::vector<T>              container_t;
+    typedef typename container_t::iterator       iterator_t;
     typedef typename container_t::const_iterator const_iterator_t;
-    
-    container_t container;  
+
+    container_t  container;
     unsigned int current_position = 0;
 
 
-    
-
     void unique_and_sort()
     {
-        std::sort(container.begin(), container.end());
+        std::sort( container.begin(), container.end() );
         container.erase( std::unique( container.begin(), container.end() ), container.end() );
     }
+
 public:
-// public:
-//     knots();
+    // public:
+    //     knots();
 
-//     ~knots();
-    void add_element(T value_)
+    //     ~knots();
+    void add_element( T value_ )
     {
-        container.push_back(value_);
+        container.push_back( value_ );
         unique_and_sort();
     }
 
-    void add_element(container_t vec_)
+    void add_element( container_t vec_ )
     {
-        container.insert(container.end(), std::make_move_iterator(vec_.begin()), std::make_move_iterator(vec_.end()) );
+        container.insert(
+            container.end(), std::make_move_iterator( vec_.begin() ), std::make_move_iterator( vec_.end() )
+        );
         unique_and_sort();
     }
 
-    template<class U>
-    void add_element(const std::vector<U>& vec_)
+    template <class U>
+    void add_element( const std::vector<U> &vec_ )
     {
-        for(const auto& value : vec_)
+        for ( const auto &value : vec_ )
         {
-            container.push_back(static_cast<T>(value));
+            container.push_back( static_cast<T>( value ) );
         }
         unique_and_sort();
     }
-    
+
     T get_max_value()
     {
         return container.back();
@@ -84,62 +82,62 @@ public:
 
     bool next()
     {
-        if(container.size() <= 2)
+        if ( container.size() <= 2 )
         {
             current_position = 0;
-            return(false);
+            return ( false );
         }
         current_position++;
-        if( current_position >= container.size() - 1 ) //size - 1 so that the first and the last knots are limiting knots, not deflation knots!
+        if ( current_position >=
+             container.size() -
+                 1 ) //size - 1 so that the first and the last knots are limiting knots, not deflation knots!
         {
             current_position = 0;
-            return(false);
+            return ( false );
         }
         else
-            return(true);
+            return ( true );
     }
 
     iterator_t next_iterator()
     {
         auto vi = begin();
-        std::advance(vi, current_position);
+        std::advance( vi, current_position );
         next();
-        return(vi);
+        return ( vi );
     }
 
     int size()
     {
-        return(container.size());
+        return ( container.size() );
     }
 
 
-    T operator [](size_t i) const
+    T operator[]( size_t i ) const
     {
-        return container.at(i);
+        return container.at( i );
     }
-    T & operator [](size_t i) 
+    T &operator[]( size_t i )
     {
-        return container.at(i);
-    }  
+        return container.at( i );
+    }
     //begin, end for c++11 iterator like "auto &x: keys ..."
-    inline iterator_t begin() noexcept 
-    { 
-        return container.begin(); 
+    inline iterator_t begin() noexcept
+    {
+        return container.begin();
     }
-    inline const_iterator_t cbegin() const noexcept 
-    { 
-        return container.cbegin(); 
+    inline const_iterator_t cbegin() const noexcept
+    {
+        return container.cbegin();
     }
-    inline iterator_t end() noexcept 
-    { 
-        return container.end(); 
+    inline iterator_t end() noexcept
+    {
+        return container.end();
     }
-    inline const_iterator_t cend() const noexcept 
-    { 
-        return container.cend(); 
+    inline const_iterator_t cend() const noexcept
+    {
+        return container.cend();
     }
-
-
 };
 
 

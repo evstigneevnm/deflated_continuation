@@ -22,13 +22,15 @@
 //on the other hand nvcc at least gives number lines of callers where assert was failed
 
 //these with __ are not supposed to be used (just intermediate help macros)
-#define __STATIC_ASSERT__CTASTR2(pre,post) pre ## post
-#define __STATIC_ASSERT__CTASTR(pre,post) __STATIC_ASSERT__CTASTR2(pre,post)
+#define __STATIC_ASSERT__CTASTR2( pre, post ) pre##post
+#define __STATIC_ASSERT__CTASTR( pre, post ) __STATIC_ASSERT__CTASTR2( pre, post )
 //no line append becuase compiler seems to give it by himself
 //__COUNTER__ requiers gcc at least 4.3; works on cl at least in VS2008 (did not tested former versions)
 //ISSUE may be make more 'stupid' realisations for earlier versions of compilers
-#define STATIC_ASSERT(cond,msg) \
-    typedef struct { int __STATIC_ASSERT__CTASTR(STATIC_ASSERTION_FAILED_,msg) : !!(cond); } \
-    __STATIC_ASSERT__CTASTR(STATIC_ASSERTION_FAILED_,__COUNTER__)
+#define STATIC_ASSERT( cond, msg )                                                                                     \
+    typedef struct                                                                                                     \
+    {                                                                                                                  \
+        int __STATIC_ASSERT__CTASTR( STATIC_ASSERTION_FAILED_, msg ) : !!( cond );                                     \
+    } __STATIC_ASSERT__CTASTR( STATIC_ASSERTION_FAILED_, __COUNTER__ )
 
 #endif

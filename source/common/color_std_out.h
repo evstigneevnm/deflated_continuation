@@ -5,36 +5,38 @@
 
 
 #include <ostream>
-namespace color 
+namespace color
 {
-    enum code 
+enum code
+{
+    FG_RED     = 31,
+    FG_GREEN   = 32,
+    FG_BLUE    = 34,
+    FG_DEFAULT = 39,
+    BG_RED     = 41,
+    BG_GREEN   = 42,
+    BG_BLUE    = 44,
+    BG_DEFAULT = 49
+};
+class modifier
+{
+    code code_;
+
+public:
+    Modifier( code pcode ) : code_( pcode )
     {
-        FG_RED      = 31,
-        FG_GREEN    = 32,
-        FG_BLUE     = 34,
-        FG_DEFAULT  = 39,
-        BG_RED      = 41,
-        BG_GREEN    = 42,
-        BG_BLUE     = 44,
-        BG_DEFAULT  = 49
-    };
-    class modifier 
+    }
+    friend std::ostream &operator<<( std::ostream &os, const modifier &mod )
     {
-        code code_;
-    public:
-        Modifier(code pcode) : code_(pcode) {}
-        friend std::ostream&
-        operator<<(std::ostream& os, const modifier& mod) 
-        {
-            return os << "\033[" << mod.code_ << "m";
-        }
-    };
+        return os << "\033[" << mod.code_ << "m";
+    }
+};
 }
 
 
 // #include <common/color_std_out.h>
 // #include <iostream>
-// int main() 
+// int main()
 // {
 //     color::modifier red(color::FG_RED);
 //     color::modifier def(color::FG_DEFAULT);

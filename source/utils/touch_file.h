@@ -17,10 +17,10 @@
 #ifndef __TOUCH_FILE_H__
 #define __TOUCH_FILE_H__
 
-void touch_file(const char f_name[])
+void touch_file( const char f_name[] )
 {
     FILE *stream = fopen( f_name, "w" );
-    fclose(stream);
+    fclose( stream );
 }
 
 #endif

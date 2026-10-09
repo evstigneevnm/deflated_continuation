@@ -37,124 +37,100 @@ namespace main_classes
 {
 
 
-
-
-template<class VectorOperations, class MatrixOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations, class LinearOperator, class Preconditioner, template<class , class , class , class , class > class LinearSolver,  template<class , class , class , class > class SystemOperator, class Parameters>
+template <
+    class VectorOperations, class MatrixOperations, class VectorFileOperations, class Log, class Monitor,
+    class NonlinearOperations, class LinearOperator, class Preconditioner,
+    template <class, class, class, class, class> class LinearSolver,
+    template <class, class, class, class> class SystemOperator, class Parameters>
 class plot_diagram_to_pos
 {
 private:
-    typedef typename VectorOperations::scalar_type  T;
-    typedef typename VectorOperations::vector_type  T_vec;
-    typedef typename MatrixOperations::matrix_type  T_mat;
-    typedef Monitor monitor_t;
-    
+    typedef typename VectorOperations::scalar_type T;
+    typedef typename VectorOperations::vector_type T_vec;
+    typedef typename MatrixOperations::matrix_type T_mat;
+    typedef Monitor                                monitor_t;
+
     typedef typename boost::archive::text_oarchive data_output;
     typedef typename boost::archive::text_iarchive data_input;
 
     typedef LinearSolver<LinearOperator, Preconditioner, VectorOperations, Monitor, Log> lin_slv_t;
 
-    typedef nonlinear_operators::newton_method::convergence_strategy<
-        VectorOperations, 
-        NonlinearOperations, 
-        Log> convergence_newton_t;
+    typedef nonlinear_operators::newton_method::convergence_strategy<VectorOperations, NonlinearOperations, Log>
+        convergence_newton_t;
 
-    typedef SystemOperator<
-        VectorOperations, 
-        NonlinearOperations,
-        LinearOperator,
-        lin_slv_t
-        > system_operator_t;
-    
+    typedef SystemOperator<VectorOperations, NonlinearOperations, LinearOperator, lin_slv_t> system_operator_t;
+
     typedef numerical_algos::newton_method::newton_solver<
-        VectorOperations, 
-        NonlinearOperations,
-        system_operator_t, 
-        convergence_newton_t
-        > newton_t;
+        VectorOperations, NonlinearOperations, system_operator_t, convergence_newton_t>
+        newton_t;
 
 
     typedef container::curve_helper_container<VectorOperations> container_helper_t;
 
-    typedef deflation::solution_storage<VectorOperations> sol_storage_def_t;   
+    typedef deflation::solution_storage<VectorOperations> sol_storage_def_t;
 
 
     typedef container::bifurcation_diagram_curve<
-        VectorOperations,
-        VectorFileOperations, 
-        Log,
-        NonlinearOperations,
-        newton_t, 
-        sol_storage_def_t,
-        container_helper_t
-        > bif_diag_curve_t;
+        VectorOperations, VectorFileOperations, Log, NonlinearOperations, newton_t, sol_storage_def_t,
+        container_helper_t>
+        bif_diag_curve_t;
 
     typedef container::bifurcation_diagram<
-        VectorOperations,
-        VectorFileOperations, 
-        Log,
-        NonlinearOperations,
-        newton_t, 
-        sol_storage_def_t,
-        bif_diag_curve_t,
-        container_helper_t
-        > bif_diag_t;
+        VectorOperations, VectorFileOperations, Log, NonlinearOperations, newton_t, sol_storage_def_t, bif_diag_curve_t,
+        container_helper_t>
+        bif_diag_t;
 
-    typedef container::stability_diagram<
-        VectorOperations, 
-        VectorFileOperations, 
-        Log
-        > stability_diagram_t;
+    typedef container::stability_diagram<VectorOperations, VectorFileOperations, Log> stability_diagram_t;
 
 
     //types of points in different curves
-    typedef typename bif_diag_t::curve_point_type solution_point_t;
+    typedef typename bif_diag_t::curve_point_type              solution_point_t;
     typedef typename stability_diagram_t::stability_point_type stability_point_t;
 
 
-    struct solution_and_stability_point:public solution_point_t
+    struct solution_and_stability_point : public solution_point_t
     {
         int dim_unstable;
-
     };
 
 
 public:
-    plot_diagram_to_pos(VectorOperations* vec_ops_, VectorFileOperations* file_ops_, Log* log_, Log* log_linsolver_, NonlinearOperations* nonlin_op_, Parameters* parameters_):
-            vec_ops(vec_ops_),
-            file_ops(file_ops_),
-            log(log_),
-            nonlin_op(nonlin_op_),
-            log_linsolver(log_linsolver_),
-            parameters(parameters_)
+    plot_diagram_to_pos(
+        VectorOperations *vec_ops_, VectorFileOperations *file_ops_, Log *log_, Log *log_linsolver_,
+        NonlinearOperations *nonlin_op_, Parameters *parameters_
+    )
+        : vec_ops( vec_ops_ ), file_ops( file_ops_ ), log( log_ ), nonlin_op( nonlin_op_ ),
+          log_linsolver( log_linsolver_ ), parameters( parameters_ )
     {
         project_dir = parameters->path_to_project;
         //set project directory the same way as in deflation_continuation
-        if(!project_dir.empty() && *project_dir.rbegin() != '/')
+        if ( !project_dir.empty() && *project_dir.rbegin() != '/' )
             project_dir += '/';
 
-        save_diagram_dir = project_dir + std::string("diagram/");
+        save_diagram_dir = project_dir + std::string( "diagram/" );
 
-        lin_op = new LinearOperator(nonlin_op);  
-        prec = new Preconditioner(nonlin_op);  
+        lin_op = new LinearOperator( nonlin_op );
+        prec   = new Preconditioner( nonlin_op );
 
-        lin_slv = new lin_slv_t(vec_ops, log_linsolver);
-        lin_slv->set_preconditioner(prec);
-        convergence_newton = new convergence_newton_t(vec_ops, log);
-        system_operator = new system_operator_t(vec_ops, lin_op, lin_slv);
-        newton = new newton_t(vec_ops, system_operator, convergence_newton);
-        
-        bif_diag = new bif_diag_t(vec_ops, file_ops, log, nonlin_op, newton, project_dir);
+        lin_slv = new lin_slv_t( vec_ops, log_linsolver );
+        lin_slv->set_preconditioner( prec );
+        convergence_newton = new convergence_newton_t( vec_ops, log );
+        system_operator    = new system_operator_t( vec_ops, lin_op, lin_slv );
+        newton             = new newton_t( vec_ops, system_operator, convergence_newton );
 
-        stability_diagram = new stability_diagram_t(vec_ops, file_ops, log, project_dir);
+        bif_diag = new bif_diag_t( vec_ops, file_ops, log, nonlin_op, newton, project_dir );
 
-        vec_ops->init_vector(x_p); vec_ops->start_use_vector(x_p);
-        vec_ops->init_vector(b_pos_plot); vec_ops->start_use_vector(b_pos_plot);
+        stability_diagram = new stability_diagram_t( vec_ops, file_ops, log, project_dir );
 
+        vec_ops->init_vector( x_p );
+        vec_ops->start_use_vector( x_p );
+        vec_ops->init_vector( b_pos_plot );
+        vec_ops->start_use_vector( b_pos_plot );
     }
     ~plot_diagram_to_pos()
     {
         delete stability_diagram;
-        delete bif_diag;        
+        delete bif_diag;
         delete newton;
         delete system_operator;
         delete convergence_newton;
@@ -162,12 +138,13 @@ public:
         delete prec;
         delete lin_op;
 
-        
-        vec_ops->stop_use_vector(x_p); vec_ops->free_vector(x_p);
-        vec_ops->stop_use_vector(b_pos_plot); vec_ops->free_vector(b_pos_plot);
 
+        vec_ops->stop_use_vector( x_p );
+        vec_ops->free_vector( x_p );
+        vec_ops->stop_use_vector( b_pos_plot );
+        vec_ops->free_vector( b_pos_plot );
     }
-   
+
 
     void set_parameters()
     {
@@ -178,155 +155,162 @@ public:
 
 
     void set_linsolver()
-/*
+    /*
 T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true
-*/    
+*/
     {
         //setup linear system:
         mon = &lin_slv->monitor();
 
-        T lin_solver_tol = parameters->nonlinear_operator.linear_solver.lin_solver_tol;
-        unsigned int lin_solver_max_it = parameters->nonlinear_operator.linear_solver.lin_solver_max_it;
-        bool save_convergence_history_ = parameters->nonlinear_operator.linear_solver.save_convergence_history;
+        T            lin_solver_tol            = parameters->nonlinear_operator.linear_solver.lin_solver_tol;
+        unsigned int lin_solver_max_it         = parameters->nonlinear_operator.linear_solver.lin_solver_max_it;
+        bool         save_convergence_history_ = parameters->nonlinear_operator.linear_solver.save_convergence_history;
         bool divide_out_norms_by_rel_base_ = parameters->nonlinear_operator.linear_solver.divide_out_norms_by_rel_base;
-        bool verbose_ = parameters->nonlinear_operator.linear_solver.verbose;
-        int use_precond_resid = parameters->nonlinear_operator.linear_solver.use_precond_resid;
-        int resid_recalc_freq = parameters->nonlinear_operator.linear_solver.resid_recalc_freq;
-        int basis_sz = parameters->nonlinear_operator.linear_solver.basis_size;
+        bool verbose_                      = parameters->nonlinear_operator.linear_solver.verbose;
+        int  use_precond_resid             = parameters->nonlinear_operator.linear_solver.use_precond_resid;
+        int  resid_recalc_freq             = parameters->nonlinear_operator.linear_solver.resid_recalc_freq;
+        int  basis_sz                      = parameters->nonlinear_operator.linear_solver.basis_size;
 
-        mon->init(lin_solver_tol, T(0), lin_solver_max_it);
-        mon->set_save_convergence_history(save_convergence_history_);
-        mon->set_divide_out_norms_by_rel_base(divide_out_norms_by_rel_base_);
-        mon->set_verbose(verbose_);
+        mon->init( lin_solver_tol, T( 0 ), lin_solver_max_it );
+        mon->set_save_convergence_history( save_convergence_history_ );
+        mon->set_divide_out_norms_by_rel_base( divide_out_norms_by_rel_base_ );
+        mon->set_verbose( verbose_ );
         mon->out_min_resid_norm();
-//
-        if(use_precond_resid >= 0)
-            lin_slv->set_use_precond_resid(use_precond_resid);
-        if(resid_recalc_freq >= 0)
-            lin_slv->set_resid_recalc_freq(resid_recalc_freq);
-        if(basis_sz > 0)
-            lin_slv->set_basis_size(basis_sz);        
-//
+        //
+        if ( use_precond_resid >= 0 )
+            lin_slv->set_use_precond_resid( use_precond_resid );
+        if ( resid_recalc_freq >= 0 )
+            lin_slv->set_resid_recalc_freq( resid_recalc_freq );
+        if ( basis_sz > 0 )
+            lin_slv->set_basis_size( basis_sz );
+        //
     }
 
     void set_newton()
-/*
+    /*
 T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true
-*/    
+*/
     {
-        T tolerance_ = parameters->nonlinear_operator.newton.tolerance;
+        T            tolerance_          = parameters->nonlinear_operator.newton.tolerance;
         unsigned int maximum_iterations_ = parameters->nonlinear_operator.newton.newton_max_it;
-        T newton_wight_ = parameters->nonlinear_operator.newton.newton_wight;
+        T            newton_wight_       = parameters->nonlinear_operator.newton.newton_wight;
 
         bool store_norms_history_ = parameters->nonlinear_operator.newton.store_norms_history;
-        bool verbose_ = parameters->nonlinear_operator.newton.verbose;
+        bool verbose_             = parameters->nonlinear_operator.newton.verbose;
 
-        convergence_newton->set_convergence_constants(tolerance_, maximum_iterations_, newton_wight_, store_norms_history_, verbose_);
+        convergence_newton->set_convergence_constants(
+            tolerance_, maximum_iterations_, newton_wight_, store_norms_history_, verbose_
+        );
     }
 
 
-    bool execute_single_curve(int& curve_number_, bool use_stability_ = false)
+    bool execute_single_curve( int &curve_number_, bool use_stability_ = false )
     {
-        
-        std::vector<solution_point_t> curve = bif_diag->get_curve_points_vector(curve_number_);
-        if(curve.size() == 0)
+
+        std::vector<solution_point_t> curve = bif_diag->get_curve_points_vector( curve_number_ );
+        if ( curve.size() == 0 )
         {
             return false;
         }
         else
         {
-            if(!use_stability_)
+            if ( !use_stability_ )
             {
                 std::string file_name;
-                
-                int total_norms = curve.at(0).vector_norms.size();
-                for(int j=0;j<total_norms-1;j++)
-                {
-                    file_name = std::to_string(j) + "_" + std::to_string(j+1) + "_curve_" + std::to_string(curve_number_) + ".pos";
-                    
-                    file_operations::plot_diagram_no_stability<T, solution_point_t>(save_diagram_dir, file_name, curve_number_, curve, j, j+1);
-                }         
 
+                int total_norms = curve.at( 0 ).vector_norms.size();
+                for ( int j = 0; j < total_norms - 1; j++ )
+                {
+                    file_name = std::to_string( j ) + "_" + std::to_string( j + 1 ) + "_curve_" +
+                                std::to_string( curve_number_ ) + ".pos";
+
+                    file_operations::plot_diagram_no_stability<T, solution_point_t>(
+                        save_diagram_dir, file_name, curve_number_, curve, j, j + 1
+                    );
+                }
             }
             else
             {
                 std::vector<solution_and_stability_point> curve_stability;
-                curve_stability.reserve(curve.size());
+                curve_stability.reserve( curve.size() );
 
-                for(auto &x: curve)
+                for ( auto &x : curve )
                 {
                     solution_and_stability_point aaa;
-                    static_cast<solution_point_t&>(aaa) = x;
-                    curve_stability.push_back(aaa);
+                    static_cast<solution_point_t &>( aaa ) = x;
+                    curve_stability.push_back( aaa );
                 }
 
 
-                std::vector<stability_point_t> stability_curve = stability_diagram->get_curve_points_vector(curve_number_);
+                std::vector<stability_point_t> stability_curve =
+                    stability_diagram->get_curve_points_vector( curve_number_ );
 
 
-                std::deque<stability_point_t> qqq( std::deque<stability_point_t>(stability_curve.begin(), stability_curve.end() ) );
+                std::deque<stability_point_t> qqq(
+                    std::deque<stability_point_t>( stability_curve.begin(), stability_curve.end() )
+                );
 
                 std::vector<solution_and_stability_point> bifurcation_points;
 
-                T lambda_pr = 0;
+                T                 lambda_pr        = 0;
                 stability_point_t stab_point_front = qqq.front();
-                for(auto &c: curve_stability)
+                for ( auto &c : curve_stability )
                 {
                     stability_point_t stab_point_front_attempt = qqq.front();
-                    T lambda_s = stab_point_front_attempt.lambda;
-                    if( c.is_data_avaliable && (c.lambda == stab_point_front_attempt.lambda) )
+                    T                 lambda_s                 = stab_point_front_attempt.lambda;
+                    if ( c.is_data_avaliable && ( c.lambda == stab_point_front_attempt.lambda ) )
                     {
                         stab_point_front = qqq.front();
                         qqq.pop_front();
-                        
-                    }    
-                    else if( (stab_point_front_attempt.point_type == "bifurcation")&&(( lambda_pr-lambda_s)*(c.lambda - lambda_s)<T(0.0)) )
+                    }
+                    else if ( ( stab_point_front_attempt.point_type == "bifurcation" ) &&
+                              ( ( lambda_pr - lambda_s ) * ( c.lambda - lambda_s ) < T( 0.0 ) ) )
                     {
-                        if(qqq.size()>1)
+                        if ( qqq.size() > 1 )
                         {
 
-                            bifurcation_points.push_back(form_bifurcation_point(curve_number_, stab_point_front_attempt));
+                            bifurcation_points.push_back(
+                                form_bifurcation_point( curve_number_, stab_point_front_attempt )
+                            );
 
-                            stab_point_front = qqq.front(); 
+                            stab_point_front = qqq.front();
                             qqq.pop_front();
-                            
                         }
                         else
                         {
-                            bifurcation_points.push_back(form_bifurcation_point(curve_number_, stab_point_front_attempt));
+                            bifurcation_points.push_back(
+                                form_bifurcation_point( curve_number_, stab_point_front_attempt )
+                            );
                             stab_point_front = qqq.front();
-                            
                         }
-                   
-                    } 
-                    lambda_pr = c.lambda;
-                    int dim_unstable = stab_point_front.unstable_dim_R + 2*stab_point_front.unstable_dim_C;
-                    c.dim_unstable = dim_unstable; //-1;
-
-
-
+                    }
+                    lambda_pr        = c.lambda;
+                    int dim_unstable = stab_point_front.unstable_dim_R + 2 * stab_point_front.unstable_dim_C;
+                    c.dim_unstable   = dim_unstable; //-1;
                 }
 
                 std::string file_name;
-                
-                int total_norms = curve_stability.at(0).vector_norms.size();
-                for(int j=0;j<total_norms-1;j++)
+
+                int total_norms = curve_stability.at( 0 ).vector_norms.size();
+                for ( int j = 0; j < total_norms - 1; j++ )
                 {
-                    file_name = std::to_string(j) + "_" + std::to_string(j+1) + "_curve_" + std::to_string(curve_number_) + ".pos";
-                    
-                    file_operations::plot_diagram_stability<T, solution_and_stability_point>(save_diagram_dir, file_name, curve_number_, curve_stability, bifurcation_points, j, j+1);
-                
+                    file_name = std::to_string( j ) + "_" + std::to_string( j + 1 ) + "_curve_" +
+                                std::to_string( curve_number_ ) + ".pos";
+
+                    file_operations::plot_diagram_stability<T, solution_and_stability_point>(
+                        save_diagram_dir, file_name, curve_number_, curve_stability, bifurcation_points, j, j + 1
+                    );
                 }
 
-                file_name = "_curve_" + std::to_string(curve_number_) + ".dat";
-                file_operations::plot_diagram_stability_gnuplot<T, solution_and_stability_point>(save_diagram_dir, file_name, curve_number_, curve_stability, bifurcation_points);       
-
-
+                file_name = "_curve_" + std::to_string( curve_number_ ) + ".dat";
+                file_operations::plot_diagram_stability_gnuplot<T, solution_and_stability_point>(
+                    save_diagram_dir, file_name, curve_number_, curve_stability, bifurcation_points
+                );
             }
-            
-            if(plot_pos_sols>0)
+
+            if ( plot_pos_sols > 0 )
             {
-/*                FILE * gnuplotPipe = popen ("gnuplot -persistent", "w");
+                /*                FILE * gnuplotPipe = popen ("gnuplot -persistent", "w");
                 std::string gnuplot_command = "set term png size 1900,1024";
                 fprintf(gnuplotPipe, "%s \n", gnuplot_command.c_str());
                 gnuplot_command = "unset colorbox";
@@ -380,7 +364,7 @@ T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool s
                     }
                 }
                 pclose(gnuplotPipe);
-*/            
+*/
             }
 
             curve_number_++;
@@ -389,132 +373,145 @@ T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool s
     }
 
 
-    void set_plot_pos_sols(int plot_pos_sols_)
+    void set_plot_pos_sols( int plot_pos_sols_ )
     {
         plot_pos_sols = plot_pos_sols_;
     }
 
     void execute()
     {
-        
-        std::string file_name_diagram_ = parameters->bifurcaiton_diagram_file_name;
+
+        std::string file_name_diagram_   = parameters->bifurcaiton_diagram_file_name;
         std::string file_name_stability_ = parameters->stability_diagram_file_name;
 
-        bool file_exists = load_diagram_data(file_name_diagram_);
-        if(file_exists)
+        bool file_exists = load_diagram_data( file_name_diagram_ );
+        if ( file_exists )
         {
-            bool stability_data = load_stability_data(file_name_stability_);
+            bool stability_data = load_stability_data( file_name_stability_ );
 
-            bool get_curve = true;
-            int curve_number = 0;
+            bool get_curve    = true;
+            int  curve_number = 0;
 
-            while(get_curve)
+            while ( get_curve )
             {
-                log->info_f("executing curve = %i", curve_number);
-                get_curve = execute_single_curve(curve_number, stability_data);
-
+                log->info_f( "executing curve = %i", curve_number );
+                get_curve = execute_single_curve( curve_number, stability_data );
             }
-            log->info("done plotting curves");
+            log->info( "done plotting curves" );
         }
-
     }
 
 
 private:
-    VectorOperations* vec_ops; 
-    MatrixOperations* mat_ops;
-    VectorFileOperations* file_ops;
-    Log* log;
-    Log* log_linsolver;
-    NonlinearOperations* nonlin_op;
-    std::string project_dir;
-    std::string save_diagram_dir;
-    Parameters* parameters;
-    unsigned int skip_files;
-//created locally:
-    LinearOperator* lin_op = nullptr;
-    Preconditioner* prec = nullptr;
-    lin_slv_t* lin_slv = nullptr;
-    monitor_t* mon = nullptr;
-    newton_t* newton = nullptr;
-    convergence_newton_t* convergence_newton = nullptr;
-    system_operator_t* system_operator = nullptr;
-    bif_diag_t* bif_diag = nullptr;
-    stability_diagram_t* stability_diagram = nullptr;
+    VectorOperations     *vec_ops;
+    MatrixOperations     *mat_ops;
+    VectorFileOperations *file_ops;
+    Log                  *log;
+    Log                  *log_linsolver;
+    NonlinearOperations  *nonlin_op;
+    std::string           project_dir;
+    std::string           save_diagram_dir;
+    Parameters           *parameters;
+    unsigned int          skip_files;
+    //created locally:
+    LinearOperator       *lin_op             = nullptr;
+    Preconditioner       *prec               = nullptr;
+    lin_slv_t            *lin_slv            = nullptr;
+    monitor_t            *mon                = nullptr;
+    newton_t             *newton             = nullptr;
+    convergence_newton_t *convergence_newton = nullptr;
+    system_operator_t    *system_operator    = nullptr;
+    bif_diag_t           *bif_diag           = nullptr;
+    stability_diagram_t  *stability_diagram  = nullptr;
 
-//  to detect curve break during analysis
+    //  to detect curve break during analysis
     T_vec x_p;
     T_vec b_pos_plot;
-    int plot_pos_sols = -1;
+    int   plot_pos_sols = -1;
 
 
-    bool load_diagram_data(const std::string file_name_ = {})
+    bool load_diagram_data( const std::string file_name_ = {} )
     {
         bool file_exists = false;
-        if(!file_name_.empty())
+        if ( !file_name_.empty() )
         {
-            std::ifstream load_file( (project_dir + file_name_).c_str() );
-            if(load_file.good())
+            std::ifstream load_file( ( project_dir + file_name_ ).c_str() );
+            if ( load_file.good() )
             {
-                log->info_f("MAIN:plot_diagram_to_pos: reading data for the bifurcaiton diagram from %s ...", (project_dir + file_name_).c_str() );
-                data_input ia(load_file);
-                ia >> (*bif_diag);
+                log->info_f(
+                    "MAIN:plot_diagram_to_pos: reading data for the bifurcaiton diagram from %s ...",
+                    ( project_dir + file_name_ ).c_str()
+                );
+                data_input ia( load_file );
+                ia >> ( *bif_diag );
                 load_file.close();
-                log->info_f("MAIN:plot_diagram_to_pos: read data for the bifurcaiton diagram from %s", (project_dir + file_name_).c_str() );
+                log->info_f(
+                    "MAIN:plot_diagram_to_pos: read data for the bifurcaiton diagram from %s",
+                    ( project_dir + file_name_ ).c_str()
+                );
                 file_exists = true;
             }
             else
             {
-                log->warning_f("MAIN:plot_diagram_to_pos: failed to load saved data for the bifurcaiton diagram %s", (project_dir + file_name_).c_str() );
+                log->warning_f(
+                    "MAIN:plot_diagram_to_pos: failed to load saved data for the bifurcaiton diagram %s",
+                    ( project_dir + file_name_ ).c_str()
+                );
                 file_exists = false;
             }
         }
         return file_exists;
     }
 
-    bool load_stability_data(const std::string file_name_ = {})
+    bool load_stability_data( const std::string file_name_ = {} )
     {
         bool file_exists = false;
-        if(!file_name_.empty())
+        if ( !file_name_.empty() )
         {
-            std::ifstream load_file( (project_dir + file_name_).c_str() );  
-            if(load_file.good())
+            std::ifstream load_file( ( project_dir + file_name_ ).c_str() );
+            if ( load_file.good() )
             {
-                log->info_f("MAIN:plot_diagram_to_pos: reading data for the stability diagram from %s ...", (project_dir + file_name_).c_str() );
-                data_input ia(load_file);
-                ia >> (*stability_diagram);
+                log->info_f(
+                    "MAIN:plot_diagram_to_pos: reading data for the stability diagram from %s ...",
+                    ( project_dir + file_name_ ).c_str()
+                );
+                data_input ia( load_file );
+                ia >> ( *stability_diagram );
                 load_file.close();
-                log->info_f("MAIN:plot_diagram_to_pos: read data for the stability diagram from %s", (project_dir + file_name_).c_str() );
+                log->info_f(
+                    "MAIN:plot_diagram_to_pos: read data for the stability diagram from %s",
+                    ( project_dir + file_name_ ).c_str()
+                );
                 file_exists = true;
             }
             else
             {
-                log->warning_f("MAIN:plot_diagram_to_pos: failed to load stability saved data for the stability diagram %s", (project_dir + file_name_).c_str() );
-                file_exists = false;                
+                log->warning_f(
+                    "MAIN:plot_diagram_to_pos: failed to load stability saved data for the stability diagram %s",
+                    ( project_dir + file_name_ ).c_str()
+                );
+                file_exists = false;
             }
-
-        }        
+        }
         return file_exists;
     }
 
 
-    solution_and_stability_point form_bifurcation_point(const int curve_number_, const stability_point_t& stab_point_front)
+    solution_and_stability_point
+    form_bifurcation_point( const int curve_number_, const stability_point_t &stab_point_front )
     {
-        stability_diagram->get_solution_from_record(curve_number_, stab_point_front, x_p);
-        std::vector<T> bif_diag_norms;
+        stability_diagram->get_solution_from_record( curve_number_, stab_point_front, x_p );
+        std::vector<T>               bif_diag_norms;
         solution_and_stability_point bif_point;
-        nonlin_op->norm_bifurcation_diagram(x_p, bif_diag_norms);
-        bif_point.lambda = stab_point_front.lambda;
+        nonlin_op->norm_bifurcation_diagram( x_p, bif_diag_norms );
+        bif_point.lambda            = stab_point_front.lambda;
         bif_point.is_data_avaliable = true;
-        bif_point.vector_norms = bif_diag_norms;
-        bif_point.id_file_name = stab_point_front.id_file_name;
-        bif_point.dim_unstable = stab_point_front.unstable_dim_R + stab_point_front.unstable_dim_C - 1;
-        return(bif_point);
+        bif_point.vector_norms      = bif_diag_norms;
+        bif_point.id_file_name      = stab_point_front.id_file_name;
+        bif_point.dim_unstable      = stab_point_front.unstable_dim_R + stab_point_front.unstable_dim_C - 1;
+        return ( bif_point );
     }
-
-
 };
-
 
 
 }

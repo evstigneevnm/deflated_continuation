@@ -48,13 +48,13 @@ template <class State, class Distance = l2_storage_distance<State>>
 class stabilized_storage
 {
 public:
-    using state_type = State;
+    using state_type    = State;
     using distance_type = Distance;
-    using real_type = decltype( std::declval<Distance>()( std::declval<const State &>(), std::declval<const State &>() ) );
+    using real_type =
+        decltype( std::declval<Distance>()( std::declval<const State &>(), std::declval<const State &>() ) );
 
     explicit stabilized_storage( real_type duplicate_tolerance, Distance distance = Distance{} )
-        : duplicate_tolerance_( duplicate_tolerance ),
-          distance_( std::move( distance ) )
+        : duplicate_tolerance_( duplicate_tolerance ), distance_( std::move( distance ) )
     {
     }
 
@@ -111,14 +111,14 @@ public:
         if ( states_.empty() )
             return { std::numeric_limits<real_type>::infinity(), static_cast<std::size_t>( -1 ) };
 
-        real_type best = std::numeric_limits<real_type>::infinity();
+        real_type   best       = std::numeric_limits<real_type>::infinity();
         std::size_t best_index = 0;
         for ( std::size_t i = 0; i < states_.size(); ++i )
         {
             const real_type dist = distance_( state, states_[i] );
             if ( dist < best )
             {
-                best = dist;
+                best       = dist;
                 best_index = i;
             }
         }
@@ -126,8 +126,8 @@ public:
     }
 
 private:
-    real_type duplicate_tolerance_;
-    Distance distance_;
+    real_type          duplicate_tolerance_;
+    Distance           distance_;
     std::vector<State> states_;
 };
 

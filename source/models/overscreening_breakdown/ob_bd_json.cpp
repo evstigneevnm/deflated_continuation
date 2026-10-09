@@ -35,120 +35,135 @@
 #include <main/parameters.hpp>
 
 
-int main(int argc, char const *argv[])
+int main( int argc, char const *argv[] )
 {
-    
-    if(argc!=3)
+
+    if ( argc != 3 )
     {
-        printf(".==================================================================================================.\n");
-        printf("Usage: %s path_to_config_file.json operaton, where:\n",argv[0]);
-        printf("    path_to_config_file.json is the json file containing all project configuration;\n");  
-        printf("    operaton stands for 'D', 'E', 'S', 'P' :\n");
-        printf("    'D' - execute deflation-continuation.\n");             
-        printf("    'E' - edit bifurcaiton curve.\n");                       
-        printf("    'P' - plot out the resutls.\n");             
-        printf(".==================================================================================================.\n");             
+        printf(
+            ".==================================================================================================.\n"
+        );
+        printf( "Usage: %s path_to_config_file.json operaton, where:\n", argv[0] );
+        printf( "    path_to_config_file.json is the json file containing all project configuration;\n" );
+        printf( "    operaton stands for 'D', 'E', 'S', 'P' :\n" );
+        printf( "    'D' - execute deflation-continuation.\n" );
+        printf( "    'E' - edit bifurcaiton curve.\n" );
+        printf( "    'P' - plot out the resutls.\n" );
+        printf(
+            ".==================================================================================================.\n"
+        );
         return 0;
     }
     typedef SCALAR_TYPE real;
     using params_st = params_s<real>;
 
-    std::string path_to_config_file_(argv[1]);
-    char what_to_execute = argv[2][0];
+    std::string path_to_config_file_( argv[1] );
+    char        what_to_execute = argv[2][0];
 
     typedef main_classes::parameters<real> parameters_t;
-    parameters_t parameters = main_classes::read_parameters_json<real>(path_to_config_file_);
+    parameters_t parameters = main_classes::read_parameters_json<real>( path_to_config_file_ );
     parameters.plot_all();
 
 
     unsigned int m_Krylov = parameters.stability_continuation.Krylov_subspace;
-    
-    int nvidia_pci_id = parameters.nvidia_pci_id;
+
+    int  nvidia_pci_id                = parameters.nvidia_pci_id;
     bool use_high_precision_reduction = parameters.use_high_precision_reduction;
 
-    size_t N = parameters.nonlinear_operator.N_size.at(0);
-    int bifurcation_parameter_number_in_vector = parameters.nonlinear_operator.problem_int_parameters_vector.at(0);
-    params_st problem_params(N, bifurcation_parameter_number_in_vector, parameters.nonlinear_operator.problem_real_parameters_vector);
-    
-    using log_t = scfd::utils::log_std ;
+    size_t N                                      = parameters.nonlinear_operator.N_size.at( 0 );
+    int    bifurcation_parameter_number_in_vector = parameters.nonlinear_operator.problem_int_parameters_vector.at( 0 );
+    params_st problem_params(
+        N, bifurcation_parameter_number_in_vector, parameters.nonlinear_operator.problem_real_parameters_vector
+    );
+
+    using log_t = scfd::utils::log_std;
 
     using vec_ops_t = gpu_vector_operations<real>;
 
     using vec_t = typename vec_ops_t::vector_type;
 
     using mat_ops_t = gpu_matrix_vector_operations<real, vec_t>;
-    
+
     using files_t = gpu_file_operations<vec_ops_t>;
 
-    using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t,log_t>;
-    
+    using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t, log_t>;
+
     using ob_prob_t = nonlinear_operators::overscreening_breakdown<vec_ops_t, mat_ops_t>;
 
     //standard linear operators and preconditioners
     //linear operators and preconditioners with shifts
     using lin_op_t = nonlinear_operators::linear_operator_overscreening_breakdown<vec_ops_t, mat_ops_t, ob_prob_t>;
-    using lin_op_shifted_t = nonlinear_operators::linear_operator_overscreening_breakdown_shifted<vec_ops_t, mat_ops_t, ob_prob_t>;
-    using prec_t = nonlinear_operators::preconditioner_overscreening_breakdown<vec_ops_t, mat_ops_t, ob_prob_t, lin_op_t>;
-    using prec_shifted_t = nonlinear_operators::preconditioner_overscreening_breakdown_shifted<vec_ops_t, mat_ops_t, ob_prob_t, lin_op_shifted_t>;
+    using lin_op_shifted_t =
+        nonlinear_operators::linear_operator_overscreening_breakdown_shifted<vec_ops_t, mat_ops_t, ob_prob_t>;
+    using prec_t =
+        nonlinear_operators::preconditioner_overscreening_breakdown<vec_ops_t, mat_ops_t, ob_prob_t, lin_op_t>;
+    using prec_shifted_t = nonlinear_operators::preconditioner_overscreening_breakdown_shifted<
+        vec_ops_t, mat_ops_t, ob_prob_t, lin_op_shifted_t>;
 
 
     using knots_t = container::knots<real>;
 
 
-    utils::init_cuda(nvidia_pci_id);
+    utils::init_cuda( nvidia_pci_id );
 
-    cublas_wrap cublas(true);
-    vec_ops_t vec_ops(N, &cublas);
-    mat_ops_t mat_ops(vec_ops.get_vector_size(), vec_ops.get_vector_size(), vec_ops.get_cublas_ref() );
-    files_t vec_file_ops(&vec_ops);
-    ob_prob_t ob_prob(&vec_ops, &mat_ops, problem_params );
-    if(use_high_precision_reduction)
+    cublas_wrap cublas( true );
+    vec_ops_t   vec_ops( N, &cublas );
+    mat_ops_t   mat_ops( vec_ops.get_vector_size(), vec_ops.get_vector_size(), vec_ops.get_cublas_ref() );
+    files_t     vec_file_ops( &vec_ops );
+    ob_prob_t   ob_prob( &vec_ops, &mat_ops, problem_params );
+    if ( use_high_precision_reduction )
     {
         vec_ops.use_high_precision();
     }
 
     log_t log;
     log_t log_linsolver;
-    log_linsolver.set_verbosity(0);
-       
+    log_linsolver.set_verbosity( 0 );
 
-    if( (what_to_execute=='D')||(what_to_execute == 'E') )
+
+    if ( ( what_to_execute == 'D' ) || ( what_to_execute == 'E' ) )
     {
         // typedef main_classes::deflation_continuation<
-        //     vec_ops_t, files_t, log_t, monitor_t, KF_3D_t, 
-        //     lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl, 
+        //     vec_ops_t, files_t, log_t, monitor_t, KF_3D_t,
+        //     lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl,
         //     nonlinear_operators::system_operator, parameters_t> deflation_continuation_t;
 
         using deflation_continuation_t = main_classes::deflation_continuation<
-            vec_ops_t, files_t, log_t, monitor_t, ob_prob_t, 
-            lin_op_t, prec_t, numerical_algos::lin_solvers::exact_wrapper, 
-            nonlinear_operators::system_operator, parameters_t>;
+            vec_ops_t, files_t, log_t, monitor_t, ob_prob_t, lin_op_t, prec_t,
+            numerical_algos::lin_solvers::exact_wrapper, nonlinear_operators::system_operator, parameters_t>;
 
-        deflation_continuation_t DC( (vec_ops_t*) &vec_ops, (files_t*) &vec_file_ops, (log_t*) &log,  (log_t*) &log_linsolver, (ob_prob_t*) &ob_prob, (parameters_t*) &parameters);
+        deflation_continuation_t DC(
+            (vec_ops_t *)&vec_ops, (files_t *)&vec_file_ops, (log_t *)&log, (log_t *)&log_linsolver,
+            (ob_prob_t *)&ob_prob, (parameters_t *)&parameters
+        );
         DC.set_parameters();
-        if(what_to_execute == 'D')
+        if ( what_to_execute == 'D' )
         {
-            DC.use_analytical_solution(false);
+            DC.use_analytical_solution( false );
             DC.execute();
         }
-        else if(what_to_execute == 'E')
+        else if ( what_to_execute == 'E' )
         {
             DC.edit();
         }
-
     }
-    else if(what_to_execute == 'P')
+    else if ( what_to_execute == 'P' )
     {
-        using plot_diagram_t = main_classes::plot_diagram_to_pos<vec_ops_t, mat_ops_t, files_t, log_t, monitor_t, ob_prob_t, lin_op_t, prec_t, numerical_algos::lin_solvers::exact_wrapper, nonlinear_operators::system_operator, parameters_t>;       
-        
-        plot_diagram_t PD( (vec_ops_t*) &vec_ops, (files_t*) &vec_file_ops, (log_t*) &log, (log_t*) &log_linsolver, (ob_prob_t*) &ob_prob, (parameters_t*) &parameters);
-        
+        using plot_diagram_t = main_classes::plot_diagram_to_pos<
+            vec_ops_t, mat_ops_t, files_t, log_t, monitor_t, ob_prob_t, lin_op_t, prec_t,
+            numerical_algos::lin_solvers::exact_wrapper, nonlinear_operators::system_operator, parameters_t>;
+
+        plot_diagram_t PD(
+            (vec_ops_t *)&vec_ops, (files_t *)&vec_file_ops, (log_t *)&log, (log_t *)&log_linsolver,
+            (ob_prob_t *)&ob_prob, (parameters_t *)&parameters
+        );
+
         PD.set_parameters();
         PD.execute();
     }
     else
     {
         std::cout << "No correct usage scheme was selected." << std::endl;
-    }    
+    }
     return 0;
 }

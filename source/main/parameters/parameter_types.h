@@ -134,31 +134,31 @@ struct parameters
             {
                 struct manual_override_s
                 {
-                    T requested;
-                    T effective;
+                    T           requested;
+                    T           effective;
                     std::string reason;
                 };
 
-                bool enabled;
-                std::string registry_file;
-                T min_shift_abs;
-                T max_shift_abs;
-                unsigned int candidate_count;
-                bool prefer_positive_shift;
-                bool require_all_intersections;
-                bool save_registry;
+                bool                           enabled;
+                std::string                    registry_file;
+                T                              min_shift_abs;
+                T                              max_shift_abs;
+                unsigned int                   candidate_count;
+                bool                           prefer_positive_shift;
+                bool                           require_all_intersections;
+                bool                           save_registry;
                 std::vector<manual_override_s> manual_overrides;
 
                 void set_default()
                 {
-                    enabled = false;
-                    registry_file = "knot_registry.json";
-                    min_shift_abs = T(1.0e-6);
-                    max_shift_abs = T(5.0e-2);
-                    candidate_count = 12;
-                    prefer_positive_shift = true;
+                    enabled                   = false;
+                    registry_file             = "knot_registry.json";
+                    min_shift_abs             = T( 1.0e-6 );
+                    max_shift_abs             = T( 5.0e-2 );
+                    candidate_count           = 12;
+                    prefer_positive_shift     = true;
                     require_all_intersections = true;
-                    save_registry = true;
+                    save_registry             = true;
                     manual_overrides.clear();
                 }
 
@@ -173,11 +173,9 @@ struct parameters
                     std::cout << "||  |  |==require_all_intersections: " << require_all_intersections << std::endl;
                     std::cout << "||  |  |==save_registry: " << save_registry << std::endl;
                     std::cout << "||  |  |==manual_overrides: ";
-                    for(const auto& item: manual_overrides)
+                    for ( const auto &item : manual_overrides )
                     {
-                        std::cout
-                            << item.requested << "->"
-                            << item.effective << " ";
+                        std::cout << item.requested << "->" << item.effective << " ";
                     }
                     std::cout << std::endl;
                 }
@@ -185,163 +183,144 @@ struct parameters
 
             struct seed_schedule_s
             {
-                bool enabled;
+                bool        enabled;
                 std::string registry_file;
-                bool save_registry;
+                bool        save_registry;
 
                 void set_default()
                 {
-                    enabled = false;
-                    registry_file =
-                        "deflation_seed_registry.json";
+                    enabled       = false;
+                    registry_file = "deflation_seed_registry.json";
                     save_registry = true;
                 }
 
                 void plot_all()
                 {
-                    std::cout << "||  |  |==enabled: "
-                              << enabled << std::endl;
-                    std::cout << "||  |  |==registry_file: "
-                              << registry_file << std::endl;
-                    std::cout << "||  |  |==save_registry: "
-                              << save_registry << std::endl;
+                    std::cout << "||  |  |==enabled: " << enabled << std::endl;
+                    std::cout << "||  |  |==registry_file: " << registry_file << std::endl;
+                    std::cout << "||  |  |==save_registry: " << save_registry << std::endl;
                 }
             };
 
             struct failed_candidate_registry_s
             {
-                bool enabled;
-                std::string registry_file;
-                std::string state_directory;
+                bool          enabled;
+                std::string   registry_file;
+                std::string   state_directory;
                 std::uint64_t policy_generation;
 
                 void set_default()
                 {
-                    enabled = true;
-                    registry_file =
-                        "failed_continuations/registry.json";
-                    state_directory =
-                        "failed_continuations/states";
+                    enabled           = true;
+                    registry_file     = "failed_continuations/registry.json";
+                    state_directory   = "failed_continuations/states";
                     policy_generation = 1;
                 }
 
                 void plot_all()
                 {
                     std::cout << "||  |  |==enabled: " << enabled << std::endl;
-                    std::cout << "||  |  |==registry_file: "
-                              << registry_file << std::endl;
-                    std::cout << "||  |  |==state_directory: "
-                              << state_directory << std::endl;
-                    std::cout << "||  |  |==policy_generation: "
-                              << policy_generation << std::endl;
+                    std::cout << "||  |  |==registry_file: " << registry_file << std::endl;
+                    std::cout << "||  |  |==state_directory: " << state_directory << std::endl;
+                    std::cout << "||  |  |==policy_generation: " << policy_generation << std::endl;
                 }
             };
 
             struct recovery_registry_s
             {
-                bool enabled;
-                std::string registry_file;
-                std::string checkpoint_directory;
+                bool          enabled;
+                std::string   registry_file;
+                std::string   checkpoint_directory;
                 std::uint64_t policy_generation;
-                bool process_before_deflation;
+                bool          process_before_deflation;
 
                 void set_default()
                 {
-                    enabled = true;
-                    registry_file =
-                        "continuation_recovery_registry.json";
-                    checkpoint_directory = "recovery_checkpoints";
-                    policy_generation = 1;
+                    enabled                  = true;
+                    registry_file            = "continuation_recovery_registry.json";
+                    checkpoint_directory     = "recovery_checkpoints";
+                    policy_generation        = 1;
                     process_before_deflation = false;
                 }
 
                 void plot_all()
                 {
                     std::cout << "||  |  |==enabled: " << enabled << std::endl;
-                    std::cout << "||  |  |==registry_file: "
-                              << registry_file << std::endl;
-                    std::cout << "||  |  |==checkpoint_directory: "
-                              << checkpoint_directory << std::endl;
-                    std::cout << "||  |  |==policy_generation: "
-                              << policy_generation << std::endl;
-                    std::cout << "||  |  |==process_before_deflation: "
-                              << process_before_deflation << std::endl;
+                    std::cout << "||  |  |==registry_file: " << registry_file << std::endl;
+                    std::cout << "||  |  |==checkpoint_directory: " << checkpoint_directory << std::endl;
+                    std::cout << "||  |  |==policy_generation: " << policy_generation << std::endl;
+                    std::cout << "||  |  |==process_before_deflation: " << process_before_deflation << std::endl;
                 }
             };
 
             struct topology_registry_s
             {
-                bool enabled;
-                std::string registry_file;
-                std::string endpoint_directory;
+                bool          enabled;
+                std::string   registry_file;
+                std::string   endpoint_directory;
                 std::uint64_t policy_generation;
-                T absolute_parameter_tolerance;
-                T relative_parameter_tolerance;
-                T state_tolerance;
-                T minimum_tangent_line_similarity;
-                bool record_transverse_junctions;
+                T             absolute_parameter_tolerance;
+                T             relative_parameter_tolerance;
+                T             state_tolerance;
+                T             minimum_tangent_line_similarity;
+                bool          record_transverse_junctions;
 
                 void set_default()
                 {
-                    enabled = true;
-                    registry_file = "branch_topology.json";
-                    endpoint_directory = "branch_topology/endpoints";
-                    policy_generation = 1;
-                    absolute_parameter_tolerance = T(1.0e-7);
-                    relative_parameter_tolerance = T(1.0e-9);
-                    state_tolerance = T(1.0e-8);
-                    minimum_tangent_line_similarity = T(0.9);
-                    record_transverse_junctions = true;
+                    enabled                         = true;
+                    registry_file                   = "branch_topology.json";
+                    endpoint_directory              = "branch_topology/endpoints";
+                    policy_generation               = 1;
+                    absolute_parameter_tolerance    = T( 1.0e-7 );
+                    relative_parameter_tolerance    = T( 1.0e-9 );
+                    state_tolerance                 = T( 1.0e-8 );
+                    minimum_tangent_line_similarity = T( 0.9 );
+                    record_transverse_junctions     = true;
                 }
 
                 void plot_all()
                 {
                     std::cout << "||  |  |==enabled: " << enabled << std::endl;
-                    std::cout << "||  |  |==registry_file: "
-                              << registry_file << std::endl;
-                    std::cout << "||  |  |==endpoint_directory: "
-                              << endpoint_directory << std::endl;
-                    std::cout << "||  |  |==policy_generation: "
-                              << policy_generation << std::endl;
-                    std::cout << "||  |  |==absolute_parameter_tolerance: "
-                              << absolute_parameter_tolerance << std::endl;
-                    std::cout << "||  |  |==relative_parameter_tolerance: "
-                              << relative_parameter_tolerance << std::endl;
-                    std::cout << "||  |  |==state_tolerance: "
-                              << state_tolerance << std::endl;
-                    std::cout << "||  |  |==minimum_tangent_line_similarity: "
-                              << minimum_tangent_line_similarity << std::endl;
-                    std::cout << "||  |  |==record_transverse_junctions: "
-                              << record_transverse_junctions << std::endl;
+                    std::cout << "||  |  |==registry_file: " << registry_file << std::endl;
+                    std::cout << "||  |  |==endpoint_directory: " << endpoint_directory << std::endl;
+                    std::cout << "||  |  |==policy_generation: " << policy_generation << std::endl;
+                    std::cout << "||  |  |==absolute_parameter_tolerance: " << absolute_parameter_tolerance
+                              << std::endl;
+                    std::cout << "||  |  |==relative_parameter_tolerance: " << relative_parameter_tolerance
+                              << std::endl;
+                    std::cout << "||  |  |==state_tolerance: " << state_tolerance << std::endl;
+                    std::cout << "||  |  |==minimum_tangent_line_similarity: " << minimum_tangent_line_similarity
+                              << std::endl;
+                    std::cout << "||  |  |==record_transverse_junctions: " << record_transverse_junctions << std::endl;
                 }
             };
 
-            bool allow_incomplete_restart_intersections;
-            bool allow_knot_interpolation_failure;
-            bool allow_failed_continuation_curve_save;
-            bool preserve_partial_curves;
-            bool check_duplicate_after_deflation;
-            unsigned int duplicate_after_deflation_retries;
-            T duplicate_after_deflation_tolerance;
-            unsigned int max_failed_continuations_per_knot;
-            T failed_continuation_rejection_tolerance;
-            knot_relocation_s knot_relocation;
-            seed_schedule_s seed_schedule;
+            bool                        allow_incomplete_restart_intersections;
+            bool                        allow_knot_interpolation_failure;
+            bool                        allow_failed_continuation_curve_save;
+            bool                        preserve_partial_curves;
+            bool                        check_duplicate_after_deflation;
+            unsigned int                duplicate_after_deflation_retries;
+            T                           duplicate_after_deflation_tolerance;
+            unsigned int                max_failed_continuations_per_knot;
+            T                           failed_continuation_rejection_tolerance;
+            knot_relocation_s           knot_relocation;
+            seed_schedule_s             seed_schedule;
             failed_candidate_registry_s failed_candidate_registry;
-            recovery_registry_s recovery_registry;
-            topology_registry_s topology_registry;
+            recovery_registry_s         recovery_registry;
+            topology_registry_s         topology_registry;
 
             void set_default()
             {
-                allow_incomplete_restart_intersections = false;
-                allow_knot_interpolation_failure = false;
-                allow_failed_continuation_curve_save = false;
-                preserve_partial_curves = true;
-                check_duplicate_after_deflation = true;
-                duplicate_after_deflation_retries = 2;
-                duplicate_after_deflation_tolerance = T(1.0e-8);
-                max_failed_continuations_per_knot = 3;
-                failed_continuation_rejection_tolerance = T(1.0e-8);
+                allow_incomplete_restart_intersections  = false;
+                allow_knot_interpolation_failure        = false;
+                allow_failed_continuation_curve_save    = false;
+                preserve_partial_curves                 = true;
+                check_duplicate_after_deflation         = true;
+                duplicate_after_deflation_retries       = 2;
+                duplicate_after_deflation_tolerance     = T( 1.0e-8 );
+                max_failed_continuations_per_knot       = 3;
+                failed_continuation_rejection_tolerance = T( 1.0e-8 );
                 knot_relocation.set_default();
                 seed_schedule.set_default();
                 failed_candidate_registry.set_default();
@@ -351,15 +330,22 @@ struct parameters
 
             void plot_all()
             {
-                std::cout << "||  |==allow_incomplete_restart_intersections: " << allow_incomplete_restart_intersections << std::endl;
-                std::cout << "||  |==allow_knot_interpolation_failure: " << allow_knot_interpolation_failure << std::endl;
-                std::cout << "||  |==allow_failed_continuation_curve_save: " << allow_failed_continuation_curve_save << std::endl;
+                std::cout << "||  |==allow_incomplete_restart_intersections: " << allow_incomplete_restart_intersections
+                          << std::endl;
+                std::cout << "||  |==allow_knot_interpolation_failure: " << allow_knot_interpolation_failure
+                          << std::endl;
+                std::cout << "||  |==allow_failed_continuation_curve_save: " << allow_failed_continuation_curve_save
+                          << std::endl;
                 std::cout << "||  |==preserve_partial_curves: " << preserve_partial_curves << std::endl;
                 std::cout << "||  |==check_duplicate_after_deflation: " << check_duplicate_after_deflation << std::endl;
-                std::cout << "||  |==duplicate_after_deflation_retries: " << duplicate_after_deflation_retries << std::endl;
-                std::cout << "||  |==duplicate_after_deflation_tolerance: " << duplicate_after_deflation_tolerance << std::endl;
-                std::cout << "||  |==max_failed_continuations_per_knot: " << max_failed_continuations_per_knot << std::endl;
-                std::cout << "||  |==failed_continuation_rejection_tolerance: " << failed_continuation_rejection_tolerance << std::endl;
+                std::cout << "||  |==duplicate_after_deflation_retries: " << duplicate_after_deflation_retries
+                          << std::endl;
+                std::cout << "||  |==duplicate_after_deflation_tolerance: " << duplicate_after_deflation_tolerance
+                          << std::endl;
+                std::cout << "||  |==max_failed_continuations_per_knot: " << max_failed_continuations_per_knot
+                          << std::endl;
+                std::cout << "||  |==failed_continuation_rejection_tolerance: "
+                          << failed_continuation_rejection_tolerance << std::endl;
                 std::cout << "||  |==knot_relocation: " << std::endl;
                 knot_relocation.plot_all();
                 std::cout << "||  |==seed_schedule: " << std::endl;
@@ -376,28 +362,27 @@ struct parameters
         struct continuation_parameter_bounds_s
         {
             bool enabled;
-            T minimum;
-            T maximum;
+            T    minimum;
+            T    maximum;
             bool resolve_with_knot_registry;
 
             void set_default()
             {
-                enabled = false;
-                minimum = T(0);
-                maximum = T(0);
+                enabled                    = false;
+                minimum                    = T( 0 );
+                maximum                    = T( 0 );
                 resolve_with_knot_registry = true;
             }
 
             void plot_all()
             {
                 std::cout << "||  |==enabled: " << enabled << std::endl;
-                if(enabled)
+                if ( enabled )
                 {
                     std::cout << "||  |==minimum: " << minimum << std::endl;
                     std::cout << "||  |==maximum: " << maximum << std::endl;
                 }
-                std::cout << "||  |==resolve_with_knot_registry: "
-                          << resolve_with_knot_registry << std::endl;
+                std::cout << "||  |==resolve_with_knot_registry: " << resolve_with_knot_registry << std::endl;
             }
         };
 
@@ -412,52 +397,51 @@ struct parameters
 
             void plot_all()
             {
-                std::cout << "||  |==preserve_last_converged_point: "
-                          << preserve_last_converged_point << std::endl;
+                std::cout << "||  |==preserve_last_converged_point: " << preserve_last_converged_point << std::endl;
             }
         };
 
         struct branch_intersection_policy_s
         {
-            bool enabled;
+            bool         enabled;
             unsigned int signature_norm_index;
-            T signature_tolerance;
-            T state_tolerance;
-            T minimum_step_fraction_from_start;
-            bool detect_forward_approach;
-            T maximum_forward_lookahead_steps;
-            T maximum_forward_distance_step_ratio;
-            T minimum_forward_distance_reduction_ratio;
+            T            signature_tolerance;
+            T            state_tolerance;
+            T            minimum_step_fraction_from_start;
+            bool         detect_forward_approach;
+            T            maximum_forward_lookahead_steps;
+            T            maximum_forward_distance_step_ratio;
+            T            minimum_forward_distance_reduction_ratio;
             unsigned int forward_distance_extrapolation_power;
-            T forward_refinement_step_factor;
+            T            forward_refinement_step_factor;
             unsigned int maximum_forward_refinements;
             unsigned int minimum_forward_refinements_for_verification;
-            T maximum_verified_forward_steps_ahead;
-            T maximum_verified_forward_distance_step_ratio;
-            bool localize_analytical_targets;
-            T analytical_target_parameter_tolerance;
-            bool verbose;
+            T            maximum_verified_forward_steps_ahead;
+            T            maximum_verified_forward_distance_step_ratio;
+            bool         localize_analytical_targets;
+            T            analytical_target_parameter_tolerance;
+            bool         verbose;
 
             void set_default()
             {
-                enabled = false;
-                signature_norm_index = 0;
-                signature_tolerance = T(1.0e-6);
-                state_tolerance = T(1.0e-8);
-                minimum_step_fraction_from_start = T(1.0e-3);
-                detect_forward_approach = false;
-                maximum_forward_lookahead_steps = T(1);
-                maximum_forward_distance_step_ratio = T(1);
-                minimum_forward_distance_reduction_ratio = T(0.05);
-                forward_distance_extrapolation_power = 1;
-                forward_refinement_step_factor = T(0.25);
-                maximum_forward_refinements = 8;
+                enabled                                      = false;
+                signature_norm_index                         = 0;
+                signature_tolerance                          = T( 1.0e-6 );
+                state_tolerance                              = T( 1.0e-8 );
+                minimum_step_fraction_from_start             = T( 1.0e-3 );
+                detect_forward_approach                      = false;
+                maximum_forward_lookahead_steps              = T( 1 );
+                maximum_forward_distance_step_ratio          = T( 1 );
+                minimum_forward_distance_reduction_ratio     = T( 0.05 );
+                forward_distance_extrapolation_power         = 1;
+                forward_refinement_step_factor               = T( 0.25 );
+                maximum_forward_refinements                  = 8;
                 minimum_forward_refinements_for_verification = 3;
-                maximum_verified_forward_steps_ahead = T(0.1);
-                maximum_verified_forward_distance_step_ratio = T(0.3);
-                localize_analytical_targets = true;
-                analytical_target_parameter_tolerance = T(1.0e-7);
-                verbose = false;
+                maximum_verified_forward_steps_ahead         = T( 0.1 );
+                maximum_verified_forward_distance_step_ratio = T( 0.3 );
+                localize_analytical_targets                  = true;
+                analytical_target_parameter_tolerance        = T( 1.0e-7 );
+                verbose                                      = false;
             }
 
             void plot_all()
@@ -466,42 +450,50 @@ struct parameters
                 std::cout << "||  |==signature_norm_index: " << signature_norm_index << std::endl;
                 std::cout << "||  |==signature_tolerance: " << signature_tolerance << std::endl;
                 std::cout << "||  |==state_tolerance: " << state_tolerance << std::endl;
-                std::cout << "||  |==minimum_step_fraction_from_start: " << minimum_step_fraction_from_start << std::endl;
+                std::cout << "||  |==minimum_step_fraction_from_start: " << minimum_step_fraction_from_start
+                          << std::endl;
                 std::cout << "||  |==detect_forward_approach: " << detect_forward_approach << std::endl;
                 std::cout << "||  |==maximum_forward_lookahead_steps: " << maximum_forward_lookahead_steps << std::endl;
-                std::cout << "||  |==maximum_forward_distance_step_ratio: " << maximum_forward_distance_step_ratio << std::endl;
-                std::cout << "||  |==minimum_forward_distance_reduction_ratio: " << minimum_forward_distance_reduction_ratio << std::endl;
-                std::cout << "||  |==forward_distance_extrapolation_power: " << forward_distance_extrapolation_power << std::endl;
+                std::cout << "||  |==maximum_forward_distance_step_ratio: " << maximum_forward_distance_step_ratio
+                          << std::endl;
+                std::cout << "||  |==minimum_forward_distance_reduction_ratio: "
+                          << minimum_forward_distance_reduction_ratio << std::endl;
+                std::cout << "||  |==forward_distance_extrapolation_power: " << forward_distance_extrapolation_power
+                          << std::endl;
                 std::cout << "||  |==forward_refinement_step_factor: " << forward_refinement_step_factor << std::endl;
                 std::cout << "||  |==maximum_forward_refinements: " << maximum_forward_refinements << std::endl;
-                std::cout << "||  |==minimum_forward_refinements_for_verification: " << minimum_forward_refinements_for_verification << std::endl;
-                std::cout << "||  |==maximum_verified_forward_steps_ahead: " << maximum_verified_forward_steps_ahead << std::endl;
-                std::cout << "||  |==maximum_verified_forward_distance_step_ratio: " << maximum_verified_forward_distance_step_ratio << std::endl;
+                std::cout << "||  |==minimum_forward_refinements_for_verification: "
+                          << minimum_forward_refinements_for_verification << std::endl;
+                std::cout << "||  |==maximum_verified_forward_steps_ahead: " << maximum_verified_forward_steps_ahead
+                          << std::endl;
+                std::cout << "||  |==maximum_verified_forward_distance_step_ratio: "
+                          << maximum_verified_forward_distance_step_ratio << std::endl;
                 std::cout << "||  |==localize_analytical_targets: " << localize_analytical_targets << std::endl;
-                std::cout << "||  |==analytical_target_parameter_tolerance: " << analytical_target_parameter_tolerance << std::endl;
+                std::cout << "||  |==analytical_target_parameter_tolerance: " << analytical_target_parameter_tolerance
+                          << std::endl;
                 std::cout << "||  |==verbose: " << verbose << std::endl;
             }
         };
 
         struct self_intersection_policy_s
         {
-            bool enabled;
+            bool         enabled;
             unsigned int signature_norm_index;
-            T signature_tolerance;
-            T state_tolerance;
-            T minimum_step_fraction_from_start;
-            uint64_t minimum_index_gap;
-            bool verbose;
+            T            signature_tolerance;
+            T            state_tolerance;
+            T            minimum_step_fraction_from_start;
+            uint64_t     minimum_index_gap;
+            bool         verbose;
 
             void set_default()
             {
-                enabled = false;
-                signature_norm_index = 0;
-                signature_tolerance = T(1.0e-6);
-                state_tolerance = T(1.0e-8);
-                minimum_step_fraction_from_start = T(1.0e-3);
-                minimum_index_gap = 50;
-                verbose = false;
+                enabled                          = false;
+                signature_norm_index             = 0;
+                signature_tolerance              = T( 1.0e-6 );
+                state_tolerance                  = T( 1.0e-8 );
+                minimum_step_fraction_from_start = T( 1.0e-3 );
+                minimum_index_gap                = 50;
+                verbose                          = false;
             }
 
             void plot_all()
@@ -510,7 +502,8 @@ struct parameters
                 std::cout << "||  |==signature_norm_index: " << signature_norm_index << std::endl;
                 std::cout << "||  |==signature_tolerance: " << signature_tolerance << std::endl;
                 std::cout << "||  |==state_tolerance: " << state_tolerance << std::endl;
-                std::cout << "||  |==minimum_step_fraction_from_start: " << minimum_step_fraction_from_start << std::endl;
+                std::cout << "||  |==minimum_step_fraction_from_start: " << minimum_step_fraction_from_start
+                          << std::endl;
                 std::cout << "||  |==minimum_index_gap: " << minimum_index_gap << std::endl;
                 std::cout << "||  |==verbose: " << verbose << std::endl;
             }
@@ -518,25 +511,25 @@ struct parameters
 
         struct isotropy_transition_policy_s
         {
-            bool enabled;
-            T relative_mode_tolerance;
-            std::size_t maximum_order;
+            bool         enabled;
+            T            relative_mode_tolerance;
+            std::size_t  maximum_order;
             unsigned int maximum_refinements;
-            T refinement_step_factor;
-            T registry_lambda_tolerance;
-            T registry_state_tolerance;
-            bool verbose;
+            T            refinement_step_factor;
+            T            registry_lambda_tolerance;
+            T            registry_state_tolerance;
+            bool         verbose;
 
             void set_default()
             {
-                enabled = false;
-                relative_mode_tolerance = T(1.0e-10);
-                maximum_order = 16;
-                maximum_refinements = 6;
-                refinement_step_factor = T(0.5);
-                registry_lambda_tolerance = T(1.0e-7);
-                registry_state_tolerance = T(1.0e-7);
-                verbose = false;
+                enabled                   = false;
+                relative_mode_tolerance   = T( 1.0e-10 );
+                maximum_order             = 16;
+                maximum_refinements       = 6;
+                refinement_step_factor    = T( 0.5 );
+                registry_lambda_tolerance = T( 1.0e-7 );
+                registry_state_tolerance  = T( 1.0e-7 );
+                verbose                   = false;
             }
 
             void plot_all()
@@ -554,29 +547,29 @@ struct parameters
 
         struct predictor_chart_policy_s
         {
-            bool enabled;
-            bool enforce;
-            T weak_progress_warning_ratio;
-            T minimum_progress_ratio;
-            T progress_jump_warning_ratio;
-            T maximum_progress_ratio;
-            T displacement_warning_ratio;
-            T maximum_displacement_ratio;
+            bool         enabled;
+            bool         enforce;
+            T            weak_progress_warning_ratio;
+            T            minimum_progress_ratio;
+            T            progress_jump_warning_ratio;
+            T            maximum_progress_ratio;
+            T            displacement_warning_ratio;
+            T            maximum_displacement_ratio;
             unsigned int maximum_retries;
-            T step_reduction_factor;
+            T            step_reduction_factor;
 
             void set_default()
             {
-                enabled = true;
-                enforce = true;
-                weak_progress_warning_ratio = T(0.2);
-                minimum_progress_ratio = T(0.02);
-                progress_jump_warning_ratio = T(5);
-                maximum_progress_ratio = T(50);
-                displacement_warning_ratio = T(20);
-                maximum_displacement_ratio = T(100);
-                maximum_retries = 4;
-                step_reduction_factor = T(0.2);
+                enabled                     = true;
+                enforce                     = true;
+                weak_progress_warning_ratio = T( 0.2 );
+                minimum_progress_ratio      = T( 0.02 );
+                progress_jump_warning_ratio = T( 5 );
+                maximum_progress_ratio      = T( 50 );
+                displacement_warning_ratio  = T( 20 );
+                maximum_displacement_ratio  = T( 100 );
+                maximum_retries             = 4;
+                step_reduction_factor       = T( 0.2 );
             }
 
             void plot_all()
@@ -597,20 +590,20 @@ struct parameters
         struct corrector_retry_policy_s
         {
             unsigned int maximum_retries;
-            T failure_reduction_factor;
-            T minimum_step_size;
-            T minimum_step_ratio;
+            T            failure_reduction_factor;
+            T            minimum_step_size;
+            T            minimum_step_ratio;
             unsigned int successes_before_growth;
-            T success_growth_factor;
+            T            success_growth_factor;
 
             void set_default()
             {
-                maximum_retries = 8;
-                failure_reduction_factor = T(0.5);
-                minimum_step_size = T(0);
-                minimum_step_ratio = T(1.0e-6);
-                successes_before_growth = 5;
-                success_growth_factor = T(1.25);
+                maximum_retries          = 8;
+                failure_reduction_factor = T( 0.5 );
+                minimum_step_size        = T( 0 );
+                minimum_step_ratio       = T( 1.0e-6 );
+                successes_before_growth  = 5;
+                success_growth_factor    = T( 1.25 );
             }
 
             void plot_all()
@@ -626,66 +619,65 @@ struct parameters
 
         struct progress_monitor_policy_s
         {
-            bool enabled;
+            bool         enabled;
             unsigned int window_size;
-            T minimum_window_progress_ratio;
+            T            minimum_window_progress_ratio;
 
             void set_default()
             {
-                enabled = false;
-                window_size = 25;
-                minimum_window_progress_ratio = T(1.0e-3);
+                enabled                       = false;
+                window_size                   = 25;
+                minimum_window_progress_ratio = T( 1.0e-3 );
             }
 
             void plot_all()
             {
                 std::cout << "||  |==enabled: " << enabled << std::endl;
                 std::cout << "||  |==window_size: " << window_size << std::endl;
-                std::cout << "||  |==minimum_window_progress_ratio: "
-                          << minimum_window_progress_ratio << std::endl;
+                std::cout << "||  |==minimum_window_progress_ratio: " << minimum_window_progress_ratio << std::endl;
             }
         };
 
-        unsigned int   continuation_steps;
-        T              step_size;
-        T              max_step_size;
-        unsigned int   deflation_attempts;
-        unsigned int   continuation_fail_attempts;
-        int            initial_direciton;
-        T              step_ds_m;
-        T              step_ds_p;
-        unsigned int   skip_files;
-        std::vector<T> deflation_knots;
-        bool           add_analytical_solution_to_diagram;
+        unsigned int              continuation_steps;
+        T                         step_size;
+        T                         max_step_size;
+        unsigned int              deflation_attempts;
+        unsigned int              continuation_fail_attempts;
+        int                       initial_direciton;
+        T                         step_ds_m;
+        T                         step_ds_p;
+        unsigned int              skip_files;
+        std::vector<T>            deflation_knots;
+        bool                      add_analytical_solution_to_diagram;
         std::vector<unsigned int> analytical_solution_branches;
 
         continuation_parameter_bounds_s continuation_parameter_bounds;
         boundary_refinement_policy_s    boundary_refinement_policy;
-        restart_policy_s                 restart_policy;
-        branch_intersection_policy_s     branch_intersection_policy;
-        self_intersection_policy_s       self_intersection_policy;
-        isotropy_transition_policy_s     isotropy_transition_policy;
-        predictor_chart_policy_s         predictor_chart_policy;
-        corrector_retry_policy_s         corrector_retry_policy;
-        progress_monitor_policy_s        progress_monitor_policy;
-        linear_solver_extended_s       linear_solver_extended;
-        newton_extended_continuation_s newton_extended_continuation;
-        newton_extended_deflation_s    newton_extended_deflation;
+        restart_policy_s                restart_policy;
+        branch_intersection_policy_s    branch_intersection_policy;
+        self_intersection_policy_s      self_intersection_policy;
+        isotropy_transition_policy_s    isotropy_transition_policy;
+        predictor_chart_policy_s        predictor_chart_policy;
+        corrector_retry_policy_s        corrector_retry_policy;
+        progress_monitor_policy_s       progress_monitor_policy;
+        linear_solver_extended_s        linear_solver_extended;
+        newton_extended_continuation_s  newton_extended_continuation;
+        newton_extended_deflation_s     newton_extended_deflation;
 
         void set_default()
         {
-            continuation_steps         = 5000;
-            step_size                  = 0.5;
-            max_step_size              = 5.0;
-            deflation_attempts         = 5;
-            continuation_fail_attempts = 4;
-            initial_direciton          = -1;
-            step_ds_m                  = 0.2;
-            step_ds_p                  = 0.01;
-            skip_files                 = 100;
-            deflation_knots            = { 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0 };
+            continuation_steps                 = 5000;
+            step_size                          = 0.5;
+            max_step_size                      = 5.0;
+            deflation_attempts                 = 5;
+            continuation_fail_attempts         = 4;
+            initial_direciton                  = -1;
+            step_ds_m                          = 0.2;
+            step_ds_p                          = 0.01;
+            skip_files                         = 100;
+            deflation_knots                    = { 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0 };
             add_analytical_solution_to_diagram = false;
-            analytical_solution_branches = {};
+            analytical_solution_branches       = {};
             continuation_parameter_bounds.set_default();
             boundary_refinement_policy.set_default();
             restart_policy.set_default();
@@ -716,13 +708,13 @@ struct parameters
             std::cout << std::endl;
             std::cout << "||==add_analytical_solution_to_diagram: " << add_analytical_solution_to_diagram << std::endl;
             std::cout << "||==analytical_solution_branches: ";
-            if(analytical_solution_branches.empty())
+            if ( analytical_solution_branches.empty() )
             {
                 std::cout << "all";
             }
             else
             {
-                for(auto &x: analytical_solution_branches)
+                for ( auto &x : analytical_solution_branches )
                     std::cout << x << " ";
             }
             std::cout << std::endl;
@@ -823,85 +815,81 @@ struct parameters
 
         struct classification_uncertainty_registry_s
         {
-            bool enabled;
+            bool        enabled;
             std::string file_name;
             std::size_t maximum_diagnostic_length;
-            bool retain_resolved;
+            bool        retain_resolved;
 
             void set_default()
             {
-                enabled = true;
-                file_name = "stability_uncertainty_registry.json";
+                enabled                   = true;
+                file_name                 = "stability_uncertainty_registry.json";
                 maximum_diagnostic_length = 16384;
-                retain_resolved = true;
+                retain_resolved           = true;
             }
 
             void plot_all() const
             {
                 std::cout << "||  |==enabled: " << enabled << std::endl;
                 std::cout << "||  |==file_name: " << file_name << std::endl;
-                std::cout << "||  |==maximum_diagnostic_length: "
-                          << maximum_diagnostic_length << std::endl;
-                std::cout << "||  |==retain_resolved: "
-                          << retain_resolved << std::endl;
+                std::cout << "||  |==maximum_diagnostic_length: " << maximum_diagnostic_length << std::endl;
+                std::cout << "||  |==retain_resolved: " << retain_resolved << std::endl;
             }
         };
 
-        bool            linear_operator_stable_eigenvalues_left_halfplane;
-        unsigned int    Krylov_subspace;
-        unsigned int    desired_spectrum;
-        std::vector<T>  Cayley_transform_sigma_mu;
-        T               stability_boundary_tolerance;
-        T               real_eigenvalue_tolerance;
-        T               conjugate_pair_tolerance;
-        bool            require_converged_eigenpairs;
-        bool            require_nonempty_spectrum;
-        bool            require_complete_scan_coverage;
-        unsigned int    spectrum_classification_retries;
-        unsigned int    transition_classification_confirmations;
-        bool            confirm_regular_stability_points;
-        bool            correct_stability_transitions_with_newton;
-        bool            recover_failed_transition_classification_with_newton;
-        bool            recover_failed_transition_newton_with_parameter_homotopy;
-        unsigned int    transition_newton_homotopy_maximum_subdivisions;
-        unsigned int    transition_refinement_maximum_iterations;
-        unsigned int    transition_refinement_maximum_subdivisions;
-        T               transition_refinement_parameter_tolerance;
-        unsigned int    turning_point_guard_source_points;
-        bool            allow_source_path_topology_splits;
-        unsigned int    symmetry_endpoint_guard_source_points;
-        stability::analysis::matrix_free_stability_config<T>
-                        matrix_free_eigensolver;
-        classification_uncertainty_registry_s
-                        classification_uncertainty_registry;
-        linear_solver_s linear_solver;
-        newton_s        newton;
+        bool                                                 linear_operator_stable_eigenvalues_left_halfplane;
+        unsigned int                                         Krylov_subspace;
+        unsigned int                                         desired_spectrum;
+        std::vector<T>                                       Cayley_transform_sigma_mu;
+        T                                                    stability_boundary_tolerance;
+        T                                                    real_eigenvalue_tolerance;
+        T                                                    conjugate_pair_tolerance;
+        bool                                                 require_converged_eigenpairs;
+        bool                                                 require_nonempty_spectrum;
+        bool                                                 require_complete_scan_coverage;
+        unsigned int                                         spectrum_classification_retries;
+        unsigned int                                         transition_classification_confirmations;
+        bool                                                 confirm_regular_stability_points;
+        bool                                                 correct_stability_transitions_with_newton;
+        bool                                                 recover_failed_transition_classification_with_newton;
+        bool                                                 recover_failed_transition_newton_with_parameter_homotopy;
+        unsigned int                                         transition_newton_homotopy_maximum_subdivisions;
+        unsigned int                                         transition_refinement_maximum_iterations;
+        unsigned int                                         transition_refinement_maximum_subdivisions;
+        T                                                    transition_refinement_parameter_tolerance;
+        unsigned int                                         turning_point_guard_source_points;
+        bool                                                 allow_source_path_topology_splits;
+        unsigned int                                         symmetry_endpoint_guard_source_points;
+        stability::analysis::matrix_free_stability_config<T> matrix_free_eigensolver;
+        classification_uncertainty_registry_s                classification_uncertainty_registry;
+        linear_solver_s                                      linear_solver;
+        newton_s                                             newton;
 
         void set_default()
         {
-            linear_operator_stable_eigenvalues_left_halfplane = true;
-            Krylov_subspace                                   = 25;
-            desired_spectrum                                  = 5;
-            stability_boundary_tolerance                       = T(1.0e-7);
-            real_eigenvalue_tolerance                          = T(1.0e-7);
-            conjugate_pair_tolerance                           = T(1.0e-6);
-            require_converged_eigenpairs                       = true;
-            require_nonempty_spectrum                          = true;
-            require_complete_scan_coverage                     = true;
-            spectrum_classification_retries                    = 2;
-            transition_classification_confirmations            = 2;
-            confirm_regular_stability_points                   = false;
-            correct_stability_transitions_with_newton          = false;
-            recover_failed_transition_classification_with_newton = true;
+            linear_operator_stable_eigenvalues_left_halfplane        = true;
+            Krylov_subspace                                          = 25;
+            desired_spectrum                                         = 5;
+            stability_boundary_tolerance                             = T( 1.0e-7 );
+            real_eigenvalue_tolerance                                = T( 1.0e-7 );
+            conjugate_pair_tolerance                                 = T( 1.0e-6 );
+            require_converged_eigenpairs                             = true;
+            require_nonempty_spectrum                                = true;
+            require_complete_scan_coverage                           = true;
+            spectrum_classification_retries                          = 2;
+            transition_classification_confirmations                  = 2;
+            confirm_regular_stability_points                         = false;
+            correct_stability_transitions_with_newton                = false;
+            recover_failed_transition_classification_with_newton     = true;
             recover_failed_transition_newton_with_parameter_homotopy = true;
-            transition_newton_homotopy_maximum_subdivisions    = 64;
-            transition_refinement_maximum_iterations           = 20;
-            transition_refinement_maximum_subdivisions          = 8;
-            transition_refinement_parameter_tolerance          = T(0);
-            turning_point_guard_source_points                   = 2;
-            allow_source_path_topology_splits                   = false;
-            symmetry_endpoint_guard_source_points               = 0;
-            matrix_free_eigensolver                            = {};
+            transition_newton_homotopy_maximum_subdivisions          = 64;
+            transition_refinement_maximum_iterations                 = 20;
+            transition_refinement_maximum_subdivisions               = 8;
+            transition_refinement_parameter_tolerance                = T( 0 );
+            turning_point_guard_source_points                        = 2;
+            allow_source_path_topology_splits                        = false;
+            symmetry_endpoint_guard_source_points                    = 0;
+            matrix_free_eigensolver                                  = {};
             classification_uncertainty_registry.set_default();
             linear_solver.set_default();
             newton.set_default();
@@ -918,200 +906,95 @@ struct parameters
                 std::cout << x_ << " ";
             }
             std::cout << std::endl;
-            std::cout << "||==stability_boundary_tolerance: "
-                      << stability_boundary_tolerance << std::endl;
-            std::cout << "||==real_eigenvalue_tolerance: "
-                      << real_eigenvalue_tolerance << std::endl;
-            std::cout << "||==conjugate_pair_tolerance: "
-                      << conjugate_pair_tolerance << std::endl;
-            std::cout << "||==require_converged_eigenpairs: "
-                      << require_converged_eigenpairs << std::endl;
-            std::cout << "||==require_nonempty_spectrum: "
-                      << require_nonempty_spectrum << std::endl;
-            std::cout << "||==require_complete_scan_coverage: "
-                      << require_complete_scan_coverage << std::endl;
-            std::cout << "||==spectrum_classification_retries: "
-                      << spectrum_classification_retries << std::endl;
-            std::cout << "||==transition_classification_confirmations: "
-                      << transition_classification_confirmations
+            std::cout << "||==stability_boundary_tolerance: " << stability_boundary_tolerance << std::endl;
+            std::cout << "||==real_eigenvalue_tolerance: " << real_eigenvalue_tolerance << std::endl;
+            std::cout << "||==conjugate_pair_tolerance: " << conjugate_pair_tolerance << std::endl;
+            std::cout << "||==require_converged_eigenpairs: " << require_converged_eigenpairs << std::endl;
+            std::cout << "||==require_nonempty_spectrum: " << require_nonempty_spectrum << std::endl;
+            std::cout << "||==require_complete_scan_coverage: " << require_complete_scan_coverage << std::endl;
+            std::cout << "||==spectrum_classification_retries: " << spectrum_classification_retries << std::endl;
+            std::cout << "||==transition_classification_confirmations: " << transition_classification_confirmations
                       << std::endl;
-            std::cout << "||==confirm_regular_stability_points: "
-                      << confirm_regular_stability_points
+            std::cout << "||==confirm_regular_stability_points: " << confirm_regular_stability_points << std::endl;
+            std::cout << "||==correct_stability_transitions_with_newton: " << correct_stability_transitions_with_newton
                       << std::endl;
-            std::cout << "||==correct_stability_transitions_with_newton: "
-                      << correct_stability_transitions_with_newton
-                      << std::endl;
-            std::cout
-                << "||==recover_failed_transition_classification_with_newton: "
-                << recover_failed_transition_classification_with_newton
-                << std::endl;
-            std::cout
-                << "||==recover_failed_transition_newton_with_parameter_homotopy: "
-                << recover_failed_transition_newton_with_parameter_homotopy
-                << std::endl;
-            std::cout
-                << "||==transition_newton_homotopy_maximum_subdivisions: "
-                << transition_newton_homotopy_maximum_subdivisions
-                << std::endl;
-            std::cout << "||==transition_refinement_maximum_iterations: "
-                      << transition_refinement_maximum_iterations
+            std::cout << "||==recover_failed_transition_classification_with_newton: "
+                      << recover_failed_transition_classification_with_newton << std::endl;
+            std::cout << "||==recover_failed_transition_newton_with_parameter_homotopy: "
+                      << recover_failed_transition_newton_with_parameter_homotopy << std::endl;
+            std::cout << "||==transition_newton_homotopy_maximum_subdivisions: "
+                      << transition_newton_homotopy_maximum_subdivisions << std::endl;
+            std::cout << "||==transition_refinement_maximum_iterations: " << transition_refinement_maximum_iterations
                       << std::endl;
             std::cout << "||==transition_refinement_maximum_subdivisions: "
-                      << transition_refinement_maximum_subdivisions
+                      << transition_refinement_maximum_subdivisions << std::endl;
+            std::cout << "||==transition_refinement_parameter_tolerance: " << transition_refinement_parameter_tolerance
                       << std::endl;
-            std::cout << "||==transition_refinement_parameter_tolerance: "
-                      << transition_refinement_parameter_tolerance
+            std::cout << "||==turning_point_guard_source_points: " << turning_point_guard_source_points << std::endl;
+            std::cout << "||==allow_source_path_topology_splits: " << allow_source_path_topology_splits << std::endl;
+            std::cout << "||==symmetry_endpoint_guard_source_points: " << symmetry_endpoint_guard_source_points
                       << std::endl;
-            std::cout << "||==turning_point_guard_source_points: "
-                      << turning_point_guard_source_points
+            std::cout << "||==matrix_free_eigensolver: " << ( matrix_free_eigensolver.enabled ? "enabled" : "disabled" )
                       << std::endl;
-            std::cout << "||==allow_source_path_topology_splits: "
-                      << allow_source_path_topology_splits
-                      << std::endl;
-            std::cout << "||==symmetry_endpoint_guard_source_points: "
-                      << symmetry_endpoint_guard_source_points
-                      << std::endl;
-            std::cout << "||==matrix_free_eigensolver: "
-                      << (matrix_free_eigensolver.enabled
-                              ? "enabled"
-                              : "disabled")
-                      << std::endl;
-            if(matrix_free_eigensolver.enabled)
+            if ( matrix_free_eigensolver.enabled )
             {
-                const auto& config = matrix_free_eigensolver;
-                std::cout
-                    << "||  |==linearization_scale: "
-                    << config.linearization_scale
-                    << std::endl;
-                std::cout
-                    << "||  |==transformation: "
-                    << stability::analysis::
-                           matrix_free_spectral_transformation_name(
-                               config.transformation.type)
-                    << std::endl;
-                std::cout
-                    << "||  |==shifts:";
-                for(const auto& shift :
-                    config.transformation.shifts)
+                const auto &config = matrix_free_eigensolver;
+                std::cout << "||  |==linearization_scale: " << config.linearization_scale << std::endl;
+                std::cout << "||  |==transformation: "
+                          << stability::analysis::matrix_free_spectral_transformation_name( config.transformation.type )
+                          << std::endl;
+                std::cout << "||  |==shifts:";
+                for ( const auto &shift : config.transformation.shifts )
                 {
-                    std::cout
-                        << " (" << shift.real()
-                        << "," << shift.imag() << ")";
+                    std::cout << " (" << shift.real() << "," << shift.imag() << ")";
                 }
                 std::cout << std::endl;
-                std::cout
-                    << "||  |==desired_eigenvalues: "
-                    << config.outer.desired_eigenvalues
-                    << std::endl;
-                std::cout
-                    << "||  |==krylov_dimension: "
-                    << config.outer.krylov_dimension
-                    << std::endl;
-                std::cout
-                    << "||  |==inner_basis_size: "
-                    << config.inner_solver.basis_size
-                    << std::endl;
-                std::cout
-                    << "||  |==inner_preconditioner_side: "
-                    << config.inner_solver.preconditioner_side
-                    << std::endl;
-                std::cout
-                    << "||  |==inner_basis_retry_sizes:";
-                for(const auto basis_size :
-                    config.inner_solver.basis_retry_sizes)
+                std::cout << "||  |==desired_eigenvalues: " << config.outer.desired_eigenvalues << std::endl;
+                std::cout << "||  |==krylov_dimension: " << config.outer.krylov_dimension << std::endl;
+                std::cout << "||  |==inner_basis_size: " << config.inner_solver.basis_size << std::endl;
+                std::cout << "||  |==inner_preconditioner_side: " << config.inner_solver.preconditioner_side
+                          << std::endl;
+                std::cout << "||  |==inner_basis_retry_sizes:";
+                for ( const auto basis_size : config.inner_solver.basis_retry_sizes )
                 {
                     std::cout << " " << basis_size;
                 }
                 std::cout << std::endl;
-                std::cout
-                    << "||  |==scan_retry: "
-                    << (config.retry.enabled
-                            ? "enabled"
-                            : "disabled")
-                    << ", maximum_shift_retries = "
-                    << config.retry.maximum_shift_retries
-                    << ", initial_shift_perturbation = "
-                    << config.retry.initial_shift_perturbation
-                    << std::endl;
-                std::cout
-                    << "||  |==preconditioner_pole_tolerances: "
-                    << config.retry.
-                           preconditioner_pole_absolute_tolerance
-                    << " "
-                    << config.retry.
-                           preconditioner_pole_relative_tolerance
-                    << std::endl;
-                std::cout
-                    << "||  |==multiplicity_probe_count: "
-                    << config.aggregation.probe_count
-                    << ", minimum_successful_probes = "
-                    << config.aggregation.
-                           minimum_successful_probes
-                    << std::endl;
-                std::cout
-                    << "||  |==small_system: "
-                    << (config.small_system.enabled
-                            ? "enabled"
-                            : "disabled")
-                    << ", maximum_dimension = "
-                    << config.small_system.maximum_dimension
-                    << ", prefer = "
-                    << config.small_system.prefer
-                    << std::endl;
-                std::cout
-                    << "||  |==eigenvector_independence_tolerance: "
-                    << config.aggregation.
-                           eigenvector_independence_tolerance
-                    << std::endl;
-                std::cout
-                    << "||  |==Ritz_subspace_recycling: "
-                    << (config.recycling.enabled
-                            ? "enabled"
-                            : "disabled")
-                    << ", maximum_vectors = "
-                    << config.recycling.maximum_vectors
-                    << ", innovation_weight = "
-                    << config.recycling.innovation_weight
-                    << ", residual_tolerances = "
-                    << config.recycling.
-                           absolute_residual_tolerance
-                    << " "
-                    << config.recycling.
-                           relative_residual_tolerance
-                    << std::endl;
-                std::cout
-                    << "||  |==invariant_subspace_tracking: "
-                    << (config.invariant_subspace_tracking.enabled
-                            ? "enabled"
-                            : "disabled")
-                    << ", maximum_dimension = "
-                    << config.invariant_subspace_tracking.
-                           maximum_dimension
-                    << ", maximum_seed_vectors = "
-                    << config.invariant_subspace_tracking.
-                           maximum_seed_vectors
-                    << ", coverage_recovery_maximum_seed_vectors = "
-                    << config.invariant_subspace_tracking.
-                           coverage_recovery_maximum_seed_vectors
-                    << ", seed_innovation_weight = "
-                    << config.invariant_subspace_tracking.
-                           seed_innovation_weight
-                    << ", minimum_retained_residual_ratio = "
-                    << config.invariant_subspace_tracking.
-                           minimum_retained_residual_ratio
-                    << ", eigenvalue_group_tolerance = "
-                    << config.invariant_subspace_tracking.
-                           eigenvalue_group_tolerance
-                    << ", invariance_tolerances = "
-                    << config.invariant_subspace_tracking.
-                           absolute_invariance_tolerance
-                    << " "
-                    << config.invariant_subspace_tracking.
-                           relative_invariance_tolerance
-                    << std::endl;
+                std::cout << "||  |==scan_retry: " << ( config.retry.enabled ? "enabled" : "disabled" )
+                          << ", maximum_shift_retries = " << config.retry.maximum_shift_retries
+                          << ", initial_shift_perturbation = " << config.retry.initial_shift_perturbation << std::endl;
+                std::cout << "||  |==preconditioner_pole_tolerances: "
+                          << config.retry.preconditioner_pole_absolute_tolerance << " "
+                          << config.retry.preconditioner_pole_relative_tolerance << std::endl;
+                std::cout << "||  |==multiplicity_probe_count: " << config.aggregation.probe_count
+                          << ", minimum_successful_probes = " << config.aggregation.minimum_successful_probes
+                          << std::endl;
+                std::cout << "||  |==small_system: " << ( config.small_system.enabled ? "enabled" : "disabled" )
+                          << ", maximum_dimension = " << config.small_system.maximum_dimension
+                          << ", prefer = " << config.small_system.prefer << std::endl;
+                std::cout << "||  |==eigenvector_independence_tolerance: "
+                          << config.aggregation.eigenvector_independence_tolerance << std::endl;
+                std::cout << "||  |==Ritz_subspace_recycling: " << ( config.recycling.enabled ? "enabled" : "disabled" )
+                          << ", maximum_vectors = " << config.recycling.maximum_vectors
+                          << ", innovation_weight = " << config.recycling.innovation_weight
+                          << ", residual_tolerances = " << config.recycling.absolute_residual_tolerance << " "
+                          << config.recycling.relative_residual_tolerance << std::endl;
+                std::cout << "||  |==invariant_subspace_tracking: "
+                          << ( config.invariant_subspace_tracking.enabled ? "enabled" : "disabled" )
+                          << ", maximum_dimension = " << config.invariant_subspace_tracking.maximum_dimension
+                          << ", maximum_seed_vectors = " << config.invariant_subspace_tracking.maximum_seed_vectors
+                          << ", coverage_recovery_maximum_seed_vectors = "
+                          << config.invariant_subspace_tracking.coverage_recovery_maximum_seed_vectors
+                          << ", seed_innovation_weight = " << config.invariant_subspace_tracking.seed_innovation_weight
+                          << ", minimum_retained_residual_ratio = "
+                          << config.invariant_subspace_tracking.minimum_retained_residual_ratio
+                          << ", eigenvalue_group_tolerance = "
+                          << config.invariant_subspace_tracking.eigenvalue_group_tolerance
+                          << ", invariance_tolerances = "
+                          << config.invariant_subspace_tracking.absolute_invariance_tolerance << " "
+                          << config.invariant_subspace_tracking.relative_invariance_tolerance << std::endl;
             }
-            std::cout << "||==classification_uncertainty_registry: "
-                      << std::endl;
+            std::cout << "||==classification_uncertainty_registry: " << std::endl;
             classification_uncertainty_registry.plot_all();
             std::cout << "||==linear_solver: " << std::endl;
             linear_solver.plot_all();
@@ -1257,7 +1140,7 @@ struct parameters
     {
         nvidia_pci_id                 = -1;
         use_high_precision_reduction  = false;
-        path_to_project                = "./";
+        path_to_project               = "./";
         bifurcaiton_diagram_file_name = "bifurcation_diagram.dat";
         stability_diagram_file_name   = "stability_diagram.dat";
 

@@ -2,42 +2,42 @@
 #define __STAR_SHAPED_BACKEND_TYPEDEFS_H__
 
 #ifndef Blocks_x_
-#define Blocks_x_ 64
+#    define Blocks_x_ 64
 #endif
 
-#if defined(STAR_SHAPED_VECTOR_BACKEND_VAR_PREC)
-#include <common/cpu_vector_operations_var_prec.h>
-#elif defined(STAR_SHAPED_VECTOR_BACKEND_OMP)
-#include <common/scfd_vector_operations.h>
-#include <scfd/backend/omp.h>
-#elif defined(STAR_SHAPED_VECTOR_BACKEND_HIP)
-#include <common/scfd_vector_operations.h>
-#include <scfd/backend/hip.h>
+#if defined( STAR_SHAPED_VECTOR_BACKEND_VAR_PREC )
+#    include <common/cpu_vector_operations_var_prec.h>
+#elif defined( STAR_SHAPED_VECTOR_BACKEND_OMP )
+#    include <common/scfd_vector_operations.h>
+#    include <scfd/backend/omp.h>
+#elif defined( STAR_SHAPED_VECTOR_BACKEND_HIP )
+#    include <common/scfd_vector_operations.h>
+#    include <scfd/backend/hip.h>
 #else
-#include <common/scfd_vector_operations.h>
-#include <scfd/backend/cuda.h>
+#    include <common/scfd_vector_operations.h>
+#    include <scfd/backend/cuda.h>
 #endif
 
 #include <scfd/utils/log.h>
 
-#if defined(STAR_SHAPED_VECTOR_BACKEND_VAR_PREC)
-#ifndef STAR_SHAPED_VAR_PREC_BITS
-#define STAR_SHAPED_VAR_PREC_BITS 100
-#endif
-#define STAR_SHAPED_BACKEND_NAME "cpu_var_prec"
+#if defined( STAR_SHAPED_VECTOR_BACKEND_VAR_PREC )
+#    ifndef STAR_SHAPED_VAR_PREC_BITS
+#        define STAR_SHAPED_VAR_PREC_BITS 100
+#    endif
+#    define STAR_SHAPED_BACKEND_NAME "cpu_var_prec"
 typedef cpu_vector_operations_var_prec<STAR_SHAPED_VAR_PREC_BITS> vec_ops_real;
-typedef typename vec_ops_real::scalar_type real;
-#elif defined(STAR_SHAPED_VECTOR_BACKEND_OMP)
-#define STAR_SHAPED_BACKEND_NAME "scfd_omp"
-typedef SCALAR_TYPE real;
+typedef typename vec_ops_real::scalar_type                        real;
+#elif defined( STAR_SHAPED_VECTOR_BACKEND_OMP )
+#    define STAR_SHAPED_BACKEND_NAME "scfd_omp"
+typedef SCALAR_TYPE                                      real;
 typedef scfd_vector_operations<scfd::backend::omp, real> vec_ops_real;
-#elif defined(STAR_SHAPED_VECTOR_BACKEND_HIP)
-#define STAR_SHAPED_BACKEND_NAME "scfd_hip"
-typedef SCALAR_TYPE real;
+#elif defined( STAR_SHAPED_VECTOR_BACKEND_HIP )
+#    define STAR_SHAPED_BACKEND_NAME "scfd_hip"
+typedef SCALAR_TYPE                                      real;
 typedef scfd_vector_operations<scfd::backend::hip, real> vec_ops_real;
 #else
-#define STAR_SHAPED_BACKEND_NAME "scfd_cuda"
-typedef SCALAR_TYPE real;
+#    define STAR_SHAPED_BACKEND_NAME "scfd_cuda"
+typedef SCALAR_TYPE                                       real;
 typedef scfd_vector_operations<scfd::backend::cuda, real> vec_ops_real;
 #endif
 

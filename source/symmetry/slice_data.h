@@ -15,10 +15,10 @@ struct slice_data
 
     using real_type = Real;
 
-    std::size_t group_dimension = 0;
-    std::size_t active_rank = 0;
-    std::size_t residual_group_order_value = 1;
-    Real tolerance = Real{};
+    std::size_t               group_dimension            = 0;
+    std::size_t               active_rank                = 0;
+    std::size_t               residual_group_order_value = 1;
+    Real                      tolerance                  = Real{};
     std::array<Real, MaxRank> active_shift{};
 
     bool active() const

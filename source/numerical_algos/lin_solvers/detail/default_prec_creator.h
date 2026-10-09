@@ -21,28 +21,28 @@
 
 namespace numerical_algos
 {
-namespace lin_solvers 
+namespace lin_solvers
 {
 
 namespace detail
 {
 
-template<class VectorOperations,class LinearOperator,class Preconditioner>
+template <class VectorOperations, class LinearOperator, class Preconditioner>
 struct default_prec_creator
 {
-    static std::shared_ptr<Preconditioner> get(std::shared_ptr<VectorOperations>)
+    static std::shared_ptr<Preconditioner> get( std::shared_ptr<VectorOperations> )
     {
         return nullptr;
     }
 };
 
-template<class VectorOperations,class LinearOperator>
-struct default_prec_creator<VectorOperations,LinearOperator,preconditioners::dummy<VectorOperations,LinearOperator>>
+template <class VectorOperations, class LinearOperator>
+struct default_prec_creator<VectorOperations, LinearOperator, preconditioners::dummy<VectorOperations, LinearOperator>>
 {
-    static std::shared_ptr<preconditioners::dummy<VectorOperations,LinearOperator>> 
-    get(std::shared_ptr<VectorOperations> vec_ops_)
+    static std::shared_ptr<preconditioners::dummy<VectorOperations, LinearOperator>>
+    get( std::shared_ptr<VectorOperations> vec_ops_ )
     {
-        return std::make_shared<preconditioners::dummy<VectorOperations,LinearOperator>>(std::move(vec_ops_));
+        return std::make_shared<preconditioners::dummy<VectorOperations, LinearOperator>>( std::move( vec_ops_ ) );
     }
 };
 

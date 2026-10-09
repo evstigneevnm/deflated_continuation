@@ -23,48 +23,64 @@ namespace detail
 {
 
 
-template<class VectorOperations>
+template <class VectorOperations>
 struct vector_wrap
 {
-    typedef VectorOperations                        vector_operations_type;
-    typedef typename VectorOperations::vector_type  vector_type;
+    typedef VectorOperations                       vector_operations_type;
+    typedef typename VectorOperations::vector_type vector_type;
 
-    vector_type                     v_;
-    bool                            is_inited_, is_using_;
+    vector_type v_;
+    bool        is_inited_, is_using_;
 
-    vector_wrap() : is_inited_(false), is_using_(false)
+    vector_wrap() : is_inited_( false ), is_using_( false )
     {
     }
 
-    vector_type         &vector() { return v_; }
-    const vector_type   &vector()const { return v_; }
-    bool                is_inited()const { return is_inited_; }
-    bool                is_using()const { return is_using_; }
-
-    void init(const vector_operations_type  &vec_ops)
+    vector_type &vector()
     {
-        if (is_inited_) return;
-        vec_ops.init_vector(v_);
+        return v_;
+    }
+    const vector_type &vector() const
+    {
+        return v_;
+    }
+    bool is_inited() const
+    {
+        return is_inited_;
+    }
+    bool is_using() const
+    {
+        return is_using_;
+    }
+
+    void init( const vector_operations_type &vec_ops )
+    {
+        if ( is_inited_ )
+            return;
+        vec_ops.init_vector( v_ );
         is_inited_ = true;
     }
-    void free(const vector_operations_type  &vec_ops)
+    void free( const vector_operations_type &vec_ops )
     {
-        if (!is_inited_) return;
+        if ( !is_inited_ )
+            return;
         is_inited_ = false;
-        vec_ops.free_vector(v_);
+        vec_ops.free_vector( v_ );
     }
-    void start_use(const vector_operations_type  &vec_ops)
+    void start_use( const vector_operations_type &vec_ops )
     {
-        if (is_using_) return;
-        vec_ops.start_use_vector(v_);
+        if ( is_using_ )
+            return;
+        vec_ops.start_use_vector( v_ );
         is_using_ = true;
     }
-    void stop_use(const vector_operations_type  &vec_ops)
+    void stop_use( const vector_operations_type &vec_ops )
     {
-        if (!is_using_) return;
+        if ( !is_using_ )
+            return;
         is_using_ = false;
-        vec_ops.stop_use_vector(v_);
-    }  
+        vec_ops.stop_use_vector( v_ );
+    }
 };
 
 }

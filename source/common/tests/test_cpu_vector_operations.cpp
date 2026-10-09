@@ -12,69 +12,74 @@ namespace
 
 struct cpu_vector_access
 {
-    template<class VecOps>
+    template <class VecOps>
     void write(
-        VecOps& vec_ops,
-        typename VecOps::vector_type& dst,
-        const std::vector<typename VecOps::scalar_type>& src) const
+        VecOps &vec_ops, typename VecOps::vector_type &dst, const std::vector<typename VecOps::scalar_type> &src
+    ) const
     {
-        vec_ops.set(src.data(), dst, src.size());
+        vec_ops.set( src.data(), dst, src.size() );
     }
 
-    template<class VecOps>
-    std::vector<typename VecOps::scalar_type> read(
-        VecOps& vec_ops,
-        const typename VecOps::vector_type& src,
-        std::size_t n) const
+    template <class VecOps>
+    std::vector<typename VecOps::scalar_type>
+    read( VecOps &vec_ops, const typename VecOps::vector_type &src, std::size_t n ) const
     {
-        std::vector<typename VecOps::scalar_type> host(n);
-        vec_ops.get(src, host.data(), n);
+        std::vector<typename VecOps::scalar_type> host( n );
+        vec_ops.get( src, host.data(), n );
         return host;
     }
 };
 
-template<class T>
-void run_slice_tests(vector_operations_tests::test_report& report)
+template <class T>
+void run_slice_tests( vector_operations_tests::test_report &report )
 {
     using vec_ops_t = scfd_serial_cpu_vector_operations<T>;
-    using vec_t = typename vec_ops_t::vector_type;
+    using vec_t     = typename vec_ops_t::vector_type;
 
-    vec_ops_t vec_ops(10);
+    vec_ops_t vec_ops( 10 );
 
     vec_t x;
     vec_t y;
     vec_t z;
-    vec_ops.init_vectors(x, y, z);
-    vec_ops.start_use_vector(x, 10);
-    vec_ops.start_use_vector(y, 3);
-    vec_ops.start_use_vector(z, 9);
+    vec_ops.init_vectors( x, y, z );
+    vec_ops.start_use_vector( x, 10 );
+    vec_ops.start_use_vector( y, 3 );
+    vec_ops.start_use_vector( z, 9 );
 
-    for(std::size_t i = 0; i < x.size(); ++i)
+    for ( std::size_t i = 0; i < x.size(); ++i )
     {
-        x(i) = static_cast<T>(i);
+        x( i ) = static_cast<T>( i );
     }
 
-    vec_ops.assign_slices(x, {{3, 4}, {6, 8}}, y);
-    vec_ops.assign_skip_slices(x, {{5, 6}}, z);
+    vec_ops.assign_slices( x, { { 3, 4 }, { 6, 8 } }, y );
+    vec_ops.assign_skip_slices( x, { { 5, 6 } }, z );
 
-    const std::vector<T> expected_y = {T(3), T(6), T(7)};
-    const std::vector<T> expected_z = {T(0), T(1), T(2), T(3), T(4), T(6), T(7), T(8), T(9)};
+    const std::vector<T> expected_y = { T( 3 ), T( 6 ), T( 7 ) };
+    const std::vector<T> expected_z = { T( 0 ), T( 1 ), T( 2 ), T( 3 ), T( 4 ), T( 6 ), T( 7 ), T( 8 ), T( 9 ) };
 
     cpu_vector_access access;
-    vector_operations_tests::check_vector_close(report, "SCFD serial slice assign_slices", access.read(vec_ops, y, y.size()), expected_y);
-    vector_operations_tests::check_vector_close(report, "SCFD serial slice assign_skip_slices", access.read(vec_ops, z, z.size()), expected_z);
+    vector_operations_tests::check_vector_close(
+        report, "SCFD serial slice assign_slices", access.read( vec_ops, y, y.size() ), expected_y
+    );
+    vector_operations_tests::check_vector_close(
+        report, "SCFD serial slice assign_skip_slices", access.read( vec_ops, z, z.size() ), expected_z
+    );
 
-    vec_ops.stop_use_vectors(x, y, z);
-    vec_ops.free_vectors(x, y, z);
+    vec_ops.stop_use_vectors( x, y, z );
+    vec_ops.free_vectors( x, y, z );
 }
 
-template<class T>
-void run_cpu_type(const std::string& label, const std::vector<std::size_t>& sizes, vector_operations_tests::test_report& report)
+template <class T>
+void run_cpu_type(
+    const std::string &label, const std::vector<std::size_t> &sizes, vector_operations_tests::test_report &report
+)
 {
-    for(const auto n : sizes)
+    for ( const auto n : sizes )
     {
-        scfd_serial_cpu_vector_operations<T> vec_ops(n);
-        vector_operations_tests::run_vector_operations_template_tests(vec_ops, cpu_vector_access{}, n, label + " n=" + std::to_string(n), report);
+        scfd_serial_cpu_vector_operations<T> vec_ops( n );
+        vector_operations_tests::run_vector_operations_template_tests(
+            vec_ops, cpu_vector_access{}, n, label + " n=" + std::to_string( n ), report
+        );
     }
 }
 
@@ -84,14 +89,14 @@ int main()
 {
     vector_operations_tests::test_report report;
 
-    const std::vector<std::size_t> sizes = {1, 7, 64};
-    using real = SCALAR_TYPE;
+    const std::vector<std::size_t> sizes = { 1, 7, 64 };
+    using real                           = SCALAR_TYPE;
 
-    run_cpu_type<real>("SCFD serial real", sizes, report);
-    run_slice_tests<real>(report);
+    run_cpu_type<real>( "SCFD serial real", sizes, report );
+    run_slice_tests<real>( report );
 
     std::cout << "Checks: " << report.checks << ", failures: " << report.failures << std::endl;
-    if(report.failures == 0)
+    if ( report.failures == 0 )
     {
         std::cout << "PASSED" << std::endl;
         return EXIT_SUCCESS;

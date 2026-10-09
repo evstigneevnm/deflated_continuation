@@ -3,7 +3,7 @@
 
 #include <nmfd/operations/io/vector_file_operations.h>
 
-template<class VectorOperations>
+template <class VectorOperations>
 using cpu_file_operations = nmfd::operations::io::vector_file_operations<VectorOperations>;
 
 #endif

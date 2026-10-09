@@ -24,10 +24,10 @@ namespace utils
 
 struct timer_event
 {
-    virtual void    init() = 0;
-    virtual void    record() = 0;
-    virtual double  elapsed_time(const timer_event &e0)const = 0;
-    virtual void    release() = 0;
+    virtual void   init()                                      = 0;
+    virtual void   record()                                    = 0;
+    virtual double elapsed_time( const timer_event &e0 ) const = 0;
+    virtual void   release()                                   = 0;
 
     /*~timer_event()
     {

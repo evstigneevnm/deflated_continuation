@@ -24,7 +24,8 @@ public:
             throw std::invalid_argument( "packed_positive_mode_view got null data" );
     }
 
-    explicit packed_positive_mode_view( std::vector<complex_type> &data ) : packed_positive_mode_view( data.data(), data.size() )
+    explicit packed_positive_mode_view( std::vector<complex_type> &data )
+        : packed_positive_mode_view( data.data(), data.size() )
     {
     }
 
@@ -64,7 +65,7 @@ public:
 
 private:
     complex_type *data_ = nullptr;
-    std::size_t size_ = 0;
+    std::size_t   size_ = 0;
 };
 
 template <class Complex>
@@ -110,7 +111,7 @@ public:
 
 private:
     const complex_type *data_ = nullptr;
-    std::size_t size_ = 0;
+    std::size_t         size_ = 0;
 };
 
 } // namespace fourier

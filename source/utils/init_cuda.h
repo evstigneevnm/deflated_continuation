@@ -25,41 +25,53 @@ namespace utils
 
 #if __DEVICE_EMULATION__
 
-inline bool init_cuda(int user_prefered_i = -1){ return true; }
+inline bool init_cuda( int user_prefered_i = -1 )
+{
+    return true;
+}
 
 #else
-inline bool init_cuda(int user_prefered_i = -1)
+inline bool init_cuda( int user_prefered_i = -1 )
 {
-    printf("Trying to init cuda\n");
+    printf( "Trying to init cuda\n" );
     int count = 0;
-    int i = 0;
+    int i     = 0;
 
-    cudaGetDeviceCount(&count);
-    if(count == 0) {
-        fprintf(stderr, "There is no device.\n");
+    cudaGetDeviceCount( &count );
+    if ( count == 0 )
+    {
+        fprintf( stderr, "There is no device.\n" );
         return false;
     }
 
-    if (user_prefered_i == -1) {
-        for(i = 0; i < count; i++) {
+    if ( user_prefered_i == -1 )
+    {
+        for ( i = 0; i < count; i++ )
+        {
             cudaDeviceProp prop;
-            if(cudaGetDeviceProperties(&prop, i) == cudaSuccess) {
-                if(prop.major >= 1) {
+            if ( cudaGetDeviceProperties( &prop, i ) == cudaSuccess )
+            {
+                if ( prop.major >= 1 )
+                {
                     break;
                 }
             }
         }
-        if(i == count) {
-            fprintf(stderr, "There is no device supporting CUDA.\n");
+        if ( i == count )
+        {
+            fprintf( stderr, "There is no device supporting CUDA.\n" );
             return false;
         }
-    } else i = user_prefered_i;
-    if (cudaSetDevice(i) != cudaSuccess) {
-        fprintf(stderr, "Error cudaSetDevice.\n");
+    }
+    else
+        i = user_prefered_i;
+    if ( cudaSetDevice( i ) != cudaSuccess )
+    {
+        fprintf( stderr, "Error cudaSetDevice.\n" );
         return false;
     }
 
-    printf("CUDA initialized; device number %d.\n", i);
+    printf( "CUDA initialized; device number %d.\n", i );
     return true;
 }
 

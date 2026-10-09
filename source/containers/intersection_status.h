@@ -6,11 +6,11 @@ namespace container
 
 struct intersection_status
 {
-    unsigned int added = 0;
-    unsigned int failed = 0;
-    unsigned int missing_data = 0;
+    unsigned int added                 = 0;
+    unsigned int failed                = 0;
+    unsigned int missing_data          = 0;
     unsigned int skipped_discontinuous = 0;
-    unsigned int skipped_incomplete = 0;
+    unsigned int skipped_incomplete    = 0;
 
     bool ok() const
     {
@@ -22,7 +22,7 @@ struct intersection_status
         return failed + missing_data + skipped_incomplete;
     }
 
-    intersection_status& operator+=(const intersection_status& that)
+    intersection_status &operator+=( const intersection_status &that )
     {
         added += that.added;
         failed += that.failed;

@@ -42,526 +42,360 @@ namespace tests
 namespace matrix_free_factorized_krylov_schur_test
 {
 
-inline std::size_t checks = 0;
+inline std::size_t checks   = 0;
 inline std::size_t failures = 0;
 
-inline void require(bool condition, const std::string& message)
+inline void require( bool condition, const std::string &message )
 {
     ++checks;
-    if(!condition)
+    if ( !condition )
     {
         ++failures;
         std::cout << "FAIL " << message << '\n';
     }
 }
 
-template<class Problem>
-std::vector<typename Problem::real_type> matrix_diagonal(
-    const Problem& problem)
+template <class Problem>
+std::vector<typename Problem::real_type> matrix_diagonal( const Problem &problem )
 {
-    std::vector<typename Problem::real_type> diagonal(
-        problem.dimension());
-    for(std::size_t index = 0; index < diagonal.size(); ++index)
-        diagonal[index] = problem.matrix(index, index);
+    std::vector<typename Problem::real_type> diagonal( problem.dimension() );
+    for ( std::size_t index = 0; index < diagonal.size(); ++index )
+        diagonal[index] = problem.matrix( index, index );
     return diagonal;
 }
 
-template<class VectorSpace, class Operator>
+template <class VectorSpace, class Operator>
 class coordinate_quotient_model
 {
 public:
     using scalar_type = typename VectorSpace::scalar_type;
     using vector_type = typename VectorSpace::vector_type;
 
-    coordinate_quotient_model(
-        VectorSpace& vector_space,
-        const Operator& linear_operator,
-        std::size_t gauge_index)
-        : vector_space_(vector_space),
-          linear_operator_(linear_operator),
-          gauge_index_(gauge_index),
-          host_(vector_space.get_default_size())
+    coordinate_quotient_model( VectorSpace &vector_space, const Operator &linear_operator, std::size_t gauge_index )
+        : vector_space_( vector_space ), linear_operator_( linear_operator ), gauge_index_( gauge_index ),
+          host_( vector_space.get_default_size() )
     {
-        if(gauge_index_ >= host_.size())
-            throw std::out_of_range(
-                "coordinate quotient gauge index");
+        if ( gauge_index_ >= host_.size() )
+            throw std::out_of_range( "coordinate quotient gauge index" );
     }
 
-    VectorSpace* get_vec_ops_ref()
+    VectorSpace *get_vec_ops_ref()
     {
         return &vector_space_;
     }
 
-    void project_current_tangent(
-        const vector_type& source,
-        vector_type& destination) const
+    void project_current_tangent( const vector_type &source, vector_type &destination ) const
     {
-        vector_space_.get(
-            source,
-            host_.data(),
-            host_.size());
+        vector_space_.get( source, host_.data(), host_.size() );
         host_[gauge_index_] = scalar_type{};
-        vector_space_.set(
-            host_.data(),
-            destination,
-            host_.size());
+        vector_space_.set( host_.data(), destination, host_.size() );
     }
 
-    void projected_jacobian_u(
-        const vector_type& source,
-        vector_type& destination) const
+    void projected_jacobian_u( const vector_type &source, vector_type &destination ) const
     {
-        linear_operator_.apply(source, destination);
-        project_current_tangent(destination, destination);
+        linear_operator_.apply( source, destination );
+        project_current_tangent( destination, destination );
     }
 
 private:
-    VectorSpace& vector_space_;
-    const Operator& linear_operator_;
-    std::size_t gauge_index_;
+    VectorSpace                     &vector_space_;
+    const Operator                  &linear_operator_;
+    std::size_t                      gauge_index_;
     mutable std::vector<scalar_type> host_;
 };
 
-template<class Driver>
+template <class Driver>
 typename Driver::options_type recovery_options()
 {
     typename Driver::options_type options;
-    options.transformed.desired_eigenvalues = 2;
-    options.transformed.krylov_dimension = 6;
-    options.transformed.restart_dimension = 3;
-    options.transformed.max_restarts = 4;
-    options.transformed.absolute_tolerance = 1.0e-11;
-    options.transformed.relative_tolerance = 1.0e-10;
+    options.transformed.desired_eigenvalues      = 2;
+    options.transformed.krylov_dimension         = 6;
+    options.transformed.restart_dimension        = 3;
+    options.transformed.max_restarts             = 4;
+    options.transformed.absolute_tolerance       = 1.0e-11;
+    options.transformed.relative_tolerance       = 1.0e-10;
     options.transformed.preserve_conjugate_pairs = true;
-    options.transformed.target.kind =
-        stability::eigensolvers::spectrum_target::largest_magnitude;
+    options.transformed.target.kind              = stability::eigensolvers::spectrum_target::largest_magnitude;
     options.transformed.orthogonalization.method =
-        nmfd::solvers::krylov::orthogonalization_method::
-            modified_gram_schmidt;
-    options.transformed.orthogonalization.reorthogonalization =
-        nmfd::solvers::krylov::reorthogonalization_policy::dgks;
-    options.transformed.orthogonalization.max_passes = 2;
-    options.recovery.absolute_residual_tolerance = 1.0e-9;
-    options.recovery.relative_residual_tolerance = 1.0e-9;
+        nmfd::solvers::krylov::orthogonalization_method::modified_gram_schmidt;
+    options.transformed.orthogonalization.reorthogonalization = nmfd::solvers::krylov::reorthogonalization_policy::dgks;
+    options.transformed.orthogonalization.max_passes          = 2;
+    options.recovery.absolute_residual_tolerance              = 1.0e-9;
+    options.recovery.relative_residual_tolerance              = 1.0e-9;
     return options;
 }
 
-template<class Backend>
-void test_complex_pair_recovery(const std::string& label)
+template <class Backend>
+void test_complex_pair_recovery( const std::string &label )
 {
-    using real_type = double;
-    using real_space_type =
-        scfd_vector_operations<Backend, real_type>;
-    using complex_scalar_type =
-        common::scfd_backend_ext::complex_t<
-            Backend,
-            real_type>;
-    using complex_space_type =
-        scfd_vector_operations<
-            Backend,
-            complex_scalar_type>;
-    using real_operator_type =
-        analytical_dense_operator<
-            real_space_type,
-            real_type>;
-    using model_type =
-        analytical_real_affine_inverse_model<
-            real_space_type>;
-    using provider_type =
-        stability::eigensolvers::transformations::
-            nonlinear_operator_real_affine_inverse_provider<
-                real_space_type,
-                model_type>;
-    using factorization_types =
-        stability::eigensolvers::transformations::
-            matrix_free_complex_factorization_types<
-                real_space_type,
-                complex_space_type,
-                real_operator_type,
-                provider_type>;
-    using factor_operator_type =
-        typename factorization_types::factor_operator_type;
-    using preconditioner_type =
-        typename factorization_types::preconditioner_type;
-    using log_type = scfd::utils::log_std;
-    using monitor_type =
-        nmfd::solvers::monitor_krylov<
-            complex_space_type,
-            log_type>;
+    using real_type           = double;
+    using real_space_type     = scfd_vector_operations<Backend, real_type>;
+    using complex_scalar_type = common::scfd_backend_ext::complex_t<Backend, real_type>;
+    using complex_space_type  = scfd_vector_operations<Backend, complex_scalar_type>;
+    using real_operator_type  = analytical_dense_operator<real_space_type, real_type>;
+    using model_type          = analytical_real_affine_inverse_model<real_space_type>;
+    using provider_type = stability::eigensolvers::transformations::nonlinear_operator_real_affine_inverse_provider<
+        real_space_type, model_type>;
+    using factorization_types = stability::eigensolvers::transformations::matrix_free_complex_factorization_types<
+        real_space_type, complex_space_type, real_operator_type, provider_type>;
+    using factor_operator_type = typename factorization_types::factor_operator_type;
+    using preconditioner_type  = typename factorization_types::preconditioner_type;
+    using log_type             = scfd::utils::log_std;
+    using monitor_type         = nmfd::solvers::monitor_krylov<complex_space_type, log_type>;
     using inner_solver_type =
-        nmfd::solvers::gmres<
-            complex_space_type,
-            monitor_type,
-            log_type,
-            factor_operator_type,
-            preconditioner_type>;
-    using factor_bundle_type =
-        stability::eigensolvers::transformations::
-            matrix_free_complex_factor_solver_bundle<
-                factorization_types,
-                inner_solver_type>;
-    using dense_lapack_type =
-        nmfd::operations::linalg::
-            host_small_dense_lapack<real_type>;
+        nmfd::solvers::gmres<complex_space_type, monitor_type, log_type, factor_operator_type, preconditioner_type>;
+    using factor_bundle_type = stability::eigensolvers::transformations::matrix_free_complex_factor_solver_bundle<
+        factorization_types, inner_solver_type>;
+    using dense_lapack_type = nmfd::operations::linalg::host_small_dense_lapack<real_type>;
     using driver_type =
-        stability::eigensolvers::
-            matrix_free_factorized_krylov_schur<
-                factor_bundle_type,
-                dense_lapack_type>;
+        stability::eigensolvers::matrix_free_factorized_krylov_schur<factor_bundle_type, dense_lapack_type>;
 
-    const auto problem =
-        complex_pair_eigenproblem<real_type>();
-    auto real_space =
-        std::make_shared<real_space_type>(problem.dimension());
-    auto complex_space =
-        std::make_shared<complex_space_type>(problem.dimension());
-    real_operator_type real_operator(*real_space, problem);
-    auto model = std::make_shared<model_type>(
-        *real_space,
-        matrix_diagonal(problem));
-    auto provider =
-        std::make_shared<provider_type>(
-            *real_space,
-            *model);
+    const auto         problem       = complex_pair_eigenproblem<real_type>();
+    auto               real_space    = std::make_shared<real_space_type>( problem.dimension() );
+    auto               complex_space = std::make_shared<complex_space_type>( problem.dimension() );
+    real_operator_type real_operator( *real_space, problem );
+    auto               model    = std::make_shared<model_type>( *real_space, matrix_diagonal( problem ) );
+    auto               provider = std::make_shared<provider_type>( *real_space, *model );
 
-    constexpr real_type step = 0.1;
-    constexpr std::size_t repetitions = 3;
+    constexpr real_type           step        = 0.1;
+    constexpr std::size_t         repetitions = 3;
     const std::complex<real_type> mapped_target =
-        std::pow(
-            std::complex<real_type>(1.0, 0.0) +
-                step*std::complex<real_type>(0.0, 2.0),
-            repetitions);
-    const std::complex<real_type> shift =
-        mapped_target +
-        std::complex<real_type>(0.04, 0.025);
-    const auto factors =
-        stability::eigensolvers::transformations::
-            euler_denominator_factors(
-                step,
-                repetitions,
-                shift);
+        std::pow( std::complex<real_type>( 1.0, 0.0 ) + step * std::complex<real_type>( 0.0, 2.0 ), repetitions );
+    const std::complex<real_type> shift = mapped_target + std::complex<real_type>( 0.04, 0.025 );
+    const auto                    factors =
+        stability::eigensolvers::transformations::euler_denominator_factors( step, repetitions, shift );
 
     typename inner_solver_type::params inner_parameters;
-    inner_parameters.basis_size = 3;
-    inner_parameters.batch_size = 3;
-    inner_parameters.preconditioner_side = 'L';
-    inner_parameters.orthogonalization = "mgs";
-    inner_parameters.reorthogonalization_policy = "dgks";
-    inner_parameters.max_orthogonalization_passes = 2;
-    inner_parameters.monitor.rel_tol = 1.0e-12;
-    inner_parameters.monitor.abs_tol = 1.0e-13;
-    inner_parameters.monitor.max_iters_num = 20;
+    inner_parameters.basis_size                           = 3;
+    inner_parameters.batch_size                           = 3;
+    inner_parameters.preconditioner_side                  = 'L';
+    inner_parameters.orthogonalization                    = "mgs";
+    inner_parameters.reorthogonalization_policy           = "dgks";
+    inner_parameters.max_orthogonalization_passes         = 2;
+    inner_parameters.monitor.rel_tol                      = 1.0e-12;
+    inner_parameters.monitor.abs_tol                      = 1.0e-13;
+    inner_parameters.monitor.max_iters_num                = 20;
     inner_parameters.monitor.divide_out_norms_by_rel_base = false;
 
-    factor_bundle_type factor_bundle(
-        real_space,
-        complex_space,
-        real_operator,
-        provider,
-        factors,
-        inner_parameters);
-    dense_lapack_type dense_lapack;
-    driver_type driver(factor_bundle, dense_lapack);
+    factor_bundle_type factor_bundle( real_space, complex_space, real_operator, provider, factors, inner_parameters );
+    dense_lapack_type  dense_lapack;
+    driver_type        driver( factor_bundle, dense_lapack );
 
-    nmfd::detail::vector_wrap<
-        real_space_type,
-        true,
-        true> initial(*real_space);
-    const std::vector<real_type> host_initial{
-        1.0,
-        0.35,
-        -0.2};
-    real_space->set(
-        host_initial.data(),
-        *initial,
-        host_initial.size());
-    stability::eigensolvers::ritz_vector_storage<
-        real_space_type> recovered_vectors(
-            *real_space,
-            problem.dimension());
+    nmfd::detail::vector_wrap<real_space_type, true, true> initial( *real_space );
+    const std::vector<real_type>                           host_initial{ 1.0, 0.35, -0.2 };
+    real_space->set( host_initial.data(), *initial, host_initial.size() );
+    stability::eigensolvers::ritz_vector_storage<real_space_type> recovered_vectors( *real_space, problem.dimension() );
 
-    const auto result = driver.execute(
-        *initial,
-        recovery_options<driver_type>(),
-        &recovered_vectors);
+    const auto result = driver.execute( *initial, recovery_options<driver_type>(), &recovered_vectors );
 
     require(
-        result.transformed.succeeded(),
-        label + " transformed Krylov-Schur status: " +
-            result.transformed.diagnostic);
+        result.transformed.succeeded(), label + " transformed Krylov-Schur status: " + result.transformed.diagnostic
+    );
+    require( result.recovered.succeeded(), label + " projected recovery status: " + result.recovered.diagnostic );
+    require( result.succeeded(), label + " complete matrix-free recovery" );
     require(
-        result.recovered.succeeded(),
-        label + " projected recovery status: " +
-            result.recovered.diagnostic);
+        result.transformed_solver_calls == result.transformed.operator_calls &&
+            result.transformed_solver_failures == 0 &&
+            result.transformed.inner_solver_calls == result.transformed_solver_calls,
+        label + " transformed solve accounting"
+    );
     require(
-        result.succeeded(),
-        label + " complete matrix-free recovery");
-    require(
-        result.transformed_solver_calls ==
-            result.transformed.operator_calls &&
-        result.transformed_solver_failures == 0 &&
-        result.transformed.inner_solver_calls ==
-            result.transformed_solver_calls,
-        label + " transformed solve accounting");
-    require(
-        recovered_vectors.size() ==
-            result.recovered.eigenpairs.size() &&
-        result.recovered.projection_dimension >= 2,
-        label + " physical Ritz-vector recovery");
+        recovered_vectors.size() == result.recovered.eigenpairs.size() && result.recovered.projection_dimension >= 2,
+        label + " physical Ritz-vector recovery"
+    );
 
-    for(const std::complex<real_type> expected :
-        {std::complex<real_type>(0.0, 2.0),
-         std::complex<real_type>(0.0, -2.0)})
+    for ( const std::complex<real_type> expected :
+          { std::complex<real_type>( 0.0, 2.0 ), std::complex<real_type>( 0.0, -2.0 ) } )
     {
         const auto nearest = std::min_element(
-            result.recovered.eigenpairs.begin(),
-            result.recovered.eigenpairs.end(),
-            [expected](const auto& left, const auto& right)
-            {
-                return
-                    std::abs(left.value - expected) <
-                    std::abs(right.value - expected);
-            });
+            result.recovered.eigenpairs.begin(), result.recovered.eigenpairs.end(),
+            [expected]( const auto &left, const auto &right ) {
+                return std::abs( left.value - expected ) < std::abs( right.value - expected );
+            }
+        );
         require(
-            nearest != result.recovered.eigenpairs.end() &&
-            std::abs(nearest->value - expected) <= 2.0e-9 &&
-            nearest->relative_residual <= 2.0e-9,
-            label + " recovered physical eigenvalue");
+            nearest != result.recovered.eigenpairs.end() && std::abs( nearest->value - expected ) <= 2.0e-9 &&
+                nearest->relative_residual <= 2.0e-9,
+            label + " recovered physical eigenvalue"
+        );
     }
 
     const auto statistics = factor_bundle.statistics();
     require(
-        statistics.solve_calls ==
-            result.transformed_solver_calls &&
-        statistics.factor_solve_calls ==
-            factors.size()*result.transformed_solver_calls &&
-        statistics.failed_solves == 0,
-        label + " factor bundle accounting");
+        statistics.solve_calls == result.transformed_solver_calls &&
+            statistics.factor_solve_calls == factors.size() * result.transformed_solver_calls &&
+            statistics.failed_solves == 0,
+        label + " factor bundle accounting"
+    );
     require(
         factor_bundle.complexified_operator().operator_calls() > 0 &&
-        factor_bundle.complexified_operator().
-            component_operator_calls() ==
-            2*factor_bundle.complexified_operator().
-                operator_calls(),
-        label + " matrix-free real Jacobian complexification");
+            factor_bundle.complexified_operator().component_operator_calls() ==
+                2 * factor_bundle.complexified_operator().operator_calls(),
+        label + " matrix-free real Jacobian complexification"
+    );
     require(
-        provider->apply_calls() > 0 &&
-        provider->failed_applications() == 0 &&
-        model->apply_calls() == provider->apply_calls(),
-        label + " real-only affine preconditioner boundary");
+        provider->apply_calls() > 0 && provider->failed_applications() == 0 &&
+            model->apply_calls() == provider->apply_calls(),
+        label + " real-only affine preconditioner boundary"
+    );
 
-    auto rejecting_options =
-        recovery_options<driver_type>();
-    rejecting_options.recovery.absolute_residual_tolerance =
-        real_type(0);
-    rejecting_options.recovery.relative_residual_tolerance =
-        real_type(0);
-    const auto rejected = driver.execute(
-        *initial,
-        rejecting_options);
+    auto rejecting_options                                 = recovery_options<driver_type>();
+    rejecting_options.recovery.absolute_residual_tolerance = real_type( 0 );
+    rejecting_options.recovery.relative_residual_tolerance = real_type( 0 );
+    const auto rejected                                    = driver.execute( *initial, rejecting_options );
     require(
         !rejected.succeeded() &&
-            rejected.recovered.diagnostic.find(
-                "rejected physical Ritz values") !=
-                std::string::npos,
-        label + " rejected physical Ritz residual diagnostics: " +
-            rejected.recovered.diagnostic);
+            rejected.recovered.diagnostic.find( "rejected physical Ritz values" ) != std::string::npos,
+        label + " rejected physical Ritz residual diagnostics: " + rejected.recovered.diagnostic
+    );
 
     using stability_assembly_type =
-        stability::analysis::matrix_free_stability_assembly<
-            factorization_types,
-            inner_solver_type,
-            dense_lapack_type>;
+        stability::analysis::matrix_free_stability_assembly<factorization_types, inner_solver_type, dense_lapack_type>;
     stability_assembly_type stability_assembly(
-        real_space,
-        complex_space,
-        real_operator,
-        provider,
-        factors,
-        inner_parameters,
-        recovery_options<driver_type>());
-    const auto structured_result =
-        stability_assembly.execute(*initial);
+        real_space, complex_space, real_operator, provider, factors, inner_parameters, recovery_options<driver_type>()
+    );
+    const auto structured_result = stability_assembly.execute( *initial );
     require(
         structured_result.succeeded(),
-        label + " structured matrix-free stability status: " +
-            structured_result.diagnostic);
+        label + " structured matrix-free stability status: " + structured_result.diagnostic
+    );
     require(
         structured_result.inner_solver_calls > 0 &&
-        structured_result.operator_calls >=
-            structured_result.inner_solver_calls &&
-        structured_result.effective_subspace_dimension >= 2,
-        label + " structured matrix-free accounting");
+            structured_result.operator_calls >= structured_result.inner_solver_calls &&
+            structured_result.effective_subspace_dimension >= 2,
+        label + " structured matrix-free accounting"
+    );
 
-    stability::analysis::spectrum_classifier<real_type>
-        classifier;
-    const auto classified =
-        classifier.classify(structured_result);
+    stability::analysis::spectrum_classifier<real_type> classifier;
+    const auto                                          classified = classifier.classify( structured_result );
     require(
-        classified.succeeded() &&
-        classified.unstable.real == 0 &&
-        classified.unstable.complex_pairs == 0 &&
-        classified.neutral_complex_pairs == 1,
-        label + " matrix-free physical spectrum classification");
+        classified.succeeded() && classified.unstable.real == 0 && classified.unstable.complex_pairs == 0 &&
+            classified.neutral_complex_pairs == 1,
+        label + " matrix-free physical spectrum classification"
+    );
 
     using scan_type =
-        stability::analysis::matrix_free_stability_scan<
-            factorization_types,
-            inner_solver_type,
-            dense_lapack_type>;
-    stability::analysis::matrix_free_stability_config<
-        real_type> scan_config;
-    scan_config.enabled = true;
-    scan_config.transformation.type =
-        stability::analysis::
-            matrix_free_spectral_transformation::
-                explicit_euler;
-    scan_config.transformation.step = step;
+        stability::analysis::matrix_free_stability_scan<factorization_types, inner_solver_type, dense_lapack_type>;
+    stability::analysis::matrix_free_stability_config<real_type> scan_config;
+    scan_config.enabled                    = true;
+    scan_config.transformation.type        = stability::analysis::matrix_free_spectral_transformation::explicit_euler;
+    scan_config.transformation.step        = step;
     scan_config.transformation.repetitions = repetitions;
-    scan_config.transformation.shifts = {
-        shift,
-        shift + std::complex<real_type>(-0.02, 0.03)};
-    scan_config.outer.desired_eigenvalues = 2;
-    scan_config.outer.krylov_dimension = 6;
-    scan_config.outer.restart_dimension = 3;
-    scan_config.outer.maximum_restarts = 4;
-    scan_config.outer.absolute_tolerance = 1.0e-11;
-    scan_config.outer.relative_tolerance = 1.0e-10;
-    scan_config.outer.breakdown_relative_tolerance = 1.0e-12;
-    scan_config.recovery.absolute_residual_tolerance = 1.0e-9;
-    scan_config.recovery.relative_residual_tolerance = 1.0e-9;
-    scan_config.inner_solver.basis_size = 3;
-    scan_config.inner_solver.basis_retry_sizes = {5};
-    scan_config.inner_solver.batch_size = 3;
-    scan_config.inner_solver.preconditioner_side = 'R';
-    scan_config.inner_solver.relative_tolerance = 1.0e-12;
-    scan_config.inner_solver.absolute_tolerance = 1.0e-13;
-    scan_config.inner_solver.maximum_iterations = 20;
+    scan_config.transformation.shifts      = { shift, shift + std::complex<real_type>( -0.02, 0.03 ) };
+    scan_config.outer.desired_eigenvalues  = 2;
+    scan_config.outer.krylov_dimension     = 6;
+    scan_config.outer.restart_dimension    = 3;
+    scan_config.outer.maximum_restarts     = 4;
+    scan_config.outer.absolute_tolerance   = 1.0e-11;
+    scan_config.outer.relative_tolerance   = 1.0e-10;
+    scan_config.outer.breakdown_relative_tolerance         = 1.0e-12;
+    scan_config.recovery.absolute_residual_tolerance       = 1.0e-9;
+    scan_config.recovery.relative_residual_tolerance       = 1.0e-9;
+    scan_config.inner_solver.basis_size                    = 3;
+    scan_config.inner_solver.basis_retry_sizes             = { 5 };
+    scan_config.inner_solver.batch_size                    = 3;
+    scan_config.inner_solver.preconditioner_side           = 'R';
+    scan_config.inner_solver.relative_tolerance            = 1.0e-12;
+    scan_config.inner_solver.absolute_tolerance            = 1.0e-13;
+    scan_config.inner_solver.maximum_iterations            = 20;
     scan_config.inner_solver.divide_norms_by_relative_base = false;
-    scan_config.aggregation.minimum_successful_scans = 2;
-    scan_config.aggregation.require_all_scans = true;
-    scan_config.aggregation.probe_count = 4;
-    scan_config.aggregation.minimum_successful_probes = 2;
-    scan_config.aggregation.require_all_probes = false;
+    scan_config.aggregation.minimum_successful_scans       = 2;
+    scan_config.aggregation.require_all_scans              = true;
+    scan_config.aggregation.probe_count                    = 4;
+    scan_config.aggregation.minimum_successful_probes      = 2;
+    scan_config.aggregation.require_all_probes             = false;
 
-    const auto scans =
-        stability::analysis::make_matrix_free_stability_scans<
-            scan_type>(scan_config);
+    const auto scans = stability::analysis::make_matrix_free_stability_scans<scan_type>( scan_config );
     const auto scan_inner_parameters =
-        stability::analysis::
-            make_matrix_free_inner_solver_parameters<
-                typename scan_type::inner_parameters_type>(
-                    scan_config);
+        stability::analysis::make_matrix_free_inner_solver_parameters<typename scan_type::inner_parameters_type>(
+            scan_config
+        );
     require(
-        scan_inner_parameters.preconditioner_side == 'R',
-        label + " scan uses true-residual right preconditioning");
+        scan_inner_parameters.preconditioner_side == 'R', label + " scan uses true-residual right preconditioning"
+    );
     require(
-        scans.size() == 2 &&
-            scans.front().inner_basis_retry_sizes ==
-                std::vector<unsigned int>({5}),
-        label + " scan preserves inner basis retry policy");
-    std::size_t generated_probe_count = 0;
-    bool generated_probe_indices_valid = true;
-    scan_type scan_driver(
-        real_space,
-        complex_space,
-        real_operator,
-        provider,
-        scans,
-        scan_inner_parameters,
-        stability::analysis::
-            make_spectrum_scan_aggregation_options(scan_config),
-        nullptr,
-        [&generated_probe_count,
-         &generated_probe_indices_valid,
-         &real_space](
-            std::size_t probe_index,
-            const typename real_space_type::vector_type& source,
-            typename real_space_type::vector_type& destination)
-        {
+        scans.size() == 2 && scans.front().inner_basis_retry_sizes == std::vector<unsigned int>( { 5 } ),
+        label + " scan preserves inner basis retry policy"
+    );
+    std::size_t generated_probe_count         = 0;
+    bool        generated_probe_indices_valid = true;
+    scan_type   scan_driver(
+        real_space, complex_space, real_operator, provider, scans, scan_inner_parameters,
+        stability::analysis::make_spectrum_scan_aggregation_options( scan_config ), nullptr,
+        [&generated_probe_count, &generated_probe_indices_valid, &real_space](
+            std::size_t probe_index, const typename real_space_type::vector_type &source,
+            typename real_space_type::vector_type &destination
+        ) {
             generated_probe_indices_valid =
-                generated_probe_indices_valid &&
-                probe_index >= std::size_t(1) &&
-                probe_index < std::size_t(4);
+                generated_probe_indices_valid && probe_index >= std::size_t( 1 ) && probe_index < std::size_t( 4 );
             ++generated_probe_count;
-            real_space->assign(source, destination);
-        });
-    const auto scanned = scan_driver.execute(*initial);
+            real_space->assign( source, destination );
+        }
+    );
+    const auto scanned = scan_driver.execute( *initial );
     require(
-        scanned.succeeded() &&
-            scanned.coverage_complete &&
-            scanned.scans_requested == 2 &&
+        scanned.succeeded() && scanned.coverage_complete && scanned.scans_requested == 2 &&
             scanned.scans_succeeded == 2,
-        label + " sequential spectral scan status: " +
-            scanned.diagnostic);
+        label + " sequential spectral scan status: " + scanned.diagnostic
+    );
     require(
-        generated_probe_indices_valid &&
-            generated_probe_count == 3*scans.size(),
-        label + " spectral scan invokes indexed probe generator");
-    const auto scan_classified = classifier.classify(scanned);
+        generated_probe_indices_valid && generated_probe_count == 3 * scans.size(),
+        label + " spectral scan invokes indexed probe generator"
+    );
+    const auto scan_classified = classifier.classify( scanned );
     require(
-        scan_classified.succeeded() &&
-            scan_classified.neutral_complex_pairs == 1,
-        label + " aggregated physical spectrum classification");
+        scan_classified.succeeded() && scan_classified.neutral_complex_pairs == 1,
+        label + " aggregated physical spectrum classification"
+    );
 
     typename scan_type::recycling_options_type recycling_options;
-    recycling_options.enabled = true;
-    recycling_options.maximum_vectors = 4;
-    recycling_options.innovation_weight = real_type(0.2);
-    recycling_options.absolute_residual_tolerance = real_type(1.0e-10);
-    recycling_options.relative_residual_tolerance = real_type(1.0e-8);
-    scan_driver.set_recycling_options(recycling_options);
+    recycling_options.enabled                     = true;
+    recycling_options.maximum_vectors             = 4;
+    recycling_options.innovation_weight           = real_type( 0.2 );
+    recycling_options.absolute_residual_tolerance = real_type( 1.0e-10 );
+    recycling_options.relative_residual_tolerance = real_type( 1.0e-8 );
+    scan_driver.set_recycling_options( recycling_options );
 
     scan_driver.begin_recycling_transaction();
-    const auto recycling_prime = scan_driver.execute(*initial);
-    if(recycling_prime.succeeded())
+    const auto recycling_prime = scan_driver.execute( *initial );
+    if ( recycling_prime.succeeded() )
         scan_driver.commit_recycling_transaction();
     else
         scan_driver.rollback_recycling_transaction();
     require(
-        recycling_prime.succeeded() &&
-            scan_driver.recycled_subspace_size() > 0,
-        label + " matrix-free scan commits recovered Ritz vectors: " +
-            recycling_prime.diagnostic);
+        recycling_prime.succeeded() && scan_driver.recycled_subspace_size() > 0,
+        label + " matrix-free scan commits recovered Ritz vectors: " + recycling_prime.diagnostic
+    );
 
     scan_driver.begin_recycling_transaction();
-    const auto recycled_scan = scan_driver.execute(*initial);
-    if(recycled_scan.succeeded())
+    const auto recycled_scan = scan_driver.execute( *initial );
+    if ( recycled_scan.succeeded() )
         scan_driver.commit_recycling_transaction();
     else
         scan_driver.rollback_recycling_transaction();
     require(
-        recycled_scan.succeeded() &&
-            recycled_scan.diagnostic.find("accepted=0") ==
-                std::string::npos &&
-            recycled_scan.diagnostic.find(
-                "2 fresh probes succeeded (minimum 2)") !=
-                std::string::npos &&
-            recycled_scan.diagnostic.find("seeded_probes=4") !=
-                std::string::npos,
-        label + " matrix-free scan reuses validated Ritz vectors: " +
-            recycled_scan.diagnostic);
+        recycled_scan.succeeded() && recycled_scan.diagnostic.find( "accepted=0" ) == std::string::npos &&
+            recycled_scan.diagnostic.find( "2 fresh probes succeeded (minimum 2)" ) != std::string::npos &&
+            recycled_scan.diagnostic.find( "seeded_probes=4" ) != std::string::npos,
+        label + " matrix-free scan reuses validated Ritz vectors: " + recycled_scan.diagnostic
+    );
 
     recycling_options.enabled = false;
-    scan_driver.set_recycling_options(recycling_options);
+    scan_driver.set_recycling_options( recycling_options );
     typename scan_type::tracking_options_type tracking_options;
-    tracking_options.enabled = true;
-    tracking_options.maximum_dimension = 4;
-    tracking_options.maximum_seed_vectors = 4;
-    tracking_options.seed_innovation_weight = real_type(0.2);
-    tracking_options.absolute_invariance_tolerance = real_type(1.0e-8);
-    tracking_options.relative_invariance_tolerance = real_type(1.0e-6);
-    scan_driver.set_tracking_options(tracking_options);
+    tracking_options.enabled                       = true;
+    tracking_options.maximum_dimension             = 4;
+    tracking_options.maximum_seed_vectors          = 4;
+    tracking_options.seed_innovation_weight        = real_type( 0.2 );
+    tracking_options.absolute_invariance_tolerance = real_type( 1.0e-8 );
+    tracking_options.relative_invariance_tolerance = real_type( 1.0e-6 );
+    scan_driver.set_tracking_options( tracking_options );
 
     scan_driver.begin_recycling_transaction();
-    const auto tracking_prime = scan_driver.execute(*initial);
+    const auto tracking_prime = scan_driver.execute( *initial );
     const auto tracking_confirmation =
-        tracking_prime.succeeded()
-        ? scan_driver.execute(*initial)
-        : typename scan_type::result_type{};
-    if(
-        tracking_prime.succeeded() &&
-        tracking_confirmation.succeeded())
+        tracking_prime.succeeded() ? scan_driver.execute( *initial ) : typename scan_type::result_type{};
+    if ( tracking_prime.succeeded() && tracking_confirmation.succeeded() )
     {
         scan_driver.commit_recycling_transaction();
     }
@@ -570,462 +404,271 @@ void test_complex_pair_recovery(const std::string& label)
         scan_driver.rollback_recycling_transaction();
     }
     require(
-        tracking_prime.succeeded() &&
-            tracking_confirmation.succeeded() &&
-            tracking_confirmation.diagnostic.find(
-                "seeded_probes=0") == std::string::npos &&
+        tracking_prime.succeeded() && tracking_confirmation.succeeded() &&
+            tracking_confirmation.diagnostic.find( "seeded_probes=0" ) == std::string::npos &&
             scan_driver.tracked_subspace_size() > 1,
         label +
             " repeated confirmation sees staged invariant-subspace "
             "seeds before commit: " +
-            tracking_confirmation.diagnostic);
+            tracking_confirmation.diagnostic
+    );
 
     scan_driver.begin_recycling_transaction();
-    const auto tracked_scan = scan_driver.execute(*initial);
-    if(tracked_scan.succeeded())
+    const auto tracked_scan = scan_driver.execute( *initial );
+    if ( tracked_scan.succeeded() )
         scan_driver.commit_recycling_transaction();
     else
         scan_driver.rollback_recycling_transaction();
     require(
         tracked_scan.succeeded() &&
-            tracked_scan.diagnostic.find(
-                "invariant-subspace tracking: committed=") !=
-                std::string::npos &&
-            tracked_scan.diagnostic.find("seeded_probes=0") ==
-                std::string::npos &&
-            tracked_scan.diagnostic.find(
-                "4 fresh probes succeeded (minimum 2)") !=
-                std::string::npos,
-        label +
-            " tracked probes supplement rather than replace discovery: " +
-            tracked_scan.diagnostic);
+            tracked_scan.diagnostic.find( "invariant-subspace tracking: committed=" ) != std::string::npos &&
+            tracked_scan.diagnostic.find( "seeded_probes=0" ) == std::string::npos &&
+            tracked_scan.diagnostic.find( "4 fresh probes succeeded (minimum 2)" ) != std::string::npos,
+        label + " tracked probes supplement rather than replace discovery: " + tracked_scan.diagnostic
+    );
 
-    tracking_options.maximum_seed_vectors = 1;
+    tracking_options.maximum_seed_vectors                   = 1;
     tracking_options.coverage_recovery_maximum_seed_vectors = 4;
-    scan_driver.set_tracking_options(tracking_options);
+    scan_driver.set_tracking_options( tracking_options );
     scan_driver.begin_recycling_transaction();
-    const auto nominal_coverage_scan = scan_driver.execute(*initial);
-    if(nominal_coverage_scan.succeeded())
+    const auto nominal_coverage_scan = scan_driver.execute( *initial );
+    if ( nominal_coverage_scan.succeeded() )
         scan_driver.commit_recycling_transaction();
     else
         scan_driver.rollback_recycling_transaction();
     require(
-        nominal_coverage_scan.succeeded() &&
-            nominal_coverage_scan.coverage_recoveries == 0 &&
-            nominal_coverage_scan.diagnostic.find(
-                "seeded_probes=2") != std::string::npos,
-        label +
-            " recovery seed cap adds no work to a covered scan: " +
-            nominal_coverage_scan.diagnostic);
+        nominal_coverage_scan.succeeded() && nominal_coverage_scan.coverage_recoveries == 0 &&
+            nominal_coverage_scan.diagnostic.find( "seeded_probes=2" ) != std::string::npos,
+        label + " recovery seed cap adds no work to a covered scan: " + nominal_coverage_scan.diagnostic
+    );
 
     scan_driver.begin_recycling_transaction();
-    const bool reconciliation_available =
-        scan_driver.classification_reconciliation_available();
-    const auto reconciliation_scan =
-        scan_driver.execute_classification_reconciliation(*initial, 1);
-    if(reconciliation_scan.succeeded())
+    const bool reconciliation_available = scan_driver.classification_reconciliation_available();
+    const auto reconciliation_scan      = scan_driver.execute_classification_reconciliation( *initial, 1 );
+    if ( reconciliation_scan.succeeded() )
         scan_driver.commit_recycling_transaction();
     else
         scan_driver.rollback_recycling_transaction();
     require(
-        reconciliation_available &&
-            reconciliation_scan.succeeded() &&
-            reconciliation_scan.coverage_recoveries == 1 &&
+        reconciliation_available && reconciliation_scan.succeeded() && reconciliation_scan.coverage_recoveries == 1 &&
             reconciliation_scan.diagnostic.find(
                 "tracked classification reconciliation with seed limit 4 "
-                "succeeded") != std::string::npos,
+                "succeeded"
+            ) != std::string::npos,
         label +
             " explicit classification reconciliation uses the expanded "
-            "tracked seed budget: " + reconciliation_scan.diagnostic);
+            "tracked seed budget: " +
+            reconciliation_scan.diagnostic
+    );
 
-    auto undercoverage_options = scan_driver.aggregation_options();
-    const auto original_aggregation_options = undercoverage_options;
-    undercoverage_options.minimum_eigenpairs =
-        nominal_coverage_scan.eigenpairs.size() + 1;
-    scan_driver.set_aggregation_options(undercoverage_options);
+    auto       undercoverage_options         = scan_driver.aggregation_options();
+    const auto original_aggregation_options  = undercoverage_options;
+    undercoverage_options.minimum_eigenpairs = nominal_coverage_scan.eigenpairs.size() + 1;
+    scan_driver.set_aggregation_options( undercoverage_options );
     scan_driver.begin_recycling_transaction();
-    const auto exhausted_coverage_recovery =
-        scan_driver.execute(*initial);
+    const auto exhausted_coverage_recovery = scan_driver.execute( *initial );
     scan_driver.rollback_recycling_transaction();
     require(
-        !exhausted_coverage_recovery.succeeded() &&
-            exhausted_coverage_recovery.coverage_recoveries == 1 &&
-            exhausted_coverage_recovery.diagnostic.find(
-                "tracked coverage recovery with seed limit 4 failed") !=
+        !exhausted_coverage_recovery.succeeded() && exhausted_coverage_recovery.coverage_recoveries == 1 &&
+            exhausted_coverage_recovery.diagnostic.find( "tracked coverage recovery with seed limit 4 failed" ) !=
                 std::string::npos,
         label +
             " aggregate undercoverage triggers the bounded tracked "
             "recovery pass: " +
-            exhausted_coverage_recovery.diagnostic);
-    scan_driver.set_aggregation_options(original_aggregation_options);
-    tracking_options.maximum_seed_vectors = 4;
+            exhausted_coverage_recovery.diagnostic
+    );
+    scan_driver.set_aggregation_options( original_aggregation_options );
+    tracking_options.maximum_seed_vectors                   = 4;
     tracking_options.coverage_recovery_maximum_seed_vectors = 0;
-    scan_driver.set_tracking_options(tracking_options);
+    scan_driver.set_tracking_options( tracking_options );
 
-    const std::size_t tracked_dimension =
-        scan_driver.tracked_subspace_size();
+    const std::size_t tracked_dimension = scan_driver.tracked_subspace_size();
     scan_driver.reset_recycled_ritz_subspace();
     require(
-        tracked_dimension > 0 &&
-            scan_driver.tracked_subspace_size() == tracked_dimension,
-        label + " legacy Ritz reset preserves tracked invariant subspace");
+        tracked_dimension > 0 && scan_driver.tracked_subspace_size() == tracked_dimension,
+        label + " legacy Ritz reset preserves tracked invariant subspace"
+    );
     scan_driver.reset_recycled_subspace();
     require(
-        scan_driver.tracked_subspace_size() == 0,
-        label + " full warm-start reset clears tracked invariant subspace");
+        scan_driver.tracked_subspace_size() == 0, label + " full warm-start reset clears tracked invariant subspace"
+    );
 }
 
-template<class Backend>
-void test_projected_quotient_recovery(const std::string& label)
+template <class Backend>
+void test_projected_quotient_recovery( const std::string &label )
 {
-    using real_type = double;
-    using real_space_type =
-        scfd_vector_operations<Backend, real_type>;
-    using complex_scalar_type =
-        common::scfd_backend_ext::complex_t<
-            Backend,
-            real_type>;
-    using complex_space_type =
-        scfd_vector_operations<
-            Backend,
-            complex_scalar_type>;
-    using base_operator_type =
-        analytical_dense_operator<
-            real_space_type,
-            real_type>;
-    using quotient_model_type =
-        coordinate_quotient_model<
-            real_space_type,
-            base_operator_type>;
-    using real_operator_type =
-        symmetry::linearization::projected_linear_operator<
-            real_space_type,
-            quotient_model_type>;
-    using affine_model_type =
-        analytical_real_affine_inverse_model<
-            real_space_type>;
+    using real_type           = double;
+    using real_space_type     = scfd_vector_operations<Backend, real_type>;
+    using complex_scalar_type = common::scfd_backend_ext::complex_t<Backend, real_type>;
+    using complex_space_type  = scfd_vector_operations<Backend, complex_scalar_type>;
+    using base_operator_type  = analytical_dense_operator<real_space_type, real_type>;
+    using quotient_model_type = coordinate_quotient_model<real_space_type, base_operator_type>;
+    using real_operator_type = symmetry::linearization::projected_linear_operator<real_space_type, quotient_model_type>;
+    using affine_model_type  = analytical_real_affine_inverse_model<real_space_type>;
     using base_provider_type =
-        stability::eigensolvers::transformations::
-            nonlinear_operator_real_affine_inverse_provider<
-                real_space_type,
-                affine_model_type>;
-    using provider_type =
-        symmetry::linearization::
-            projected_affine_inverse_provider<
-                real_space_type,
-                quotient_model_type,
-                base_provider_type>;
-    using factorization_types =
-        stability::eigensolvers::transformations::
-            matrix_free_complex_factorization_types<
-                real_space_type,
-                complex_space_type,
-                real_operator_type,
-                provider_type>;
-    using factor_operator_type =
-        typename factorization_types::factor_operator_type;
-    using preconditioner_type =
-        typename factorization_types::preconditioner_type;
-    using log_type = scfd::utils::log_std;
-    using monitor_type =
-        nmfd::solvers::monitor_krylov<
-            complex_space_type,
-            log_type>;
+        stability::eigensolvers::transformations::nonlinear_operator_real_affine_inverse_provider<
+            real_space_type, affine_model_type>;
+    using provider_type = symmetry::linearization::projected_affine_inverse_provider<
+        real_space_type, quotient_model_type, base_provider_type>;
+    using factorization_types = stability::eigensolvers::transformations::matrix_free_complex_factorization_types<
+        real_space_type, complex_space_type, real_operator_type, provider_type>;
+    using factor_operator_type = typename factorization_types::factor_operator_type;
+    using preconditioner_type  = typename factorization_types::preconditioner_type;
+    using log_type             = scfd::utils::log_std;
+    using monitor_type         = nmfd::solvers::monitor_krylov<complex_space_type, log_type>;
     using inner_solver_type =
-        nmfd::solvers::gmres<
-            complex_space_type,
-            monitor_type,
-            log_type,
-            factor_operator_type,
-            preconditioner_type>;
-    using factor_bundle_type =
-        stability::eigensolvers::transformations::
-            matrix_free_complex_factor_solver_bundle<
-                factorization_types,
-                inner_solver_type>;
-    using dense_lapack_type =
-        nmfd::operations::linalg::
-            host_small_dense_lapack<real_type>;
+        nmfd::solvers::gmres<complex_space_type, monitor_type, log_type, factor_operator_type, preconditioner_type>;
+    using factor_bundle_type = stability::eigensolvers::transformations::matrix_free_complex_factor_solver_bundle<
+        factorization_types, inner_solver_type>;
+    using dense_lapack_type = nmfd::operations::linalg::host_small_dense_lapack<real_type>;
     using stability_assembly_type =
-        stability::analysis::matrix_free_stability_assembly<
-            factorization_types,
-            inner_solver_type,
-            dense_lapack_type>;
+        stability::analysis::matrix_free_stability_assembly<factorization_types, inner_solver_type, dense_lapack_type>;
 
-    const auto problem = diagonal_eigenproblem<real_type>();
-    auto real_space =
-        std::make_shared<real_space_type>(problem.dimension());
-    auto complex_space =
-        std::make_shared<complex_space_type>(problem.dimension());
-    base_operator_type base_operator(*real_space, problem);
-    quotient_model_type quotient_model(
-        *real_space,
-        base_operator,
-        problem.dimension() - 1);
-    real_operator_type quotient_operator(
-        &quotient_model,
-        real_type(0));
-    auto affine_model =
-        std::make_shared<affine_model_type>(
-            *real_space,
-            matrix_diagonal(problem));
-    auto base_provider =
-        std::make_shared<base_provider_type>(
-            *real_space,
-            *affine_model);
-    auto provider =
-        std::make_shared<provider_type>(
-            *real_space,
-            quotient_model,
-            base_provider,
-            real_type(0));
+    const auto          problem       = diagonal_eigenproblem<real_type>();
+    auto                real_space    = std::make_shared<real_space_type>( problem.dimension() );
+    auto                complex_space = std::make_shared<complex_space_type>( problem.dimension() );
+    base_operator_type  base_operator( *real_space, problem );
+    quotient_model_type quotient_model( *real_space, base_operator, problem.dimension() - 1 );
+    real_operator_type  quotient_operator( &quotient_model, real_type( 0 ) );
+    auto                affine_model  = std::make_shared<affine_model_type>( *real_space, matrix_diagonal( problem ) );
+    auto                base_provider = std::make_shared<base_provider_type>( *real_space, *affine_model );
+    auto provider = std::make_shared<provider_type>( *real_space, quotient_model, base_provider, real_type( 0 ) );
 
-    constexpr real_type step = 0.1;
-    constexpr std::size_t repetitions = 3;
+    constexpr real_type           step        = 0.1;
+    constexpr std::size_t         repetitions = 3;
     const std::complex<real_type> mapped_target =
-        std::pow(
-            std::complex<real_type>(1.0, 0.0) +
-                step*std::complex<real_type>(2.0, 0.0),
-            repetitions);
-    const auto factors =
-        stability::eigensolvers::transformations::
-            euler_denominator_factors(
-                step,
-                repetitions,
-                mapped_target +
-                    std::complex<real_type>(0.04, 0.025));
+        std::pow( std::complex<real_type>( 1.0, 0.0 ) + step * std::complex<real_type>( 2.0, 0.0 ), repetitions );
+    const auto factors = stability::eigensolvers::transformations::euler_denominator_factors(
+        step, repetitions, mapped_target + std::complex<real_type>( 0.04, 0.025 )
+    );
 
     typename inner_solver_type::params inner_parameters;
-    inner_parameters.basis_size = 4;
-    inner_parameters.batch_size = 4;
-    inner_parameters.preconditioner_side = 'L';
-    inner_parameters.orthogonalization = "mgs";
-    inner_parameters.reorthogonalization_policy = "dgks";
-    inner_parameters.max_orthogonalization_passes = 2;
-    inner_parameters.monitor.rel_tol = 1.0e-12;
-    inner_parameters.monitor.abs_tol = 1.0e-13;
-    inner_parameters.monitor.max_iters_num = 24;
+    inner_parameters.basis_size                           = 4;
+    inner_parameters.batch_size                           = 4;
+    inner_parameters.preconditioner_side                  = 'L';
+    inner_parameters.orthogonalization                    = "mgs";
+    inner_parameters.reorthogonalization_policy           = "dgks";
+    inner_parameters.max_orthogonalization_passes         = 2;
+    inner_parameters.monitor.rel_tol                      = 1.0e-12;
+    inner_parameters.monitor.abs_tol                      = 1.0e-13;
+    inner_parameters.monitor.max_iters_num                = 24;
     inner_parameters.monitor.divide_out_norms_by_rel_base = false;
 
-    using raw_driver_type =
-        typename stability_assembly_type::solver_type::
-            eigensolver_type;
-    auto options = recovery_options<raw_driver_type>();
-    options.transformed.krylov_dimension = 7;
+    using raw_driver_type                 = typename stability_assembly_type::solver_type::eigensolver_type;
+    auto options                          = recovery_options<raw_driver_type>();
+    options.transformed.krylov_dimension  = 7;
     options.transformed.restart_dimension = 4;
     stability_assembly_type stability_assembly(
-        real_space,
-        complex_space,
-        quotient_operator,
-        provider,
-        factors,
-        inner_parameters,
-        options);
+        real_space, complex_space, quotient_operator, provider, factors, inner_parameters, options
+    );
 
-    nmfd::detail::vector_wrap<
-        real_space_type,
-        true,
-        true> initial(*real_space);
-    const std::vector<real_type> host_initial{
-        0.4,
-        -0.7,
-        1.0,
-        0.8};
-    real_space->set(
-        host_initial.data(),
-        *initial,
-        host_initial.size());
-    const auto result = stability_assembly.execute(*initial);
-    require(
-        result.succeeded(),
-        label + " projected quotient stability status: " +
-            result.diagnostic);
+    nmfd::detail::vector_wrap<real_space_type, true, true> initial( *real_space );
+    const std::vector<real_type>                           host_initial{ 0.4, -0.7, 1.0, 0.8 };
+    real_space->set( host_initial.data(), *initial, host_initial.size() );
+    const auto result = stability_assembly.execute( *initial );
+    require( result.succeeded(), label + " projected quotient stability status: " + result.diagnostic );
 
     const auto target = std::min_element(
-        result.eigenpairs.begin(),
-        result.eigenpairs.end(),
-        [](const auto& left, const auto& right)
-        {
-            return
-                std::abs(left.value - std::complex<real_type>(2.0, 0.0)) <
-                std::abs(right.value - std::complex<real_type>(2.0, 0.0));
-        });
+        result.eigenpairs.begin(), result.eigenpairs.end(), []( const auto &left, const auto &right ) {
+            return std::abs( left.value - std::complex<real_type>( 2.0, 0.0 ) ) <
+                   std::abs( right.value - std::complex<real_type>( 2.0, 0.0 ) );
+        }
+    );
     require(
-        target != result.eigenpairs.end() &&
-        std::abs(
-            target->value -
-            std::complex<real_type>(2.0, 0.0)) <= 2.0e-9,
-        label + " projected quotient recovers physical unstable mode");
+        target != result.eigenpairs.end() && std::abs( target->value - std::complex<real_type>( 2.0, 0.0 ) ) <= 2.0e-9,
+        label + " projected quotient recovers physical unstable mode"
+    );
     const bool contains_identity_completion =
-        std::any_of(
-            result.eigenpairs.begin(),
-            result.eigenpairs.end(),
-            [](const auto& estimate)
-            {
-                return std::abs(
-                    estimate.value -
-                    std::complex<real_type>(1.0, 0.0)) <= 1.0e-8;
-            });
-    require(
-        !contains_identity_completion,
-        label + " projected stability excludes Newton gauge completion");
+        std::any_of( result.eigenpairs.begin(), result.eigenpairs.end(), []( const auto &estimate ) {
+            return std::abs( estimate.value - std::complex<real_type>( 1.0, 0.0 ) ) <= 1.0e-8;
+        } );
+    require( !contains_identity_completion, label + " projected stability excludes Newton gauge completion" );
 
-    stability::analysis::spectrum_classifier<real_type>
-        classifier;
-    const auto classified = classifier.classify(result);
+    stability::analysis::spectrum_classifier<real_type> classifier;
+    const auto                                          classified = classifier.classify( result );
     require(
-        classified.succeeded() &&
-        classified.unstable.real == 1,
-        label + " projected quotient unstable dimension");
+        classified.succeeded() && classified.unstable.real == 1, label + " projected quotient unstable dimension"
+    );
 }
 
-template<class Backend>
-void test_inner_failure(const std::string& label)
+template <class Backend>
+void test_inner_failure( const std::string &label )
 {
-    using real_type = double;
-    using real_space_type =
-        scfd_vector_operations<Backend, real_type>;
-    using complex_scalar_type =
-        common::scfd_backend_ext::complex_t<
-            Backend,
-            real_type>;
-    using complex_space_type =
-        scfd_vector_operations<
-            Backend,
-            complex_scalar_type>;
-    using real_operator_type =
-        analytical_dense_operator<
-            real_space_type,
-            real_type>;
-    using model_type =
-        analytical_real_affine_inverse_model<
-            real_space_type>;
-    using provider_type =
-        stability::eigensolvers::transformations::
-            nonlinear_operator_real_affine_inverse_provider<
-                real_space_type,
-                model_type>;
-    using factorization_types =
-        stability::eigensolvers::transformations::
-            matrix_free_complex_factorization_types<
-                real_space_type,
-                complex_space_type,
-                real_operator_type,
-                provider_type>;
-    using factor_operator_type =
-        typename factorization_types::factor_operator_type;
-    using preconditioner_type =
-        typename factorization_types::preconditioner_type;
-    using log_type = scfd::utils::log_std;
-    using monitor_type =
-        nmfd::solvers::monitor_krylov<
-            complex_space_type,
-            log_type>;
+    using real_type           = double;
+    using real_space_type     = scfd_vector_operations<Backend, real_type>;
+    using complex_scalar_type = common::scfd_backend_ext::complex_t<Backend, real_type>;
+    using complex_space_type  = scfd_vector_operations<Backend, complex_scalar_type>;
+    using real_operator_type  = analytical_dense_operator<real_space_type, real_type>;
+    using model_type          = analytical_real_affine_inverse_model<real_space_type>;
+    using provider_type = stability::eigensolvers::transformations::nonlinear_operator_real_affine_inverse_provider<
+        real_space_type, model_type>;
+    using factorization_types = stability::eigensolvers::transformations::matrix_free_complex_factorization_types<
+        real_space_type, complex_space_type, real_operator_type, provider_type>;
+    using factor_operator_type = typename factorization_types::factor_operator_type;
+    using preconditioner_type  = typename factorization_types::preconditioner_type;
+    using log_type             = scfd::utils::log_std;
+    using monitor_type         = nmfd::solvers::monitor_krylov<complex_space_type, log_type>;
     using inner_solver_type =
-        nmfd::solvers::gmres<
-            complex_space_type,
-            monitor_type,
-            log_type,
-            factor_operator_type,
-            preconditioner_type>;
-    using factor_bundle_type =
-        stability::eigensolvers::transformations::
-            matrix_free_complex_factor_solver_bundle<
-                factorization_types,
-                inner_solver_type>;
-    using dense_lapack_type =
-        nmfd::operations::linalg::
-            host_small_dense_lapack<real_type>;
+        nmfd::solvers::gmres<complex_space_type, monitor_type, log_type, factor_operator_type, preconditioner_type>;
+    using factor_bundle_type = stability::eigensolvers::transformations::matrix_free_complex_factor_solver_bundle<
+        factorization_types, inner_solver_type>;
+    using dense_lapack_type = nmfd::operations::linalg::host_small_dense_lapack<real_type>;
     using driver_type =
-        stability::eigensolvers::
-            matrix_free_factorized_krylov_schur<
-                factor_bundle_type,
-                dense_lapack_type>;
+        stability::eigensolvers::matrix_free_factorized_krylov_schur<factor_bundle_type, dense_lapack_type>;
 
-    const auto problem =
-        complex_pair_eigenproblem<real_type>();
-    auto real_space =
-        std::make_shared<real_space_type>(problem.dimension());
-    auto complex_space =
-        std::make_shared<complex_space_type>(problem.dimension());
-    real_operator_type real_operator(*real_space, problem);
-    real_operator.fail_after(0);
-    auto model = std::make_shared<model_type>(
-        *real_space,
-        matrix_diagonal(problem));
-    auto provider =
-        std::make_shared<provider_type>(
-            *real_space,
-            *model);
-    const auto factors =
-        stability::eigensolvers::transformations::
-            euler_denominator_factors(
-                real_type(0.1),
-                std::size_t(3),
-                std::complex<real_type>(0.9, 0.5));
+    const auto         problem       = complex_pair_eigenproblem<real_type>();
+    auto               real_space    = std::make_shared<real_space_type>( problem.dimension() );
+    auto               complex_space = std::make_shared<complex_space_type>( problem.dimension() );
+    real_operator_type real_operator( *real_space, problem );
+    real_operator.fail_after( 0 );
+    auto       model    = std::make_shared<model_type>( *real_space, matrix_diagonal( problem ) );
+    auto       provider = std::make_shared<provider_type>( *real_space, *model );
+    const auto factors  = stability::eigensolvers::transformations::euler_denominator_factors(
+        real_type( 0.1 ), std::size_t( 3 ), std::complex<real_type>( 0.9, 0.5 )
+    );
 
     typename inner_solver_type::params inner_parameters;
-    inner_parameters.basis_size = 3;
-    inner_parameters.batch_size = 3;
-    inner_parameters.monitor.rel_tol = 1.0e-10;
-    inner_parameters.monitor.abs_tol = 1.0e-12;
-    inner_parameters.monitor.max_iters_num = 8;
+    inner_parameters.basis_size                           = 3;
+    inner_parameters.batch_size                           = 3;
+    inner_parameters.monitor.rel_tol                      = 1.0e-10;
+    inner_parameters.monitor.abs_tol                      = 1.0e-12;
+    inner_parameters.monitor.max_iters_num                = 8;
     inner_parameters.monitor.divide_out_norms_by_rel_base = false;
 
-    factor_bundle_type factor_bundle(
-        real_space,
-        complex_space,
-        real_operator,
-        provider,
-        factors,
-        inner_parameters);
-    dense_lapack_type dense_lapack;
-    driver_type driver(factor_bundle, dense_lapack);
-    nmfd::detail::vector_wrap<
-        real_space_type,
-        true,
-        true> initial(*real_space);
-    const std::vector<real_type> host_initial{
-        1.0,
-        0.25,
-        -0.5};
-    real_space->set(
-        host_initial.data(),
-        *initial,
-        host_initial.size());
+    factor_bundle_type factor_bundle( real_space, complex_space, real_operator, provider, factors, inner_parameters );
+    dense_lapack_type  dense_lapack;
+    driver_type        driver( factor_bundle, dense_lapack );
+    nmfd::detail::vector_wrap<real_space_type, true, true> initial( *real_space );
+    const std::vector<real_type>                           host_initial{ 1.0, 0.25, -0.5 };
+    real_space->set( host_initial.data(), *initial, host_initial.size() );
 
-    const auto result = driver.execute(
-        *initial,
-        recovery_options<driver_type>());
+    const auto result = driver.execute( *initial, recovery_options<driver_type>() );
     require(
-        result.transformed.status ==
-            stability::eigensolvers::eigensolver_status::
-                inner_solver_failure,
-        label + " inner failure status");
+        result.transformed.status == stability::eigensolvers::eigensolver_status::inner_solver_failure,
+        label + " inner failure status"
+    );
     require(
-        result.transformed_solver_calls == 1 &&
-        result.transformed_solver_failures == 1 &&
-        result.transformed.inner_solver_calls == 1,
-        label + " inner failure accounting");
+        result.transformed_solver_calls == 1 && result.transformed_solver_failures == 1 &&
+            result.transformed.inner_solver_calls == 1,
+        label + " inner failure accounting"
+    );
     require(
-        result.recovered.eigenpairs.empty() &&
-        !result.succeeded(),
-        label + " failed transform skips physical recovery");
+        result.recovered.eigenpairs.empty() && !result.succeeded(), label + " failed transform skips physical recovery"
+    );
 }
 
-template<class Backend>
-void run_backend(const std::string& label)
+template <class Backend>
+void run_backend( const std::string &label )
 {
-    test_complex_pair_recovery<Backend>(label);
-    test_projected_quotient_recovery<Backend>(label);
-    test_inner_failure<Backend>(label);
+    test_complex_pair_recovery<Backend>( label );
+    test_projected_quotient_recovery<Backend>( label );
+    test_inner_failure<Backend>( label );
 }
 
 inline int finish()
 {
-    std::cout << "Checks: " << checks
-              << ", failures: " << failures << '\n';
-    if(failures != 0)
+    std::cout << "Checks: " << checks << ", failures: " << failures << '\n';
+    if ( failures != 0 )
     {
         std::cout << "FAILED\n";
         return EXIT_FAILURE;

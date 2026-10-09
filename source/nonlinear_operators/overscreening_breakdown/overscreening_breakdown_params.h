@@ -2,17 +2,17 @@
 #define __PARAMS_S_OVERSCREENING_BREAKDOWN_H__
 
 
-template<class T>
+template <class T>
 struct params_s
 {
-    size_t N = 10;
-    T sigma = 1.0;
-    T L = 1.0;
-    T gamma = 1.0;
-    T delta = 1.0;    
-    T mu = 1.0;
-    T u0 = 1.0;
-    int param_number = 0;
+    size_t N            = 10;
+    T      sigma        = 1.0;
+    T      L            = 1.0;
+    T      gamma        = 1.0;
+    T      delta        = 1.0;
+    T      mu           = 1.0;
+    T      u0           = 1.0;
+    int    param_number = 0;
 
     void print_data() const
     {
@@ -27,16 +27,15 @@ struct params_s
         std::cout << "=   param_number = " << param_number << std::endl;
         std::cout << "=   .........." << std::endl;
     }
-    params_s(size_t N_p, int param_number_p, const std::vector<T>& other_params_p):
-    N(N_p),
-    param_number(param_number_p) 
+    params_s( size_t N_p, int param_number_p, const std::vector<T> &other_params_p )
+        : N( N_p ), param_number( param_number_p )
     {
-        sigma = other_params_p.at(0);
-        L = other_params_p.at(1);
-        gamma = other_params_p.at(2);
-        delta = other_params_p.at(3);
-        mu = other_params_p.at(4);
-        u0 = other_params_p.at(5);
+        sigma = other_params_p.at( 0 );
+        L     = other_params_p.at( 1 );
+        gamma = other_params_p.at( 2 );
+        delta = other_params_p.at( 3 );
+        mu    = other_params_p.at( 4 );
+        u0    = other_params_p.at( 5 );
         print_data();
     }
     params_s() = default;

@@ -18,9 +18,9 @@
 #define __DEVICE_TAG_H__
 
 #ifndef __CUDACC__
-#define __DEVICE_TAG__
+#    define __DEVICE_TAG__
 #else
-#define __DEVICE_TAG__ __device__ __host__
+#    define __DEVICE_TAG__ __device__ __host__
 #endif
 
 /*#ifndef __CUDACC__

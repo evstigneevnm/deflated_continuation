@@ -22,24 +22,24 @@ struct t_test
     int x;
 };
 
-DEFINE_CONSTANT_BUFFER(t_test, buf)
+DEFINE_CONSTANT_BUFFER( t_test, buf )
 
 __global__ void ker_test2()
 {
-    printf("device test2: buf().x = %d\n", buf().x);
+    printf( "device test2: buf().x = %d\n", buf().x );
 }
 
 void test_init()
 {
-    t_test  test;
+    t_test test;
     test.x = 178;
 
-    COPY_TO_CONSTANT_BUFFER(buf, test);
+    COPY_TO_CONSTANT_BUFFER( buf, test );
 }
 
 void test_test()
 {
-    printf("host test2: buf().x = %d\n", buf().x);
-    ker_test2<<<1,1>>>();
+    printf( "host test2: buf().x = %d\n", buf().x );
+    ker_test2<<<1, 1>>>();
     cudaDeviceSynchronize();
 }

@@ -11,35 +11,33 @@ namespace discretization
 namespace common
 {
 
-template<std::size_t Dimension>
+template <std::size_t Dimension>
 class structured_extent
 {
 public:
-    using size_type = std::size_t;
+    using size_type       = std::size_t;
     using dimensions_type = std::array<size_type, Dimension>;
 
     structured_extent() = default;
 
-    explicit structured_extent(const dimensions_type& dimensions):
-        dimensions_(dimensions)
+    explicit structured_extent( const dimensions_type &dimensions ) : dimensions_( dimensions )
     {
         validate();
     }
 
-    template<class... Sizes>
-    explicit structured_extent(Sizes... sizes):
-        dimensions_{static_cast<size_type>(sizes)...}
+    template <class... Sizes>
+    explicit structured_extent( Sizes... sizes ) : dimensions_{ static_cast<size_type>( sizes )... }
     {
-        static_assert(sizeof...(Sizes) == Dimension, "structured_extent dimension mismatch");
+        static_assert( sizeof...( Sizes ) == Dimension, "structured_extent dimension mismatch" );
         validate();
     }
 
-    size_type operator[](const size_type dimension) const
+    size_type operator[]( const size_type dimension ) const
     {
-        return dimensions_.at(dimension);
+        return dimensions_.at( dimension );
     }
 
-    const dimensions_type& dimensions() const
+    const dimensions_type &dimensions() const
     {
         return dimensions_;
     }
@@ -47,35 +45,35 @@ public:
     size_type size() const
     {
         size_type result = 1;
-        for(const size_type value: dimensions_)
+        for ( const size_type value : dimensions_ )
         {
-            if(value > std::numeric_limits<size_type>::max()/result)
+            if ( value > std::numeric_limits<size_type>::max() / result )
             {
-                throw std::overflow_error("structured_extent total size overflows size_t");
+                throw std::overflow_error( "structured_extent total size overflows size_t" );
             }
             result *= value;
         }
         return result;
     }
 
-    bool operator==(const structured_extent& other) const
+    bool operator==( const structured_extent &other ) const
     {
         return dimensions_ == other.dimensions_;
     }
 
-    bool operator!=(const structured_extent& other) const
+    bool operator!=( const structured_extent &other ) const
     {
-        return !(*this == other);
+        return !( *this == other );
     }
 
 private:
     void validate() const
     {
-        for(const size_type value: dimensions_)
+        for ( const size_type value : dimensions_ )
         {
-            if(value == 0)
+            if ( value == 0 )
             {
-                throw std::invalid_argument("structured_extent dimensions must be positive");
+                throw std::invalid_argument( "structured_extent dimensions must be positive" );
             }
         }
     }

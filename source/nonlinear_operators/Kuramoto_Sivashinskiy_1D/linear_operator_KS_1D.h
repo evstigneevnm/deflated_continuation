@@ -4,25 +4,24 @@
 namespace nonlinear_operators
 {
 
-template<class VectorOperations, class NonlinearOperator>
+template <class VectorOperations, class NonlinearOperator>
 class linear_operator_KS_1D
 {
 public:
-    using T = typename VectorOperations::scalar_type;
+    using T     = typename VectorOperations::scalar_type;
     using T_vec = typename VectorOperations::vector_type;
 
-    explicit linear_operator_KS_1D(NonlinearOperator* nonlin_op_):
-        nonlin_op(nonlin_op_)
+    explicit linear_operator_KS_1D( NonlinearOperator *nonlin_op_ ) : nonlin_op( nonlin_op_ )
     {
     }
 
-    void apply(const T_vec& x, T_vec& f) const
+    void apply( const T_vec &x, T_vec &f ) const
     {
-        nonlin_op->jacobian_u(x, f);
+        nonlin_op->jacobian_u( x, f );
     }
 
 private:
-    NonlinearOperator* nonlin_op;
+    NonlinearOperator *nonlin_op;
 };
 
 } // namespace nonlinear_operators

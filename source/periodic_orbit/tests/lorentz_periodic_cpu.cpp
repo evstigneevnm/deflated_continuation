@@ -36,29 +36,22 @@ int main( int argc, char const *argv[] )
     using nlin_op_t = nonlinear_operators::lorentz<vec_ops_t>;
 
     using periodic_orbit_nonlinear_operator_t = periodic_orbit::periodic_orbit_nonlinear_operator<
-        vec_ops_t,
-        nlin_op_t,
-        log_t,
-        time_steppers::time_step_adaptation_error_control,
+        vec_ops_t, nlin_op_t, log_t, time_steppers::time_step_adaptation_error_control,
         time_steppers::explicit_time_step>;
 
     using periodic_orbit_linear_operator_t = typename periodic_orbit_nonlinear_operator_t::linear_operator_type;
     using periodic_orbit_preconditioner_t  = typename periodic_orbit_nonlinear_operator_t::preconditioner_type;
 
-    using lin_solve_t = numerical_algos::lin_solvers::
-        bicgstabl<periodic_orbit_linear_operator_t, periodic_orbit_preconditioner_t, vec_ops_t, monitor_t, log_t>;
+    using lin_solve_t = numerical_algos::lin_solvers::bicgstabl<
+        periodic_orbit_linear_operator_t, periodic_orbit_preconditioner_t, vec_ops_t, monitor_t, log_t>;
 
     using system_operator_single_section_t = nonlinear_operators::newton_method::system_operator_single_section<
-        vec_ops_t,
-        periodic_orbit_nonlinear_operator_t,
-        periodic_orbit_linear_operator_t,
-        lin_solve_t>;
-    using convergence_strategy_single_section_t = nonlinear_operators::newton_method::
-        convergence_strategy_single_section<vec_ops_t, periodic_orbit_nonlinear_operator_t, log_t>;
+        vec_ops_t, periodic_orbit_nonlinear_operator_t, periodic_orbit_linear_operator_t, lin_solve_t>;
+    using convergence_strategy_single_section_t =
+        nonlinear_operators::newton_method::convergence_strategy_single_section<
+            vec_ops_t, periodic_orbit_nonlinear_operator_t, log_t>;
     using newton_solver_t = numerical_algos::newton_method::newton_solver<
-        vec_ops_t,
-        periodic_orbit_nonlinear_operator_t,
-        system_operator_single_section_t,
+        vec_ops_t, periodic_orbit_nonlinear_operator_t, system_operator_single_section_t,
         convergence_strategy_single_section_t>;
 
     std::string scheme_name( "RKDP45" );
@@ -114,12 +107,7 @@ int main( int argc, char const *argv[] )
 
     size_t    parameter_select = 0;
     nlin_op_t lorentz(
-        &vec_ops,
-        parameter_select,
-        sigma,
-        rho,
-        beta,
-        epsilon,
+        &vec_ops, parameter_select, sigma, rho, beta, epsilon,
         delta
     ); // use second parameter as a bifurcation parameter.
     lorentz.set_period_point( x0 );
@@ -200,7 +188,7 @@ int main( int argc, char const *argv[] )
 
     for ( int j = 0; j < 3; j++ )
     {
-        std::cout << x0(j) << std::endl;
+        std::cout << x0( j ) << std::endl;
     }
 
     std::stringstream ss_periodic_estimate;

@@ -15,129 +15,140 @@ namespace newton_method_extended
 {
 
 
-template<class vector_operations, class nonlinear_operator, class logging>
+template <class vector_operations, class nonlinear_operator, class logging>
 class convergence_strategy
 {
 private:
-    typedef typename vector_operations::scalar_type  T;
-    typedef typename vector_operations::vector_type  T_vec;
-    typedef scfd::utils::logged_obj_base<logging> logged_obj_t;
+    typedef typename vector_operations::scalar_type T;
+    typedef typename vector_operations::vector_type T_vec;
+    typedef scfd::utils::logged_obj_base<logging>   logged_obj_t;
 
-public:    
+public:
     using norms_storage_type = std::vector<T>;
 
-    convergence_strategy(vector_operations*& vec_ops_, logging*& log_, T tolerance_ = 1.0e-6, unsigned int maximum_iterations_= 1000, T newton_wight_=0.5, bool store_norms_history_ = false, bool verbose_ = true):
-    vec_ops(vec_ops_),
-    log(log_),
-    iterations(0),
-    tolerance(tolerance_),
-    maximum_iterations(maximum_iterations_),
-    newton_wight(newton_wight_),
-    newton_wight_initial(newton_wight_),
-    verbose(verbose_),
-    store_norms_history(store_norms_history_),
-    max_norm_Fx_(1.0e16)
+    convergence_strategy(
+        vector_operations *&vec_ops_, logging *&log_, T tolerance_ = 1.0e-6, unsigned int maximum_iterations_ = 1000,
+        T newton_wight_ = 0.5, bool store_norms_history_ = false, bool verbose_ = true
+    )
+        : vec_ops( vec_ops_ ), log( log_ ), iterations( 0 ), tolerance( tolerance_ ),
+          maximum_iterations( maximum_iterations_ ), newton_wight( newton_wight_ ),
+          newton_wight_initial( newton_wight_ ), verbose( verbose_ ), store_norms_history( store_norms_history_ ),
+          max_norm_Fx_( 1.0e16 )
     {
-        vec_ops->init_vector(x1); vec_ops->start_use_vector(x1);
-        vec_ops->init_vector(Fx); vec_ops->start_use_vector(Fx);
-        if(store_norms_history)
+        vec_ops->init_vector( x1 );
+        vec_ops->start_use_vector( x1 );
+        vec_ops->init_vector( Fx );
+        vec_ops->start_use_vector( Fx );
+        if ( store_norms_history )
         {
-            norms_evolution.reserve(maximum_iterations);
+            norms_evolution.reserve( maximum_iterations );
         }
-
     }
     ~convergence_strategy()
     {
-        vec_ops->stop_use_vector(x1); vec_ops->free_vector(x1);
-        vec_ops->stop_use_vector(Fx); vec_ops->free_vector(Fx);
+        vec_ops->stop_use_vector( x1 );
+        vec_ops->free_vector( x1 );
+        vec_ops->stop_use_vector( Fx );
+        vec_ops->free_vector( Fx );
     }
 
-    void set_convergence_constants(T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(1), bool store_norms_history_ = false, bool verbose_ = true, unsigned int stagnation_max_ = 10)
+    void set_convergence_constants(
+        T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T( 1 ), bool store_norms_history_ = false,
+        bool verbose_ = true, unsigned int stagnation_max_ = 10
+    )
     {
-        tolerance = tolerance_;
-        maximum_iterations = maximum_iterations_;
+        tolerance            = tolerance_;
+        maximum_iterations   = maximum_iterations_;
         newton_wight_initial = newton_wight_;
 
         store_norms_history = store_norms_history_;
-        verbose = verbose_;
+        verbose             = verbose_;
         // stagnation_max = stagnation_max_;
-        if(store_norms_history)
+        if ( store_norms_history )
         {
-            norms_evolution.reserve(maximum_iterations);
-        }        
+            norms_evolution.reserve( maximum_iterations );
+        }
     }
 
 
-    bool check_convergence(nonlinear_operator* nonlin_op, T_vec& x, T& lambda, T_vec& delta_x, T& delta_lambda, int& result_status, bool lin_solver_converged = true)
+    bool check_convergence(
+        nonlinear_operator *nonlin_op, T_vec &x, T &lambda, T_vec &delta_x, T &delta_lambda, int &result_status,
+        bool lin_solver_converged = true
+    )
     {
-        if(!lin_solver_converged)
+        if ( !lin_solver_converged )
         {
-            log->error("deflation::convergence: linear solver failed.");
+            log->error( "deflation::convergence: linear solver failed." );
             result_status = 5;
             return true;
         }
 
         bool finish = false;
-        nonlinear_operators::detail::residual(nonlin_op, x, lambda, Fx);
-        T normFx = vec_ops->norm(Fx);
+        nonlinear_operators::detail::residual( nonlin_op, x, lambda, Fx );
+        T normFx = vec_ops->norm( Fx );
         //update solution
-        vec_ops->assign_mul(T(1), x, newton_wight, delta_x, x1);
-        T lambda1 = lambda + newton_wight*delta_lambda;
-        nonlinear_operators::detail::project_state(nonlin_op, x1);
-        nonlinear_operators::detail::residual(nonlin_op, x1, lambda1, Fx);
-        T normFx1 = vec_ops->norm(Fx);
-        if(store_norms_history)
+        vec_ops->assign_mul( T( 1 ), x, newton_wight, delta_x, x1 );
+        T lambda1 = lambda + newton_wight * delta_lambda;
+        nonlinear_operators::detail::project_state( nonlin_op, x1 );
+        nonlinear_operators::detail::residual( nonlin_op, x1, lambda1, Fx );
+        T normFx1 = vec_ops->norm( Fx );
+        if ( store_norms_history )
         {
-            norms_evolution.push_back(normFx1);
+            norms_evolution.push_back( normFx1 );
         }
 
         iterations++;
-        log->info_f("iteration %i, previous residual %le, current residual %le",iterations, (double)normFx, (double)normFx1);
+        log->info_f(
+            "iteration %i, previous residual %le, current residual %le", iterations, (double)normFx, (double)normFx1
+        );
 
-        if(common::scalar_math::isnan(normFx))
+        if ( common::scalar_math::isnan( normFx ) )
         {
-            log->info("Newton initial vector caused nan.");
-            finish = true;
+            log->info( "Newton initial vector caused nan." );
+            finish        = true;
             result_status = 3;
         }
-        else if(normFx1 > max_norm_Fx_)
+        else if ( normFx1 > max_norm_Fx_ )
         {
-            log->error_f("deflation::convergence: Newton update went above %le, stopping.", double(max_norm_Fx_) );
-            finish = true;
-            result_status = 2;            
-        }        
-        else if(common::scalar_math::isnan(normFx1))
+            log->error_f( "deflation::convergence: Newton update went above %le, stopping.", double( max_norm_Fx_ ) );
+            finish        = true;
+            result_status = 2;
+        }
+        else if ( common::scalar_math::isnan( normFx1 ) )
         {
-            log->info("Newton updated vector caused nan.");
-            finish = true;
+            log->info( "Newton updated vector caused nan." );
+            finish        = true;
             result_status = 3;
-        }else if(common::scalar_math::isinf(normFx))
+        }
+        else if ( common::scalar_math::isinf( normFx ) )
         {
-            log->info("Newton initial vector caused inf.");
-            finish = true;
-            result_status = 2;            
-        }else if(common::scalar_math::isinf(normFx1))
+            log->info( "Newton initial vector caused inf." );
+            finish        = true;
+            result_status = 2;
+        }
+        else if ( common::scalar_math::isinf( normFx1 ) )
         {
-            log->info("Newton update caused inf.");
-            finish = true;
-            result_status = 2;            
-        }else
-        {   
+            log->info( "Newton update caused inf." );
+            finish        = true;
+            result_status = 2;
+        }
+        else
+        {
             //update solution
             lambda = lambda1;
-            vec_ops->assign(x1,x);
+            vec_ops->assign( x1, x );
         }
-        if(normFx1<tolerance)
+        if ( normFx1 < tolerance )
         {
-            log->info_f("Newton converged with %le.", (double)normFx1);
+            log->info_f( "Newton converged with %le.", (double)normFx1 );
             result_status = 0;
-            finish = true;
+            finish        = true;
         }
-        else if(iterations>=maximum_iterations)
+        else if ( iterations >= maximum_iterations )
         {
-            log->info_f("Newton max iterations (%i) reached.", iterations);
+            log->info_f( "Newton max iterations (%i) reached.", iterations );
             result_status = 1;
-            finish = true;
+            finish        = true;
         }
 
 
@@ -157,23 +168,22 @@ public:
     {
         newton_wight = newton_wight_initial;
     }
-    std::vector<T>* get_norms_history_handle()
+    std::vector<T> *get_norms_history_handle()
     {
         return &norms_evolution;
     }
 
 private:
-    vector_operations* vec_ops;
-    logging* log;
-    unsigned int maximum_iterations;
-    unsigned int iterations;
-    T tolerance;
-    T_vec x1, Fx;
-    T newton_wight, newton_wight_initial;
-    bool verbose, store_norms_history;
-    std::vector<T> norms_evolution;
-    T max_norm_Fx_;
-
+    vector_operations *vec_ops;
+    logging           *log;
+    unsigned int       maximum_iterations;
+    unsigned int       iterations;
+    T                  tolerance;
+    T_vec              x1, Fx;
+    T                  newton_wight, newton_wight_initial;
+    bool               verbose, store_norms_history;
+    std::vector<T>     norms_evolution;
+    T                  max_norm_Fx_;
 };
 
 

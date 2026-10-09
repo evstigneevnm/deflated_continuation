@@ -10,7 +10,7 @@ namespace external_libraries_compat
 {
 struct cuda_memory
 {
-    using pointer_type = void *;
+    using pointer_type       = void *;
     using const_pointer_type = const void *;
 
     static const bool is_host_visible = false;

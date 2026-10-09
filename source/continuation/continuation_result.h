@@ -26,9 +26,9 @@ enum class continuation_failure_kind
     unknown
 };
 
-inline const char* to_string(const continuation_failure_kind kind)
+inline const char *to_string( const continuation_failure_kind kind )
 {
-    switch(kind)
+    switch ( kind )
     {
     case continuation_failure_kind::none:
         return "none";
@@ -65,23 +65,22 @@ enum class semicurve_status
     open_recoverable
 };
 
-template<class Scalar>
+template <class Scalar>
 struct semicurve_result
 {
-    semicurve_status status = semicurve_status::not_started;
-    continuation_failure_kind failure = continuation_failure_kind::none;
-    container::curve_endpoint_reason endpoint_reason =
-        container::curve_endpoint_reason::none;
-    int direction = 0;
-    unsigned int accepted_points = 0;
-    std::uint64_t segment_id = 0;
-    std::uint64_t first_point_index = 0;
-    std::uint64_t last_point_index = 0;
-    Scalar start_parameter = Scalar(0);
-    Scalar last_parameter = Scalar(0);
-    Scalar attempted_step = Scalar(0);
-    unsigned int retry_count = 0;
-    std::string message;
+    semicurve_status                 status            = semicurve_status::not_started;
+    continuation_failure_kind        failure           = continuation_failure_kind::none;
+    container::curve_endpoint_reason endpoint_reason   = container::curve_endpoint_reason::none;
+    int                              direction         = 0;
+    unsigned int                     accepted_points   = 0;
+    std::uint64_t                    segment_id        = 0;
+    std::uint64_t                    first_point_index = 0;
+    std::uint64_t                    last_point_index  = 0;
+    Scalar                           start_parameter   = Scalar( 0 );
+    Scalar                           last_parameter    = Scalar( 0 );
+    Scalar                           attempted_step    = Scalar( 0 );
+    unsigned int                     retry_count       = 0;
+    std::string                      message;
 
     bool has_progress() const
     {
@@ -101,22 +100,22 @@ struct semicurve_result
     }
 };
 
-template<class Scalar>
+template <class Scalar>
 struct continuation_curve_result
 {
     std::array<semicurve_result<Scalar>, 2> semicurves{};
-    unsigned int semicurves_started = 0;
-    bool branch_closed = false;
+    unsigned int                            semicurves_started = 0;
+    bool                                    branch_closed      = false;
 
     bool complete() const
     {
-        if(semicurves_started == 0)
+        if ( semicurves_started == 0 )
         {
             return false;
         }
-        for(unsigned int index = 0; index < semicurves_started; ++index)
+        for ( unsigned int index = 0; index < semicurves_started; ++index )
         {
-            if(!semicurves[index].complete())
+            if ( !semicurves[index].complete() )
             {
                 return false;
             }
@@ -126,9 +125,9 @@ struct continuation_curve_result
 
     bool has_valid_progress() const
     {
-        for(const auto& semicurve: semicurves)
+        for ( const auto &semicurve : semicurves )
         {
-            if(semicurve.has_progress())
+            if ( semicurve.has_progress() )
             {
                 return true;
             }
@@ -138,9 +137,9 @@ struct continuation_curve_result
 
     bool has_recoverable_segment() const
     {
-        for(const auto& semicurve: semicurves)
+        for ( const auto &semicurve : semicurves )
         {
-            if(semicurve.recoverable())
+            if ( semicurve.recoverable() )
             {
                 return true;
             }

@@ -4,8 +4,9 @@
 #include <fstream>
 #include <iostream>
 
-inline bool exists_test0 (const std::string& name) {
-    std::ifstream f(name.c_str());
+inline bool exists_test0( const std::string &name )
+{
+    std::ifstream f( name.c_str() );
     return f.good();
 }
 
@@ -15,7 +16,7 @@ inline bool exists_test0 (const std::string& name) {
 //         return true;
 //     } else {
 //         return false;
-//     }   
+//     }
 // }
 
 // inline bool exists_test2 (const std::string& name) {
@@ -23,16 +24,16 @@ inline bool exists_test0 (const std::string& name) {
 // }
 
 // inline bool exists_test3 (const std::string& name) {
-//   struct stat buffer;   
-//   return (stat (name.c_str(), &buffer) == 0); 
+//   struct stat buffer;
+//   return (stat (name.c_str(), &buffer) == 0);
 // }
 
 
-int main(int argc, char const *argv[])
+int main( int argc, char const *argv[] )
 {
     std::string f_string = "test_folder";
-    std::string aaa = f_string + std::string("/") + "test_file";
-    if(exists_test0 (aaa))
+    std::string aaa      = f_string + std::string( "/" ) + "test_file";
+    if ( exists_test0( aaa ) )
     {
         std::cout << f_string << " exists!" << std::endl;
     }

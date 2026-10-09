@@ -44,13 +44,13 @@ inline const char *small_solve_status_name( small_solve_status status )
 template <class T>
 struct small_solve_info
 {
-    small_solve_status status = small_solve_status::success;
-    std::size_t        size = 0;
-    std::size_t        rank = 0;
-    T                  determinant = T{};
+    small_solve_status status        = small_solve_status::success;
+    std::size_t        size          = 0;
+    std::size_t        rank          = 0;
+    T                  determinant   = T{};
     T                  min_abs_pivot = T{};
     T                  max_abs_entry = T{};
-    T                  pivot_ratio = T{};
+    T                  pivot_ratio   = T{};
 
     bool ok() const
     {
@@ -199,22 +199,21 @@ public:
     }
 
 private:
-    std::size_t                       rows_ = 0;
-    std::size_t                       cols_ = 0;
-    std::array<T, MaxRows * MaxCols>  data_{};
+    std::size_t                      rows_ = 0;
+    std::size_t                      cols_ = 0;
+    std::array<T, MaxRows * MaxCols> data_{};
 };
 
 template <class T, std::size_t MaxN>
 small_solve_info<T> factor_lu(
-    small_matrix<T, MaxN, MaxN> &lu, std::array<std::size_t, MaxN> &pivots, T singular_tol = T{},
-    T condition_tol = T{}
+    small_matrix<T, MaxN, MaxN> &lu, std::array<std::size_t, MaxN> &pivots, T singular_tol = T{}, T condition_tol = T{}
 )
 {
     static_assert( std::is_floating_point<T>::value, "factor_lu currently expects a real floating point type" );
 
     small_solve_info<T> info;
     const std::size_t   n = lu.rows();
-    info.size = n;
+    info.size             = n;
 
     if ( n == 0 || lu.cols() != n )
     {
@@ -231,8 +230,7 @@ small_solve_info<T> factor_lu(
             max_abs_entry = std::max( max_abs_entry, static_cast<T>( std::abs( lu( i, j ) ) ) );
 
     const T scale = std::max( T{ 1 }, max_abs_entry );
-    const T tol =
-        singular_tol > T{} ? singular_tol : std::numeric_limits<T>::epsilon() * scale * static_cast<T>( n );
+    const T tol   = singular_tol > T{} ? singular_tol : std::numeric_limits<T>::epsilon() * scale * static_cast<T>( n );
 
     info.max_abs_entry = max_abs_entry;
     info.min_abs_pivot = std::numeric_limits<T>::infinity();
@@ -240,25 +238,25 @@ small_solve_info<T> factor_lu(
     T det_sign = T{ 1 };
     for ( std::size_t k = 0; k < n; ++k )
     {
-        std::size_t pivot = k;
+        std::size_t pivot     = k;
         T           pivot_abs = static_cast<T>( std::abs( lu( k, k ) ) );
         for ( std::size_t i = k + 1; i < n; ++i )
         {
             const T candidate = static_cast<T>( std::abs( lu( i, k ) ) );
             if ( candidate > pivot_abs )
             {
-                pivot = i;
+                pivot     = i;
                 pivot_abs = candidate;
             }
         }
 
         if ( pivot_abs <= tol )
         {
-            info.status = small_solve_status::singular;
-            info.rank = k;
-            info.determinant = T{};
+            info.status        = small_solve_status::singular;
+            info.rank          = k;
+            info.determinant   = T{};
             info.min_abs_pivot = std::isfinite( info.min_abs_pivot ) ? info.min_abs_pivot : T{};
-            info.pivot_ratio = info.min_abs_pivot / scale;
+            info.pivot_ratio   = info.min_abs_pivot / scale;
             return info;
         }
 
@@ -325,13 +323,13 @@ small_solve_info<T> solve(
     {
         small_solve_info<T> info;
         info.status = small_solve_status::invalid_size;
-        info.size = a.rows();
+        info.size   = a.rows();
         return info;
     }
 
-    small_matrix<T, MaxN, MaxN> lu = a;
+    small_matrix<T, MaxN, MaxN>   lu = a;
     std::array<std::size_t, MaxN> pivots{};
-    auto info = factor_lu( lu, pivots, singular_tol, condition_tol );
+    auto                          info = factor_lu( lu, pivots, singular_tol, condition_tol );
     if ( !info.ok() )
         return info;
 
@@ -342,25 +340,25 @@ small_solve_info<T> solve(
 
 template <class T, std::size_t MaxN, std::size_t MaxRhs>
 small_solve_info<T> solve_multiple_rhs(
-    const small_matrix<T, MaxN, MaxN> &a, const small_matrix<T, MaxN, MaxRhs> &b,
-    small_matrix<T, MaxN, MaxRhs> &x, T singular_tol = T{}, T condition_tol = T{}
+    const small_matrix<T, MaxN, MaxN> &a, const small_matrix<T, MaxN, MaxRhs> &b, small_matrix<T, MaxN, MaxRhs> &x,
+    T singular_tol = T{}, T condition_tol = T{}
 )
 {
     if ( a.rows() != a.cols() || b.rows() != a.rows() )
     {
         small_solve_info<T> info;
         info.status = small_solve_status::invalid_size;
-        info.size = a.rows();
+        info.size   = a.rows();
         return info;
     }
 
-    small_matrix<T, MaxN, MaxN> lu = a;
+    small_matrix<T, MaxN, MaxN>   lu = a;
     std::array<std::size_t, MaxN> pivots{};
-    auto info = factor_lu( lu, pivots, singular_tol, condition_tol );
+    auto                          info = factor_lu( lu, pivots, singular_tol, condition_tol );
     if ( !info.ok() )
         return info;
 
-    const std::size_t n = a.rows();
+    const std::size_t n         = a.rows();
     const std::size_t rhs_count = b.cols();
     x.resize( n, rhs_count );
     for ( std::size_t i = 0; i < n; ++i )

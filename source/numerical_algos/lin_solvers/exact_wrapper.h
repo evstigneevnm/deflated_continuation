@@ -30,88 +30,90 @@ In this case the consept is as follows:
 
 namespace numerical_algos
 {
-namespace lin_solvers 
+namespace lin_solvers
 {
 
-template<class LinearOperator, class Preconditioner, class VectorOperations, class Monitor, class Log>
-class exact_wrapper: public iter_solver_base<LinearOperator,Preconditioner, VectorOperations,Monitor,Log>
+template <class LinearOperator, class Preconditioner, class VectorOperations, class Monitor, class Log>
+class exact_wrapper : public iter_solver_base<LinearOperator, Preconditioner, VectorOperations, Monitor, Log>
 {
 public:
-    using scalar_type = typename VectorOperations::scalar_type;
-    using vector_type = typename VectorOperations::vector_type;
-    using linear_operator_type = LinearOperator;
-    using preconditioner_type = Preconditioner;
+    using scalar_type            = typename VectorOperations::scalar_type;
+    using vector_type            = typename VectorOperations::vector_type;
+    using linear_operator_type   = LinearOperator;
+    using preconditioner_type    = Preconditioner;
     using vector_operations_type = VectorOperations;
-    using monitor_type = Monitor;
-    using log_type = Log;
+    using monitor_type           = Monitor;
+    using log_type               = Log;
+
 private:
     using monitor_call_wrap_t = detail::monitor_call_wrap<VectorOperations, Monitor>;
-    using parent_t = iter_solver_base<LinearOperator,Preconditioner, VectorOperations,Monitor,Log>;
-    using logged_obj_t = typename parent_t::logged_obj_t;
+    using parent_t            = iter_solver_base<LinearOperator, Preconditioner, VectorOperations, Monitor, Log>;
+    using logged_obj_t        = typename parent_t::logged_obj_t;
+
 protected:
     using parent_t::monitor_;
-    using parent_t::vec_ops_;
     using parent_t::prec_;
+    using parent_t::vec_ops_;
 
 public:
-
-    exact_wrapper(const vector_operations_type *vec_ops_p, Log *log = nullptr, int obj_log_lev = 3):
-    parent_t(vec_ops_p, log, obj_log_lev, "exact::")
+    exact_wrapper( const vector_operations_type *vec_ops_p, Log *log = nullptr, int obj_log_lev = 3 )
+        : parent_t( vec_ops_p, log, obj_log_lev, "exact::" )
     {
-        vec_ops_->init_vector(r_);
-        vec_ops_->start_use_vector(r_);
+        vec_ops_->init_vector( r_ );
+        vec_ops_->start_use_vector( r_ );
     }
     ~exact_wrapper()
     {
-        vec_ops_->stop_use_vector(r_);
-        vec_ops_->free_vector(r_);
+        vec_ops_->stop_use_vector( r_ );
+        vec_ops_->free_vector( r_ );
     }
 
-    void set_basis_size(int basis_sz) 
-    {
-        //dummy
-    }   
-    void set_use_precond_resid(bool use_precond_resid)
+    void set_basis_size( int basis_sz )
     {
         //dummy
     }
-    void set_resid_recalc_freq(int resid_recalc_freq)
+    void set_use_precond_resid( bool use_precond_resid )
     {
         //dummy
-    }     
-    virtual bool solve(const linear_operator_type &A, const vector_type &b, vector_type &x)const
+    }
+    void set_resid_recalc_freq( int resid_recalc_freq )
     {
-        if (prec_ == nullptr)
+        //dummy
+    }
+    virtual bool solve( const linear_operator_type &A, const vector_type &b, vector_type &x ) const
+    {
+        if ( prec_ == nullptr )
         {
-            throw std::logic_error("exact::solve: preconditioner can't be NULL since preconditioner is used to solve the system exactly! Use 'set_preconditioner' method before running an exact solver.");
+            throw std::logic_error(
+                "exact::solve: preconditioner can't be NULL since preconditioner is used to solve the system exactly! "
+                "Use 'set_preconditioner' method before running an exact solver."
+            );
         }
 
 
-        monitor_call_wrap_t monitor_wrap(monitor_);
-        monitor_wrap.start(b);
+        monitor_call_wrap_t monitor_wrap( monitor_ );
+        monitor_wrap.start( b );
 
-        prec_->set_operator(&A);
-        vec_ops_->assign(b, x);
-        prec_->apply(x);
+        prec_->set_operator( &A );
+        vec_ops_->assign( b, x );
+        prec_->apply( x );
         ++monitor_;
-        calc_residual(A, x, b, r_);
-        monitor_.check_finished(x, r_);
+        calc_residual( A, x, b, r_ );
+        monitor_.check_finished( x, r_ );
         bool res = monitor_.converged();
         return res;
-
     }
 
 
 private:
     mutable vector_type r_;
-    void calc_residual(const linear_operator_type &A, const vector_type &x, const vector_type &b, vector_type &r)const
+    void
+    calc_residual( const linear_operator_type &A, const vector_type &x, const vector_type &b, vector_type &r ) const
     {
-        vec_ops_->assign_scalar(0, r);
-        A.apply(x, r);
-        vec_ops_->add_mul( static_cast<scalar_type>(1.0), b, static_cast<scalar_type>(-1.0), r);
+        vec_ops_->assign_scalar( 0, r );
+        A.apply( x, r );
+        vec_ops_->add_mul( static_cast<scalar_type>( 1.0 ), b, static_cast<scalar_type>( -1.0 ), r );
     }
-
-
 };
 
 

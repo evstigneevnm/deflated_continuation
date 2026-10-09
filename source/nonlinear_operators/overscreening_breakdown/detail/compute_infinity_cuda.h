@@ -7,7 +7,7 @@ namespace detail
 {
 
 
-    /*
+/*
         0x7f800000 = infinity
 
         0xff800000 = -infinity
@@ -16,13 +16,13 @@ namespace detail
 
         0xfff0000000000000 = -infinity
      */
-    // infinit spec
-
+// infinit spec
 
 
 template <class T>
 __DEVICE_TAG__ inline T compute_infinity()
-{}
+{
+}
 
 template <>
 __DEVICE_TAG__ inline float compute_infinity()
@@ -39,4 +39,4 @@ __DEVICE_TAG__ inline double compute_infinity()
 
 }
 
-#endif 
+#endif

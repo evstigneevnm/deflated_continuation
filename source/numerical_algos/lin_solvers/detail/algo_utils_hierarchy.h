@@ -5,17 +5,17 @@
 
 namespace numerical_algos
 {
-namespace detail 
+namespace detail
 {
 
-template<class Algo, class = int>
+template <class Algo, class = int>
 struct algo_utils_hierarchy
 {
     using type = utils_hierarchy_dummy;
 };
 
-template<class Algo>
-struct algo_utils_hierarchy<Algo,decltype((void)(typename Algo::utils_hierarchy()),int(0))>
+template <class Algo>
+struct algo_utils_hierarchy<Algo, decltype( (void)( typename Algo::utils_hierarchy() ), int( 0 ) )>
 {
     using type = typename Algo::utils_hierarchy;
 };

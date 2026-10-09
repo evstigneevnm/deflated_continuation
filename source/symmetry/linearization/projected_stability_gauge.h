@@ -8,34 +8,28 @@ namespace symmetry
 namespace linearization
 {
 
-template<class Scalar>
+template <class Scalar>
 struct projected_stability_gauge
 {
     Scalar operator_completion = Scalar{};
-    Scalar scaled_eigenvalue = Scalar{};
+    Scalar scaled_eigenvalue   = Scalar{};
 };
 
-template<class Scalar>
-projected_stability_gauge<Scalar>
-make_projected_stability_gauge(
-    Scalar linearization_scale,
-    bool left_halfplane_is_stable,
-    Scalar magnitude = Scalar(1))
+template <class Scalar>
+projected_stability_gauge<Scalar> make_projected_stability_gauge(
+    Scalar linearization_scale, bool left_halfplane_is_stable, Scalar magnitude = Scalar( 1 )
+)
 {
-    if(linearization_scale == Scalar(0))
+    if ( linearization_scale == Scalar( 0 ) )
         throw std::invalid_argument(
             "projected stability gauge requires a nonzero "
-            "linearization scale");
-    if(!(magnitude > Scalar(0)))
-        throw std::invalid_argument(
-            "projected stability gauge magnitude must be positive");
+            "linearization scale"
+        );
+    if ( !( magnitude > Scalar( 0 ) ) )
+        throw std::invalid_argument( "projected stability gauge magnitude must be positive" );
 
-    const Scalar scaled_eigenvalue =
-        left_halfplane_is_stable ? -magnitude : magnitude;
-    return {
-        scaled_eigenvalue/linearization_scale,
-        scaled_eigenvalue
-    };
+    const Scalar scaled_eigenvalue = left_halfplane_is_stable ? -magnitude : magnitude;
+    return { scaled_eigenvalue / linearization_scale, scaled_eigenvalue };
 }
 
 } // namespace linearization

@@ -17,96 +17,70 @@ namespace analysis
 namespace detail
 {
 
-template<class Eigensolver, class ProbeGenerator, class = void>
+template <class Eigensolver, class ProbeGenerator, class = void>
 struct has_probe_generator_setter : std::false_type
 {
 };
 
-template<class Eigensolver, class ProbeGenerator>
+template <class Eigensolver, class ProbeGenerator>
 struct has_probe_generator_setter<
-    Eigensolver,
-    ProbeGenerator,
-    std::void_t<decltype(
-        std::declval<Eigensolver&>().set_probe_generator(
-            std::declval<ProbeGenerator>()))>>
+    Eigensolver, ProbeGenerator,
+    std::void_t<decltype( std::declval<Eigensolver &>().set_probe_generator( std::declval<ProbeGenerator>() ) )>>
     : std::true_type
 {
 };
 
-template<class Eigensolver, class = void>
+template <class Eigensolver, class = void>
 struct has_probe_generator_query : std::false_type
 {
 };
 
-template<class Eigensolver>
+template <class Eigensolver>
 struct has_probe_generator_query<
-    Eigensolver,
-    std::void_t<decltype(
-        std::declval<const Eigensolver&>().
-            has_probe_generator())>>
-    : std::true_type
+    Eigensolver, std::void_t<decltype( std::declval<const Eigensolver &>().has_probe_generator() )>> : std::true_type
 {
 };
 
-template<class Eigensolver, class = void>
+template <class Eigensolver, class = void>
 struct has_primary_recycling_control : std::false_type
 {
 };
 
-template<class Eigensolver>
+template <class Eigensolver>
 struct has_primary_recycling_control<
-    Eigensolver,
-    std::void_t<
-        decltype(
-            std::declval<const Eigensolver&>().
-                begin_recycling_transaction()),
-        decltype(
-            std::declval<const Eigensolver&>().
-                commit_recycling_transaction()),
-        decltype(
-            std::declval<const Eigensolver&>().
-                rollback_recycling_transaction()),
-        decltype(
-            std::declval<const Eigensolver&>().
-                reset_recycled_subspace())>>
-    : std::true_type
+    Eigensolver, std::void_t<
+                     decltype( std::declval<const Eigensolver &>().begin_recycling_transaction() ),
+                     decltype( std::declval<const Eigensolver &>().commit_recycling_transaction() ),
+                     decltype( std::declval<const Eigensolver &>().rollback_recycling_transaction() ),
+                     decltype( std::declval<const Eigensolver &>().reset_recycled_subspace() )>> : std::true_type
 {
 };
 
-template<class Eigensolver, class = void>
+template <class Eigensolver, class = void>
 struct has_primary_ritz_recycling_reset : std::false_type
 {
 };
 
-template<class Eigensolver>
+template <class Eigensolver>
 struct has_primary_ritz_recycling_reset<
-    Eigensolver,
-    std::void_t<decltype(
-        std::declval<const Eigensolver&>().
-            reset_recycled_ritz_subspace())>>
+    Eigensolver, std::void_t<decltype( std::declval<const Eigensolver &>().reset_recycled_ritz_subspace() )>>
     : std::true_type
 {
 };
 
-template<class Eigensolver, class Vector, class = void>
+template <class Eigensolver, class Vector, class = void>
 struct has_primary_classification_reconciliation : std::false_type
 {
 };
 
-template<class Eigensolver, class Vector>
+template <class Eigensolver, class Vector>
 struct has_primary_classification_reconciliation<
-    Eigensolver,
-    Vector,
+    Eigensolver, Vector,
     std::void_t<
-        decltype(
-            std::declval<const Eigensolver&>().
-                classification_reconciliation_available()),
-        decltype(
-            std::declval<const Eigensolver&>().
-                execute_classification_reconciliation(
-                    std::declval<const Vector&>(),
-                    std::declval<std::size_t>()))>>
-    : std::true_type
+        decltype( std::declval<const Eigensolver &>().classification_reconciliation_available() ),
+        decltype( std::declval<const Eigensolver &>().execute_classification_reconciliation(
+            std::declval<const Vector &>(), std::declval<std::size_t>()
+        ) )>> : std::true_type
 {
 };
 
@@ -118,109 +92,83 @@ struct has_primary_classification_reconciliation<
  * transactionally after a primary failure. Both solvers operate through the
  * same vector-space and linear-operator abstractions.
  */
-template<class PrimaryEigensolver, class SmallSystemEigensolver>
+template <class PrimaryEigensolver, class SmallSystemEigensolver>
 class dimension_guarded_eigensolver
 {
 public:
-    using primary_type = PrimaryEigensolver;
+    using primary_type      = PrimaryEigensolver;
     using small_system_type = SmallSystemEigensolver;
-    using vector_type = typename primary_type::vector_type;
-    using result_type = typename primary_type::result_type;
+    using vector_type       = typename primary_type::vector_type;
+    using result_type       = typename primary_type::result_type;
 
     static_assert(
-        std::is_same<
-            vector_type,
-            typename small_system_type::vector_type>::value,
-        "dimension-guarded eigensolvers require the same vector type");
+        std::is_same<vector_type, typename small_system_type::vector_type>::value,
+        "dimension-guarded eigensolvers require the same vector type"
+    );
     static_assert(
-        std::is_same<
-            result_type,
-            typename small_system_type::result_type>::value,
-        "dimension-guarded eigensolvers require the same result type");
+        std::is_same<result_type, typename small_system_type::result_type>::value,
+        "dimension-guarded eigensolvers require the same result type"
+    );
 
     dimension_guarded_eigensolver(
-        primary_type& primary,
-        const small_system_type& small_system,
-        std::size_t dimension,
-        std::size_t maximum_small_dimension,
-        bool prefer_small_system)
-        : primary_(primary),
-          small_system_(small_system),
-          dimension_(dimension),
-          maximum_small_dimension_(maximum_small_dimension),
-          prefer_small_system_(prefer_small_system)
+        primary_type &primary, const small_system_type &small_system, std::size_t dimension,
+        std::size_t maximum_small_dimension, bool prefer_small_system
+    )
+        : primary_( primary ), small_system_( small_system ), dimension_( dimension ),
+          maximum_small_dimension_( maximum_small_dimension ), prefer_small_system_( prefer_small_system )
     {
-        if(dimension_ == 0)
+        if ( dimension_ == 0 )
         {
             throw std::invalid_argument(
                 "dimension-guarded eigensolver requires a nonzero "
-                "dimension");
+                "dimension"
+            );
         }
     }
 
-    result_type execute(const vector_type& initial_vector) const
+    result_type execute( const vector_type &initial_vector ) const
     {
-        if(small_system_available() && prefer_small_system_)
+        if ( small_system_available() && prefer_small_system_ )
         {
-            result_type result =
-                small_system_.execute(initial_vector);
-            prefix_diagnostic(
-                result,
-                "small-system eigensolver selected");
+            result_type result = small_system_.execute( initial_vector );
+            prefix_diagnostic( result, "small-system eigensolver selected" );
             return result;
         }
 
-        result_type primary_result =
-            primary_.execute(initial_vector);
-        if(primary_result.succeeded() || !small_system_available())
+        result_type primary_result = primary_.execute( initial_vector );
+        if ( primary_result.succeeded() || !small_system_available() )
             return primary_result;
 
-        result_type fallback_result =
-            small_system_.execute(initial_vector);
+        result_type       fallback_result = small_system_.execute( initial_vector );
         const std::string primary_diagnostic =
-            primary_result.diagnostic.empty()
-            ? std::string("primary eigensolver failed")
-            : primary_result.diagnostic;
-        prefix_diagnostic(
-            fallback_result,
-            "small-system recovery after {" +
-                primary_diagnostic + "}");
+            primary_result.diagnostic.empty() ? std::string( "primary eigensolver failed" ) : primary_result.diagnostic;
+        prefix_diagnostic( fallback_result, "small-system recovery after {" + primary_diagnostic + "}" );
         return fallback_result;
     }
 
     bool small_system_available() const
     {
-        return
-            maximum_small_dimension_ != 0 &&
-            dimension_ <= maximum_small_dimension_;
+        return maximum_small_dimension_ != 0 && dimension_ <= maximum_small_dimension_;
     }
 
     bool classification_fallback_available() const
     {
-        return
-            small_system_available() &&
-            !prefer_small_system_;
+        return small_system_available() && !prefer_small_system_;
     }
 
-    result_type execute_classification_fallback(
-        const vector_type& initial_vector) const
+    result_type execute_classification_fallback( const vector_type &initial_vector ) const
     {
-        if(!classification_fallback_available())
+        if ( !classification_fallback_available() )
         {
             result_type result;
-            result.status =
-                eigensolvers::eigensolver_status::invalid_input;
+            result.status            = eigensolvers::eigensolver_status::invalid_input;
             result.coverage_complete = false;
-            result.diagnostic =
-                "small-system classification fallback is unavailable";
+            result.diagnostic        = "small-system classification fallback is unavailable";
             return result;
         }
 
-        result_type result =
-            small_system_.execute(initial_vector);
-        prefix_diagnostic(
-            result,
-            "small-system recovery after incomplete classification");
+        result_type result = small_system_.execute( initial_vector );
+        prefix_diagnostic( result, "small-system recovery after incomplete classification" );
         return result;
     }
 
@@ -229,82 +177,57 @@ public:
         return small_system_available();
     }
 
-    result_type execute_classification_confirmation(
-        const vector_type& initial_vector) const
+    result_type execute_classification_confirmation( const vector_type &initial_vector ) const
     {
-        if(!classification_confirmation_available())
+        if ( !classification_confirmation_available() )
         {
             result_type result;
-            result.status =
-                eigensolvers::eigensolver_status::invalid_input;
+            result.status            = eigensolvers::eigensolver_status::invalid_input;
             result.coverage_complete = false;
-            result.diagnostic =
-                "small-system classification confirmation is "
-                "unavailable";
+            result.diagnostic        = "small-system classification confirmation is "
+                                       "unavailable";
             return result;
         }
 
-        result_type result =
-            small_system_.execute(initial_vector);
-        prefix_diagnostic(
-            result,
-            "small-system classification confirmation");
+        result_type result = small_system_.execute( initial_vector );
+        prefix_diagnostic( result, "small-system classification confirmation" );
         return result;
     }
 
     bool classification_reconciliation_available() const
     {
-        if constexpr(
-            detail::has_primary_classification_reconciliation<
-                primary_type,
-                vector_type>::value)
+        if constexpr ( detail::has_primary_classification_reconciliation<primary_type, vector_type>::value )
         {
             return primary_.classification_reconciliation_available();
         }
         return false;
     }
 
-    result_type execute_classification_reconciliation(
-        const vector_type& initial_vector,
-        std::size_t minimum_results) const
+    result_type
+    execute_classification_reconciliation( const vector_type &initial_vector, std::size_t minimum_results ) const
     {
-        if constexpr(
-            detail::has_primary_classification_reconciliation<
-                primary_type,
-                vector_type>::value)
+        if constexpr ( detail::has_primary_classification_reconciliation<primary_type, vector_type>::value )
         {
-            return primary_.execute_classification_reconciliation(
-                initial_vector,
-                minimum_results);
+            return primary_.execute_classification_reconciliation( initial_vector, minimum_results );
         }
 
         result_type result;
-        result.status =
-            eigensolvers::eigensolver_status::invalid_input;
+        result.status            = eigensolvers::eigensolver_status::invalid_input;
         result.coverage_complete = false;
-        result.diagnostic =
-            "primary classification reconciliation is unavailable";
+        result.diagnostic        = "primary classification reconciliation is unavailable";
         return result;
     }
 
-    template<
+    template <
         class ProbeGenerator,
-        std::enable_if_t<
-            detail::has_probe_generator_setter<
-                primary_type,
-                ProbeGenerator>::value,
-            int> = 0>
-    void set_probe_generator(ProbeGenerator probe_generator)
+        std::enable_if_t<detail::has_probe_generator_setter<primary_type, ProbeGenerator>::value, int> = 0>
+    void set_probe_generator( ProbeGenerator probe_generator )
     {
-        primary_.set_probe_generator(
-            std::move(probe_generator));
+        primary_.set_probe_generator( std::move( probe_generator ) );
     }
 
-    template<
-        class Primary = primary_type,
-        std::enable_if_t<
-            detail::has_probe_generator_query<Primary>::value,
-            int> = 0>
+    template <
+        class Primary = primary_type, std::enable_if_t<detail::has_probe_generator_query<Primary>::value, int> = 0>
     bool has_probe_generator() const
     {
         return primary_.has_probe_generator();
@@ -312,8 +235,7 @@ public:
 
     void begin_recycling_transaction() const
     {
-        if constexpr(
-            detail::has_primary_recycling_control<primary_type>::value)
+        if constexpr ( detail::has_primary_recycling_control<primary_type>::value )
         {
             primary_.begin_recycling_transaction();
         }
@@ -321,8 +243,7 @@ public:
 
     void commit_recycling_transaction() const
     {
-        if constexpr(
-            detail::has_primary_recycling_control<primary_type>::value)
+        if constexpr ( detail::has_primary_recycling_control<primary_type>::value )
         {
             primary_.commit_recycling_transaction();
         }
@@ -330,8 +251,7 @@ public:
 
     void rollback_recycling_transaction() const
     {
-        if constexpr(
-            detail::has_primary_recycling_control<primary_type>::value)
+        if constexpr ( detail::has_primary_recycling_control<primary_type>::value )
         {
             primary_.rollback_recycling_transaction();
         }
@@ -339,8 +259,7 @@ public:
 
     void reset_recycled_subspace() const
     {
-        if constexpr(
-            detail::has_primary_recycling_control<primary_type>::value)
+        if constexpr ( detail::has_primary_recycling_control<primary_type>::value )
         {
             primary_.reset_recycled_subspace();
         }
@@ -348,35 +267,27 @@ public:
 
     void reset_recycled_ritz_subspace() const
     {
-        if constexpr(
-            detail::has_primary_ritz_recycling_reset<
-                primary_type>::value)
+        if constexpr ( detail::has_primary_ritz_recycling_reset<primary_type>::value )
         {
             primary_.reset_recycled_ritz_subspace();
         }
-        else if constexpr(
-            detail::has_primary_recycling_control<primary_type>::value)
+        else if constexpr ( detail::has_primary_recycling_control<primary_type>::value )
         {
             primary_.reset_recycled_subspace();
         }
     }
 
 private:
-    static void prefix_diagnostic(
-        result_type& result,
-        const std::string& prefix)
+    static void prefix_diagnostic( result_type &result, const std::string &prefix )
     {
-        result.diagnostic =
-            result.diagnostic.empty()
-            ? prefix
-            : prefix + ": " + result.diagnostic;
+        result.diagnostic = result.diagnostic.empty() ? prefix : prefix + ": " + result.diagnostic;
     }
 
-    primary_type& primary_;
-    const small_system_type& small_system_;
-    std::size_t dimension_;
-    std::size_t maximum_small_dimension_;
-    bool prefer_small_system_;
+    primary_type            &primary_;
+    const small_system_type &small_system_;
+    std::size_t              dimension_;
+    std::size_t              maximum_small_dimension_;
+    bool                     prefer_small_system_;
 };
 
 } // namespace analysis

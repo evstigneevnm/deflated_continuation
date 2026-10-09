@@ -38,142 +38,161 @@
 #include <common/gpu_vector_operations.h>
 #include <models/KS_2D/test_deflation_continuation_typedefs_KS.h>
 
-int main(int argc, char const *argv[])
+int main( int argc, char const *argv[] )
 {
-    
-    if(argc!=6)
+
+    if ( argc != 6 )
     {
-        printf("Usage: %s Nx Ny lambda_0 dS S\n   lambda_0 - starting parameter\n   dS - continuation step\n   S - number of continuation steps\n",argv[0]);
+        printf(
+            "Usage: %s Nx Ny lambda_0 dS S\n   lambda_0 - starting parameter\n   dS - continuation step\n   S - number "
+            "of continuation steps\n",
+            argv[0]
+        );
         return 0;
     }
-    size_t Nx = atoi(argv[1]);
-    size_t Ny = atoi(argv[2]);
-    real lambda0 = atof(argv[3]);
-    real dS = atof(argv[4]);
-    unsigned int S = atoi(argv[5]);
+    size_t       Nx      = atoi( argv[1] );
+    size_t       Ny      = atoi( argv[2] );
+    real         lambda0 = atof( argv[3] );
+    real         dS      = atof( argv[4] );
+    unsigned int S       = atoi( argv[5] );
 
 
-
-
-
-    init_cuda(1);
-    real norm_wight = std::sqrt(real(Nx*Ny));
+    init_cuda( 1 );
+    real norm_wight = std::sqrt( real( Nx * Ny ) );
 
     //linsolver control
     unsigned int lin_solver_max_it = 1500;
     unsigned int use_precond_resid = 1;
     unsigned int resid_recalc_freq = 1;
-    unsigned int basis_sz = 2;
-    real lin_solver_tol = 1.0e-3;
-    
+    unsigned int basis_sz          = 2;
+    real         lin_solver_tol    = 1.0e-3;
+
     //newton control
-    unsigned int newton_def_max_it = 350;
+    unsigned int newton_def_max_it  = 350;
     unsigned int newton_def_cont_it = 100;
-    real newton_def_tol = 1.0e-9;
-    real newton_cont_tol = 1.0e-9;
+    real         newton_def_tol     = 1.0e-9;
+    real         newton_cont_tol    = 1.0e-9;
 
-    real a_val = real(2);
-    real b_val = real(4);
+    real a_val = real( 2 );
+    real b_val = real( 4 );
 
-    fft_t *CUFFT_C2R = new fft_t(Nx, Ny);
-    size_t My=CUFFT_C2R->get_reduced_size();
-    cublas_wrap *CUBLAS = new cublas_wrap();
-    CUBLAS->set_pointer_location_device(false);
+    fft_t       *CUFFT_C2R = new fft_t( Nx, Ny );
+    size_t       My        = CUFFT_C2R->get_reduced_size();
+    cublas_wrap *CUBLAS    = new cublas_wrap();
+    CUBLAS->set_pointer_location_device( false );
 
-    vec_ops_real *vec_ops_R = new vec_ops_real(Nx*Ny, CUBLAS);
-    vec_ops_complex *vec_ops_C = new vec_ops_complex(Nx*My, CUBLAS);
-    vec_ops_real_im *vec_ops_R_im = new vec_ops_real_im(Nx*My-1, CUBLAS);
+    vec_ops_real    *vec_ops_R    = new vec_ops_real( Nx * Ny, CUBLAS );
+    vec_ops_complex *vec_ops_C    = new vec_ops_complex( Nx * My, CUBLAS );
+    vec_ops_real_im *vec_ops_R_im = new vec_ops_real_im( Nx * My - 1, CUBLAS );
     //CUDA GRIDS
-    dim3 Blocks; dim3 Grids; dim3 Grids_F;
-    KS_2D *KS2D = new KS_2D(a_val, b_val, Nx, Ny, vec_ops_R, vec_ops_C, vec_ops_R_im, CUFFT_C2R);
-    KS2D->get_cuda_grid(Grids, Grids_F, Blocks);
-    printf("Blocks = (%i,%i,%i)\n", Blocks.x, Blocks.y, Blocks.z);
-    printf("Grids = (%i,%i,%i)\n", Grids.x, Grids.y, Grids.z);
-    printf("GridsFourier = (%i,%i,%i)\n", Grids_F.x, Grids_F.y, Grids_F.z);
-    log_t *log = new log_t();
-    lin_op_t *Ax = new lin_op_t(KS2D);
-    prec_t *prec = new prec_t(KS2D);
+    dim3   Blocks;
+    dim3   Grids;
+    dim3   Grids_F;
+    KS_2D *KS2D = new KS_2D( a_val, b_val, Nx, Ny, vec_ops_R, vec_ops_C, vec_ops_R_im, CUFFT_C2R );
+    KS2D->get_cuda_grid( Grids, Grids_F, Blocks );
+    printf( "Blocks = (%i,%i,%i)\n", Blocks.x, Blocks.y, Blocks.z );
+    printf( "Grids = (%i,%i,%i)\n", Grids.x, Grids.y, Grids.z );
+    printf( "GridsFourier = (%i,%i,%i)\n", Grids_F.x, Grids_F.y, Grids_F.z );
+    log_t     *log  = new log_t();
+    lin_op_t  *Ax   = new lin_op_t( KS2D );
+    prec_t    *prec = new prec_t( KS2D );
     monitor_t *mon;
-    monitor_t *mon_orig; 
+    monitor_t *mon_orig;
     //setup deflation system
-    sherman_morrison_linear_system_solve_t *SM = new sherman_morrison_linear_system_solve_t(prec, vec_ops_R_im, log);
-    mon = &SM->get_linsolver_handle()->monitor();
-    mon->init(lin_solver_tol, real(0), lin_solver_max_it);
-    mon->set_save_convergence_history(true);
-    mon->set_divide_out_norms_by_rel_base(true);
+    sherman_morrison_linear_system_solve_t *SM = new sherman_morrison_linear_system_solve_t( prec, vec_ops_R_im, log );
+    mon                                        = &SM->get_linsolver_handle()->monitor();
+    mon->init( lin_solver_tol, real( 0 ), lin_solver_max_it );
+    mon->set_save_convergence_history( true );
+    mon->set_divide_out_norms_by_rel_base( true );
     mon->out_min_resid_norm();
-    SM->get_linsolver_handle()->set_use_precond_resid(use_precond_resid);
-    SM->get_linsolver_handle()->set_resid_recalc_freq(resid_recalc_freq);
-    SM->get_linsolver_handle()->set_basis_size(basis_sz);
-    SM->is_small_alpha(false);
+    SM->get_linsolver_handle()->set_use_precond_resid( use_precond_resid );
+    SM->get_linsolver_handle()->set_resid_recalc_freq( resid_recalc_freq );
+    SM->get_linsolver_handle()->set_basis_size( basis_sz );
+    SM->is_small_alpha( false );
 
-    convergence_newton_def_t *conv_newton_def = new convergence_newton_def_t(vec_ops_R_im, log, newton_def_tol, newton_def_max_it, real(1), true );
-    sol_storage_def_t *sol_storage_def = new sol_storage_def_t(vec_ops_R_im, 50, norm_wight);
-    system_operator_def_t *system_operator_def = new system_operator_def_t(vec_ops_R_im, Ax, SM, sol_storage_def);
-    newton_def_t *newton_def = new newton_def_t(vec_ops_R_im, system_operator_def, conv_newton_def);
+    convergence_newton_def_t *conv_newton_def =
+        new convergence_newton_def_t( vec_ops_R_im, log, newton_def_tol, newton_def_max_it, real( 1 ), true );
+    sol_storage_def_t     *sol_storage_def     = new sol_storage_def_t( vec_ops_R_im, 50, norm_wight );
+    system_operator_def_t *system_operator_def = new system_operator_def_t( vec_ops_R_im, Ax, SM, sol_storage_def );
+    newton_def_t          *newton_def          = new newton_def_t( vec_ops_R_im, system_operator_def, conv_newton_def );
 
     //setup linear system:
     mon_orig = &SM->get_linsolver_handle_original()->monitor();
-    mon_orig->init(lin_solver_tol, real(0), lin_solver_max_it);
-    mon_orig->set_save_convergence_history(true);
-    mon_orig->set_divide_out_norms_by_rel_base(true);
+    mon_orig->init( lin_solver_tol, real( 0 ), lin_solver_max_it );
+    mon_orig->set_save_convergence_history( true );
+    mon_orig->set_divide_out_norms_by_rel_base( true );
     mon_orig->out_min_resid_norm();
-    SM->get_linsolver_handle_original()->set_use_precond_resid(use_precond_resid);
-    SM->get_linsolver_handle_original()->set_resid_recalc_freq(resid_recalc_freq);
-    SM->get_linsolver_handle_original()->set_basis_size(basis_sz);    
-    convergence_newton_t *conv_newton = new convergence_newton_t(vec_ops_R_im, log, newton_cont_tol, newton_def_max_it, real(1) );
-    system_operator_t *system_operator = new system_operator_t(vec_ops_R_im, Ax, SM);
-    newton_t *newton = new newton_t(vec_ops_R_im, system_operator, conv_newton);
+    SM->get_linsolver_handle_original()->set_use_precond_resid( use_precond_resid );
+    SM->get_linsolver_handle_original()->set_resid_recalc_freq( resid_recalc_freq );
+    SM->get_linsolver_handle_original()->set_basis_size( basis_sz );
+    convergence_newton_t *conv_newton =
+        new convergence_newton_t( vec_ops_R_im, log, newton_cont_tol, newton_def_max_it, real( 1 ) );
+    system_operator_t *system_operator = new system_operator_t( vec_ops_R_im, Ax, SM );
+    newton_t          *newton          = new newton_t( vec_ops_R_im, system_operator, conv_newton );
 
     //setup continuation system:
-    predictor_cont_t* predict = new predictor_cont_t(vec_ops_R_im, log);
-    predict->set_steps(dS, dS, real(0.0765), real(0.1), 30);
-    system_operator_cont_t* system_operator_cont = new system_operator_cont_t(vec_ops_R_im, Ax, SM);
-    convergence_newton_cont_t *conv_newton_cont = new convergence_newton_cont_t(vec_ops_R_im, log, newton_cont_tol, newton_def_cont_it, real(1), true);
-    newton_cont_t* newton_cont = new newton_cont_t(vec_ops_R_im, system_operator_cont, conv_newton_cont);
-    advance_step_cont_t* continuation_step = new advance_step_cont_t(vec_ops_R_im, log, system_operator_cont, newton_cont, predict, 'S');
-    tangent_0_cont_t* init_tangent = new tangent_0_cont_t(vec_ops_R_im, Ax, SM);
+    predictor_cont_t *predict = new predictor_cont_t( vec_ops_R_im, log );
+    predict->set_steps( dS, dS, real( 0.0765 ), real( 0.1 ), 30 );
+    system_operator_cont_t    *system_operator_cont = new system_operator_cont_t( vec_ops_R_im, Ax, SM );
+    convergence_newton_cont_t *conv_newton_cont =
+        new convergence_newton_cont_t( vec_ops_R_im, log, newton_cont_tol, newton_def_cont_it, real( 1 ), true );
+    newton_cont_t       *newton_cont = new newton_cont_t( vec_ops_R_im, system_operator_cont, conv_newton_cont );
+    advance_step_cont_t *continuation_step =
+        new advance_step_cont_t( vec_ops_R_im, log, system_operator_cont, newton_cont, predict, 'S' );
+    tangent_0_cont_t *init_tangent = new tangent_0_cont_t( vec_ops_R_im, Ax, SM );
 
 
     real_vec u_out_ph;
-    vec_ops_R->init_vector(u_out_ph); vec_ops_R->start_use_vector(u_out_ph);
-    
+    vec_ops_R->init_vector( u_out_ph );
+    vec_ops_R->start_use_vector( u_out_ph );
 
-    deflation_operator_t *deflation_op = new deflation_operator_t(vec_ops_R_im, log, newton_def, 5);
 
-    
+    deflation_operator_t *deflation_op = new deflation_operator_t( vec_ops_R_im, log, newton_def, 5 );
+
+
     //deflation_op->execute_all(lambda0, KS2D, sol_storage_def);
-    deflation_op->find_add_solution(lambda0, KS2D, sol_storage_def);
-    
+    deflation_op->find_add_solution( lambda0, KS2D, sol_storage_def );
 
-    unsigned int p=0;
-    for(auto &x: *sol_storage_def)
-    {        
-        KS2D->physical_solution((real_im_vec&)x, u_out_ph);
+
+    unsigned int p = 0;
+    for ( auto &x : *sol_storage_def )
+    {
+        KS2D->physical_solution( (real_im_vec &)x, u_out_ph );
         std::ostringstream stringStream;
-        stringStream << "u_out_" << (p++) << ".dat";
+        stringStream << "u_out_" << ( p++ ) << ".dat";
         //gpu_file_operations::write_matrix<real>(stringStream.str(), Nx, Ny, u_out_ph);
     }
 
     real_im_vec x0, x0_s, x1, x1_s, x1_p, d_x, f, xxx, xxx1;
     real_im_vec x0p, x_1_g;
-    vec_ops_R_im->init_vector(x0); vec_ops_R_im->start_use_vector(x0);
-    vec_ops_R_im->init_vector(x1_p); vec_ops_R_im->start_use_vector(x1_p);
-    vec_ops_R_im->init_vector(x0_s); vec_ops_R_im->start_use_vector(x0_s);
-    vec_ops_R_im->init_vector(x1); vec_ops_R_im->start_use_vector(x1);
-    vec_ops_R_im->init_vector(x1_s); vec_ops_R_im->start_use_vector(x1_s);
-    vec_ops_R_im->init_vector(d_x); vec_ops_R_im->start_use_vector(d_x);
-    vec_ops_R_im->init_vector(f); vec_ops_R_im->start_use_vector(f);
-    vec_ops_R_im->init_vector(xxx); vec_ops_R_im->start_use_vector(xxx);
-    vec_ops_R_im->init_vector(xxx1); vec_ops_R_im->start_use_vector(xxx1);
-    vec_ops_R_im->init_vector(x0p); vec_ops_R_im->start_use_vector(x0p);
-    vec_ops_R_im->init_vector(x_1_g); vec_ops_R_im->start_use_vector(x_1_g);
+    vec_ops_R_im->init_vector( x0 );
+    vec_ops_R_im->start_use_vector( x0 );
+    vec_ops_R_im->init_vector( x1_p );
+    vec_ops_R_im->start_use_vector( x1_p );
+    vec_ops_R_im->init_vector( x0_s );
+    vec_ops_R_im->start_use_vector( x0_s );
+    vec_ops_R_im->init_vector( x1 );
+    vec_ops_R_im->start_use_vector( x1 );
+    vec_ops_R_im->init_vector( x1_s );
+    vec_ops_R_im->start_use_vector( x1_s );
+    vec_ops_R_im->init_vector( d_x );
+    vec_ops_R_im->start_use_vector( d_x );
+    vec_ops_R_im->init_vector( f );
+    vec_ops_R_im->start_use_vector( f );
+    vec_ops_R_im->init_vector( xxx );
+    vec_ops_R_im->start_use_vector( xxx );
+    vec_ops_R_im->init_vector( xxx1 );
+    vec_ops_R_im->start_use_vector( xxx1 );
+    vec_ops_R_im->init_vector( x0p );
+    vec_ops_R_im->start_use_vector( x0p );
+    vec_ops_R_im->init_vector( x_1_g );
+    vec_ops_R_im->start_use_vector( x_1_g );
 
 
-    x0 = (*sol_storage_def)[0].get_ref();
-    printf("solutions in container = %i\n",sol_storage_def->get_size());
-    (*sol_storage_def)[0].copy(x0);
-    KS2D->physical_solution((real_im_vec&)x0, u_out_ph);
+    x0 = ( *sol_storage_def )[0].get_ref();
+    printf( "solutions in container = %i\n", sol_storage_def->get_size() );
+    ( *sol_storage_def )[0].copy( x0 );
+    KS2D->physical_solution( (real_im_vec &)x0, u_out_ph );
     //gpu_file_operations::write_matrix<real>("u_out_C0.dat", Nx, Ny, u_out_ph);
 
     real lambda0_s, lambda1_s, lambda1_p;
@@ -181,10 +200,10 @@ int main(int argc, char const *argv[])
     real d_lambda;
     real lambda_0p, lambda_1_g;
 
-    init_tangent->execute(KS2D, -1, x0, lambda0, x0_s, lambda0_s);
+    init_tangent->execute( KS2D, -1, x0, lambda0, x0_s, lambda0_s );
     real norm = 1;
 
-/*
+    /*
 
 
 
@@ -240,45 +259,59 @@ int main(int argc, char const *argv[])
 
     }
 //*/
-    std::ofstream file_diag("diagram.dat", std::ofstream::out);
-    
-    file_diag << std::setprecision(10) << lambda0 << " " << vec_ops_R_im->norm_l2(x0) << " " << lambda0 << " " << vec_ops_R_im->norm_l2(x0) << std::endl;
-    for(unsigned int s=0;s<S;s++)
+    std::ofstream file_diag( "diagram.dat", std::ofstream::out );
+
+    file_diag << std::setprecision( 10 ) << lambda0 << " " << vec_ops_R_im->norm_l2( x0 ) << " " << lambda0 << " "
+              << vec_ops_R_im->norm_l2( x0 ) << std::endl;
+    for ( unsigned int s = 0; s < S; s++ )
     {
-        continuation_step->solve(KS2D, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
-        predict->apply(x0p, lambda_0p, x_1_g, lambda_1_g);
-        vec_ops_R_im->assign(x1,x0);
-        vec_ops_R_im->assign(x1_s,x0_s);
-        lambda0 = lambda1;
+        continuation_step->solve( KS2D, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s );
+        predict->apply( x0p, lambda_0p, x_1_g, lambda_1_g );
+        vec_ops_R_im->assign( x1, x0 );
+        vec_ops_R_im->assign( x1_s, x0_s );
+        lambda0   = lambda1;
         lambda0_s = lambda1_s;
-        
-        file_diag << lambda_0p << " " << vec_ops_R_im->norm_l2(x0p) << " " << lambda1 << " " << vec_ops_R_im->norm_l2(x1) << std::endl;
-        std::flush(file_diag);
+
+        file_diag << lambda_0p << " " << vec_ops_R_im->norm_l2( x0p ) << " " << lambda1 << " "
+                  << vec_ops_R_im->norm_l2( x1 ) << std::endl;
+        std::flush( file_diag );
     }
     file_diag.close();
 
-    KS2D->F(x1, lambda1, f);
-    norm = vec_ops_R_im->norm_l2(f);
-    printf("\n===(%le, %le)===", lambda1, norm);
+    KS2D->F( x1, lambda1, f );
+    norm = vec_ops_R_im->norm_l2( f );
+    printf( "\n===(%le, %le)===", lambda1, norm );
 
-    KS2D->physical_solution((real_im_vec&)x1, u_out_ph);
+    KS2D->physical_solution( (real_im_vec &)x1, u_out_ph );
     //gpu_file_operations::write_matrix<real>("u_out_1.dat", Nx, Ny, u_out_ph);
 
 
-    vec_ops_R_im->stop_use_vector(x0); vec_ops_R_im->free_vector(x0);
-    vec_ops_R_im->stop_use_vector(x0_s); vec_ops_R_im->free_vector(x0_s);
-    vec_ops_R_im->stop_use_vector(x1_p); vec_ops_R_im->free_vector(x1_p);
-    vec_ops_R_im->stop_use_vector(x1); vec_ops_R_im->free_vector(x1);
-    vec_ops_R_im->stop_use_vector(x1_s); vec_ops_R_im->free_vector(x1_s);
-    vec_ops_R_im->stop_use_vector(d_x); vec_ops_R_im->free_vector(d_x);
-    vec_ops_R_im->stop_use_vector(f); vec_ops_R_im->free_vector(f);
-    vec_ops_R_im->stop_use_vector(xxx); vec_ops_R_im->free_vector(xxx);
-    vec_ops_R_im->stop_use_vector(xxx1); vec_ops_R_im->free_vector(xxx1);
-    vec_ops_R_im->stop_use_vector(x0p); vec_ops_R_im->free_vector(x0p);
-    vec_ops_R_im->stop_use_vector(x_1_g); vec_ops_R_im->free_vector(x_1_g);
-    
-    
-    vec_ops_R->stop_use_vector(u_out_ph); vec_ops_R->free_vector(u_out_ph);
+    vec_ops_R_im->stop_use_vector( x0 );
+    vec_ops_R_im->free_vector( x0 );
+    vec_ops_R_im->stop_use_vector( x0_s );
+    vec_ops_R_im->free_vector( x0_s );
+    vec_ops_R_im->stop_use_vector( x1_p );
+    vec_ops_R_im->free_vector( x1_p );
+    vec_ops_R_im->stop_use_vector( x1 );
+    vec_ops_R_im->free_vector( x1 );
+    vec_ops_R_im->stop_use_vector( x1_s );
+    vec_ops_R_im->free_vector( x1_s );
+    vec_ops_R_im->stop_use_vector( d_x );
+    vec_ops_R_im->free_vector( d_x );
+    vec_ops_R_im->stop_use_vector( f );
+    vec_ops_R_im->free_vector( f );
+    vec_ops_R_im->stop_use_vector( xxx );
+    vec_ops_R_im->free_vector( xxx );
+    vec_ops_R_im->stop_use_vector( xxx1 );
+    vec_ops_R_im->free_vector( xxx1 );
+    vec_ops_R_im->stop_use_vector( x0p );
+    vec_ops_R_im->free_vector( x0p );
+    vec_ops_R_im->stop_use_vector( x_1_g );
+    vec_ops_R_im->free_vector( x_1_g );
+
+
+    vec_ops_R->stop_use_vector( u_out_ph );
+    vec_ops_R->free_vector( u_out_ph );
 
     delete init_tangent;
     delete continuation_step;

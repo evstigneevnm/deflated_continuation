@@ -6,7 +6,5 @@
 int main()
 {
     return discretization::fourier::tests::run_fourier_foundation_tests<
-        scfd::backend::omp,
-        external_libraries::fft::fftw_backend
-    >("scfd_omp_fftw");
+        scfd::backend::omp, external_libraries::fft::fftw_backend>( "scfd_omp_fftw" );
 }

@@ -11,22 +11,22 @@ namespace time_steppers
 {
 namespace detail
 {
-template<class T>
+template <class T>
 struct scipy_error_square_mapping
 {
     using scalar_type = T;
     scalar_type absolute_tolerance;
     scalar_type relative_tolerance;
 
-    __DEVICE_TAG__ scalar_type operator()(scalar_type error, scalar_type previous, scalar_type candidate) const
+    __DEVICE_TAG__ scalar_type operator()( scalar_type error, scalar_type previous, scalar_type candidate ) const
     {
-        const auto x = std::abs(previous);
-        const auto y = std::abs(candidate);
-        const auto scale = absolute_tolerance + relative_tolerance * (x > y ? x : y);
-        const auto value = error / scale;
+        const auto x      = std::abs( previous );
+        const auto y      = std::abs( candidate );
+        const auto scale  = absolute_tolerance + relative_tolerance * ( x > y ? x : y );
+        const auto value  = error / scale;
         const auto square = value * value;
-        return std::isfinite(error) && std::isfinite(previous) && std::isfinite(candidate) && std::isfinite(scale) &&
-                       scale > 0 && std::isfinite(square)
+        return std::isfinite( error ) && std::isfinite( previous ) && std::isfinite( candidate ) &&
+                       std::isfinite( scale ) && scale > 0 && std::isfinite( square )
                    ? square
                    : std::numeric_limits<scalar_type>::infinity();
     }

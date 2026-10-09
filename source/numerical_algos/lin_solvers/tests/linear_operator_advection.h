@@ -20,61 +20,60 @@ namespace tests
 {
 
 
-template<class VectorOperations, class Log> 
+template <class VectorOperations, class Log>
 class linear_operator_advection
 {
-public:    
+public:
     using scalar_type = typename VectorOperations::scalar_type;
     using vector_type = typename VectorOperations::vector_type;
-    using Ord = typename VectorOperations::ordinal_type;
+    using Ord         = typename VectorOperations::ordinal_type;
+
 private:
-    using T = scalar_type;
+    using T     = scalar_type;
     using T_vec = vector_type;
-    const VectorOperations& vec_ops_;
-    Ord N;
-    T a_;
-    T tau_;
-    T h_;
-    T cfl_;
+    const VectorOperations &vec_ops_;
+    Ord                     N;
+    T                       a_;
+    T                       tau_;
+    T                       h_;
+    T                       cfl_;
 
 public:
-
-    linear_operator_advection(const VectorOperations& vec_ops, T a, T tau):
-    vec_ops_(vec_ops), a_(a), tau_(tau)
+    linear_operator_advection( const VectorOperations &vec_ops, T a, T tau ) : vec_ops_( vec_ops ), a_( a ), tau_( tau )
     {
-        N = vec_ops_.size();
-        h_ = 1.0/static_cast<T>(N);
-        cfl_ = a_*tau_/h_;
+        N    = vec_ops_.size();
+        h_   = 1.0 / static_cast<T>( N );
+        cfl_ = a_ * tau_ / h_;
     }
     ~linear_operator_advection()
-    {}
+    {
+    }
 
     T diag_coefficient() const
     {
-        return (1.0+cfl_);
+        return ( 1.0 + cfl_ );
     }
     T side_coefficient() const
     {
-        return (-cfl_);   
+        return ( -cfl_ );
     }
     Ord get_size() const
     {
         return N;
-    }    
+    }
 
-    void apply(const T_vec& x, T_vec& f)const
+    void apply( const T_vec &x, T_vec &f ) const
     {
         //action of the linear operator on the input vector
-        for(Ord j=0; j<N; j++)
+        for ( Ord j = 0; j < N; j++ )
         {
-            Ord jm = ((j==0)?N-1:j-1);
+            Ord jm = ( ( j == 0 ) ? N - 1 : j - 1 );
 
-            f(j) = (1.0+cfl_)*x(j)-(cfl_)*x(jm);
+            f( j ) = ( 1.0 + cfl_ ) * x( j ) - (cfl_)*x( jm );
         }
     }
 
 private:
-
 };
 
 }

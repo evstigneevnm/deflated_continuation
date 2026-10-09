@@ -13,55 +13,53 @@ namespace discretization
 namespace fourier
 {
 
-template<class T, std::size_t Dimension>
+template <class T, std::size_t Dimension>
 class periodic_grid
 {
 public:
-    using scalar_type = T;
-    using extent_type = discretization::common::structured_extent<Dimension>;
+    using scalar_type  = T;
+    using extent_type  = discretization::common::structured_extent<Dimension>;
     using lengths_type = std::array<scalar_type, Dimension>;
 
-    periodic_grid(const extent_type& extent, const lengths_type& lengths):
-        extent_(extent),
-        lengths_(lengths)
+    periodic_grid( const extent_type &extent, const lengths_type &lengths ) : extent_( extent ), lengths_( lengths )
     {
-        for(const scalar_type length: lengths_)
+        for ( const scalar_type length : lengths_ )
         {
-            if(!(length > scalar_type(0)))
+            if ( !( length > scalar_type( 0 ) ) )
             {
-                throw std::invalid_argument("periodic_grid lengths must be positive");
+                throw std::invalid_argument( "periodic_grid lengths must be positive" );
             }
         }
     }
 
-    const extent_type& extent() const
+    const extent_type &extent() const
     {
         return extent_;
     }
 
-    scalar_type length(const std::size_t dimension) const
+    scalar_type length( const std::size_t dimension ) const
     {
-        return lengths_.at(dimension);
+        return lengths_.at( dimension );
     }
 
-    scalar_type spacing(const std::size_t dimension) const
+    scalar_type spacing( const std::size_t dimension ) const
     {
-        return length(dimension)/static_cast<scalar_type>(extent_[dimension]);
+        return length( dimension ) / static_cast<scalar_type>( extent_[dimension] );
     }
 
-    scalar_type coordinate(const std::size_t dimension, const std::size_t index) const
+    scalar_type coordinate( const std::size_t dimension, const std::size_t index ) const
     {
-        return spacing(dimension)*static_cast<scalar_type>(index);
+        return spacing( dimension ) * static_cast<scalar_type>( index );
     }
 
-    scalar_type wave_number(const std::size_t dimension, const int signed_mode) const
+    scalar_type wave_number( const std::size_t dimension, const int signed_mode ) const
     {
-        const scalar_type pi = std::acos(scalar_type(-1));
-        return scalar_type(2)*pi*static_cast<scalar_type>(signed_mode)/length(dimension);
+        const scalar_type pi = std::acos( scalar_type( -1 ) );
+        return scalar_type( 2 ) * pi * static_cast<scalar_type>( signed_mode ) / length( dimension );
     }
 
 private:
-    extent_type extent_;
+    extent_type  extent_;
     lengths_type lengths_;
 };
 

@@ -2,10 +2,9 @@
 #include "json_test.h"
 
 
-
-int main(int argc, char const *argv[])
+int main( int argc, char const *argv[] )
 {
-    parameters<double> p = read_json<double>("data.json");
+    parameters<double> p = read_json<double>( "data.json" );
 
 
     std::cout << "a_e = " << p.a_e << std::endl;
@@ -15,7 +14,7 @@ int main(int argc, char const *argv[])
     std::cout << "a_i_i = " << p.internal.internal.a_2 << std::endl;
     std::cout << "b_i_i = " << p.internal.internal.b_2 << std::endl;
     std::cout << "keys = " << std::endl;
-    for(auto &x: p.internal.internal.keys)
+    for ( auto &x : p.internal.internal.keys )
     {
         std::cout << x << " ";
     }

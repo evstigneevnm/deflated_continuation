@@ -3,7 +3,7 @@
 
 #include <nmfd/operations/io/matrix_file_operations.h>
 
-template<class MatrixOperations>
+template <class MatrixOperations>
 using cpu_matrix_file_operations = nmfd::operations::io::matrix_file_operations<MatrixOperations>;
 
 #endif

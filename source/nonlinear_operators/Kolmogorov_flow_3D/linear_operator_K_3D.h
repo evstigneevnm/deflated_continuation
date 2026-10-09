@@ -12,31 +12,27 @@ namespace nonlinear_operators
 {
 
 
-template<class vector_operations, class nonlinear_operator> 
+template <class vector_operations, class nonlinear_operator>
 class linear_operator_K_3D
 {
-public:    
-    typedef typename vector_operations::scalar_type  T;
-    typedef typename vector_operations::vector_type  T_vec;
+public:
+    typedef typename vector_operations::scalar_type T;
+    typedef typename vector_operations::vector_type T_vec;
 
-    linear_operator_K_3D(nonlinear_operator*& nonlin_op_): 
-    nonlin_op(nonlin_op_)
+    linear_operator_K_3D( nonlinear_operator *&nonlin_op_ ) : nonlin_op( nonlin_op_ )
     {
-
     }
     ~linear_operator_K_3D()
     {
-
     }
 
-    void apply(const T_vec& x, T_vec& f)const
+    void apply( const T_vec &x, T_vec &f ) const
     {
-        nonlin_op->jacobian_u(x, f);
+        nonlin_op->jacobian_u( x, f );
     }
 
 private:
-    nonlinear_operator* nonlin_op;
-
+    nonlinear_operator *nonlin_op;
 };
 
 }

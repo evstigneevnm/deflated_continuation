@@ -12,12 +12,11 @@ namespace fourier
 namespace codecs
 {
 
-template<class ComponentCodec, std::size_t ComponentCount>
+template <class ComponentCodec, std::size_t ComponentCount>
 class component_product
 {
 public:
-    explicit component_product(ComponentCodec codec):
-        codec_(std::move(codec))
+    explicit component_product( ComponentCodec codec ) : codec_( std::move( codec ) )
     {
     }
 
@@ -28,10 +27,10 @@ public:
 
     std::size_t state_size() const
     {
-        return ComponentCount*component_size();
+        return ComponentCount * component_size();
     }
 
-    const ComponentCodec& component_codec() const
+    const ComponentCodec &component_codec() const
     {
         return codec_;
     }

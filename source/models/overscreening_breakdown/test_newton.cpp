@@ -38,169 +38,161 @@
 // #include <stability/stability_analysis.hpp>
 
 
-
-int main(int argc, char const *argv[])
+int main( int argc, char const *argv[] )
 {
-    using real =  SCALAR_TYPE;
-    using vec_ops_t = gpu_vector_operations<real>;
-    using T_vec = typename vec_ops_t::vector_type;
-    using mat_ops_t = gpu_matrix_vector_operations<real, T_vec>;
-    using T_mat = typename mat_ops_t::matrix_type;
-    using ob_prob_t = nonlinear_operators::overscreening_breakdown<vec_ops_t, mat_ops_t>;
+    using real           = SCALAR_TYPE;
+    using vec_ops_t      = gpu_vector_operations<real>;
+    using T_vec          = typename vec_ops_t::vector_type;
+    using mat_ops_t      = gpu_matrix_vector_operations<real, T_vec>;
+    using T_mat          = typename mat_ops_t::matrix_type;
+    using ob_prob_t      = nonlinear_operators::overscreening_breakdown<vec_ops_t, mat_ops_t>;
     using vec_file_ops_t = gpu_file_operations<vec_ops_t>;
-    using params_t = params_s<real>;
+    using params_t       = params_s<real>;
 
 
-    if(argc != 8)
+    if ( argc != 8 )
     {
         std::cout << argv[0] << " DOF sigma L gamma delta mu u0" << std::endl;
         std::cout << " DOF - deg of freedom, sigma>=0 is the parameter value" << std::endl;
         std::cout << " L>0 - mapping value, gamma>=0 - regularization value of the first part of the rhs" << std::endl;
-        std::cout << " delta>=0 - 4-th derivative value, mu>=0 - rhs second part multiplayer, u0>0 - initial condition value" << std::endl;
-        return(0);       
+        std::cout
+            << " delta>=0 - 4-th derivative value, mu>=0 - rhs second part multiplayer, u0>0 - initial condition value"
+            << std::endl;
+        return ( 0 );
     }
 
-    size_t N = std::stoi(argv[1]);
-    real sigma = std::stof(argv[2]);
-    real L = std::stof(argv[3]);
-    real gamma = std::stof(argv[4]);
-    real delta = std::stof(argv[5]);
-    real mu = std::stof(argv[6]);
-    real u0 = std::stof(argv[7]);
+    size_t N     = std::stoi( argv[1] );
+    real   sigma = std::stof( argv[2] );
+    real   L     = std::stof( argv[3] );
+    real   gamma = std::stof( argv[4] );
+    real   delta = std::stof( argv[5] );
+    real   mu    = std::stof( argv[6] );
+    real   u0    = std::stof( argv[7] );
 
-    params_t params(N, 0, {sigma, L, gamma, delta, mu, u0} );
+    params_t params( N, 0, { sigma, L, gamma, delta, mu, u0 } );
 
-    utils::init_cuda(-1);
+    utils::init_cuda( -1 );
     //linsolver control
     real lin_solver_tol = 1.0e-10;
     //newton deflation control
     unsigned int newton_def_max_it = 500;
-    real newton_def_tol = 1.0e-10;
+    real         newton_def_tol    = 1.0e-10;
 
 
+    cublas_wrap    cublas( true );
+    vec_ops_t      vec_ops( N, &cublas );
+    mat_ops_t      mat_ops( vec_ops.get_vector_size(), vec_ops.get_vector_size(), vec_ops.get_cublas_ref() );
+    vec_file_ops_t vec_file_ops( &vec_ops );
 
-    cublas_wrap cublas(true);
-    vec_ops_t vec_ops(N, &cublas);
-    mat_ops_t mat_ops(vec_ops.get_vector_size(), vec_ops.get_vector_size(), vec_ops.get_cublas_ref() );
-    vec_file_ops_t vec_file_ops(&vec_ops);
-    
-    ob_prob_t ob_prob(&vec_ops, &mat_ops, params );
+    ob_prob_t ob_prob( &vec_ops, &mat_ops, params );
 
     // linear solver config
     using lin_op_t = nonlinear_operators::linear_operator_overscreening_breakdown<vec_ops_t, mat_ops_t, ob_prob_t>;
-    using lin_op_shifted_t = nonlinear_operators::linear_operator_overscreening_breakdown_shifted<vec_ops_t, mat_ops_t, ob_prob_t>;
-    using prec_t = nonlinear_operators::preconditioner_overscreening_breakdown<vec_ops_t, mat_ops_t, ob_prob_t, lin_op_t>;
-    using prec_shifted_t = nonlinear_operators::preconditioner_overscreening_breakdown_shifted<vec_ops_t, mat_ops_t, ob_prob_t, lin_op_shifted_t>;
+    using lin_op_shifted_t =
+        nonlinear_operators::linear_operator_overscreening_breakdown_shifted<vec_ops_t, mat_ops_t, ob_prob_t>;
+    using prec_t =
+        nonlinear_operators::preconditioner_overscreening_breakdown<vec_ops_t, mat_ops_t, ob_prob_t, lin_op_t>;
+    using prec_shifted_t = nonlinear_operators::preconditioner_overscreening_breakdown_shifted<
+        vec_ops_t, mat_ops_t, ob_prob_t, lin_op_shifted_t>;
 
-    using log_t = scfd::utils::log_std;
-    using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t, log_t>;
+    using log_t        = scfd::utils::log_std;
+    using monitor_t    = numerical_algos::lin_solvers::default_monitor<vec_ops_t, log_t>;
     using lin_solver_t = numerical_algos::lin_solvers::exact_wrapper<lin_op_t, prec_t, vec_ops_t, monitor_t, log_t>;
-    using lin_solver_shifted_t = numerical_algos::lin_solvers::exact_wrapper<lin_op_shifted_t, prec_shifted_t, vec_ops_t, monitor_t, log_t>;    
+    using lin_solver_shifted_t =
+        numerical_algos::lin_solvers::exact_wrapper<lin_op_shifted_t, prec_shifted_t, vec_ops_t, monitor_t, log_t>;
 
     monitor_t *mon, *mon_shifted;
 
     log_t log;
     log_t log3;
-    log3.set_verbosity(1);
-    lin_op_t lin_op(&ob_prob);
-    prec_t prec(&ob_prob);
+    log3.set_verbosity( 1 );
+    lin_op_t lin_op( &ob_prob );
+    prec_t   prec( &ob_prob );
 
-//  for stability analysis
-    lin_op_shifted_t lin_op_shifted(&vec_ops, &ob_prob); 
-    prec_shifted_t prec_shifted(&vec_ops, &ob_prob);
+    //  for stability analysis
+    lin_op_shifted_t lin_op_shifted( &vec_ops, &ob_prob );
+    prec_shifted_t   prec_shifted( &vec_ops, &ob_prob );
 
 
-    lin_solver_t lin_solver(&vec_ops, &log3);
-    lin_solver.set_preconditioner(&prec);
+    lin_solver_t lin_solver( &vec_ops, &log3 );
+    lin_solver.set_preconditioner( &prec );
 
     mon = &lin_solver.monitor();
-    mon->init(lin_solver_tol, real(0.0), 10);
-    mon->set_save_convergence_history(true);
-    mon->set_divide_out_norms_by_rel_base(true);   
+    mon->init( lin_solver_tol, real( 0.0 ), 10 );
+    mon->set_save_convergence_history( true );
+    mon->set_divide_out_norms_by_rel_base( true );
 
-    lin_solver_shifted_t lin_solver_shifted(&vec_ops, &log3);
-    lin_solver_shifted.set_preconditioner(&prec_shifted);
+    lin_solver_shifted_t lin_solver_shifted( &vec_ops, &log3 );
+    lin_solver_shifted.set_preconditioner( &prec_shifted );
 
     mon_shifted = &lin_solver.monitor();
-    mon_shifted->init(lin_solver_tol, real(0.0), 10);
-    mon_shifted->set_save_convergence_history(true);
-    mon_shifted->set_divide_out_norms_by_rel_base(true);     
-
-
+    mon_shifted->init( lin_solver_tol, real( 0.0 ), 10 );
+    mon_shifted->set_save_convergence_history( true );
+    mon_shifted->set_divide_out_norms_by_rel_base( true );
 
 
     T_vec x0, x1, dx, x_back, b;
 
-    vec_ops.init_vectors(b, x0, x1, dx, x_back); vec_ops.start_use_vectors(b, x0, x1, dx, x_back);
+    vec_ops.init_vectors( b, x0, x1, dx, x_back );
+    vec_ops.start_use_vectors( b, x0, x1, dx, x_back );
 
-    
 
-    ob_prob.randomize_vector(x0);
-    vec_ops.assign(x0, x_back);
-    ob_prob.physical_solution(x0, x1);
-    vec_file_ops.write_vector("test_newton_solution_initial.dat", x1);
+    ob_prob.randomize_vector( x0 );
+    vec_ops.assign( x0, x_back );
+    ob_prob.physical_solution( x0, x1 );
+    vec_file_ops.write_vector( "test_newton_solution_initial.dat", x1 );
 
-    printf("initial solution norm = %le \n", vec_ops.norm(x0) );
+    printf( "initial solution norm = %le \n", vec_ops.norm( x0 ) );
 
-    real solution_norm = 1;
-    unsigned int iter = 0;
-    bool ok_flag = true;
+    real              solution_norm = 1;
+    unsigned int      iter          = 0;
+    bool              ok_flag       = true;
     std::vector<real> newton_norm;
 
-    ob_prob.F(x0, sigma, b);
-    solution_norm = vec_ops.norm(b);
-    newton_norm.push_back(solution_norm);
+    ob_prob.F( x0, sigma, b );
+    solution_norm = vec_ops.norm( b );
+    newton_norm.push_back( solution_norm );
 
-    
-    using convergence_newton_t = nonlinear_operators::newton_method::convergence_strategy<
-        vec_ops_t, 
-        ob_prob_t, 
-        log_t>;
 
-    using system_operator_t = nonlinear_operators::system_operator<
-        vec_ops_t,
-        ob_prob_t,
-        lin_op_t,
-        lin_solver_t>;
+    using convergence_newton_t = nonlinear_operators::newton_method::convergence_strategy<vec_ops_t, ob_prob_t, log_t>;
 
-    using newton_t = numerical_algos::newton_method::newton_solver<
-        vec_ops_t,
-        ob_prob_t,
-        system_operator_t,
-        convergence_newton_t>;
+    using system_operator_t = nonlinear_operators::system_operator<vec_ops_t, ob_prob_t, lin_op_t, lin_solver_t>;
 
-    log_t *log_p = &log;
-    convergence_newton_t conv_newton(&vec_ops, &log);
-    
-    system_operator_t system_operator(&vec_ops, &lin_op, &lin_solver);
-    vec_ops_t *vec_ops_p = &vec_ops;
-    system_operator_t *system_operator_p = &system_operator;
-    convergence_newton_t *conv_newton_p = &conv_newton;
-    newton_t newton(vec_ops_p, system_operator_p, conv_newton_p);
+    using newton_t =
+        numerical_algos::newton_method::newton_solver<vec_ops_t, ob_prob_t, system_operator_t, convergence_newton_t>;
 
-    conv_newton.set_convergence_constants(newton_def_tol, newton_def_max_it);
+    log_t               *log_p = &log;
+    convergence_newton_t conv_newton( &vec_ops, &log );
 
-    vec_ops.assign(x_back, x0);
+    system_operator_t     system_operator( &vec_ops, &lin_op, &lin_solver );
+    vec_ops_t            *vec_ops_p         = &vec_ops;
+    system_operator_t    *system_operator_p = &system_operator;
+    convergence_newton_t *conv_newton_p     = &conv_newton;
+    newton_t              newton( vec_ops_p, system_operator_p, conv_newton_p );
+
+    conv_newton.set_convergence_constants( newton_def_tol, newton_def_max_it );
+
+    vec_ops.assign( x_back, x0 );
 
     ob_prob_t *ob_prob_p = &ob_prob;
 
-    bool converged = newton.solve(ob_prob_p, x0, sigma);
-    if(!converged)
+    bool converged = newton.solve( ob_prob_p, x0, sigma );
+    if ( !converged )
     {
-        printf("Newton 2 failed to converge!\n");
+        printf( "Newton 2 failed to converge!\n" );
     }
-    printf("Newton 2 solution norm = %le \n", vec_ops.norm(x0) );
+    printf( "Newton 2 solution norm = %le \n", vec_ops.norm( x0 ) );
     std::stringstream f_name, f_name_domain;
     f_name << "test_newton_solution_" << params.N << "_" << params.L << ".dat";
     f_name_domain << "test_newton_solution_domain_" << params.N << "_" << params.L << ".dat";
     // ob_prob.physical_solution(x0, x1);
     // vec_file_ops.write_vector(f_name.str(), x1);
 
-    ob_prob.write_solution_basis(f_name.str(), x0);
-    ob_prob.write_solution_domain(f_name_domain.str(), x0); //add another method with the domain range
+    ob_prob.write_solution_basis( f_name.str(), x0 );
+    ob_prob.write_solution_domain( f_name_domain.str(), x0 ); //add another method with the domain range
 
     //testing stability
-/*
+    /*
 //  eigensolver types
     using lapack_wrap_t = lapack_wrap<real>;
     using s_inv_system_op_t = stability::system_operator_shift_inverse<vec_ops_t, ob_prob_t, lin_op_shifted_t, lin_solver_shifted_t, log_t>;
@@ -233,11 +225,12 @@ int main(int argc, char const *argv[])
     stabl.set_linear_operator_stable_eigenvalues_halfplane(1);
     stabl.execute(x0, sigma);
 */
-    vec_ops.stop_use_vectors(b, x0, x1, dx, x_back); vec_ops.free_vectors(b, x0, x1, dx, x_back);
+    vec_ops.stop_use_vectors( b, x0, x1, dx, x_back );
+    vec_ops.free_vectors( b, x0, x1, dx, x_back );
 
-// #include <limits>
-    
-//     std::cout << "numeric_limits_float = " << std::numeric_limits<float>::epsilon() << std::endl;
-    
+    // #include <limits>
+
+    //     std::cout << "numeric_limits_float = " << std::numeric_limits<float>::epsilon() << std::endl;
+
     return 0;
 }

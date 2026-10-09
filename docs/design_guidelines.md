@@ -13,6 +13,10 @@ not require changes to unrelated algorithm interfaces.
 
 ## Core Rules
 
+- Follow the root SCFD-derived `.clang-format` for C/C++ and CUDA code. Use
+  clang-format 21 (`make format`, `make format-check`) for reproducible formatting;
+  use LF line endings and format touched files before committing. Never format
+  vendor/submodule code, generated data, or frozen `source/time_stepper/legacy/` files.
 - Use C++17 templates and static polymorphism. Check capabilities with SFINAE,
   `std::void_t`, `if constexpr`, and clear `static_assert` diagnostics.
 - Name real-number template parameters `T`, not `Scalar`. Keep established

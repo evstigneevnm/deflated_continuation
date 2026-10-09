@@ -26,8 +26,8 @@ struct matrix_transpose_2d
 template <class Scalar, class MatrixType>
 struct matrix_assign_scalar_2d
 {
-    const Scalar   value;
-    MatrixType     dst;
+    const Scalar value;
+    MatrixType   dst;
 
     template <class IdxND>
     __DEVICE_TAG__ void operator()( const IdxND &idx )

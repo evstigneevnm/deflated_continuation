@@ -21,20 +21,31 @@
 #include <string>
 #include <sstream>
 
-#define __STR_HELPER(x) #x
-#define __STR(x) __STR_HELPER(x)
+#define __STR_HELPER( x ) #x
+#define __STR( x ) __STR_HELPER( x )
 
-#define CUSPARSE_SAFE_CALL(X)                                                                                                                                                                                                                          \
-        do {                                                                                                                                                                                                                                           \
-                cusparseStatus_t status = (X);                                                                                                                                                                                                         \
-                cudaError_t cuda_res = cudaDeviceSynchronize();                                                                                                                                                                                        \
-                if (status != CUSPARSE_STATUS_SUCCESS) {                                                                                                                                                                                               \
-                        std::stringstream ss;                                                                                                                                                                                                          \
-                        ss << std::string("CUSPARSE_SAFE_CALL " __FILE__ " " __STR(__LINE__) " : " #X " failed: returned status ") << status;                                                                                                          \
-                        std::string str = ss.str();                                                                                                                                                                                                    \
-                        throw std::runtime_error(str);                                                                                                                                                                                                 \
-                }                                                                                                                                                                                                                                      \
-                if (cuda_res != cudaSuccess) throw std::runtime_error(std::string("CUSOLVER_SAFE_CALL " __FILE__ " " __STR(__LINE__) " : " #X " failed cudaDeviceSynchronize: ") + std::string(cudaGetErrorString(cuda_res)));                         \
-        } while (0)
+#define CUSPARSE_SAFE_CALL( X )                                                                                        \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        cusparseStatus_t status   = ( X );                                                                             \
+        cudaError_t      cuda_res = cudaDeviceSynchronize();                                                           \
+        if ( status != CUSPARSE_STATUS_SUCCESS )                                                                       \
+        {                                                                                                              \
+            std::stringstream ss;                                                                                      \
+            ss << std::string(                                                                                         \
+                      "CUSPARSE_SAFE_CALL " __FILE__ " " __STR( __LINE__ ) " : " #X " failed: returned status "        \
+                  )                                                                                                    \
+               << status;                                                                                              \
+            std::string str = ss.str();                                                                                \
+            throw std::runtime_error( str );                                                                           \
+        }                                                                                                              \
+        if ( cuda_res != cudaSuccess )                                                                                 \
+            throw std::runtime_error(                                                                                  \
+                std::string(                                                                                           \
+                    "CUSOLVER_SAFE_CALL " __FILE__ " " __STR( __LINE__ ) " : " #X " failed cudaDeviceSynchronize: "    \
+                ) +                                                                                                    \
+                std::string( cudaGetErrorString( cuda_res ) )                                                          \
+            );                                                                                                         \
+    } while ( 0 )
 
 #endif

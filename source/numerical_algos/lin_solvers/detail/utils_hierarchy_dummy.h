@@ -3,7 +3,7 @@
 
 namespace numerical_algos
 {
-namespace detail 
+namespace detail
 {
 
 struct utils_hierarchy_dummy

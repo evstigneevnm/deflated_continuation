@@ -21,39 +21,41 @@
 
 namespace numerical_algos
 {
-namespace lin_solvers 
+namespace lin_solvers
 {
 namespace detail
 {
 
-template<class VectorOperations, class Monitor>
+template <class VectorOperations, class Monitor>
 struct monitor_call_wrap
 {
-    typedef VectorOperations                        vector_operations_type;
-    typedef typename VectorOperations::vector_type  vector_type;
+    typedef VectorOperations                       vector_operations_type;
+    typedef typename VectorOperations::vector_type vector_type;
 
-    Monitor                 &monitor_;
-    bool                    is_started_;
+    Monitor &monitor_;
+    bool     is_started_;
 
-    monitor_call_wrap(Monitor &monitor) : 
-        monitor_(monitor), is_started_(false) {}
-
-    void start(const vector_type& rhs)
+    monitor_call_wrap( Monitor &monitor ) : monitor_( monitor ), is_started_( false )
     {
-        assert(!is_started_);
-        monitor_.start(rhs);
+    }
+
+    void start( const vector_type &rhs )
+    {
+        assert( !is_started_ );
+        monitor_.start( rhs );
         is_started_ = true;
     }
     void stop()
     {
-        assert(is_started_);
+        assert( is_started_ );
         is_started_ = false;
         monitor_.stop();
     }
 
     ~monitor_call_wrap()
     {
-        if (is_started_) stop();
+        if ( is_started_ )
+            stop();
     }
 };
 

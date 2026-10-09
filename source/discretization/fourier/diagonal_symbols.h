@@ -6,22 +6,22 @@ namespace discretization
 namespace fourier
 {
 
-template<class T>
+template <class T>
 struct diagonal_symbols
 {
-    static T laplacian(const T k_squared)
+    static T laplacian( const T k_squared )
     {
         return -k_squared;
     }
 
-    static T biharmonic(const T k_squared)
+    static T biharmonic( const T k_squared )
     {
-        return k_squared*k_squared;
+        return k_squared * k_squared;
     }
 
-    static T inverse_laplacian(const T k_squared)
+    static T inverse_laplacian( const T k_squared )
     {
-        return k_squared == T(0) ? T(0) : -T(1)/k_squared;
+        return k_squared == T( 0 ) ? T( 0 ) : -T( 1 ) / k_squared;
     }
 };
 

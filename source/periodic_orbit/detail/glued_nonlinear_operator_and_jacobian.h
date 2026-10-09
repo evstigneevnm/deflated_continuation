@@ -12,90 +12,90 @@ namespace detail
 {
 
 
-
 // assumed, that nonlinear operator contains the jacoboan s.t. it can perofrm operator-vector application
-template<class VectorOperations, class NonlinearOperator, bool ParamterJacobian = false>
+template <class VectorOperations, class NonlinearOperator, bool ParamterJacobian = false>
 class glued_nonlinear_operator_and_jacobian
 {
 private:
     struct fake_deleter
     {
-        template<class PT>
-        void operator()(PT* p) const {}
-    }; 
+        template <class PT>
+        void operator()( PT *p ) const
+        {
+        }
+    };
 
 public:
     using glued_vector_operations_type = scfd::linspace::glued_vector_space<VectorOperations, 2>;
-    using vector_type = typename glued_vector_operations_type::vector_type;
-    using scalar_type = typename VectorOperations::scalar_type;
+    using vector_type                  = typename glued_vector_operations_type::vector_type;
+    using scalar_type                  = typename VectorOperations::scalar_type;
+
 private:
-    using T = scalar_type;
-    using T_vec = vector_type;
+    using T      = scalar_type;
+    using T_vec  = vector_type;
     using T_vec1 = typename VectorOperations::vector_type;
 
 public:
-
-    glued_nonlinear_operator_and_jacobian(VectorOperations* vec_ops_p, NonlinearOperator* nonlin_op_p):
-    vec_ops_(vec_ops_p),
-    nonlin_op_(nonlin_op_p)
+    glued_nonlinear_operator_and_jacobian( VectorOperations *vec_ops_p, NonlinearOperator *nonlin_op_p )
+        : vec_ops_( vec_ops_p ), nonlin_op_( nonlin_op_p )
     {
 
-        std::shared_ptr<VectorOperations> aaa(vec_ops_, fake_deleter() );
-        glued_vector_operations_ = new glued_vector_operations_type(aaa, aaa);
-        vec_ops_->init_vector(x_l); vec_ops_->start_use_vector(x_l);
-
+        std::shared_ptr<VectorOperations> aaa( vec_ops_, fake_deleter() );
+        glued_vector_operations_ = new glued_vector_operations_type( aaa, aaa );
+        vec_ops_->init_vector( x_l );
+        vec_ops_->start_use_vector( x_l );
     }
     ~glued_nonlinear_operator_and_jacobian()
     {
-        vec_ops_->stop_use_vector(x_l); vec_ops_->free_vector(x_l);
+        vec_ops_->stop_use_vector( x_l );
+        vec_ops_->free_vector( x_l );
         delete glued_vector_operations_;
     }
-    
-    glued_vector_operations_type* glued_vector_operations()
+
+    glued_vector_operations_type *glued_vector_operations()
     {
         return glued_vector_operations_;
     }
 
-    void F(const T time_p, const T_vec& in_p, const T param_p, T_vec& out_p)
+    void F( const T time_p, const T_vec &in_p, const T param_p, T_vec &out_p )
     {
-        nonlin_op_->F(time_p, in_p.comp(0), param_p, out_p.comp(0) );
-        nonlin_op_->set_linearization_point(in_p.comp(0), param_p);
-        if constexpr (ParamterJacobian)
+        nonlin_op_->F( time_p, in_p.comp( 0 ), param_p, out_p.comp( 0 ) );
+        nonlin_op_->set_linearization_point( in_p.comp( 0 ), param_p );
+        if constexpr ( ParamterJacobian )
         {
             // variaitonal:
             // dv/dt = df/du(u,lambda) v + df/dlambda
-            nonlin_op_->jacobian_u(in_p.comp(1), out_p.comp(1));
+            nonlin_op_->jacobian_u( in_p.comp( 1 ), out_p.comp( 1 ) );
             nonlin_op_->jacobian_alpha( x_l );
-            vec_ops_->add_mul(1.0, x_l, out_p.comp(1));
+            vec_ops_->add_mul( 1.0, x_l, out_p.comp( 1 ) );
         }
         else
         {
-            nonlin_op_->jacobian_u( in_p.comp(1), out_p.comp(1) );
+            nonlin_op_->jacobian_u( in_p.comp( 1 ), out_p.comp( 1 ) );
         }
     }
 
-    void norm_bifurcation_diagram(const T_vec& v_in, std::vector<T>& bif_norms_at_t_)const 
+    void norm_bifurcation_diagram( const T_vec &v_in, std::vector<T> &bif_norms_at_t_ ) const
     {
-        nonlin_op_->norm_bifurcation_diagram(v_in.comp(0), bif_norms_at_t_);
+        nonlin_op_->norm_bifurcation_diagram( v_in.comp( 0 ), bif_norms_at_t_ );
     }
-    T check_solution_quality(const T_vec& v_out)const
+    T check_solution_quality( const T_vec &v_out ) const
     {
-        return nonlin_op_->check_solution_quality(v_out.comp(0));
+        return nonlin_op_->check_solution_quality( v_out.comp( 0 ) );
     }
-    glued_vector_operations_type* get_glued_vec_ops()const
+    glued_vector_operations_type *get_glued_vec_ops() const
     {
         return glued_vector_operations_;
     }
 
 
 protected:
-    glued_vector_operations_type* glued_vector_operations_;
+    glued_vector_operations_type *glued_vector_operations_;
+
 private:
-    VectorOperations* vec_ops_;
-    NonlinearOperator* nonlin_op_;
-    T_vec1 x_l;
-
-
+    VectorOperations  *vec_ops_;
+    NonlinearOperator *nonlin_op_;
+    T_vec1             x_l;
 };
 
 }

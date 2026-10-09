@@ -25,87 +25,86 @@
 namespace
 {
 
-void print_usage(const char* executable)
+void print_usage( const char *executable )
 {
-    std::cerr
-        << "Usage: " << executable
-        << " [path_to_config_file.json] [--seed-exact-theta theta] [--continue-seed-only] [--quiet]\n";
+    std::cerr << "Usage: " << executable
+              << " [path_to_config_file.json] [--seed-exact-theta theta] [--continue-seed-only] [--quiet]\n";
 }
 
-template<class T>
-T parse_scalar(const std::string& value, const char* label)
+template <class T>
+T parse_scalar( const std::string &value, const char *label )
 {
-    std::istringstream stream(value);
-    T result = T(0);
+    std::istringstream stream( value );
+    T                  result = T( 0 );
     stream >> result;
-    if(!stream)
+    if ( !stream )
     {
-        throw std::runtime_error(std::string("failed to parse ") + label + " from '" + value + "'");
+        throw std::runtime_error( std::string( "failed to parse " ) + label + " from '" + value + "'" );
     }
     return result;
 }
 
 } // namespace
 
-int main(int argc, char const* argv[])
+int main( int argc, char const *argv[] )
 {
     using files_ops_t = gpu_file_operations<vec_ops_real>;
-    using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
-    using real_vec = typename vec_ops_real::vector_type;
-    using bratu_t = nonlinear_operators::bratu<vec_ops_real, Blocks_x_>;
-    using lin_op_t = nonlinear_operators::linear_operator_bratu<vec_ops_real, bratu_t>;
-    using prec_t = nonlinear_operators::preconditioner_bratu<vec_ops_real, bratu_t, lin_op_t>;
+    using monitor_t   = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
+    using real_vec    = typename vec_ops_real::vector_type;
+    using bratu_t     = nonlinear_operators::bratu<vec_ops_real, Blocks_x_>;
+    using lin_op_t    = nonlinear_operators::linear_operator_bratu<vec_ops_real, bratu_t>;
+    using prec_t      = nonlinear_operators::preconditioner_bratu<vec_ops_real, bratu_t, lin_op_t>;
 
-#if defined(BRATU_VECTOR_BACKEND_VAR_PREC)
+#if defined( BRATU_VECTOR_BACKEND_VAR_PREC )
     using parameters_real = double;
-    using parameters_t = main_classes::parameters<double>;
+    using parameters_t    = main_classes::parameters<double>;
 #else
     using parameters_real = real;
-    using parameters_t = main_classes::parameters<real>;
+    using parameters_t    = main_classes::parameters<real>;
 #endif
 
     std::string path_to_config_file = "json_project_files/bratu_test.json";
-    bool quiet = false;
-    bool seed_exact_theta = false;
-    bool continue_seed_only = false;
-    real theta_seed = real(1);
+    bool        quiet               = false;
+    bool        seed_exact_theta    = false;
+    bool        continue_seed_only  = false;
+    real        theta_seed          = real( 1 );
 
-    for(int argi = 1; argi < argc; ++argi)
+    for ( int argi = 1; argi < argc; ++argi )
     {
         const std::string arg = argv[argi];
-        if(arg == "--quiet")
+        if ( arg == "--quiet" )
         {
             quiet = true;
         }
-        else if(arg == "--continue-seed-only")
+        else if ( arg == "--continue-seed-only" )
         {
             continue_seed_only = true;
         }
-        else if(arg == "--seed-exact-theta")
+        else if ( arg == "--seed-exact-theta" )
         {
-            if(argi + 1 >= argc)
+            if ( argi + 1 >= argc )
             {
-                print_usage(argv[0]);
+                print_usage( argv[0] );
                 return 1;
             }
             try
             {
-                theta_seed = parse_scalar<real>(argv[++argi], "theta");
+                theta_seed = parse_scalar<real>( argv[++argi], "theta" );
             }
-            catch(const std::exception& e)
+            catch ( const std::exception &e )
             {
                 std::cerr << e.what() << std::endl;
                 return 2;
             }
             seed_exact_theta = true;
         }
-        else if(path_to_config_file == "json_project_files/bratu_test.json")
+        else if ( path_to_config_file == "json_project_files/bratu_test.json" )
         {
             path_to_config_file = arg;
         }
         else
         {
-            print_usage(argv[0]);
+            print_usage( argv[0] );
             return 1;
         }
     }
@@ -113,79 +112,63 @@ int main(int argc, char const* argv[])
     std::cout << "Using Bratu backend: " << BRATU_BACKEND_NAME << std::endl;
     std::cout << "Reading config file: " << path_to_config_file << std::endl;
 
-    parameters_t parameters = main_classes::read_parameters_json<parameters_real>(path_to_config_file);
-    if(!quiet)
+    parameters_t parameters = main_classes::read_parameters_json<parameters_real>( path_to_config_file );
+    if ( !quiet )
     {
         parameters.plot_all();
     }
 
-    if(parameters.nonlinear_operator.N_size.empty())
+    if ( parameters.nonlinear_operator.N_size.empty() )
     {
         std::cerr << "Bratu config must provide nonlinear_operator.discrete_problem_dimensions[0].\n";
         return 2;
     }
-    const std::size_t interior_size = parameters.nonlinear_operator.N_size.at(0);
-    const bool use_high_precision_reduction = parameters.use_high_precision_reduction;
-    const auto spatial_discretization =
-        bratu_model::spatial_discretization_from_parameters<bratu_t>(
-            parameters,
-            path_to_config_file);
+    const std::size_t interior_size                = parameters.nonlinear_operator.N_size.at( 0 );
+    const bool        use_high_precision_reduction = parameters.use_high_precision_reduction;
+    const auto        spatial_discretization =
+        bratu_model::spatial_discretization_from_parameters<bratu_t>( parameters, path_to_config_file );
 
-    vec_ops_real vec_ops_R(interior_size);
-    if(use_high_precision_reduction)
+    vec_ops_real vec_ops_R( interior_size );
+    if ( use_high_precision_reduction )
     {
-#if defined(BRATU_VECTOR_BACKEND_VAR_PREC)
+#if defined( BRATU_VECTOR_BACKEND_VAR_PREC )
         std::cerr << "Warning: variable-precision vector operations use native reductions.\n";
 #else
         vec_ops_R.use_high_precision();
 #endif
     }
 
-    files_ops_t file_ops(&vec_ops_R);
-    bratu_t BRATU(interior_size, &vec_ops_R, spatial_discretization);
-    std::cout << "Bratu spatial discretization: "
-              << bratu_t::discretization_name(spatial_discretization) << std::endl;
+    files_ops_t file_ops( &vec_ops_R );
+    bratu_t     BRATU( interior_size, &vec_ops_R, spatial_discretization );
+    std::cout << "Bratu spatial discretization: " << bratu_t::discretization_name( spatial_discretization )
+              << std::endl;
     log_t log;
     log_t log_linsolver;
-    log.set_verbosity(quiet ? 0 : 1);
-    log_linsolver.set_verbosity(quiet ? 0 : 1);
+    log.set_verbosity( quiet ? 0 : 1 );
+    log_linsolver.set_verbosity( quiet ? 0 : 1 );
 
     using deflation_continuation_t = main_classes::deflation_continuation<
-        vec_ops_real,
-        files_ops_t,
-        log_t,
-        monitor_t,
-        bratu_t,
-        lin_op_t,
-        prec_t,
-        numerical_algos::lin_solvers::exact_wrapper,
-        nonlinear_operators::system_operator,
-        parameters_t>;
+        vec_ops_real, files_ops_t, log_t, monitor_t, bratu_t, lin_op_t, prec_t,
+        numerical_algos::lin_solvers::exact_wrapper, nonlinear_operators::system_operator, parameters_t>;
 
-    deflation_continuation_t DC(
-        &vec_ops_R,
-        &file_ops,
-        &log,
-        &log_linsolver,
-        &BRATU,
-        &parameters);
+    deflation_continuation_t DC( &vec_ops_R, &file_ops, &log, &log_linsolver, &BRATU, &parameters );
 
     DC.set_parameters();
 
-    if(seed_exact_theta)
+    if ( seed_exact_theta )
     {
         real_vec x_seed;
-        vec_ops_R.init_vector(x_seed);
-        vec_ops_R.start_use_vector(x_seed);
-        BRATU.exact_solution_from_theta(theta_seed, x_seed);
-        const real lambda_seed = BRATU.lambda_from_theta(theta_seed);
+        vec_ops_R.init_vector( x_seed );
+        vec_ops_R.start_use_vector( x_seed );
+        BRATU.exact_solution_from_theta( theta_seed, x_seed );
+        const real lambda_seed = BRATU.lambda_from_theta( theta_seed );
         std::cout << "Exact Bratu seed: theta=" << theta_seed << ", lambda=" << lambda_seed << std::endl;
-        DC.add_solution_curve(x_seed, lambda_seed);
-        vec_ops_R.stop_use_vector(x_seed);
-        vec_ops_R.free_vector(x_seed);
+        DC.add_solution_curve( x_seed, lambda_seed );
+        vec_ops_R.stop_use_vector( x_seed );
+        vec_ops_R.free_vector( x_seed );
     }
 
-    if(!continue_seed_only)
+    if ( !continue_seed_only )
     {
         DC.execute();
     }

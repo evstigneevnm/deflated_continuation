@@ -5,23 +5,23 @@
 
 namespace numerical_algos
 {
-namespace detail 
+namespace detail
 {
 
 struct params_hierarchy_dummy
 {
-    params_hierarchy_dummy(const std::string &log_prefix = "", const std::string &log_name = "")
+    params_hierarchy_dummy( const std::string &log_prefix = "", const std::string &log_name = "" )
     {
     }
-    #ifdef SCFD_ENABLE_NLOHMANN
-    void from_json(const nlohmann::json& j)
+#ifdef SCFD_ENABLE_NLOHMANN
+    void from_json( const nlohmann::json &j )
     {
     }
     nlohmann::json to_json() const
     {
         return nlohmann::json();
     }
-    #endif
+#endif
 };
 
 } // namespace detail

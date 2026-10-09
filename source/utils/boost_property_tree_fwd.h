@@ -3,11 +3,13 @@
 
 #include <string>
 
-namespace boost {
-namespace property_tree {
-template<typename Key, typename Data, typename KeyCompare> 
+namespace boost
+{
+namespace property_tree
+{
+template <typename Key, typename Data, typename KeyCompare>
 class basic_ptree;
-typedef basic_ptree<std::string, std::string, std::less<std::string> > ptree;
+typedef basic_ptree<std::string, std::string, std::less<std::string>> ptree;
 }
 }
 
