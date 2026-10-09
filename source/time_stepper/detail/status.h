@@ -13,6 +13,7 @@ enum class adaptation_status
 };
 enum class single_step_status
 {
+    idle,
     converged,
     failed_minimum_dt,
     failed_nonfinite,

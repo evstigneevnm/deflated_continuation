@@ -27,6 +27,8 @@ There is no implicit-residual reinterpretation and no general singular-mass solv
 The single-step method returns a pending candidate. The integrator calls
 `finalize()` after external processing; failed candidates never replace the
 committed output. `apply()` on the integrator starts a fresh trajectory.
+Construction and `reset()` report `idle`. A successful single-step `apply()`
+reports `converged`; `finalize()` retains that numerical result status.
 External managers own their own reset policy and receive the actual step interval.
 Vector operations, problem, adaptation, step, and external manager must outlive
 their non-owning consumers. Do not share mutable instances between trajectories.

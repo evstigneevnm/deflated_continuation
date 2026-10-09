@@ -219,7 +219,7 @@ public:
         ++generation_;
         dt_       = 0;
         attempts_ = 0;
-        status_   = single_step_status::converged;
+        status_   = single_step_status::idle;
     }
 
     void apply( const vector_type &in, vector_type &out )
@@ -334,7 +334,7 @@ private:
     scalar_type                                          time_ = 0, target_ = 1, dt_ = 0;
     unsigned int                                         attempts_    = 0;
     bool                                                 initialized_ = false, pending_ = false;
-    single_step_status                                   status_ = single_step_status::converged;
+    single_step_status                                   status_ = single_step_status::idle;
 
     friend class continuous_integration<explicit_time_step>;
 

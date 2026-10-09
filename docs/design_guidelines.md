@@ -362,13 +362,17 @@ The status of a single step is given as the following structure:
 ```cpp
 enum class single_step_status 
 {
-  converged = 0,
+  idle = 0,
+  converged,
   failed_minimum_dt,
   failed_nan,
   failed_inf,
   failed_solver,
 };
 ```
+
+Construction and `reset()` report `idle`: no numerical step result is available.
+A successful `apply()` reports `converged`; `finalize()` retains that result status.
 
 The `continuous_integration` class is a lightweight structure the has the follwing life time. Dense output describes the pending numerical step and remains valid until the next apply(), reset(), or finalize(). External event processing must finish before finalization. It should provide a structure with:
 

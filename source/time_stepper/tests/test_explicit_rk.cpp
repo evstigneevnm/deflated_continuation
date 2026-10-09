@@ -418,6 +418,11 @@ try
         {
             constant_type adaptation( { .1 / ( level + 1 ) } );
             step_type     step( operations, problem, adaptation, { name } );
+            require(
+                step.get_status() == nmfd::time_steppers::single_step_status::idle && step.get_dt() == 0 &&
+                    step.get_attempts() == 0,
+                "New step is idle"
+            );
             nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator(
                 operations, step
             );
@@ -455,13 +460,19 @@ try
     operations.get( result, &unchanged );
     require(
         unchanged == value && integrator.get_steps() == 0 &&
-            integrator.get_status() == nmfd::time_steppers::integration_status::completed,
+            integrator.get_status() == nmfd::time_steppers::integration_status::completed &&
+            step.get_status() == nmfd::time_steppers::single_step_status::idle,
         "Zero-length integration"
     );
     operations.assign_scalar( 1., initial );
 
     // A pending result and its embedded error must be explicitly finalized.
     step.reset();
+    require(
+        step.get_status() == nmfd::time_steppers::single_step_status::idle && step.get_dt() == 0 &&
+            step.get_attempts() == 0,
+        "Reset clears the last successful step"
+    );
     step.set_time( 0 );
     step.set_target_time( 1 );
     step.apply( initial, result );
@@ -478,7 +489,29 @@ try
         refused = true;
     }
     require( refused, "No overwrite of a pending step" );
+    step.reset();
+    require(
+        step.get_status() == nmfd::time_steppers::single_step_status::idle && step.get_dt() == 0 &&
+            step.get_attempts() == 0,
+        "Reset discards a pending step"
+    );
+    refused = false;
+    try
+    {
+        step.error_estimate();
+    }
+    catch ( const std::logic_error & )
+    {
+        refused = true;
+    }
+    require( refused, "Reset invalidates the pending error estimate" );
+    step.apply( initial, result );
+    require( step.get_status() == nmfd::time_steppers::single_step_status::converged, "Apply after reset" );
     step.finalize( nmfd::time_steppers::adaptation_status::accepted, .1, result );
+    require(
+        step.get_status() == nmfd::time_steppers::single_step_status::converged,
+        "Finalization preserves the numerical result status"
+    );
     constant_type half( { .05 } );
     step_type     half_step( operations, problem, half );
     half_step.set_target_time( 1 );
@@ -523,6 +556,12 @@ try
     );
     operations.get( result, &value );
     require( value == 77, "Failed attempt must not write output" );
+    limited.reset();
+    require(
+        limited.get_status() == nmfd::time_steppers::single_step_status::idle && limited.get_dt() == 0 &&
+            limited.get_attempts() == 0,
+        "Reset clears the last failed step"
+    );
 
     limited_rate nonfinite{ operations };
     p.initial_step = .1;

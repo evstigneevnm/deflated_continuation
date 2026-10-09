@@ -198,7 +198,8 @@ void check_lifecycle( operations_type &ops, vector_type &in, vector_type &out, v
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, growth, adaptive_type, true>;
     step_type step( ops, problem, adaptation );
-    bool      refused = false;
+    require( step.get_status() == nmfd::time_steppers::single_step_status::idle, "New dense step is idle" );
+    bool refused = false;
     try
     {
         step.get_continuous_integration();
@@ -232,6 +233,11 @@ void check_lifecycle( operations_type &ops, vector_type &in, vector_type &out, v
         require( refused && read( ops, sample ) == 77, "Invalid theta must not modify output" );
     }
     step.reset();
+    require(
+        step.get_status() == nmfd::time_steppers::single_step_status::idle && step.get_dt() == 0 &&
+            step.get_attempts() == 0,
+        "Reset clears the pending dense step"
+    );
     ops.assign_scalar( 1., in );
     step.apply( in, out );
     refused = false;
