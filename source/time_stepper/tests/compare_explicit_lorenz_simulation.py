@@ -9,7 +9,7 @@ import sys
 import numpy as np
 from scipy.integrate import solve_ivp
 
-SCIPY_METHODS = {"DOPRI54": "RK45", "BS32": "RK23"}
+SCIPY_METHODS = ("RK45", "RK23", "DOP853")
 
 
 def read_trajectory(path):
@@ -28,7 +28,9 @@ def read_trajectory(path):
     if (metadata.get("format") != "nmfd.lorenz_trajectory.v1"
             or metadata.get("problem") != "lorenz"
             or not isinstance(metadata.get("method"), str) or metadata["method"] not in SCIPY_METHODS):
-        raise ValueError("Expected a Lorenz trajectory using DOPRI54 or BS32")
+        raise ValueError("Expected a Lorenz trajectory using RK45, RK23 or DOP853")
+    if metadata["method"] == "DOP853" and metadata.get("controller") != "scipy":
+        raise ValueError("Adaptive DOP853 requires scipy controller metadata")
     data = np.loadtxt(path, comments="#", ndmin=2)
     if data.shape[0] < 2 or data.shape[1] != 4 or not np.isfinite(data).all():
         raise ValueError("Expected finite time/x/y/z rows, including both endpoints")
@@ -93,7 +95,7 @@ def compare(args):
     time, actual = data[:, 0], data[:, 1:]
     parameters = tuple(metadata["parameters"][key] for key in ("sigma", "rho", "beta", "epsilon", "delta"))
     adaptation = metadata["adaptation"]
-    scipy_method = SCIPY_METHODS[metadata["method"]]
+    scipy_method = metadata["method"]
     reference = solve_ivp(
         lorenz_rhs, (time[0], time[-1]), metadata["initial_state"], args=parameters,
         method=scipy_method, t_eval=time, rtol=args.reference_rtol, atol=args.reference_atol,

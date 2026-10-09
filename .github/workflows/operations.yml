@@ -60,6 +60,211 @@ jobs:
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rk/test_explicit_rk_cpu.bin
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rk/test_explicit_rk_cpu_omp.bin
 
+  scfd-transform-reduction-cpu:
+    needs: [scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Verify transformed sums on serial and OMP
+        run: |
+          make test_transform_reduce_sum_cpu.bin test_transform_reduce_sum_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/transform_sum"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/transform_sum/test_transform_reduce_sum_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/transform_sum/test_transform_reduce_sum_cpu_omp.bin
+
+  timestepper-scipy-adaptation-cpu:
+    needs: [timestepper-tables-explicit-cpu, scfd-transform-reduction-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Verify SciPy adaptation on serial and OMP
+        run: |
+          make test_explicit_scipy_adaptation_cpu.bin test_explicit_scipy_adaptation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scipy_adaptation"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/scipy_adaptation/test_explicit_scipy_adaptation_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/scipy_adaptation/test_explicit_scipy_adaptation_cpu_omp.bin
+
+  timestepper-scipy-adaptation-cuda:
+    needs: [timestepper-scipy-adaptation-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify transformed sums and SciPy adaptation when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping SciPy adaptation CUDA tests: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping SciPy adaptation CUDA tests: nvcc unavailable"
+            exit 0
+          fi
+          make test_transform_reduce_sum_cuda.bin test_explicit_scipy_adaptation_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scipy_adaptation_cuda" REAL_TYPE=double
+          ./"$BUILD_DIR"/scipy_adaptation_cuda/test_transform_reduce_sum_cuda.bin
+          ./"$BUILD_DIR"/scipy_adaptation_cuda/test_explicit_scipy_adaptation_cuda.bin
+
+  timestepper-dop853-fixed-cpu:
+    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Verify fixed DOP853 on serial and OMP
+        run: |
+          make test_explicit_dop853_cpu.bin test_explicit_dop853_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dop853_fixed"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dop853_fixed/test_explicit_dop853_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dop853_fixed/test_explicit_dop853_cpu_omp.bin
+
+  timestepper-dop853-fixed-cuda:
+    needs: [timestepper-dop853-fixed-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify fixed DOP853 when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping fixed CUDA DOP853: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping fixed CUDA DOP853: nvcc unavailable"
+            exit 0
+          fi
+          make test_explicit_dop853_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dop853_fixed_cuda" REAL_TYPE=double
+          ./"$BUILD_DIR"/dop853_fixed_cuda/test_explicit_dop853_cuda.bin
+
+  timestepper-dop853-dense-cpu:
+    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Verify native DOP853 dense output on serial and OMP
+        run: |
+          make test_explicit_dop853_dense_output_cpu.bin test_explicit_dop853_dense_output_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dop853_dense"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dop853_dense/test_explicit_dop853_dense_output_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dop853_dense/test_explicit_dop853_dense_output_cpu_omp.bin
+
+  timestepper-dop853-dense-python-cpu:
+    needs: [timestepper-dop853-dense-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU and Python dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends python3-numpy python3-scipy
+          fi
+      - name: Compare fixed-step native interpolants with SciPy
+        run: |
+          DENSE_BUILD="$BUILD_DIR/dop853_dense_python"
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            PYTHON=/usr/bin/python3
+          else
+            PYTHON=python3
+            if ! "$PYTHON" -c 'import numpy, scipy' >/dev/null 2>&1; then
+              PYTHON="$HOME/anaconda3/bin/python"
+            fi
+          fi
+          make test_explicit_dop853_dense_output_cpu.bin test_explicit_dop853_dense_output_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$DENSE_BUILD"
+          for backend in cpu cpu_omp; do
+            SAMPLES="$DENSE_BUILD/samples_${backend}.txt"
+            OMP_NUM_THREADS=8 "$DENSE_BUILD/test_explicit_dop853_dense_output_${backend}.bin" "$SAMPLES"
+            "$PYTHON" source/time_stepper/tests/compare_explicit_dop853_dense_output.py "$SAMPLES"
+          done
+
+  timestepper-dop853-dense-cuda:
+    needs: [timestepper-dop853-dense-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify native DOP853 dense output when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA DOP853 dense output: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA DOP853 dense output: nvcc unavailable"
+            exit 0
+          fi
+          make test_explicit_dop853_dense_output_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dop853_dense_cuda" REAL_TYPE=double
+          ./"$BUILD_DIR"/dop853_dense_cuda/test_explicit_dop853_dense_output_cuda.bin
+
+  timestepper-dop853-adaptive-cpu:
+    needs: [timestepper-tables-explicit-cpu, timestepper-scipy-adaptation-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Verify adaptive DOP853 on serial and OMP
+        run: |
+          make test_explicit_dop853_adaptive_cpu.bin test_explicit_dop853_adaptive_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dop853_adaptive"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dop853_adaptive/test_explicit_dop853_adaptive_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dop853_adaptive/test_explicit_dop853_adaptive_cpu_omp.bin
+
+  timestepper-dop853-adaptive-cuda:
+    needs: [timestepper-dop853-adaptive-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify adaptive DOP853 and Lorenz simulation when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping adaptive CUDA DOP853: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping adaptive CUDA DOP853: nvcc unavailable"
+            exit 0
+          fi
+          make test_explicit_dop853_adaptive_cuda.bin test_explicit_lorenz_simulation_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dop853_adaptive_cuda" REAL_TYPE=double
+          ./"$BUILD_DIR"/dop853_adaptive_cuda/test_explicit_dop853_adaptive_cuda.bin
+          ./"$BUILD_DIR"/dop853_adaptive_cuda/test_explicit_lorenz_simulation_cuda.bin 1 "$BUILD_DIR/dop853_adaptive_cuda/lorenz_DOP853_scipy.dat" DOP853 scipy
+
   timestepper-explicit-lorenz-cpu:
     needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
     runs-on: ubuntu-latest
@@ -79,7 +284,7 @@ jobs:
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_lorenz/test_explicit_lorenz_cpu_omp.bin
 
   timestepper-lorenz-simulation-python-cpu:
-    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-lorenz-cpu]
+    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-lorenz-cpu, timestepper-scipy-adaptation-cpu, timestepper-dop853-adaptive-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -93,7 +298,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends python3-numpy python3-scipy python3-matplotlib
           fi
-      - name: Compare Lorenz trajectories with SciPy RK45 and RK23
+      - name: Compare Lorenz trajectories with SciPy RK45, RK23 and DOP853
         run: |
           SIMULATION_BUILD="$BUILD_DIR/lorenz_simulation"
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -108,10 +313,15 @@ jobs:
           "$PYTHON" source/time_stepper/tests/test_compare_explicit_lorenz_simulation.py
           make test_explicit_lorenz_simulation_cpu.bin test_explicit_lorenz_simulation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$SIMULATION_BUILD"
           for backend in cpu cpu_omp; do
-            for method in DOPRI54 BS32; do
-              TRAJECTORY="$SIMULATION_BUILD/lorenz_${backend}_${method}.dat"
-              OMP_NUM_THREADS=8 "$SIMULATION_BUILD/test_explicit_lorenz_simulation_${backend}.bin" 1 "$TRAJECTORY" "$method"
-              "$PYTHON" source/time_stepper/tests/compare_explicit_lorenz_simulation.py "$TRAJECTORY"
+            for method in RK45 RK23 DOP853; do
+              for controller in matlab scipy; do
+                if [ "$method" = DOP853 ] && [ "$controller" != scipy ]; then
+                  continue
+                fi
+                TRAJECTORY="$SIMULATION_BUILD/lorenz_${backend}_${method}_${controller}.dat"
+                OMP_NUM_THREADS=8 "$SIMULATION_BUILD/test_explicit_lorenz_simulation_${backend}.bin" 1 "$TRAJECTORY" "$method" "$controller"
+                "$PYTHON" source/time_stepper/tests/compare_explicit_lorenz_simulation.py "$TRAJECTORY"
+              done
             done
           done
       - name: Save trajectories, comparisons, and plots

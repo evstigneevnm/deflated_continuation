@@ -930,6 +930,16 @@ test_explicit_%_cuda.bin: source/time_stepper/tests/test_explicit_%.cpp $(TIME_S
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_explicit_$*_cuda.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_explicit_$*_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
+test_transform_reduce_sum_cpu.bin: source/common/tests/test_transform_reduce_sum.cpp $(SCFD_VECTOR_OPS_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_transform_reduce_sum_cpu_omp.bin: source/common/tests/test_transform_reduce_sum.cpp $(SCFD_VECTOR_OPS_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER)
+	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_transform_reduce_sum_cuda.bin: source/common/tests/test_transform_reduce_sum.cpp $(SCFD_VECTOR_OPS_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_transform_reduce_sum_cuda.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_transform_reduce_sum_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
 test_butcher_tables: source/time_stepper/legacy/tests/butcher_tables.cpp
 	$(G++) $(G++FLAGS) $(IPROJECT) source/time_stepper/legacy/tests/butcher_tables.cpp -o $(BUILD_DIR)/test_butcher_tables.bin 2>$(RESULTS)
 

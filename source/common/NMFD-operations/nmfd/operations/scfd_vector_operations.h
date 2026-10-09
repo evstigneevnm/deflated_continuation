@@ -31,7 +31,7 @@ namespace detail
 
 // Namespace-level types can be passed to CUDA kernels.
 template<class VectorOperations, class Transform, std::size_t N>
-struct scfd_transform_max_kernel
+struct scfd_transform_kernel
 {
     using scalar_type = typename VectorOperations::scalar_type;
     using norm_type = typename VectorOperations::norm_type;
@@ -502,7 +502,7 @@ public:
             throw std::invalid_argument("Transform reduction: vector size mismatch");
         const auto identity = -std::numeric_limits<norm_type>::infinity();
         if (sz_ == 0) return identity;
-        using kernel_type = nmfd::operations::detail::scfd_transform_max_kernel<scfd_vector_operations, Transform, sizeof...(Vectors)>;
+        using kernel_type = nmfd::operations::detail::scfd_transform_kernel<scfd_vector_operations, Transform, sizeof...(Vectors)>;
         kernel_type kernel{transform, {}, helper_real_.raw_ptr()};
         std::size_t index = 0;
         ((kernel.inputs[index++] = vectors.raw_ptr()), ...);
@@ -510,6 +510,40 @@ public:
         for_each_.wait();
         return reduce_type()(static_cast<ordinal_type>(sz_), helper_real_.raw_ptr(), identity,
             nmfd::operations::detail::scfd_transform_max_op<norm_type>{});
+    }
+
+    // Elementwise real-valued mapping followed by sum; empty -> zero, NaNs propagate.
+    template<class Transform, class... Vectors>
+    norm_type transform_reduce_sum(const Transform& transform, const Vectors&... vectors) const
+    {
+        static_assert(sizeof...(Vectors) > 0, "Transform reduction requires at least one vector");
+        static_assert((std::is_same_v<Vectors, vector_type> && ...), "Transform reduction vector type mismatch");
+        static_assert(std::is_convertible_v<decltype(transform((*vectors.raw_ptr())...)), norm_type>,
+            "Transform reduction requires a real scalar result");
+        if (((get_size(vectors) != sz_) || ...))
+        {
+            throw std::invalid_argument("Transform reduction: vector size mismatch");
+        }
+        last_reduction_high_precision_ = false;
+        if (sz_ == 0)
+        {
+            return norm_type(0);
+        }
+        using kernel_type = nmfd::operations::detail::scfd_transform_kernel<scfd_vector_operations, Transform, sizeof...(Vectors)>;
+        kernel_type kernel{transform, {}, helper_real_.raw_ptr()};
+        std::size_t index = 0;
+        ((kernel.inputs[index++] = vectors.raw_ptr()), ...);
+        for_each_(kernel, static_cast<ordinal_type>(sz_));
+        for_each_.wait();
+        if constexpr (std::is_same_v<scalar_type, norm_type>)
+        {
+            if (high_precision_requested_)
+            {
+                last_reduction_high_precision_ = true;
+                return high_precision_reduction_.sum(static_cast<ordinal_type>(sz_), helper_real_.raw_ptr());
+            }
+        }
+        return reduce_type()(static_cast<ordinal_type>(sz_), helper_real_.raw_ptr(), norm_type(0));
     }
 
     norm_type normalize(vector_type& x) const

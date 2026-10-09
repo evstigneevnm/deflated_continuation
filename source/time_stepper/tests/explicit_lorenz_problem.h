@@ -15,7 +15,9 @@ struct explicit_lorenz_problem
 {
     using scalar_type = typename VectorOperations::scalar_type;
     using vector_type = typename VectorOperations::vector_type;
-    scalar_type sigma = 10, rho = 28, beta = scalar_type(8) / 3, epsilon = scalar_type(.0055L), delta = 0;
+    // epsilon controls cubic damping in the spontaneous relaminarization model.
+    // Setting epsilon to zero recovers the classical Lorenz system.
+    scalar_type sigma = 10, rho = 28, beta = scalar_type(8) / 3, epsilon = 0*scalar_type(.0055L), delta = 0;
 
     struct mapping
     {

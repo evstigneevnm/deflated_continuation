@@ -109,7 +109,7 @@ static_assert(!has_dense<disabled_step>::value && has_dense<dense_step>::value);
 
 void check_methods(operations_type& ops, vector_type& in, vector_type& out, vector_type& sample)
 {
-    for (const auto* method : {"EE", "HE", "BS32", "RK33SSP", "RK43SSP", "RK64SSP", "DOPRI54"})
+    for (const auto* method : {"EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK64SSP", "RK45"})
     {
         for (const double direction : {1., -1.})
         {

@@ -26,6 +26,7 @@ constexpr const char* backend_name = "serial_cpu";
 #include <contrib/json/nlohmann/json.hpp>
 #include <time_stepper/integration/time_integrator.h>
 #include <time_stepper/integration/time_step_adaptation_matlab.h>
+#include <time_stepper/integration/time_step_adaptation_scipy.h>
 #include <time_stepper/runge_kutta/explicit_time_step.h>
 
 namespace nmfd
@@ -118,29 +119,13 @@ private:
 }
 }
 
-int main(int argc, char** argv)
-try
+template<class Adaptation>
+void run_simulation(
+    double end_time, const std::string& filename, const std::string& method, const std::string& controller)
 {
-    if (argc != 3 && argc != 4)
-    {
-        std::cerr << "Usage: " << argv[0] << " end_time trajectory.dat [DOPRI54|BS32]\n";
-        return argc == 2 && std::string(argv[1]) == "--help" ? 0 : 2;
-    }
-    const std::string method = argc == 4 ? argv[3] : "DOPRI54";
-    if (method != "DOPRI54" && method != "BS32")
-    {
-        throw std::invalid_argument("Lorenz comparison supports DOPRI54 and BS32");
-    }
-    std::size_t parsed = 0;
-    const double end_time = std::stod(argv[1], &parsed);
-    if (parsed != std::string(argv[1]).size() || !std::isfinite(end_time) || end_time <= 0)
-    {
-        throw std::invalid_argument("Integration end time must be positive and finite");
-    }
-    backend_type::init_device();
     using operations_type = scfd_vector_operations<backend_type, double>;
     using problem_type = nmfd::time_steppers::tests::explicit_lorenz_problem<operations_type>;
-    using adaptation_type = nmfd::time_steppers::integration::time_step_adaptation_matlab<operations_type>;
+    using adaptation_type = Adaptation;
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, problem_type, adaptation_type>;
     using external_type = nmfd::time_steppers::tests::external_manager<operations_type>;
@@ -155,13 +140,13 @@ try
     const scfd::static_vec::vec<double, 3> initial_values{2.2, 30.5, 2.5};
     operations.set(initial_values.d, *initial);
 
-    adaptation_type::params adaptation_params;
+    typename adaptation_type::params adaptation_params;
     adaptation_params.relative_tolerance = 1e-10;
     adaptation_params.absolute_tolerance = 1e-12;
     adaptation_type adaptation(operations, adaptation_params);
     step_type step(operations, problem, adaptation, {method});
     const nlohmann::json metadata = {{"format", "nmfd.lorenz_trajectory.v1"}, {"problem", "lorenz"}, {"method", method},
-        {"backend", backend_name}, {"start_time", 0}, {"end_time", end_time},
+        {"backend", backend_name}, {"controller", controller}, {"start_time", 0}, {"end_time", end_time},
         {"initial_state", {initial_values[0], initial_values[1], initial_values[2]}},
         {"parameters", {{"sigma", problem.sigma}, {"rho", problem.rho}, {"beta", problem.beta},
                            {"epsilon", problem.epsilon}, {"delta", problem.delta}}},
@@ -170,7 +155,7 @@ try
                 {"absolute_tolerance", adaptation_params.absolute_tolerance},
                 {"initial_step", adaptation_params.initial_step}, {"minimum_step", adaptation_params.minimum_step},
                 {"maximum_step", adaptation_params.maximum_step}}}};
-    external_type external(operations, {argv[2]}, metadata);
+    external_type external(operations, {filename}, metadata);
     integrator_type integrator(operations, step, {}, &external);
     integrator.set_time_interval(0, end_time);
     integrator.apply(*initial, *result);
@@ -180,8 +165,47 @@ try
         throw std::runtime_error("Lorenz simulation failed; trajectory is incomplete");
     }
     external.complete(integrator.get_steps());
-    std::cout << "lorenz: " << method << ", " << backend_name << ", " << integrator.get_steps()
-              << " accepted steps, final time " << end_time << ", trajectory " << argv[2] << '\n';
+    std::cout << "lorenz: " << method << ", " << controller << ", " << backend_name << ", " << integrator.get_steps()
+              << " accepted steps, final time " << end_time << ", trajectory " << filename << '\n';
+}
+
+int main(int argc, char** argv)
+try
+{
+    if (argc < 3 || argc > 5)
+    {
+        std::cerr << "Usage: " << argv[0] << " end_time trajectory.dat [RK45|RK23|DOP853] [matlab|scipy]\n";
+        return argc == 2 && std::string(argv[1]) == "--help" ? 0 : 2;
+    }
+    const std::string method = argc >= 4 ? argv[3] : "RK45";
+    const std::string controller = argc == 5 ? argv[4] : method == "DOP853" ? "scipy" : "matlab";
+    if ((method != "RK45" && method != "RK23" && method != "DOP853") ||
+        (controller != "matlab" && controller != "scipy"))
+    {
+        throw std::invalid_argument("Expected RK45, RK23 or DOP853 and matlab or scipy adaptation");
+    }
+    if (method == "DOP853" && controller != "scipy")
+    {
+        throw std::invalid_argument("Adaptive DOP853 requires scipy adaptation for its combined estimator");
+    }
+    std::size_t parsed = 0;
+    const double end_time = std::stod(argv[1], &parsed);
+    if (parsed != std::string(argv[1]).size() || !std::isfinite(end_time) || end_time <= 0)
+    {
+        throw std::invalid_argument("Integration end time must be positive and finite");
+    }
+    backend_type::init_device();
+    using operations_type = scfd_vector_operations<backend_type, double>;
+    if (controller == "scipy")
+    {
+        run_simulation<nmfd::time_steppers::integration::time_step_adaptation_scipy<operations_type>>(
+            end_time, argv[2], method, controller);
+    }
+    else
+    {
+        run_simulation<nmfd::time_steppers::integration::time_step_adaptation_matlab<operations_type>>(
+            end_time, argv[2], method, controller);
+    }
 }
 catch (const std::exception& e)
 {

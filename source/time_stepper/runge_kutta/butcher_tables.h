@@ -3,6 +3,7 @@
 
 #include <string>
 #include <time_stepper/runge_kutta/butcher_table.h>
+#include <time_stepper/runge_kutta/dop853_coefficients.h>
 
 namespace nmfd
 {
@@ -23,7 +24,7 @@ inline butcher_table make_butcher_table(const std::string& name)
         return {{{0, 0}, {1, 0}}, {.5L, .5L}, 2, {}, {1, 0}, 1,
             2e-15L, {{1, -.5L}, {0, .5L}}, 2};
     }
-    if (name == "BS32")
+    if (name == "RK23")
     {
         // Bogacki-Shampine 3(2), including the endpoint derivative and native cubic extension.
         return {{{0, 0, 0, 0}, {1.L / 2, 0, 0, 0}, {0, 3.L / 4, 0, 0},
@@ -43,7 +44,7 @@ inline butcher_table make_butcher_table(const std::string& name)
         return {{{0, 0, 0, 0}, {.5L, 0, 0, 0}, {.5L, .5L, 0, 0}, {1.L / 6, 1.L / 6, 1.L / 6, 0}},
             {1.L / 6, 1.L / 6, 1.L / 6, .5L}, 3, {}, {1.L / 3, 1.L / 3, 1.L / 3, 0}, 2};
     }
-    if (name == "DOPRI54")
+    if (name == "RK45")
     {
         return {{{0, 0, 0, 0, 0, 0, 0}, {1.L / 5, 0, 0, 0, 0, 0, 0},
             {3.L / 40, 9.L / 40, 0, 0, 0, 0, 0}, {44.L / 45, -56.L / 15, 32.L / 9, 0, 0, 0, 0},
@@ -62,6 +63,10 @@ inline butcher_table make_butcher_table(const std::string& name)
                 {0, 127303824393.L / 49829197408, -318862633887.L / 49829197408, 701980252875.L / 199316789632},
                 {0, -282668133.L / 205662961, 2019193451.L / 616988883, -1453857185.L / 822651844},
                 {0, 40617522.L / 29380423, -110615467.L / 29380423, 69997945.L / 29380423}}, 4};
+    }
+    if (name == "DOP853")
+    {
+        return detail::make_dop853_table();
     }
     if (name == "RK64SSP")
     {

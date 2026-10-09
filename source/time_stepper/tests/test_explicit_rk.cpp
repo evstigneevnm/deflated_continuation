@@ -286,7 +286,7 @@ void test_storage(const vector_type& initial, vector_type& result)
         step_type step(operations, problem, adaptation);
         require(operations.live_vectors == step.table().size() + 2, "RK storage: derivatives, work, embedded error");
         nmfd::time_steppers::integration::time_integrator<counting_operations, step_type> integrator(operations, step);
-        require(operations.live_vectors == 10, "DOPRI54 integration must own 10 vectors, not 14");
+        require(operations.live_vectors == 10, "RK45 integration must own 10 vectors, not 14");
         integrator.set_time_interval(0, .25);
         for (int run = 0; run < 2; ++run)
         {
@@ -321,7 +321,7 @@ void test_storage(const vector_type& initial, vector_type& result)
     require(operations.live_vectors == 0, "Unembedded RK storage release");
 }
 
-void test_bs32_error(operations_type& operations, const vector_type& initial, vector_type& result)
+void test_rk23_error(operations_type& operations, const vector_type& initial, vector_type& result)
 {
     forced_growth problem{operations};
     using step_type =
@@ -331,19 +331,19 @@ void test_bs32_error(operations_type& operations, const vector_type& initial, ve
     {
         const double h = .1 / (level + 1);
         constant_type adaptation({h});
-        step_type step(operations, problem, adaptation, {"BS32"});
+        step_type step(operations, problem, adaptation, {"RK23"});
         step.apply(initial, result);
-        require(step.get_status() == nmfd::time_steppers::single_step_status::converged, "BS32 fixed step");
+        require(step.get_status() == nmfd::time_steppers::single_step_status::converged, "RK23 fixed step");
         double value = 0;
         operations.get(result, &value);
-        require(std::abs(value - (1 + h + h * h + h * h * h / 3)) < 2e-14, "BS32 primary update for u'=u+t, u(0)=1");
+        require(std::abs(value - (1 + h + h * h + h * h * h / 3)) < 2e-14, "RK23 primary update for u'=u+t, u(0)=1");
         operations.get(step.error_estimate(), &value);
         require(std::abs(value + h * h * h * (1 + h) / 24) < 2e-14,
-            "BS32 signed embedded state error includes the step-size factor exactly once");
+            "RK23 signed embedded state error includes the step-size factor exactly once");
         errors[level] = std::abs(value);
         step.finalize(nmfd::time_steppers::adaptation_status::accepted, h, result);
     }
-    require(errors[0] / errors[1] > 8 && errors[0] / errors[1] < 8.5, "BS32 embedded state error scales as h^3");
+    require(errors[0] / errors[1] > 8 && errors[0] / errors[1] < 8.5, "RK23 embedded state error scales as h^3");
 
     adaptive_type::params p;
     p.initial_step = .5;
@@ -352,13 +352,13 @@ void test_bs32_error(operations_type& operations, const vector_type& initial, ve
     adaptive_type adaptation(operations, p);
     using adaptive_step =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, adaptive_type>;
-    adaptive_step step(operations, problem, adaptation, {"BS32"});
+    adaptive_step step(operations, problem, adaptation, {"RK23"});
     step.apply(initial, result);
     require(step.get_status() == nmfd::time_steppers::single_step_status::converged && step.get_attempts() > 1,
-        "BS32 adaptive rejection converges from the original state");
+        "RK23 adaptive rejection converges from the original state");
     double value = 0;
     operations.get(initial, &value);
-    require(value == 1, "BS32 rejection preserves the input state");
+    require(value == 1, "RK23 rejection preserves the input state");
     step.finalize(nmfd::time_steppers::adaptation_status::accepted, step.get_dt(), result);
 }
 
@@ -383,12 +383,12 @@ try
     auto& coarse = *coarse_wrap;
     operations.assign_scalar(1., initial);
     test_storage(initial, result);
-    test_bs32_error(operations, initial, result);
+    test_rk23_error(operations, initial, result);
     forced_growth problem{operations};
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, constant_type>;
     const auto exact = 2 * std::exp(.5) - 1.5;
-    for (const auto* name : {"EE", "HE", "BS32", "RK33SSP", "RK43SSP", "RK64SSP", "DOPRI54"})
+    for (const auto* name : {"EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK64SSP", "RK45"})
     {
         double errors[2]{};
         for (int level = 0; level < 2; ++level)
@@ -479,7 +479,7 @@ try
     operations.get(result, &value);
     require(value == 77 && no_error.get_status() == nmfd::time_steppers::single_step_status::error_estimate_unavailable,
         "Do not adapt an unembedded method using a zero error vector");
-    adaptive_step limited(operations, problem, adaptation, {"DOPRI54", 1});
+    adaptive_step limited(operations, problem, adaptation, {"RK45", 1});
     limited.reset();
     limited.apply(initial, result);
     require(

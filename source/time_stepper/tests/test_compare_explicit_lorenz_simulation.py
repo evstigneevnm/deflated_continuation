@@ -21,7 +21,7 @@ class LorenzSimulationComparisonTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.path = Path(self.directory.name) / "trajectory.dat"
         self.metadata = {
-            "format": "nmfd.lorenz_trajectory.v1", "problem": "lorenz", "method": "DOPRI54",
+            "format": "nmfd.lorenz_trajectory.v1", "problem": "lorenz", "method": "RK45",
             "backend": "serial_cpu", "start_time": 0, "end_time": 0.01,
             "initial_state": [2.2, 30.5, 2.5],
             "parameters": {"sigma": 10, "rho": 28, "beta": 8 / 3, "epsilon": 0.0055, "delta": 0},
@@ -44,15 +44,15 @@ class LorenzSimulationComparisonTests(unittest.TestCase):
         self.assertEqual(metadata, self.metadata)
         np.testing.assert_array_equal(data, self.data)
 
-    def test_bs32_metadata_is_accepted(self):
-        self.metadata["method"] = "BS32"
+    def test_rk23_metadata_is_accepted(self):
+        self.metadata["method"] = "RK23"
         self.write()
         metadata, data = comparison.read_trajectory(self.path)
-        self.assertEqual(metadata["method"], "BS32")
+        self.assertEqual(metadata["method"], "RK23")
         np.testing.assert_array_equal(data, self.data)
 
-    def test_bs32_uses_scipy_rk23(self):
-        self.metadata["method"] = "BS32"
+    def test_rk23_uses_scipy_rk23(self):
+        self.metadata["method"] = "RK23"
         self.write()
         args = SimpleNamespace(trajectory=self.path, reference_rtol=1e-12, reference_atol=1e-14,
                                check_rtol=1e-7, check_atol=1e-8, no_plots=True, diagnostic_only=True)
@@ -62,6 +62,24 @@ class LorenzSimulationComparisonTests(unittest.TestCase):
         self.assertEqual(solver.call_args.kwargs["method"], "RK23")
         summary = json.loads(self.path.with_name("trajectory_summary.json").read_text(encoding="utf-8"))
         self.assertEqual(summary["reference_method"], "SciPy RK23")
+
+    def test_dop853_uses_scipy_dop853(self):
+        self.metadata.update(method="DOP853", controller="scipy")
+        self.write()
+        args = SimpleNamespace(trajectory=self.path, reference_rtol=1e-12, reference_atol=1e-14,
+                               check_rtol=1e-7, check_atol=1e-8, no_plots=True, diagnostic_only=True)
+        with mock.patch.object(comparison, "solve_ivp", wraps=comparison.solve_ivp) as solver:
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(comparison.compare(args), 0)
+        self.assertEqual(solver.call_args.kwargs["method"], "DOP853")
+        summary = json.loads(self.path.with_name("trajectory_summary.json").read_text(encoding="utf-8"))
+        self.assertEqual(summary["reference_method"], "SciPy DOP853")
+
+    def test_dop853_rejects_wrong_controller(self):
+        self.metadata.update(method="DOP853", controller="matlab")
+        self.write()
+        with self.assertRaisesRegex(ValueError, "controller"):
+            comparison.read_trajectory(self.path)
 
     def test_incomplete_trajectory_is_rejected(self):
         self.write(complete=False)
@@ -99,7 +117,7 @@ class LorenzSimulationComparisonTests(unittest.TestCase):
     def test_unsupported_method_is_rejected(self):
         self.metadata["method"] = "RK33SSP"
         self.write()
-        with self.assertRaisesRegex(ValueError, "DOPRI54"):
+        with self.assertRaisesRegex(ValueError, "RK45"):
             comparison.read_trajectory(self.path)
 
     def test_adaptation_settings_are_checked(self):

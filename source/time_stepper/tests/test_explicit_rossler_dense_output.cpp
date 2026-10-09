@@ -18,6 +18,7 @@ using backend_type = scfd::backend::serial_cpu;
 #include <time_stepper/runge_kutta/explicit_time_step.h>
 #include <time_stepper/integration/time_step_adaptation_constant.h>
 #include <time_stepper/integration/time_step_adaptation_matlab.h>
+#include <time_stepper/integration/time_step_adaptation_scipy.h>
 #include <time_stepper/integration/time_integrator.h>
 
 using operations_type = scfd_vector_operations<backend_type, double>;
@@ -108,6 +109,41 @@ struct external_manager
     }
 };
 
+template<class Adaptation, class Problem>
+void check_adaptive(operations_type& ops, Problem& problem, const vector_type& initial, vector_type& result,
+    const char* method)
+{
+    typename Adaptation::params p;
+    p.initial_step = duration;
+    p.relative_tolerance = 1e-11;
+    p.absolute_tolerance = 1e-13;
+    Adaptation adaptation(ops, p);
+    using step_type = nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, Problem, Adaptation, true>;
+    step_type step(ops, problem, adaptation, {method});
+    external_manager<step_type> external(ops, step);
+    nmfd::time_steppers::integration::time_integrator<operations_type, step_type, decltype(external)> integrator(
+        ops, step, {}, &external);
+    integrator.set_time_interval(0, duration);
+    for (int run = 0; run < 3; ++run)
+    {
+        external.reset(run == 2);
+        integrator.apply(initial, result);
+        require(external.error < 2e-8 && external.interior_samples >= 4, "Independent dense reference mismatch");
+        require(external.samples == (run == 2 ? 4u : 5u), "Restart must sample each point exactly once");
+        require(integrator.get_status() ==
+                    (run == 2 ? integration_status::stopped_by_external_operation : integration_status::completed),
+            "Dense integration status");
+        require(std::abs(integrator.get_final_time() - (run == 2 ? sample_times[3] : duration)) < 1e-14,
+            "Dense manager must commit matching time");
+        scfd::static_vec::vec<double, 3> final_state;
+        ops.get(result, final_state.d);
+        for (int i = 0; i < 3; ++i)
+        {
+            require(std::abs(final_state[i] - reference[run == 2 ? 3 : 4][i]) < 2e-8, "Dense manager committed state");
+        }
+    }
+}
+
 int main()
 try
 {
@@ -122,7 +158,7 @@ try
     using fixed_type = nmfd::time_steppers::integration::time_step_adaptation_constant<operations_type>;
     using fixed_step =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, decltype(problem), fixed_type, true>;
-    for (const auto* method : {"EE", "HE", "BS32", "RK33SSP", "RK43SSP", "RK64SSP", "DOPRI54"})
+    for (const auto* method : {"EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK64SSP", "RK45", "DOP853"})
     {
         double errors[2]{};
         for (int level = 0; level < 2; ++level)
@@ -138,45 +174,32 @@ try
                         external.interior_samples >= 4,
                 "Fixed dense output sampling");
             errors[level] = external.error;
+            if (step.table().order() == 8)
+            {
+                external.reset(true);
+                integrator.apply(*initial, *result);
+                require(integrator.get_status() == integration_status::stopped_by_external_operation &&
+                            external.samples == 4 && external.error < 2e-8 &&
+                            std::abs(integrator.get_final_time() - sample_times[3]) < 1e-14,
+                    "DOP853 external manager must commit a shortened dense endpoint");
+                scfd::static_vec::vec<double, 3> endpoint;
+                ops.get(*result, endpoint.d);
+                for (int i = 0; i < 3; ++i)
+                {
+                    require(std::abs(endpoint[i] - reference[3][i]) < 2e-8, "DOP853 external committed state");
+                }
+            }
         }
         require(errors[1] < std::max(1e-11, .8 * errors[0]), "Fixed dense refinement must improve accuracy");
     }
-    using adaptive_type = nmfd::time_steppers::integration::time_step_adaptation_matlab<operations_type>;
-    adaptive_type::params p;
-    p.initial_step = duration;
-    p.relative_tolerance = 1e-11;
-    p.absolute_tolerance = 1e-13;
-    adaptive_type adaptation(ops, p);
-    using step_type =
-        nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, decltype(problem), adaptive_type, true>;
-    for (const auto* method : {"DOPRI54", "BS32"})
+    using matlab_type = nmfd::time_steppers::integration::time_step_adaptation_matlab<operations_type>;
+    for (const auto* method : {"RK45", "RK23"})
     {
-        step_type step(ops, problem, adaptation, {method});
-        external_manager<step_type> external(ops, step);
-        nmfd::time_steppers::integration::time_integrator<operations_type, step_type, decltype(external)> integrator(
-            ops, step, {}, &external);
-        integrator.set_time_interval(0, duration);
-        for (int run = 0; run < 3; ++run)
-        {
-            external.reset(run == 2);
-            integrator.apply(*initial, *result);
-            require(external.error < 2e-8 && external.interior_samples >= 4, "Independent dense reference mismatch");
-            require(external.samples == (run == 2 ? 4u : 5u), "Restart must sample each point exactly once");
-            require(integrator.get_status() ==
-                        (run == 2 ? integration_status::stopped_by_external_operation : integration_status::completed),
-                "Dense integration status");
-            require(std::abs(integrator.get_final_time() - (run == 2 ? sample_times[3] : duration)) < 1e-14,
-                "Dense manager must commit matching time");
-            scfd::static_vec::vec<double, 3> final_state;
-            ops.get(*result, final_state.d);
-            for (int i = 0; i < 3; ++i)
-            {
-                require(
-                    std::abs(final_state[i] - reference[run == 2 ? 3 : 4][i]) < 2e-8, "Dense manager committed state");
-            }
-        }
+        check_adaptive<matlab_type>(ops, problem, *initial, *result, method);
     }
-    std::cout << "rossler: dense output, seven fixed methods, adaptive restart and external endpoint refinement PASS\n";
+    using scipy_type = nmfd::time_steppers::integration::time_step_adaptation_scipy<operations_type>;
+    check_adaptive<scipy_type>(ops, problem, *initial, *result, "DOP853");
+    std::cout << "rossler: dense output, eight fixed methods, adaptive restart and external endpoint refinement PASS\n";
 }
 catch (const std::exception& e)
 {

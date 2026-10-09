@@ -30,14 +30,23 @@ public:
         irk
     };
 
+    enum class error_estimator_type
+    {
+        none,
+        embedded_pair,
+        dop853_combined
+    };
+
     butcher_table(matrix_type a, vector_type b, unsigned int order,
         vector_type c = {}, vector_type embedded_b = {}, unsigned int embedded_order = 0,
         scalar_type coefficient_tolerance = 2e-15L,
-        matrix_type dense_coefficients = {}, unsigned int dense_order = 0):
+        matrix_type dense_coefficients = {}, unsigned int dense_order = 0,
+        matrix_type dense_outout_a = {}, vector_type dense_outout_c = {}, matrix_type error_coefficients = {}):
         a_(std::move(a)), b_(std::move(b)), c_(std::move(c)),
         embedded_b_(std::move(embedded_b)), order_(order), embedded_order_(embedded_order),
         tolerance_(coefficient_tolerance), dense_coefficients_(std::move(dense_coefficients)),
-        dense_order_(dense_order)
+        dense_order_(dense_order), dense_outout_a_(std::move(dense_outout_a)),
+        dense_outout_c_(std::move(dense_outout_c)), error_coefficients_(std::move(error_coefficients))
     {
         if (b_.empty() || a_.size() != b_.size() || order_ == 0 ||
             !std::isfinite(tolerance_) || tolerance_ <= 0 ||
@@ -69,20 +78,51 @@ public:
             validate_vector(embedded_b_, size());
             check_equal(std::accumulate(embedded_b_.begin(), embedded_b_.end(), 0.L), 1.L);
         }
+        if (!error_coefficients_.empty())
+        {
+            if (is_embedded() || order_ != 8 || error_coefficients_.size() != 2)
+            {
+                throw std::invalid_argument("Invalid DOP853 combined estimator");
+            }
+            for (const auto& row : error_coefficients_)
+            {
+                validate_vector(row, size());
+                check_equal(std::accumulate(row.begin(), row.end(), 0.L), 0.L);
+            }
+        }
         if (dense_coefficients_.empty() != (dense_order_ == 0) || dense_order_ > order_)
         {
             throw std::invalid_argument("Invalid dense-output order");
         }
+        if (dense_outout_a_.size() != dense_outout_c_.size() ||
+            (!has_dense_output() && !dense_outout_a_.empty()))
+        {
+            throw std::invalid_argument("Invalid additional dense-output stages");
+        }
+        validate_vector(dense_outout_c_, dense_outout_a_.size());
+        for (std::size_t i = 0; i < dense_outout_a_.size(); ++i)
+        {
+            const auto& row = dense_outout_a_[i];
+            validate_vector(row, dense_outout_stage_count());
+            check_equal(std::accumulate(row.begin(), row.end(), 0.L), dense_outout_c_[i]);
+            for (std::size_t j = size() + i; j < row.size(); ++j)
+            {
+                if (row[j] != 0)
+                {
+                    throw std::invalid_argument("Dense-output stages must use earlier derivatives only");
+                }
+            }
+        }
         if (has_dense_output())
         {
-            if (dense_coefficients_.size() != size() || dense_degree() < dense_order_)
+            if (dense_coefficients_.size() != dense_outout_stage_count() || dense_degree() < dense_order_)
             {
                 throw std::invalid_argument("Invalid dense-output dimensions");
             }
-            for (std::size_t i = 0; i < size(); ++i)
+            for (std::size_t i = 0; i < dense_outout_stage_count(); ++i)
             {
                 validate_vector(dense_coefficients_[i], dense_degree());
-                check_equal(dense_b(i, 1), b_[i]);
+                check_equal(dense_b(i, 1), i < size() ? b_[i] : 0.L);
             }
             for (std::size_t j = 0; j < dense_degree(); ++j)
             {
@@ -113,12 +153,23 @@ public:
 
     unsigned int error_order() const
     {
-        return is_embedded() ? embedded_order_ + 1 : 0;
+        return error_estimator() == error_estimator_type::dop853_combined ? 8 : is_embedded() ? embedded_order_ + 1 : 0;
     }
 
     bool is_embedded() const
     {
         return !embedded_b_.empty();
+    }
+
+    error_estimator_type error_estimator() const
+    {
+        return !error_coefficients_.empty() ? error_estimator_type::dop853_combined
+            : is_embedded() ? error_estimator_type::embedded_pair : error_estimator_type::none;
+    }
+
+    bool has_error_estimate() const
+    {
+        return error_estimator() != error_estimator_type::none;
     }
 
     scalar_type coefficient_tolerance() const
@@ -148,7 +199,12 @@ public:
 
     scalar_type error_b(std::size_t i) const
     {
-        return b(i) - embedded_b(i);
+        return error_coefficients_.empty() ? b(i) - embedded_b(i) : error_coefficients_[0].at(i);
+    }
+
+    scalar_type secondary_error_b(std::size_t i) const
+    {
+        return error_coefficients_.at(1).at(i);
     }
 
     bool has_dense_output() const
@@ -159,6 +215,30 @@ public:
     unsigned int dense_order() const
     {
         return dense_order_;
+    }
+
+    // Total derivatives used by the interpolant, including the ordinary stages.
+    std::size_t dense_outout_stage_count() const
+    {
+        return size() + dense_outout_a_.size();
+    }
+
+    scalar_type dense_outout_a(std::size_t i, std::size_t j) const
+    {
+        if (j >= dense_outout_stage_count())
+        {
+            throw std::out_of_range("Dense-output stage index");
+        }
+        if (i < size())
+        {
+            return j < size() ? a(i, j) : 0.L;
+        }
+        return dense_outout_a_.at(i - size()).at(j);
+    }
+
+    scalar_type dense_outout_c(std::size_t i) const
+    {
+        return i < size() ? c(i) : dense_outout_c_.at(i - size());
     }
 
     std::size_t dense_degree() const
@@ -216,6 +296,9 @@ private:
     scalar_type tolerance_;
     matrix_type dense_coefficients_;
     unsigned int dense_order_;
+    matrix_type dense_outout_a_;
+    vector_type dense_outout_c_;
+    matrix_type error_coefficients_;
 
     static void validate_vector(const vector_type& v, std::size_t size)
     {

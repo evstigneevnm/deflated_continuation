@@ -59,17 +59,18 @@ inline void check_order(const nmfd::time_steppers::runge_kutta::butcher_table& t
     }
     std::vector<std::vector<long double>> weights;
     bool next_order_fails = false;
+    const auto stage_count = dense ? table.dense_outout_stage_count() : table.size();
     for (const auto& t : trees)
     {
-        std::vector<long double> phi(table.size(), 1);
-        for (std::size_t i = 0; i < table.size(); ++i)
+        std::vector<long double> phi(stage_count, 1);
+        for (std::size_t i = 0; i < stage_count; ++i)
         {
             for (const auto child : t.children)
             {
                 long double product = 0;
-                for (std::size_t j = 0; j < table.size(); ++j)
+                for (std::size_t j = 0; j < stage_count; ++j)
                 {
-                    product += table.a(i, j) * weights[child][j];
+                    product += (dense ? table.dense_outout_a(i, j) : table.a(i, j)) * weights[child][j];
                 }
                 phi[i] *= product;
             }
@@ -86,7 +87,7 @@ inline void check_order(const nmfd::time_steppers::runge_kutta::butcher_table& t
             for (std::size_t j = 0; j < table.dense_degree(); ++j)
             {
                 long double coefficient = 0;
-                for (std::size_t i = 0; i < table.size(); ++i)
+                for (std::size_t i = 0; i < stage_count; ++i)
                 {
                     coefficient += table.dense_coefficient(i, j) * phi[i];
                 }

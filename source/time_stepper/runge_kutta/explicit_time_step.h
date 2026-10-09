@@ -50,6 +50,19 @@ struct has_error_requirement<Adaptation,
     std::void_t<decltype(std::declval<const Adaptation&>().requires_error_estimate())>> : std::true_type
 {
 };
+
+template<class Adaptation, class T, class Vector, class = void>
+struct has_dual_error_assessment : std::false_type
+{
+};
+
+template<class Adaptation, class T, class Vector>
+struct has_dual_error_assessment<Adaptation, T, Vector,
+    std::void_t<decltype(std::declval<Adaptation&>().assess(std::declval<T>(), std::declval<T>(),
+        std::declval<const Vector&>(), std::declval<const Vector&>(), std::declval<T&>(),
+        std::declval<unsigned int>(), std::declval<const Vector*>(), std::declval<const Vector*>()))>> : std::true_type
+{
+};
 }
 
 template<class VectorOperations, class Problem, class TimeStepAdaptation, bool DenseOutput = false>
@@ -61,7 +74,7 @@ public:
 
     struct params
     {
-        std::string method = "DOPRI54";
+        std::string method = "RK45";
         unsigned int maximum_attempts = 32;
     };
     static_assert(detail::has_apply<Problem, vector_type>::value,
@@ -70,8 +83,10 @@ public:
     explicit_time_step(VectorOperations& operations, Problem& problem,
         TimeStepAdaptation& adaptation, const params& p = {}):
         operations_(operations), problem_(problem), adaptation_(adaptation), params_(p),
-        table_(make_butcher_table(p.method)), work_(operations),
-        error_(operations, table_.is_embedded()), dense_(operations, !table_.has_dense_output())
+        table_(make_butcher_table(p.method)), combined_error_(use_combined_error()), work_(operations),
+        error_(operations, table_.is_embedded() || (combined_error_ && supports_combined_error)),
+        secondary_error_(operations, combined_error_ && supports_combined_error),
+        dense_(operations, !table_.has_dense_output())
     {
         if (table_.type() != butcher_table::scheme_type::explicit_rk)
         {
@@ -82,12 +97,17 @@ public:
             throw std::invalid_argument("Empty RK attempt budget");
         }
         work_.start_use();
-        if (table_.is_embedded())
+        if (table_.is_embedded() || (combined_error_ && supports_combined_error))
         {
             error_.start_use();
         }
-        stages_.reserve(table_.size());
-        for (std::size_t i = 0; i < table_.size(); ++i)
+        if (combined_error_ && supports_combined_error)
+        {
+            secondary_error_.start_use();
+        }
+        const auto stage_count = DenseOutput ? table_.dense_outout_stage_count() : table_.size();
+        stages_.reserve(stage_count);
+        for (std::size_t i = 0; i < stage_count; ++i)
         {
             stages_.emplace_back(operations);
             stages_.back().start_use();
@@ -164,6 +184,24 @@ public:
         return *error_;
     }
 
+    // DOP853 components are raw E5/E3 defects, not standalone combined estimates.
+    const vector_type& error_estimate(std::size_t component) const
+    {
+        if (!pending_ || (!table_.is_embedded() && !combined_error_))
+        {
+            throw std::logic_error("No pending RK error components");
+        }
+        if (component == 0)
+        {
+            return *error_;
+        }
+        if (component == 1 && combined_error_)
+        {
+            return *secondary_error_;
+        }
+        throw std::out_of_range("RK error component index");
+    }
+
     void reset()
     {
         adaptation_.reset();
@@ -183,11 +221,16 @@ public:
         ++generation_;
         if constexpr (detail::has_error_requirement<TimeStepAdaptation>::value)
         {
-            if (adaptation_.requires_error_estimate() && !table_.is_embedded())
+            if (adaptation_.requires_error_estimate() && !table_.has_error_estimate())
             {
                 status_ = single_step_status::error_estimate_unavailable;
                 return;
             }
+        }
+        if (combined_error_ && !supports_combined_error)
+        {
+            status_ = single_step_status::error_estimate_unavailable;
+            return;
         }
         if (!initialized_)
         {
@@ -218,32 +261,21 @@ public:
                 continue;
             }
             scalar_type next_dt = proposed;
-            const auto decision = adaptation_.assess(time_, dt_, in, *work_, next_dt,
-                table_.error_order(), table_.is_embedded() ? &*error_ : nullptr);
+            const auto decision = assess(in, next_dt);
             if (decision == adaptation_status::accepted)
             {
                 if constexpr (DenseOutput)
                 {
-                    if (!table_.has_dense_output())
+                    if (!prepare_dense(in))
                     {
-                        if constexpr (detail::has_set_time<Problem, scalar_type>::value)
+                        if (adaptation_.reject_step(dt_) != adaptation_status::rejected)
                         {
-                            problem_.set_time(time_ + dt_);
+                            status_ = single_step_status::failed_nonfinite;
+                            return;
                         }
-                        problem_.apply(*work_, *dense_.endpoint_rate);
-                        if (!operations_.check_is_valid_number(*dense_.endpoint_rate))
-                        {
-                            if (adaptation_.reject_step(dt_) != adaptation_status::rejected)
-                            {
-                                status_ = single_step_status::failed_nonfinite;
-                                return;
-                            }
-                            adaptation_.update(adaptation_status::rejected, time_, dt_, in);
-                            continue;
-                        }
+                        adaptation_.update(adaptation_status::rejected, time_, dt_, in);
+                        continue;
                     }
-                    // Snapshot before copying the candidate: step.apply(x, x) is supported.
-                    operations_.assign(in, *dense_.previous);
                 }
                 operations_.assign(*work_, out);
                 status_ = single_step_status::converged;
@@ -277,12 +309,15 @@ public:
 
 private:
     using vector_wrap_type = nmfd::detail::vector_wrap<VectorOperations>;
+    static constexpr bool supports_combined_error =
+        detail::has_dual_error_assessment<TimeStepAdaptation, scalar_type, vector_type>::value;
     VectorOperations& operations_;
     Problem& problem_;
     TimeStepAdaptation& adaptation_;
     params params_;
     butcher_table table_;
-    vector_wrap_type work_, error_;
+    bool combined_error_;
+    vector_wrap_type work_, error_, secondary_error_;
     std::vector<vector_wrap_type> stages_;
     detail::dense_storage<VectorOperations, DenseOutput> dense_;
     std::size_t generation_ = 0;
@@ -292,6 +327,33 @@ private:
     single_step_status status_ = single_step_status::converged;
 
     friend class continuous_integration<explicit_time_step>;
+
+    bool use_combined_error() const
+    {
+        if (table_.error_estimator() != butcher_table::error_estimator_type::dop853_combined)
+        {
+            return false;
+        }
+        if constexpr (detail::has_error_requirement<TimeStepAdaptation>::value)
+        {
+            return adaptation_.requires_error_estimate();
+        }
+        return supports_combined_error;
+    }
+
+    adaptation_status assess(const vector_type& in, scalar_type& next_dt)
+    {
+        if constexpr (supports_combined_error)
+        {
+            if (combined_error_)
+            {
+                return adaptation_.assess(time_, dt_, in, *work_, next_dt,
+                    table_.error_order(), &*error_, &*secondary_error_);
+            }
+        }
+        return adaptation_.assess(time_, dt_, in, *work_, next_dt,
+            table_.error_order(), table_.is_embedded() ? &*error_ : nullptr);
+    }
 
     scalar_type evaluate_dense(scalar_type theta, vector_type& out, std::size_t generation) const
     {
@@ -315,7 +377,7 @@ private:
         else if (table_.has_dense_output())
         {
             operations_.assign(*dense_.previous, out);
-            for (std::size_t i = 0; i < table_.size(); ++i)
+            for (std::size_t i = 0; i < table_.dense_outout_stage_count(); ++i)
             {
                 const auto weight = static_cast<scalar_type>(table_.dense_b(i, theta));
                 if (weight != 0)
@@ -334,6 +396,53 @@ private:
             operations_.add_mul(dt_ * c, *dense_.endpoint_rate, out);
         }
         return time_ + theta * dt_;
+    }
+
+    bool prepare_dense(const vector_type& in)
+    {
+        static_assert(DenseOutput, "Dense output is disabled");
+        // Reuse the snapshot buffer as scratch without disturbing the candidate.
+        auto& scratch = *dense_.previous;
+        for (std::size_t i = table_.size(); i < table_.dense_outout_stage_count(); ++i)
+        {
+            operations_.assign(in, scratch);
+            for (std::size_t j = 0; j < i; ++j)
+            {
+                const auto weight = static_cast<scalar_type>(table_.dense_outout_a(i, j));
+                if (weight != 0)
+                {
+                    operations_.add_mul(dt_ * weight, *stages_[j], scratch);
+                }
+            }
+            if (!operations_.check_is_valid_number(scratch))
+            {
+                return false;
+            }
+            if constexpr (detail::has_set_time<Problem, scalar_type>::value)
+            {
+                problem_.set_time(time_ + dt_ * static_cast<scalar_type>(table_.dense_outout_c(i)));
+            }
+            problem_.apply(scratch, *stages_[i]);
+            if (!operations_.check_is_valid_number(*stages_[i]))
+            {
+                return false;
+            }
+        }
+        if constexpr (detail::has_set_time<Problem, scalar_type>::value)
+        {
+            problem_.set_time(time_ + dt_);
+        }
+        if (!table_.has_dense_output())
+        {
+            problem_.apply(*work_, *dense_.endpoint_rate);
+            if (!operations_.check_is_valid_number(*dense_.endpoint_rate))
+            {
+                return false;
+            }
+        }
+        // Snapshot before publishing the candidate: step.apply(x, x) is supported.
+        operations_.assign(in, scratch);
+        return true;
     }
 
     bool compute(const vector_type& in)
@@ -361,9 +470,14 @@ private:
         }
         // All derivatives are retained; the last stage state can become the candidate.
         operations_.assign(in, work);
-        if (table_.is_embedded())
+        const bool primary_error = table_.is_embedded() || combined_error_;
+        if (primary_error)
         {
             operations_.assign_scalar(scalar_type(0), *error_);
+        }
+        if (combined_error_)
+        {
+            operations_.assign_scalar(scalar_type(0), *secondary_error_);
         }
         for (std::size_t i = 0; i < table_.size(); ++i)
         {
@@ -371,13 +485,19 @@ private:
             {
                 operations_.add_mul(dt_ * static_cast<scalar_type>(table_.b(i)), *stages_[i], work);
             }
-            if (table_.is_embedded() && table_.error_b(i) != 0)
+            if (primary_error && table_.error_b(i) != 0)
             {
                 operations_.add_mul(dt_ * static_cast<scalar_type>(table_.error_b(i)), *stages_[i], *error_);
             }
+            if (combined_error_ && table_.secondary_error_b(i) != 0)
+            {
+                operations_.add_mul(dt_ * static_cast<scalar_type>(table_.secondary_error_b(i)),
+                    *stages_[i], *secondary_error_);
+            }
         }
         return operations_.check_is_valid_number(work) &&
-            (!table_.is_embedded() || operations_.check_is_valid_number(*error_));
+            (!primary_error || operations_.check_is_valid_number(*error_)) &&
+            (!combined_error_ || operations_.check_is_valid_number(*secondary_error_));
     }
 };
 }

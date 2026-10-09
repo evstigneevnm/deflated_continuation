@@ -43,7 +43,7 @@ try
     adaptation_type adaptation(operations, p);
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, decltype(problem), adaptation_type>;
-    for (const auto* method : {"DOPRI54", "BS32"})
+    for (const auto* method : {"RK45", "RK23"})
     {
         step_type step(operations, problem, adaptation, {method});
         nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator(operations, step);
@@ -70,7 +70,7 @@ try
     using constant_type = nmfd::time_steppers::integration::time_step_adaptation_constant<operations_type>;
     using fixed_step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, decltype(problem), constant_type>;
-    for (const auto* method : {"EE", "HE", "BS32", "RK33SSP", "RK43SSP", "RK64SSP", "DOPRI54"})
+    for (const auto* method : {"EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK64SSP", "RK45"})
     {
         double errors[2]{};
         for (int resolution = 0; resolution < 2; ++resolution)
