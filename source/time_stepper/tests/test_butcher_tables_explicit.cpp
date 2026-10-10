@@ -11,6 +11,11 @@ try
     {
         const auto table = make_butcher_table( name );
         require( table.type() == butcher_table::scheme_type::explicit_rk, name );
+        const std::string method( name );
+        require(
+            table.has_fsal() == ( method == "RK23" || method == "RK45" || method == "DOP853" ),
+            "FSAL capability must follow the table coefficients"
+        );
         table_tests::check_order( table, name );
         if ( table.is_embedded() )
         {
@@ -27,6 +32,19 @@ try
     require( upper.type() == butcher_table::scheme_type::irk, "Zero diagonal is not enough for ERK" );
     const butcher_table tiny( { { 0, 1e-30L }, { 0, 0 } }, { .5L, .5L }, 1 );
     require( tiny.type() == butcher_table::scheme_type::irk, "Do not erase small nonzero coefficients" );
+    auto                       endpoint_rows = make_butcher_table( "RK23" );
+    butcher_table::matrix_type almost( 4, butcher_table::vector_type( 4 ) );
+    butcher_table::vector_type weights( 4 );
+    for ( std::size_t i = 0; i < 4; ++i )
+    {
+        weights[i] = endpoint_rows.b( i );
+        for ( std::size_t j = 0; j < 4; ++j )
+        {
+            almost[i][j] = endpoint_rows.a( i, j );
+        }
+    }
+    almost.back()[0] += 1e-16L;
+    require( !butcher_table( almost, weights, 3 ).has_fsal(), "Approximate endpoint rows must not enable FSAL" );
     unsigned int rejected = 0;
     try
     {

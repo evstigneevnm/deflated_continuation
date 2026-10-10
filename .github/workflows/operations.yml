@@ -60,6 +60,44 @@ jobs:
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rk/test_explicit_rk_cpu.bin
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rk/test_explicit_rk_cpu_omp.bin
 
+  timestepper-fsal-cpu:
+    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Verify FSAL lifecycle and memory on serial and OMP
+        run: |
+          make test_explicit_fsal_cpu.bin test_explicit_fsal_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fsal"
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/fsal/test_explicit_fsal_cpu.bin
+          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/fsal/test_explicit_fsal_cpu_omp.bin
+
+  timestepper-fsal-cuda:
+    needs: [timestepper-fsal-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify FSAL lifecycle and memory when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA FSAL: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA FSAL: nvcc unavailable"
+            exit 0
+          fi
+          make test_explicit_fsal_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fsal_cuda" REAL_TYPE=double
+          ./"$BUILD_DIR"/fsal_cuda/test_explicit_fsal_cuda.bin
+
   scfd-transform-reduction-cpu:
     needs: [scfd-vector-operations-cpu]
     runs-on: ubuntu-latest

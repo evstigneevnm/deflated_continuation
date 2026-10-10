@@ -171,6 +171,16 @@ public:
         return error_estimator() != error_estimator_type::none;
     }
 
+    bool has_fsal() const
+    {
+        if ( size() < 2 || type() != scheme_type::explicit_rk || c_.front() != 0 || c_.back() != 1 )
+        {
+            return false;
+        }
+        // Reuse requires structural equality, not approximate coefficient agreement.
+        return a_.back() == b_;
+    }
+
     scalar_type coefficient_tolerance() const
     {
         return tolerance_;

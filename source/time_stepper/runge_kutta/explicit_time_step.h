@@ -79,8 +79,9 @@ public:
 
     struct params
     {
-        std::string  method           = "RK45";
-        unsigned int maximum_attempts = 32;
+        std::string  method              = "RK45";
+        unsigned int maximum_attempts    = 32;
+        bool         reuse_endpoint_rate = false;
     };
     static_assert(
         detail::has_apply<Problem, vector_type>::value,
@@ -114,11 +115,14 @@ public:
             secondary_error_.start_use();
         }
         const auto stage_count = DenseOutput ? table_.dense_outout_stage_count() : table_.size();
+        reuse_endpoint_rate_   = p.reuse_endpoint_rate && table_.has_fsal();
         stages_.reserve( stage_count );
+        stage_slots_.reserve( stage_count );
         for ( std::size_t i = 0; i < stage_count; ++i )
         {
             stages_.emplace_back( operations );
             stages_.back().start_use();
+            stage_slots_.push_back( i );
         }
     }
 
@@ -131,6 +135,10 @@ public:
         if ( !std::isfinite( time ) )
         {
             throw std::invalid_argument( "Nonfinite RK time" );
+        }
+        if ( cached_rate_valid_ && time != cached_rate_time_ )
+        {
+            invalidate_rhs_cache();
         }
         time_ = time;
     }
@@ -212,9 +220,16 @@ public:
         throw std::out_of_range( "RK error component index" );
     }
 
+    void invalidate_rhs_cache()
+    {
+        cached_rate_valid_ = false;
+        ++rhs_generation_;
+    }
+
     void reset()
     {
         adaptation_.reset();
+        invalidate_rhs_cache();
         initialized_ = pending_ = false;
         ++generation_;
         dt_       = 0;
@@ -229,6 +244,9 @@ public:
             throw std::logic_error( "Finalize the pending RK step first" );
         }
         ++generation_;
+        bool first_rate_valid = reuse_endpoint_rate_ && cached_rate_valid_ && cached_rate_time_ == time_;
+        cached_rate_valid_    = false;
+        trial_rhs_generation_ = rhs_generation_;
         if constexpr ( detail::has_error_requirement<TimeStepAdaptation>::value )
         {
             if ( adaptation_.requires_error_estimate() && !table_.has_error_estimate() )
@@ -259,7 +277,7 @@ public:
                 status_ = single_step_status::step_size_underflow;
                 return;
             }
-            if ( !compute( in ) )
+            if ( !compute( in, first_rate_valid ) )
             {
                 // No assessment/callback may inspect an invalid numerical candidate.
                 if ( adaptation_.reject_step( dt_ ) != adaptation_status::rejected )
@@ -314,7 +332,15 @@ public:
             throw std::invalid_argument( "Committed time is outside the pending RK step" );
         }
         adaptation_.update( outcome, committed_time, elapsed, state );
-        pending_ = false;
+        pending_           = false;
+        cached_rate_valid_ = reuse_endpoint_rate_ && outcome == adaptation_status::accepted &&
+                             committed_time == time_ + dt_ && trial_rhs_generation_ == rhs_generation_;
+        if ( cached_rate_valid_ )
+        {
+            // Dense output has expired; only the logical buffer roles change.
+            std::swap( stage_slots_.front(), stage_slots_[table_.size() - 1] );
+            cached_rate_time_ = committed_time;
+        }
     }
 
 private:
@@ -329,14 +355,28 @@ private:
     bool                                                 combined_error_;
     vector_wrap_type                                     work_, error_, secondary_error_;
     std::vector<vector_wrap_type>                        stages_;
+    std::vector<std::size_t>                             stage_slots_;
     detail::dense_storage<VectorOperations, DenseOutput> dense_;
-    std::size_t                                          generation_ = 0;
+    std::size_t                                          generation_     = 0;
+    std::size_t                                          rhs_generation_ = 0, trial_rhs_generation_ = 0;
+    scalar_type                                          cached_rate_time_    = 0;
+    bool                                                 reuse_endpoint_rate_ = false, cached_rate_valid_ = false;
     scalar_type                                          time_ = 0, target_ = 1, dt_ = 0;
     unsigned int                                         attempts_    = 0;
     bool                                                 initialized_ = false, pending_ = false;
     single_step_status                                   status_ = single_step_status::idle;
 
     friend class continuous_integration<explicit_time_step>;
+
+    vector_type &stage( std::size_t i )
+    {
+        return *stages_[stage_slots_[i]];
+    }
+
+    const vector_type &stage( std::size_t i ) const
+    {
+        return *stages_[stage_slots_[i]];
+    }
 
     bool use_combined_error() const
     {
@@ -394,7 +434,7 @@ private:
                 const auto weight = static_cast<scalar_type>( table_.dense_b( i, theta ) );
                 if ( weight != 0 )
                 {
-                    operations_.add_mul( dt_ * weight, *stages_[i], out );
+                    operations_.add_mul( dt_ * weight, stage( i ), out );
                 }
             }
         }
@@ -403,7 +443,7 @@ private:
             const auto a = theta * theta * ( 3 - 2 * theta ), b = theta * ( 1 - theta ) * ( 1 - theta ),
                        c = -theta * theta * ( 1 - theta );
             operations_.assign_mul( 1 - a, *dense_.previous, a, *work_, out );
-            operations_.add_mul( dt_ * b, *stages_[0], out );
+            operations_.add_mul( dt_ * b, stage( 0 ), out );
             operations_.add_mul( dt_ * c, *dense_.endpoint_rate, out );
         }
         return time_ + theta * dt_;
@@ -422,7 +462,7 @@ private:
                 const auto weight = static_cast<scalar_type>( table_.dense_outout_a( i, j ) );
                 if ( weight != 0 )
                 {
-                    operations_.add_mul( dt_ * weight, *stages_[j], scratch );
+                    operations_.add_mul( dt_ * weight, stage( j ), scratch );
                 }
             }
             if ( !operations_.check_is_valid_number( scratch ) )
@@ -433,8 +473,8 @@ private:
             {
                 problem_.set_time( time_ + dt_ * static_cast<scalar_type>( table_.dense_outout_c( i ) ) );
             }
-            problem_.apply( scratch, *stages_[i] );
-            if ( !operations_.check_is_valid_number( *stages_[i] ) )
+            problem_.apply( scratch, stage( i ) );
+            if ( !operations_.check_is_valid_number( stage( i ) ) )
             {
                 return false;
             }
@@ -456,27 +496,35 @@ private:
         return true;
     }
 
-    bool compute( const vector_type &in )
+    bool compute( const vector_type &in, bool &first_rate_valid )
     {
         auto &work = *work_;
         for ( std::size_t i = 0; i < table_.size(); ++i )
         {
+            if constexpr ( detail::has_set_time<Problem, scalar_type>::value )
+            {
+                problem_.set_time( time_ + dt_ * static_cast<scalar_type>( table_.c( i ) ) );
+            }
+            if ( i == 0 && first_rate_valid )
+            {
+                continue;
+            }
             operations_.assign( in, work );
             for ( std::size_t j = 0; j < i; ++j )
             {
                 if ( table_.a( i, j ) != 0 )
                 {
-                    operations_.add_mul( dt_ * static_cast<scalar_type>( table_.a( i, j ) ), *stages_[j], work );
+                    operations_.add_mul( dt_ * static_cast<scalar_type>( table_.a( i, j ) ), stage( j ), work );
                 }
             }
-            if constexpr ( detail::has_set_time<Problem, scalar_type>::value )
-            {
-                problem_.set_time( time_ + dt_ * static_cast<scalar_type>( table_.c( i ) ) );
-            }
-            problem_.apply( work, *stages_[i] );
-            if ( !operations_.check_is_valid_number( *stages_[i] ) )
+            problem_.apply( work, stage( i ) );
+            if ( !operations_.check_is_valid_number( stage( i ) ) )
             {
                 return false;
+            }
+            if ( i == 0 )
+            {
+                first_rate_valid = reuse_endpoint_rate_;
             }
         }
         // All derivatives are retained; the last stage state can become the candidate.
@@ -494,16 +542,16 @@ private:
         {
             if ( table_.b( i ) != 0 )
             {
-                operations_.add_mul( dt_ * static_cast<scalar_type>( table_.b( i ) ), *stages_[i], work );
+                operations_.add_mul( dt_ * static_cast<scalar_type>( table_.b( i ) ), stage( i ), work );
             }
             if ( primary_error && table_.error_b( i ) != 0 )
             {
-                operations_.add_mul( dt_ * static_cast<scalar_type>( table_.error_b( i ) ), *stages_[i], *error_ );
+                operations_.add_mul( dt_ * static_cast<scalar_type>( table_.error_b( i ) ), stage( i ), *error_ );
             }
             if ( combined_error_ && table_.secondary_error_b( i ) != 0 )
             {
                 operations_.add_mul(
-                    dt_ * static_cast<scalar_type>( table_.secondary_error_b( i ) ), *stages_[i], *secondary_error_
+                    dt_ * static_cast<scalar_type>( table_.secondary_error_b( i ) ), stage( i ), *secondary_error_
                 );
             }
         }

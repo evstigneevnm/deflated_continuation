@@ -374,6 +374,14 @@ enum class single_step_status
 Construction and `reset()` report `idle`: no numerical step result is available.
 A successful `apply()` reports `converged`; `finalize()` retains that result status.
 
+FSAL reuse is optional (`reuse_endpoint_rate`, default `false`). Derive capability
+from the Butcher coefficients. Reuse a finite base derivative during retries;
+promote an endpoint only after an unchanged, full `accepted` commit. Exchange
+logical stage-buffer indices, without copying or allocating trajectory vectors.
+Invalidate after modified/shortened endpoints, failed commits, resets, or time
+discontinuities. Call `invalidate_rhs_cache()` after independent state/RHS changes;
+it preserves adaptation history and prevents promotion of a pending stale endpoint.
+
 The `continuous_integration` class is a lightweight structure the has the follwing life time. Dense output describes the pending numerical step and remains valid until the next apply(), reset(), or finalize(). External event processing must finish before finalization. It should provide a structure with:
 
 ```cpp

@@ -60,9 +60,37 @@ Coefficient sources: [SSP embedded pairs](https://imrefekete.web.elte.hu/files/2
 [Dormand-Prince method](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.RK45.html).
 Rooted-tree tests check nonlinear order, not just a scalar stability polynomial.
 
-This pass does not implement implicit/IMEX stepping or FSAL reuse.
+This pass does not implement implicit/IMEX stepping.
 Adaptive initialization uses the configured initial step and bounded rejection,
 not an extra initial derivative evaluation.
+
+## FSAL Reuse
+
+Endpoint derivative reuse is opt-in for RK23, RK45, and the extended DOP853 table:
+
+```cpp
+step_type::params p;
+p.method = "RK45";
+p.reuse_endpoint_rate = true;
+step_type step(operations, problem, adaptation, p);
+```
+
+Consecutive inputs must follow the committed trajectory. After changing the RHS,
+parameters, forcing, or input state independently, call `step.invalidate_rhs_cache()`
+or `step.reset()`. Explicit invalidation preserves adaptation history and blocks
+promotion of an already pending endpoint. An unchanged, full `accepted` commit
+promotes the endpoint derivative by exchanging logical stage-buffer indices;
+there are no additional state vectors or vector copies. Modified/shortened
+endpoints, failed commits, resets, and time discontinuities discard reuse.
+Internal retries retain a finite starting derivative, never a rejected endpoint.
+Problems must provide deterministic RHS evaluations for fixed state, time, and
+parameters; leave reuse disabled for evaluations with untracked mutable effects.
+Dense-output views expire before the stage-buffer roles change.
+
+`test_explicit_fsal_{cpu,cpu_omp,cuda}.bin` checks RHS counts, cached/uncached
+agreement, memory, invalidation, retries, and external section refinement.
+Separate `timestepper-fsal-cpu` and capability-gated `timestepper-fsal-cuda`
+workflow jobs run these tests.
 
 ## Dense Output
 
