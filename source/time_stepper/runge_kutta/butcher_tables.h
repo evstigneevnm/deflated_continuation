@@ -60,6 +60,15 @@ inline butcher_table make_butcher_table( const std::string &name )
             2
         };
     }
+    if ( name == "RK4" )
+    {
+        return {
+            { { 0, 0, 0, 0 }, { .5L, 0, 0, 0 }, { 0, .5L, 0, 0 }, { 0, 0, 1, 0 } },
+            { 1.L / 6, 1.L / 3, 1.L / 3, 1.L / 6 },
+            4,
+            { 0, .5L, .5L, 1 }
+        };
+    }
     if ( name == "RK45" )
     {
         return {

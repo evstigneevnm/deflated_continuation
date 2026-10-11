@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare a completed NMFD Lorenz trajectory with the matching SciPy RK method."""
+"""Compare a Lorenz trajectory with matching SciPy RK or NumPy classical RK4."""
 
 import argparse
 import json
@@ -27,8 +27,8 @@ def read_trajectory(path):
         raise ValueError("Trajectory metadata and footer must be objects")
     if (metadata.get("format") != "nmfd.lorenz_trajectory.v1"
             or metadata.get("problem") != "lorenz"
-            or not isinstance(metadata.get("method"), str) or metadata["method"] not in SCIPY_METHODS):
-        raise ValueError("Expected a Lorenz trajectory using RK45, RK23 or DOP853")
+            or not isinstance(metadata.get("method"), str) or metadata["method"] not in SCIPY_METHODS + ("RK4",)):
+        raise ValueError("Expected a Lorenz trajectory using RK45, RK23, DOP853 or RK4")
     if metadata["method"] == "DOP853" and metadata.get("controller") != "scipy":
         raise ValueError("Adaptive DOP853 requires scipy controller metadata")
     data = np.loadtxt(path, comments="#", ndmin=2)
@@ -47,6 +47,19 @@ def read_trajectory(path):
             or not np.array_equal(data[0, 1:], initial) or not (np.diff(data[:, 0]) > 0).all()):
         raise ValueError("Trajectory endpoints, initial state, or time ordering are inconsistent")
     adaptation = metadata["adaptation"]
+    if not isinstance(adaptation, dict):
+        raise ValueError("Invalid timestep adaptation metadata")
+    if metadata["method"] == "RK4":
+        if metadata.get("controller") != "constant":
+            raise ValueError("Classical RK4 requires constant controller metadata")
+        step = adaptation.get("step_size")
+        if isinstance(step, bool) or not isinstance(step, (int, float)) or not np.isfinite(step) or step <= 0:
+            raise ValueError("Invalid constant step size")
+        expected_times = data[:-1, 0] + np.minimum(step, interval[1] - data[:-1, 0])
+        tolerance = 4 * np.finfo(float).eps * max(1, abs(interval[0]), abs(interval[1]))
+        if not np.allclose(data[1:, 0], expected_times, rtol=0, atol=tolerance):
+            raise ValueError("RK4 time grid differs from the constant step size")
+        return metadata, data
     settings = [adaptation[key] for key in
                 ("relative_tolerance", "absolute_tolerance", "initial_step", "minimum_step", "maximum_step")]
     if not np.isfinite(settings).all() or min(settings) <= 0 or settings[3] > settings[4]:
@@ -61,7 +74,21 @@ def lorenz_rhs(time, state, sigma, rho, beta, epsilon, delta):
             -beta * z + x * y - delta]
 
 
-def save_plots(base, time, actual, reference, error, method, scipy_method):
+def rk4_reference(time, initial, parameters, step_size):
+    result = np.empty((len(time), 3))
+    result[0] = initial
+    for i, start in enumerate(time[:-1]):
+        state = result[i]
+        step = min(step_size, time[-1] - start)
+        k1 = np.asarray(lorenz_rhs(start, state, *parameters))
+        k2 = np.asarray(lorenz_rhs(start + step / 2, state + step * k1 / 2, *parameters))
+        k3 = np.asarray(lorenz_rhs(start + step / 2, state + step * k2 / 2, *parameters))
+        k4 = np.asarray(lorenz_rhs(start + step, state + step * k3, *parameters))
+        result[i + 1] = state + step * (k1 + 2 * k2 + 2 * k3 + k4) / 6
+    return result
+
+
+def save_plots(base, time, actual, reference, error, method, reference_method):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -69,7 +96,7 @@ def save_plots(base, time, actual, reference, error, method, scipy_method):
     figure, axes = plt.subplots(3, 1, figsize=(9, 8), sharex=True)
     for component, axis in enumerate(axes):
         axis.plot(time, actual[:, component], label=f"NMFD {method}", color="black")
-        axis.plot(time, reference[:, component], label=f"SciPy {scipy_method}", color="tab:blue", linestyle="--")
+        axis.plot(time, reference[:, component], label=reference_method, color="tab:blue", linestyle="--")
         axis.set_ylabel("xyz"[component])
         axis.grid(alpha=0.25)
     axes[0].legend()
@@ -82,7 +109,7 @@ def save_plots(base, time, actual, reference, error, method, scipy_method):
     for component in range(3):
         axis.plot(time, np.abs(error[:, component]), label="xyz"[component])
     axis.set_xlabel("Time")
-    axis.set_ylabel(f"Absolute difference from SciPy {scipy_method}")
+    axis.set_ylabel(f"Absolute difference from {reference_method}")
     axis.grid(alpha=0.25)
     axis.legend()
     figure.tight_layout()
@@ -95,25 +122,33 @@ def compare(args):
     time, actual = data[:, 0], data[:, 1:]
     parameters = tuple(metadata["parameters"][key] for key in ("sigma", "rho", "beta", "epsilon", "delta"))
     adaptation = metadata["adaptation"]
-    scipy_method = metadata["method"]
-    reference = solve_ivp(
-        lorenz_rhs, (time[0], time[-1]), metadata["initial_state"], args=parameters,
-        method=scipy_method, t_eval=time, rtol=args.reference_rtol, atol=args.reference_atol,
-        first_step=min(adaptation["initial_step"], time[-1] - time[0]),
-        max_step=adaptation["maximum_step"])
-    if not reference.success or reference.y.shape != actual.T.shape or not np.isfinite(reference.y).all():
-        raise ValueError("SciPy reference integration failed: " + reference.message)
-    expected = reference.y.T
+    if metadata["method"] == "RK4":
+        expected = rk4_reference(time, metadata["initial_state"], parameters, adaptation["step_size"])
+        reference_method = "NumPy classical RK4"
+        reference_rhs_calls = 4 * (len(time) - 1)
+        if not np.isfinite(expected).all():
+            raise ValueError("NumPy RK4 reference integration failed")
+    else:
+        reference = solve_ivp(
+            lorenz_rhs, (time[0], time[-1]), metadata["initial_state"], args=parameters,
+            method=metadata["method"], t_eval=time, rtol=args.reference_rtol, atol=args.reference_atol,
+            first_step=min(adaptation["initial_step"], time[-1] - time[0]),
+            max_step=adaptation["maximum_step"])
+        if not reference.success or reference.y.shape != actual.T.shape or not np.isfinite(reference.y).all():
+            raise ValueError("SciPy reference integration failed: " + reference.message)
+        expected = reference.y.T
+        reference_method = f"SciPy {metadata['method']}"
+        reference_rhs_calls = reference.nfev
     error = actual - expected
     scale = args.check_atol + args.check_rtol * np.maximum(np.abs(actual), np.abs(expected))
     maximum_scaled_error = float(np.max(np.abs(error) / scale))
     within_tolerance = maximum_scaled_error <= 1
     summary = {
         "cpp_metadata": metadata,
-        "reference_method": f"SciPy {scipy_method}",
-        "reference_rtol": args.reference_rtol,
-        "reference_atol": args.reference_atol,
-        "reference_rhs_calls": reference.nfev,
+        "reference_method": reference_method,
+        "reference_rtol": args.reference_rtol if metadata["method"] in SCIPY_METHODS else None,
+        "reference_atol": args.reference_atol if metadata["method"] in SCIPY_METHODS else None,
+        "reference_rhs_calls": reference_rhs_calls,
         "accepted_cpp_steps": len(data) - 1,
         "check_rtol": args.check_rtol,
         "check_atol": args.check_atol,
@@ -131,7 +166,7 @@ def compare(args):
     base.with_name(base.name + "_summary.json").write_text(
         json.dumps(summary, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     if not args.no_plots:
-        save_plots(base, time, actual, expected, error, metadata["method"], scipy_method)
+        save_plots(base, time, actual, expected, error, metadata["method"], reference_method)
     status = "DIAGNOSTIC" if args.diagnostic_only else "PASS" if within_tolerance else "FAIL"
     print(f"Lorenz {status}: {len(data)} samples, max scaled difference {maximum_scaled_error:.6g}")
     print("Maximum absolute differences (x, y, z):", *summary["maximum_absolute_error"])

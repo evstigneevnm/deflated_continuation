@@ -7,7 +7,7 @@ using table_tests::require;
 int main()
 try
 {
-    for ( const auto *name : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK64SSP", "RK45", "DOP853" } )
+    for ( const auto *name : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK4", "RK64SSP", "RK45", "DOP853" } )
     {
         const auto table = make_butcher_table( name );
         require( table.type() == butcher_table::scheme_type::explicit_rk, name );
@@ -155,6 +155,16 @@ try
         ++rejected;
     }
     require( rejected == 5, "Malformed dense extensions must be rejected" );
+    const auto rk4 = make_butcher_table( "RK4" );
+    require(
+        rk4.size() == 4 && rk4.order() == 4 && !rk4.has_error_estimate() && !rk4.has_fsal() && !rk4.has_dense_output(),
+        "Classical RK4 has no embedded estimator, FSAL, or native extension"
+    );
+    require(
+        rk4.a( 1, 0 ) == .5L && rk4.a( 2, 1 ) == .5L && rk4.a( 3, 2 ) == 1.L && rk4.b( 0 ) == 1.L / 6 &&
+            rk4.b( 1 ) == 1.L / 3 && rk4.b( 2 ) == 1.L / 3 && rk4.b( 3 ) == 1.L / 6,
+        "Classical RK4 rational coefficients"
+    );
     const auto dp = make_butcher_table( "RK45" );
     require(
         dp.size() == 7 && dp.order() == 5 && dp.embedded_order() == 4,

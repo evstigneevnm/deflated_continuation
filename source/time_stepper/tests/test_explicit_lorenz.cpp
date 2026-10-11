@@ -72,7 +72,7 @@ try
     using constant_type = nmfd::time_steppers::integration::time_step_adaptation_constant<operations_type>;
     using fixed_step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, decltype( problem ), constant_type>;
-    for ( const auto *method : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK64SSP", "RK45" } )
+    for ( const auto *method : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK4", "RK64SSP", "RK45" } )
     {
         double errors[2]{};
         for ( int resolution = 0; resolution < 2; ++resolution )
@@ -100,7 +100,7 @@ try
             throw std::runtime_error( "lorenz: refinement did not improve " + std::string( method ) );
         }
     }
-    std::cout << "lorenz: adaptive restart/reference and seven fixed RK methods PASS\n";
+    std::cout << "lorenz: adaptive restart/reference and eight fixed RK methods PASS\n";
 }
 catch ( const std::exception &e )
 {

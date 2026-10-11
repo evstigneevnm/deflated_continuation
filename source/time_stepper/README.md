@@ -9,7 +9,7 @@ the supplied Makefile. Scratch vectors and RK stages are allocated once and reus
 
 ## Explicit RK
 
-- `runge_kutta/butcher_tables.h`: EE, HE, RK23, RK33SSP, RK43SSP, RK64SSP, RK45,
+- `runge_kutta/butcher_tables.h`: EE, HE, RK23, RK33SSP, RK43SSP, RK4, RK64SSP, RK45,
   DOP853,
   plus separately tested implicit/IMEX coefficient tables.
 - `runge_kutta/explicit_time_step.h`: stage evaluation and bounded retry loop.
@@ -43,6 +43,8 @@ Table names:
 - `RK23` is Bogacki-Shampine 3(2), stored with four derivatives including the
   endpoint derivative. Its embedded state error scales as `h^3`.
 - `RK45` is Dormand-Prince 5(4), stored with seven stages.
+- `RK4` is classical four-stage, fourth-order Runge-Kutta, without an embedded
+  estimator or FSAL. Use constant adaptation; embedded-error controllers reject it.
 - `DOP853` supplies the eighth-order primary formula, stored with twelve primary
   stages plus the endpoint derivative, and a combined E5/E3 estimator with error
   exponent eight. Use constant or SciPy adaptation. Its native seventh-order dense
@@ -115,6 +117,7 @@ The stepper must stay alive at the same address while a view is used.
 | HE | Native quadratic | 2 | 1 | 0 |
 | RK23 | Native cubic | 3 | 1 | 0 |
 | RK45 | Shampine quartic | 4 | 1 | 0 |
+| RK4 | Endpoint cubic Hermite | 3 | 2 | 1 |
 | DOP853 | Native degree-seven polynomial | 7 | 4 | 3 |
 | RK33SSP, RK43SSP, RK64SSP | Endpoint cubic Hermite | 3 | 2 | 1 |
 
@@ -302,7 +305,24 @@ integration interval, backend, and tolerances in a JSON comment header, followed
 by `time x y z` rows. A completion footer identifies successfully finished runs;
 the comparator rejects incomplete, nonfinite, or inconsistent data.
 
-The Python script uses the saved method name directly: RK45, RK23, or DOP853.
+The Python script uses the saved method name directly for SciPy RK45, RK23, or DOP853.
+Classical RK4 instead uses an independent NumPy implementation on the recorded
+constant-step grid, including a clipped final step. It produces the same
+trajectory, difference, summary, and plot files; reference tolerances do not apply
+to this fixed-step comparison. Analytical order tests and high-accuracy ODE
+fixtures separately verify numerical accuracy.
+
+```sh
+OMP_NUM_THREADS=8 ./build/test_explicit_lorenz_simulation_cpu_omp.bin \
+     1 build/lorenz_rk4.dat RK4 constant 0.001
+python3 source/time_stepper/tests/compare_explicit_lorenz_simulation.py \
+     build/lorenz_rk4.dat
+```
+
+RK4 defaults to constant adaptation with step size `0.001`. The optional final
+argument sets the constant step or the initial step for adaptive methods.
+`timestepper-rk4-simulation-python-cpu` separately checks serial/OMP recordings,
+Python agreement, endpoint clipping, and rejection of adaptive RK4 settings.
 It uses tighter tolerances and samples at the C++ output times. Adaptive controllers
 differ, so matching accepted-step counts or bitwise-identical states is not required.
 It writes `_python.dat`, `_error.dat`, `_summary.json`, `_comparison.png`, and

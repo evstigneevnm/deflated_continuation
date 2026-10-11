@@ -2,6 +2,7 @@
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #ifdef TEST_VECTOR_BACKEND_CUDA
 #    include <scfd/backend/cuda.h>
 using backend_type = scfd::backend::cuda;
@@ -109,7 +110,7 @@ static_assert( !has_dense<disabled_step>::value && has_dense<dense_step>::value 
 
 void check_methods( operations_type &ops, vector_type &in, vector_type &out, vector_type &sample )
 {
-    for ( const auto *method : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK64SSP", "RK45" } )
+    for ( const auto *method : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK4", "RK64SSP", "RK45" } )
     {
         for ( const double direction : { 1., -1. } )
         {
@@ -124,7 +125,11 @@ void check_methods( operations_type &ops, vector_type &in, vector_type &out, vec
                     nmfd::time_steppers::runge_kutta::explicit_time_step<counting_operations, growth, fixed_type, true>;
                 {
                     step_type step( counted, problem, fixed, { method } );
-                    order               = step.dense_output_order();
+                    order = step.dense_output_order();
+                    if ( std::string( method ) == "RK4" )
+                    {
+                        require( order == 3, "RK4 uses third-order Hermite dense output" );
+                    }
                     const auto expected = step.table().size() + 1 + step.table().is_embedded() +
                                           ( step.table().has_dense_output() ? 1 : 2 );
                     require( counted.live == expected, "Dense vector storage budget" );

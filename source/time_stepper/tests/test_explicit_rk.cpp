@@ -336,6 +336,16 @@ void test_storage( const vector_type &initial, vector_type &result )
         require( refused, "Unembedded error access must be rejected" );
     }
     require( operations.live_vectors == 0, "Unembedded RK storage release" );
+    {
+        using fixed_step =
+            nmfd::time_steppers::runge_kutta::explicit_time_step<counting_operations, forced_growth, constant_type>;
+        constant_type constant( { .1 } );
+        fixed_step    step( operations, problem, constant, { "RK4" } );
+        require( operations.live_vectors == 5, "RK4 owns four derivatives and work, no embedded error vector" );
+        step.apply( initial, result );
+        require( step.get_status() == nmfd::time_steppers::single_step_status::converged, "Classical RK4 fixed step" );
+    }
+    require( operations.live_vectors == 0, "RK4 storage release" );
 }
 
 void test_rk23_error( operations_type &operations, const vector_type &initial, vector_type &result )
@@ -411,7 +421,7 @@ try
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, constant_type>;
     const auto exact = 2 * std::exp( .5 ) - 1.5;
-    for ( const auto *name : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK64SSP", "RK45" } )
+    for ( const auto *name : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK4", "RK64SSP", "RK45" } )
     {
         double errors[2]{};
         for ( int level = 0; level < 2; ++level )
@@ -547,6 +557,13 @@ try
     require(
         value == 77 && no_error.get_status() == nmfd::time_steppers::single_step_status::error_estimate_unavailable,
         "Do not adapt an unembedded method using a zero error vector"
+    );
+    adaptive_step rk4_no_error( operations, problem, adaptation, { "RK4" } );
+    rk4_no_error.apply( initial, result );
+    operations.get( result, &value );
+    require(
+        value == 77 && rk4_no_error.get_status() == nmfd::time_steppers::single_step_status::error_estimate_unavailable,
+        "RK4 cannot use embedded-error adaptation without an estimator"
     );
     adaptive_step limited( operations, problem, adaptation, { "RK45", 1 } );
     limited.reset();

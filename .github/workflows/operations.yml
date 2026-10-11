@@ -372,6 +372,54 @@ jobs:
             ${{ env.BUILD_DIR }}/lorenz_simulation/*.json
             ${{ env.BUILD_DIR }}/lorenz_simulation/*.png
 
+  timestepper-rk4-simulation-python-cpu:
+    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-rk-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted CPU and Python dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends python3-numpy python3-scipy python3-matplotlib
+          fi
+      - name: Compare classical RK4 Lorenz trajectories with NumPy
+        run: |
+          SIMULATION_BUILD="$BUILD_DIR/rk4_simulation"
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            PYTHON=/usr/bin/python3
+          else
+            PYTHON=python3
+            if ! "$PYTHON" -c 'import numpy, scipy, matplotlib' >/dev/null 2>&1; then
+              PYTHON="$HOME/anaconda3/bin/python"
+            fi
+          fi
+          export MPLCONFIGDIR="$SIMULATION_BUILD/matplotlib"
+          "$PYTHON" source/time_stepper/tests/test_compare_explicit_lorenz_simulation.py
+          make test_explicit_lorenz_simulation_cpu.bin test_explicit_lorenz_simulation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$SIMULATION_BUILD"
+          for backend in cpu cpu_omp; do
+            TRAJECTORY="$SIMULATION_BUILD/lorenz_${backend}_RK4.dat"
+            OMP_NUM_THREADS=8 "$SIMULATION_BUILD/test_explicit_lorenz_simulation_${backend}.bin" 0.1003 "$TRAJECTORY" RK4 constant 0.0005
+            "$PYTHON" source/time_stepper/tests/compare_explicit_lorenz_simulation.py "$TRAJECTORY"
+            if OMP_NUM_THREADS=8 "$SIMULATION_BUILD/test_explicit_lorenz_simulation_${backend}.bin" 0.1 "$TRAJECTORY.invalid" RK4 scipy; then
+              echo "RK4 must reject embedded-error adaptation"
+              exit 1
+            fi
+          done
+      - name: Save RK4 trajectories, comparisons, and plots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: timestepper-rk4-simulation
+          path: |
+            ${{ env.BUILD_DIR }}/rk4_simulation/*.dat
+            ${{ env.BUILD_DIR }}/rk4_simulation/*.json
+            ${{ env.BUILD_DIR }}/rk4_simulation/*.png
+
   timestepper-explicit-rossler-cpu:
     needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
     runs-on: ubuntu-latest

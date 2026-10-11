@@ -171,7 +171,7 @@ try
     using fixed_type = nmfd::time_steppers::integration::time_step_adaptation_constant<operations_type>;
     using fixed_step =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, decltype( problem ), fixed_type, true>;
-    for ( const auto *method : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK64SSP", "RK45", "DOP853" } )
+    for ( const auto *method : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK4", "RK64SSP", "RK45", "DOP853" } )
     {
         double errors[2]{};
         for ( int level = 0; level < 2; ++level )
@@ -216,7 +216,7 @@ try
     }
     using scipy_type = nmfd::time_steppers::integration::time_step_adaptation_scipy<operations_type>;
     check_adaptive<scipy_type>( ops, problem, *initial, *result, "DOP853" );
-    std::cout << "lorenz: dense output, eight fixed methods, adaptive restart and external endpoint refinement PASS\n";
+    std::cout << "lorenz: dense output, nine fixed methods, adaptive restart and external endpoint refinement PASS\n";
 }
 catch ( const std::exception &e )
 {

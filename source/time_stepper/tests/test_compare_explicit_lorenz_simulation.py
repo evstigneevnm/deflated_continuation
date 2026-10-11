@@ -81,6 +81,49 @@ class LorenzSimulationComparisonTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "controller"):
             comparison.read_trajectory(self.path)
 
+    def test_rk4_uses_numpy_instead_of_a_fictitious_scipy_solver(self):
+        self.metadata.update(method="RK4", controller="constant", adaptation={"step_size": 0.01})
+        self.write()
+        args = SimpleNamespace(trajectory=self.path, reference_rtol=1e-12, reference_atol=1e-14,
+                               check_rtol=1e-7, check_atol=1e-8, no_plots=True, diagnostic_only=True)
+        with mock.patch.object(comparison, "solve_ivp") as solver:
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(comparison.compare(args), 0)
+        solver.assert_not_called()
+        summary = json.loads(self.path.with_name("trajectory_summary.json").read_text(encoding="utf-8"))
+        self.assertEqual(summary["reference_method"], "NumPy classical RK4")
+        self.assertEqual(summary["reference_rhs_calls"], 4)
+        self.assertIsNone(summary["reference_rtol"])
+
+    def test_rk4_rejects_adaptive_controller(self):
+        self.metadata.update(method="RK4", controller="scipy", adaptation={"step_size": 0.01})
+        self.write()
+        with self.assertRaisesRegex(ValueError, "constant controller"):
+            comparison.read_trajectory(self.path)
+
+    def test_rk4_checks_step_size_and_grid(self):
+        self.metadata.update(method="RK4", controller="constant")
+        for step in (0, -0.01, True, None, float("nan"), float("inf"), 0.001):
+            with self.subTest(step=step):
+                self.metadata["adaptation"] = {"step_size": step}
+                self.write()
+                with self.assertRaisesRegex(ValueError, "step size"):
+                    comparison.read_trajectory(self.path)
+
+    def test_adaptation_metadata_requires_an_object(self):
+        self.metadata["adaptation"] = []
+        self.write()
+        with self.assertRaisesRegex(ValueError, "adaptation"):
+            comparison.read_trajectory(self.path)
+
+    def test_numpy_rk4_reference_has_fourth_order(self):
+        errors = []
+        for count in (10, 20, 40):
+            time = np.linspace(0, 1, count + 1)
+            values = comparison.rk4_reference(time, [0, 0, 1], (0, 0, 1, 0, 0), 1 / count)
+            errors.append(abs(values[-1, 2] - np.exp(-1)))
+        self.assertTrue(all(14 < coarse / fine < 18 for coarse, fine in zip(errors, errors[1:])))
+
     def test_incomplete_trajectory_is_rejected(self):
         self.write(complete=False)
         with self.assertRaisesRegex(ValueError, "completion footer"):

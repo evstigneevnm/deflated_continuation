@@ -25,9 +25,12 @@ constexpr const char *backend_name = "serial_cpu";
 #include <common/scfd_vector_operations.h>
 #include <contrib/json/nlohmann/json.hpp>
 #include <time_stepper/integration/time_integrator.h>
+#include <time_stepper/integration/time_step_adaptation_constant.h>
 #include <time_stepper/integration/time_step_adaptation_matlab.h>
 #include <time_stepper/integration/time_step_adaptation_scipy.h>
 #include <time_stepper/runge_kutta/explicit_time_step.h>
+
+using operations_type = scfd_vector_operations<backend_type, double>;
 
 namespace nmfd
 {
@@ -121,10 +124,10 @@ private:
 
 template <class Adaptation>
 void run_simulation(
-    double end_time, const std::string &filename, const std::string &method, const std::string &controller
+    operations_type &operations, double end_time, const std::string &filename, const std::string &method,
+    const std::string &controller, Adaptation &adaptation, const nlohmann::json &adaptation_settings
 )
 {
-    using operations_type = scfd_vector_operations<backend_type, double>;
     using problem_type    = nmfd::time_steppers::tests::explicit_lorenz_problem<operations_type>;
     using adaptation_type = Adaptation;
     using step_type =
@@ -133,7 +136,6 @@ void run_simulation(
     using integrator_type =
         nmfd::time_steppers::integration::time_integrator<operations_type, step_type, external_type>;
 
-    operations_type                            operations( 3 );
     problem_type                               problem;
     nmfd::detail::vector_wrap<operations_type> initial( operations ), result( operations );
     initial.start_use();
@@ -141,10 +143,6 @@ void run_simulation(
     const scfd::static_vec::vec<double, 3> initial_values{ 2.2, 30.5, 2.5 };
     operations.set( initial_values.d, *initial );
 
-    typename adaptation_type::params adaptation_params;
-    adaptation_params.relative_tolerance = 1e-10;
-    adaptation_params.absolute_tolerance = 1e-12;
-    adaptation_type      adaptation( operations, adaptation_params );
     step_type            step( operations, problem, adaptation, { method } );
     const nlohmann::json metadata = {
         { "format", "nmfd.lorenz_trajectory.v1" },
@@ -161,12 +159,7 @@ void run_simulation(
             { "beta", problem.beta },
             { "epsilon", problem.epsilon },
             { "delta", problem.delta } } },
-        { "adaptation",
-          { { "relative_tolerance", adaptation_params.relative_tolerance },
-            { "absolute_tolerance", adaptation_params.absolute_tolerance },
-            { "initial_step", adaptation_params.initial_step },
-            { "minimum_step", adaptation_params.minimum_step },
-            { "maximum_step", adaptation_params.maximum_step } } }
+        { "adaptation", adaptation_settings }
     };
     external_type   external( operations, { filename }, metadata );
     integrator_type integrator( operations, step, {}, &external );
@@ -182,43 +175,91 @@ void run_simulation(
               << " accepted steps, final time " << end_time << ", trajectory " << filename << '\n';
 }
 
+template <class Adaptation>
+void run_adaptive_simulation(
+    operations_type &operations, double end_time, const std::string &filename, const std::string &method,
+    const std::string &controller, double initial_step
+)
+{
+    typename Adaptation::params p;
+    p.relative_tolerance = 1e-10;
+    p.absolute_tolerance = 1e-12;
+    if ( initial_step > 0 )
+    {
+        p.initial_step = initial_step;
+    }
+    Adaptation adaptation( operations, p );
+    run_simulation(
+        operations, end_time, filename, method, controller, adaptation,
+        { { "relative_tolerance", p.relative_tolerance },
+          { "absolute_tolerance", p.absolute_tolerance },
+          { "initial_step", p.initial_step },
+          { "minimum_step", p.minimum_step },
+          { "maximum_step", p.maximum_step } }
+    );
+}
+
+double positive_time( const std::string &value )
+{
+    std::size_t  parsed = 0;
+    const double time   = std::stod( value, &parsed );
+    if ( parsed != value.size() || !std::isfinite( time ) || time <= 0 )
+    {
+        throw std::invalid_argument( "Integration time and step size must be positive and finite" );
+    }
+    return time;
+}
+
 int main( int argc, char **argv )
 try
 {
-    if ( argc < 3 || argc > 5 )
+    if ( argc < 3 || argc > 6 )
     {
-        std::cerr << "Usage: " << argv[0] << " end_time trajectory.dat [RK45|RK23|DOP853] [matlab|scipy]\n";
+        std::cerr << "Usage: " << argv[0]
+                  << " end_time trajectory.dat [RK45|RK23|DOP853|RK4] [matlab|scipy|constant] [step_size]\n";
         return argc == 2 && std::string( argv[1] ) == "--help" ? 0 : 2;
     }
     const std::string method     = argc >= 4 ? argv[3] : "RK45";
-    const std::string controller = argc == 5 ? argv[4] : method == "DOP853" ? "scipy" : "matlab";
-    if ( ( method != "RK45" && method != "RK23" && method != "DOP853" ) ||
-         ( controller != "matlab" && controller != "scipy" ) )
+    const std::string controller = argc >= 5            ? argv[4]
+                                   : method == "RK4"    ? "constant"
+                                   : method == "DOP853" ? "scipy"
+                                                        : "matlab";
+    if ( ( method != "RK45" && method != "RK23" && method != "DOP853" && method != "RK4" ) ||
+         ( controller != "matlab" && controller != "scipy" && controller != "constant" ) )
     {
-        throw std::invalid_argument( "Expected RK45, RK23 or DOP853 and matlab or scipy adaptation" );
+        throw std::invalid_argument( "Expected RK45, RK23, DOP853 or RK4 and matlab, scipy or constant adaptation" );
+    }
+    if ( ( method == "RK4" ) != ( controller == "constant" ) )
+    {
+        throw std::invalid_argument( "This simulation uses constant stepping only for RK4" );
     }
     if ( method == "DOP853" && controller != "scipy" )
     {
         throw std::invalid_argument( "Adaptive DOP853 requires scipy adaptation for its combined estimator" );
     }
-    std::size_t  parsed   = 0;
-    const double end_time = std::stod( argv[1], &parsed );
-    if ( parsed != std::string( argv[1] ).size() || !std::isfinite( end_time ) || end_time <= 0 )
-    {
-        throw std::invalid_argument( "Integration end time must be positive and finite" );
-    }
+    const double end_time  = positive_time( argv[1] );
+    const double step_size = argc == 6 ? positive_time( argv[5] ) : 0;
     backend_type::init_device();
-    using operations_type = scfd_vector_operations<backend_type, double>;
-    if ( controller == "scipy" )
+    operations_type operations( 3 );
+    if ( controller == "constant" )
     {
-        run_simulation<nmfd::time_steppers::integration::time_step_adaptation_scipy<operations_type>>(
-            end_time, argv[2], method, controller
+        using adaptation_type      = nmfd::time_steppers::integration::time_step_adaptation_constant<operations_type>;
+        const double    fixed_step = step_size > 0 ? step_size : .001;
+        adaptation_type adaptation( { fixed_step } );
+        run_simulation(
+            operations, end_time, argv[2], method, controller, adaptation, { { "step_size", fixed_step } }
+        );
+    }
+    else if ( controller == "scipy" )
+    {
+        run_adaptive_simulation<nmfd::time_steppers::integration::time_step_adaptation_scipy<operations_type>>(
+            operations, end_time, argv[2], method, controller, step_size
         );
     }
     else
     {
-        run_simulation<nmfd::time_steppers::integration::time_step_adaptation_matlab<operations_type>>(
-            end_time, argv[2], method, controller
+        run_adaptive_simulation<nmfd::time_steppers::integration::time_step_adaptation_matlab<operations_type>>(
+            operations, end_time, argv[2], method, controller, step_size
         );
     }
 }

@@ -476,7 +476,7 @@ try
     reference.start_use();
     sample.start_use();
     reference_sample.start_use();
-    for ( const auto *method : { "RK23", "RK45", "DOP853", "HE", "RK33SSP" } )
+    for ( const auto *method : { "RK23", "RK45", "DOP853", "RK4", "HE", "RK33SSP" } )
     {
         for ( const bool forced : { false, true } )
         {
