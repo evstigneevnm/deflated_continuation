@@ -14,6 +14,106 @@ defaults:
     shell: bash
 
 jobs:
+  nmfd-newton-failure-reporting-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify numerical failures and optional linear-solver hook
+        run: |
+          make test_newton_failure_reporting_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_failure"
+          timeout 30s ./"$BUILD_DIR"/newton_failure/test_newton_failure_reporting_cpu.bin
+
+  nmfd-newton-backtracking-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify bounded backtracking and configuration validation with and without JSON
+        run: |
+          make test_newton_backtracking_cpu.bin test_newton_backtracking_json_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_backtracking"
+          timeout 30s ./"$BUILD_DIR"/newton_backtracking/test_newton_backtracking_cpu.bin
+          timeout 30s ./"$BUILD_DIR"/newton_backtracking/test_newton_backtracking_json_cpu.bin
+
+  nmfd-newton-convergence-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify tolerance, stagnation, iteration limits, restart, and rollback
+        run: |
+          make test_newton_convergence_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_convergence"
+          timeout 30s ./"$BUILD_DIR"/newton_convergence/test_newton_convergence_cpu.bin
+
+  nmfd-newton-vector-ownership-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify scratch cleanup and reuse across injected failures
+        run: |
+          make test_newton_vector_ownership_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_ownership"
+          timeout 30s ./"$BUILD_DIR"/newton_ownership/test_newton_vector_ownership_cpu.bin
+
+  nmfd-newton-sanitizers-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Run Newton regressions with address and undefined-behavior sanitizers
+        run: |
+          make test_newton_failure_reporting_cpu.bin test_newton_backtracking_cpu.bin test_newton_convergence_cpu.bin test_newton_vector_ownership_cpu.bin test_newton_backtracking_json_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_sanitizers" NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          for test in failure_reporting backtracking convergence vector_ownership backtracking_json; do
+            timeout 30s ./"$BUILD_DIR"/newton_sanitizers/"test_newton_${test}_cpu.bin"
+          done
+
+  nmfd-newton-backend-cpu-omp:
+    needs: [nmfd-newton-failure-reporting-cpu, nmfd-newton-vector-ownership-cpu, scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify Newton restart and rollback with SCFD OMP storage
+        run: |
+          make test_nmfd_newton_backend_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_backend_omp"
+          OMP_NUM_THREADS=8 timeout 30s ./"$BUILD_DIR"/newton_backend_omp/test_nmfd_newton_backend_cpu_omp.bin
+
+  nmfd-newton-backend-cuda:
+    needs: [nmfd-newton-backend-cpu-omp, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify Newton restart and rollback when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA Newton: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA Newton: nvcc unavailable"
+            exit 0
+          fi
+          make test_nmfd_newton_backend_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/newton_backend_cuda"
+          timeout 60s ./"$BUILD_DIR"/newton_backend_cuda/test_nmfd_newton_backend_cuda.bin
+
   timestepper-tables-explicit-cpu:
     runs-on: ubuntu-latest
     steps:

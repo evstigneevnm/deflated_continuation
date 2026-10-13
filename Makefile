@@ -922,6 +922,23 @@ abc_flow_lyapunov_exponents: source/models/abc_flow/abc_flow_lyapunov_exponents.
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_lyapunov_exponents.cpp $(BUILD_DIR)/abc_flow_ker.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(LIBS2) -o $(BUILD_DIR)/abc_flow_lyapunov_exponents.bin 2>$(RESULTS)
 
 
+NEWTON_TEST_HEADERS = $(CONTRIB_NMFD_NEWTON)/test/solvers/newton_test_fixture.h $(wildcard $(CONTRIB_NMFD_NEWTON)/include/nmfd/solvers/*.h $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/*.h) $(CONTRIB_NMFD_NEWTON)/include/nmfd/operations/static_vector_space.h
+NEWTON_TEST_INCLUDES = $(INMFD_NEWTON) -I$(CONTRIB_NMFD_NEWTON)/contrib/SCFD/include
+NEWTON_TEST_FLAGS ?=
+
+test_newton_%_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_newton_%.cpp $(NEWTON_TEST_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) $< -o $(BUILD_DIR)/$@
+
+test_newton_backtracking_json_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_newton_backtracking.cpp $(NEWTON_TEST_HEADERS) $(CONTRIB_NMFD_NEWTON)/contrib/json/nlohmann/json.hpp
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) -DNMFD_ENABLE_NLOHMANN -I$(CONTRIB_NMFD_NEWTON)/contrib/json $< -o $(BUILD_DIR)/$@
+
+test_nmfd_newton_backend_cpu_omp.bin: source/common/tests/test_nmfd_newton_backend.cpp $(NEWTON_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_nmfd_newton_backend_cuda.bin: source/common/tests/test_nmfd_newton_backend.cpp $(NEWTON_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_nmfd_newton_backend_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_nmfd_newton_backend_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
+
 TIME_STEPPER_HEADERS = $(wildcard source/time_stepper/runge_kutta/*.h source/time_stepper/integration/*.h source/time_stepper/detail/*.h)
 TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS = $(wildcard source/time_stepper/tests/explicit_*_problem.h)
 TIME_STEPPER_VECTOR_WRAP_HEADER = $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/vector_wrap.h
