@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - name: Verify numerical failures and optional linear-solver hook
+      - name: Verify increment failures, vector validation, and projection recovery
         run: |
           make test_newton_failure_reporting_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_failure"
           timeout 30s ./"$BUILD_DIR"/newton_failure/test_newton_failure_reporting_cpu.bin
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - name: Verify bounded backtracking and configuration validation with and without JSON
+      - name: Verify bounded backtracking, overflow recovery, logging, and JSON configuration
         run: |
           make test_newton_backtracking_cpu.bin test_newton_backtracking_json_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_backtracking"
           timeout 30s ./"$BUILD_DIR"/newton_backtracking/test_newton_backtracking_cpu.bin
@@ -88,7 +88,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - name: Verify Newton restart and rollback with SCFD OMP storage
+      - name: Verify Newton validation, projection recovery, restart, and rollback with SCFD OMP storage
         run: |
           make test_nmfd_newton_backend_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_backend_omp"
           OMP_NUM_THREADS=8 timeout 30s ./"$BUILD_DIR"/newton_backend_omp/test_nmfd_newton_backend_cpu_omp.bin
@@ -101,7 +101,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - name: Verify Newton restart and rollback when CUDA is available
+      - name: Verify Newton validation, projection recovery, restart, and rollback when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
             echo "Skipping CUDA Newton: no usable GPU"

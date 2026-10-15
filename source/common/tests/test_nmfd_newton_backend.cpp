@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstdio>
 #include <limits>
 #include <memory>
@@ -17,8 +18,11 @@ using backend_type = scfd::backend::serial_cpu;
 #include <nmfd/solvers/newton_iteration.h>
 #include <nmfd/solvers/nonlinear_solver.h>
 
+unsigned int checks = 0;
+
 void require( bool passed, const char *message )
 {
+    ++checks;
     if ( !passed )
         throw std::runtime_error( message );
 }
@@ -39,6 +43,7 @@ struct affine_problem
 
     Operations                           &operations;
     bool                                  invalid_residual = false;
+    unsigned int                          residual_calls   = 0;
     std::shared_ptr<jacobi_operator_type> jacobi;
 
     explicit affine_problem( Operations &ops )
@@ -47,6 +52,7 @@ struct affine_problem
     }
     void apply( const vector_type &x, vector_type &out )
     {
+        ++residual_calls;
         if ( invalid_residual )
             operations.assign_scalar( std::numeric_limits<scalar_type>::quiet_NaN(), out );
         else
@@ -87,23 +93,40 @@ struct diagonal_solver
     }
 };
 
+template <class Operations>
+struct trial_projection
+{
+    using scalar_type = typename Operations::scalar_type;
+    using vector_type = typename Operations::vector_type;
+    Operations  &operations;
+    unsigned int calls = 0, invalid_trials = 0;
+
+    void apply( vector_type &x )
+    {
+        if ( ++calls <= invalid_trials )
+            operations.assign_scalar( std::numeric_limits<scalar_type>::infinity(), x );
+    }
+};
+
 template <class T>
-void test()
+void test( bool full_check )
 {
     using operations_type = scfd_vector_operations<backend_type, T>;
     using problem_type    = affine_problem<operations_type>;
     using linear_type     = diagonal_solver<operations_type, problem_type>;
+    using projection_type = trial_projection<operations_type>;
     using iteration_type  = nmfd::solvers::newton_iteration<operations_type, problem_type, linear_type>;
-    using strategy_type =
-        nmfd::solvers::default_convergence_strategy<operations_type, scfd::utils::log_std, problem_type>;
-    using solver_type =
-        nmfd::solvers::nonlinear_solver<operations_type, scfd::utils::log_std, problem_type, iteration_type>;
+    using strategy_type   = nmfd::solvers::default_convergence_strategy<
+          operations_type, scfd::utils::log_std, problem_type, projection_type>;
+    using solver_type = nmfd::solvers::nonlinear_solver<
+        operations_type, scfd::utils::log_std, problem_type, iteration_type, projection_type>;
     auto                           operations = std::make_shared<operations_type>( 1024 );
     auto                           linear     = std::make_shared<linear_type>( linear_type{ *operations } );
     auto                           iteration  = std::make_shared<iteration_type>( operations, linear );
     typename strategy_type::params p;
-    p.check_linear_solver_fail = true;
-    auto         strategy      = std::make_shared<strategy_type>( operations, nullptr, p );
+    p.perform_full_check      = full_check;
+    p.max_backtracking_trials = 3;
+    auto         strategy     = std::make_shared<strategy_type>( operations, nullptr, p );
     solver_type  solver( operations, nullptr, iteration, strategy );
     problem_type problem( *operations );
     nmfd::detail::vector_wrap<operations_type, false, false> initial( *operations ), state( *operations ),
@@ -129,8 +152,9 @@ void test()
         problem.invalid_residual   = expected == 2;
         linear->converged          = expected != 6;
         linear->invalid_correction = expected == 7;
+        const int status           = expected == 7 && !full_check ? 3 : expected;
         require(
-            !solver.solve( &problem, nullptr, nullptr, *initial, *state ) && strategy->get_result_status() == expected,
+            !solver.solve( &problem, nullptr, nullptr, *initial, *state ) && strategy->get_result_status() == status,
             "backend failure status is incorrect"
         );
         operations->assign_lin_comb( T( 1 ), *state, T( -1 ), *initial, *residual );
@@ -141,15 +165,58 @@ void test()
     require( solver.solve( &problem, nullptr, nullptr, *initial, *state ), "backend solver restart failed" );
     problem.apply( *state, *residual );
     require( operations->norm_l2( *residual ) == T( 0 ), "backend restart root is incorrect" );
+
+    for ( T value :
+          { std::numeric_limits<T>::quiet_NaN(), std::numeric_limits<T>::infinity(),
+            -std::numeric_limits<T>::infinity() } )
+    {
+        operations->assign_scalar( value, *initial );
+        const auto calls = linear->calls, residual_calls = problem.residual_calls;
+        require(
+            !solver.solve( &problem, nullptr, nullptr, *initial, *state ) &&
+                strategy->get_result_status() == ( full_check ? 11 : 2 ) && linear->calls == calls,
+            "backend invalid input did not terminate before the linear solve"
+        );
+        require(
+            problem.residual_calls == residual_calls + ( full_check ? 0u : 1u ) &&
+                !operations->check_is_valid_number( *state ),
+            "backend input validation evaluated an invalid state or failed to restore it"
+        );
+    }
+    operations->assign_scalar( T( 2 ), *initial );
+    projection_type projection{ *operations, 0, 3 };
+    const auto      residual_calls = problem.residual_calls;
+    require(
+        !solver.solve( &problem, &projection, nullptr, *initial, *state ) &&
+            strategy->get_result_status() == ( full_check ? 10 : 3 ) && projection.calls == 3,
+        "backend projection failure has an incorrect status or retry count"
+    );
+    require(
+        problem.residual_calls == residual_calls + ( full_check ? 3u : 6u ),
+        "backend validation did not bypass residual evaluation after invalid projection"
+    );
+    operations->assign_lin_comb( T( 1 ), *state, T( -1 ), *initial, *residual );
+    require( operations->norm_l2( *residual ) == T( 0 ), "backend projection failure did not restore input" );
+    projection.calls          = 0;
+    projection.invalid_trials = 1;
+    require(
+        solver.solve( &problem, &projection, nullptr, *initial, *state ) && projection.calls == 3,
+        "backend failed to recover from a transient invalid projection"
+    );
+    problem.apply( *state, *residual );
+    require( operations->norm_l2( *residual ) == T( 0 ), "backend projection recovery root is incorrect" );
 }
 
 int main()
 {
     try
     {
-        test<float>();
-        test<double>();
-        std::printf( "28 backend checks, 0 failures\n" );
+        for ( bool full_check : { false, true } )
+        {
+            test<float>( full_check );
+            test<double>( full_check );
+        }
+        std::printf( "%u backend checks, 0 failures\n", checks );
         return 0;
     }
     catch ( const std::exception &error )
