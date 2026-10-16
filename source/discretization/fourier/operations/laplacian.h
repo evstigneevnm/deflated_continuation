@@ -21,7 +21,7 @@ void laplacian( const SpectralField &input, const WavevectorTable &wavevectors, 
     using complex_type  = typename SpectralField::value_type;
     using traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
     using scalar_type   = typename traits::real_type;
-    using for_each_type = typename Backend::template for_each_type<std::ptrdiff_t>;
+    using for_each_type = typename Backend::for_each_type;
     if ( input.size() != output.size() || input.size() != wavevectors.index_space().complex_size() )
     {
         throw std::invalid_argument( "Fourier laplacian argument mismatch" );
@@ -48,7 +48,7 @@ void biharmonic( const SpectralField &input, const WavevectorTable &wavevectors,
     using complex_type  = typename SpectralField::value_type;
     using traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
     using scalar_type   = typename traits::real_type;
-    using for_each_type = typename Backend::template for_each_type<std::ptrdiff_t>;
+    using for_each_type = typename Backend::for_each_type;
     if ( input.size() != output.size() || input.size() != wavevectors.index_space().complex_size() )
     {
         throw std::invalid_argument( "Fourier biharmonic argument mismatch" );

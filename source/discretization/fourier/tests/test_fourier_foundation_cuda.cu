@@ -13,7 +13,7 @@ int main()
     {
         common::init_cuda_from_scfd_selector( "auto" );
         return discretization::fourier::tests::run_fourier_foundation_tests<
-            scfd::backend::cuda, external_libraries::fft::cufft_backend>( "scfd_cuda_cufft" );
+            scfd::backend::cuda<std::ptrdiff_t>, external_libraries::fft::cufft_backend>( "scfd_cuda_cufft" );
     }
     catch ( const std::exception &error )
     {

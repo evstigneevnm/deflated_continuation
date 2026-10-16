@@ -125,8 +125,8 @@ void run_backend( const std::string &label )
 
 int main()
 {
-    run_backend<scfd::backend::serial_cpu>( "serial" );
-    run_backend<scfd::backend::omp>( "omp" );
+    run_backend<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    run_backend<scfd::backend::omp<std::ptrdiff_t>>( "omp" );
     std::cout << "Checks: " << checks << ", failures: " << failures << '\n';
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

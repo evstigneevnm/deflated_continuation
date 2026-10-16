@@ -2023,7 +2023,7 @@ void test_multiple_transition_sequence( const std::string &label )
 
 void test_structured_facade()
 {
-    using vector_space_type        = scfd_vector_operations<scfd::backend::serial_cpu, double>;
+    using vector_space_type        = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
     using vector_type              = typename vector_space_type::vector_type;
     using problem_type             = parameterized_problem<vector_space_type>;
     using newton_type              = exact_branch_newton<vector_space_type, problem_type>;
@@ -2162,7 +2162,7 @@ void test_fold_secant_refinement( const std::string &label )
 
 void test_facade_with_separate_linearization_provider()
 {
-    using vector_space_type        = scfd_vector_operations<scfd::backend::serial_cpu, double>;
+    using vector_space_type        = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
     using vector_type              = typename vector_space_type::vector_type;
     using problem_type             = parameterized_problem<vector_space_type>;
     using provider_type            = separate_linearization_provider<vector_space_type>;
@@ -2200,43 +2200,43 @@ void test_facade_with_separate_linearization_provider()
 int main()
 {
     test_spectrum_classifier();
-    test_distinct_stability_probe_policy<scfd::backend::serial_cpu>( "serial" );
-    test_distinct_stability_probe_policy<scfd::backend::omp>( "OMP" );
-    test_evaluator_and_refiner<scfd::backend::serial_cpu>( "serial" );
-    test_evaluator_and_refiner<scfd::backend::omp>( "OMP" );
-    test_classification_retry<scfd::backend::serial_cpu>( "serial" );
-    test_classification_retry<scfd::backend::omp>( "OMP" );
-    test_classification_fallback<scfd::backend::serial_cpu>( "serial" );
-    test_classification_fallback<scfd::backend::omp>( "OMP" );
-    test_classification_confirmation<scfd::backend::serial_cpu>( "serial" );
-    test_classification_confirmation<scfd::backend::omp>( "OMP" );
-    test_classification_confirmation_consensus<scfd::backend::serial_cpu>( "serial" );
-    test_classification_confirmation_consensus<scfd::backend::omp>( "OMP" );
-    test_classification_confirmation_retry_consensus<scfd::backend::serial_cpu>( "serial" );
-    test_classification_confirmation_retry_consensus<scfd::backend::omp>( "OMP" );
-    test_classification_confirmation_reconciliation<scfd::backend::serial_cpu>( "serial" );
-    test_classification_confirmation_reconciliation<scfd::backend::omp>( "OMP" );
-    test_failed_classification_confirmation_retry<scfd::backend::serial_cpu>( "serial" );
-    test_failed_classification_confirmation_retry<scfd::backend::omp>( "OMP" );
-    test_recycling_transaction<scfd::backend::serial_cpu>( "serial" );
-    test_recycling_transaction<scfd::backend::omp>( "OMP" );
-    test_multiple_transition_sequence<scfd::backend::serial_cpu>( "serial" );
-    test_multiple_transition_sequence<scfd::backend::omp>( "OMP" );
-    test_transition_state_alignment<scfd::backend::serial_cpu>( "serial" );
-    test_transition_state_alignment<scfd::backend::omp>( "OMP" );
-    test_unexpected_secant_signature_recovery<scfd::backend::serial_cpu>( "serial" );
-    test_unexpected_secant_signature_recovery<scfd::backend::omp>( "OMP" );
-    test_failed_secant_classification_recovery<scfd::backend::serial_cpu>( "serial" );
-    test_failed_secant_classification_recovery<scfd::backend::omp>( "OMP" );
-    test_failed_transition_newton_homotopy_recovery<scfd::backend::serial_cpu>( "serial" );
-    test_failed_transition_newton_homotopy_recovery<scfd::backend::omp>( "OMP" );
-    test_transition_fallback_newton<scfd::backend::serial_cpu>( "serial" );
-    test_transition_fallback_newton<scfd::backend::omp>( "OMP" );
-    test_coalescence_before_hopf_refinement<scfd::backend::serial_cpu>( "serial" );
-    test_coalescence_before_hopf_refinement<scfd::backend::omp>( "OMP" );
+    test_distinct_stability_probe_policy<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_distinct_stability_probe_policy<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_evaluator_and_refiner<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_evaluator_and_refiner<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_classification_retry<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_classification_retry<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_classification_fallback<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_classification_fallback<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_classification_confirmation<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_classification_confirmation<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_classification_confirmation_consensus<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_classification_confirmation_consensus<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_classification_confirmation_retry_consensus<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_classification_confirmation_retry_consensus<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_classification_confirmation_reconciliation<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_classification_confirmation_reconciliation<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_failed_classification_confirmation_retry<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_failed_classification_confirmation_retry<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_recycling_transaction<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_recycling_transaction<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_multiple_transition_sequence<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_multiple_transition_sequence<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_transition_state_alignment<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_transition_state_alignment<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_unexpected_secant_signature_recovery<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_unexpected_secant_signature_recovery<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_failed_secant_classification_recovery<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_failed_secant_classification_recovery<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_failed_transition_newton_homotopy_recovery<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_failed_transition_newton_homotopy_recovery<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_transition_fallback_newton<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_transition_fallback_newton<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    test_coalescence_before_hopf_refinement<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_coalescence_before_hopf_refinement<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
     test_structured_facade();
-    test_fold_secant_refinement<scfd::backend::serial_cpu>( "serial" );
-    test_fold_secant_refinement<scfd::backend::omp>( "OMP" );
+    test_fold_secant_refinement<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test_fold_secant_refinement<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
     test_facade_with_separate_linearization_provider();
 
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;

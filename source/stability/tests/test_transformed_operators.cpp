@@ -460,12 +460,12 @@ void run_rotated_inexact_exponential_case( const std::string &label )
 
 int main()
 {
-    run_cayley_case<scfd::backend::serial_cpu>( "serial" );
-    run_cayley_case<scfd::backend::omp>( "OMP" );
-    run_inexact_exponential_case<scfd::backend::serial_cpu>( "serial" );
-    run_inexact_exponential_case<scfd::backend::omp>( "OMP" );
-    run_rotated_inexact_exponential_case<scfd::backend::serial_cpu>( "serial" );
-    run_rotated_inexact_exponential_case<scfd::backend::omp>( "OMP" );
+    run_cayley_case<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    run_cayley_case<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    run_inexact_exponential_case<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    run_inexact_exponential_case<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    run_rotated_inexact_exponential_case<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    run_rotated_inexact_exponential_case<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
 
     std::cout << "Checks: " << checks << ", failures: " << failures << '\n';
     if ( failures != 0 )

@@ -31,9 +31,13 @@ namespace scfd
 {
 namespace backend
 {
+template <class Ordinal>
 struct cuda;
+template <class Ordinal>
 struct hip;
+template <class Ordinal>
 struct omp;
+template <class Ordinal>
 struct serial_cpu;
 }
 }
@@ -460,8 +464,8 @@ public:
     }
 };
 
-template <class T, class Ordinal>
-class compensated_reduction<scfd::backend::serial_cpu, T, Ordinal>
+template <class BackendOrdinal, class T, class Ordinal>
+class compensated_reduction<scfd::backend::serial_cpu<BackendOrdinal>, T, Ordinal>
     : public detail::serial_compensated_reduction_impl<T, Ordinal>
 {
 public:
@@ -469,8 +473,9 @@ public:
     using detail::serial_compensated_reduction_impl<T, Ordinal>::serial_compensated_reduction_impl;
 };
 
-template <class T, class Ordinal>
-class compensated_reduction<scfd::backend::omp, T, Ordinal> : public detail::omp_compensated_reduction_impl<T, Ordinal>
+template <class BackendOrdinal, class T, class Ordinal>
+class compensated_reduction<scfd::backend::omp<BackendOrdinal>, T, Ordinal>
+    : public detail::omp_compensated_reduction_impl<T, Ordinal>
 {
 public:
     static constexpr bool is_supported = true;
@@ -478,8 +483,8 @@ public:
 };
 
 #if defined( __CUDACC__ ) && !defined( __HIPCC__ )
-template <class T, class Ordinal>
-class compensated_reduction<scfd::backend::cuda, T, Ordinal>
+template <class BackendOrdinal, class T, class Ordinal>
+class compensated_reduction<scfd::backend::cuda<BackendOrdinal>, T, Ordinal>
 {
 public:
     using arithmetic_type              = detail::arithmetic<T>;
@@ -540,8 +545,8 @@ private:
 #endif
 
 #if defined( NMFD_HIGH_PRECISION_BLAS1_HIP_USES_CUDA_OGITA )
-template <class T, class Ordinal>
-class compensated_reduction<scfd::backend::hip, T, Ordinal>
+template <class BackendOrdinal, class T, class Ordinal>
+class compensated_reduction<scfd::backend::hip<BackendOrdinal>, T, Ordinal>
 {
 public:
     using arithmetic_type              = detail::arithmetic<T>;

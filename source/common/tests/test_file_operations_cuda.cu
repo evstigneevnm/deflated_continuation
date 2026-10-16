@@ -62,7 +62,7 @@ template <class T>
 class cuda_flat_matrix_operations
 {
 public:
-    using backend_type          = scfd::backend::cuda;
+    using backend_type          = scfd::backend::cuda<std::ptrdiff_t>;
     using scalar_type           = T;
     using ordinal_type          = int;
     using matrix_type           = scfd::arrays::array<scalar_type, typename backend_type::memory_type>;
@@ -70,7 +70,7 @@ public:
     using host_view_traits      = common::scfd_backend_ext::host_view_traits<matrix_type>;
     using matrix_host_view_type = typename host_view_traits::view_type;
     using copy_type             = typename backend_type::copy_type;
-    using for_each_type         = typename backend_type::template for_each_type<ordinal_type>;
+    using for_each_type         = typename backend_type::for_each_type;
 
     cuda_flat_matrix_operations( std::size_t rows_, std::size_t cols_ ) : rows( rows_ ), cols( cols_ )
     {
@@ -200,7 +200,7 @@ private:
 void test_cuda_vector_file_operations( test_report &report, const std::filesystem::path &dir )
 {
     using scalar_type = SCALAR_TYPE;
-    using vec_ops_t   = scfd_vector_operations<scfd::backend::cuda, scalar_type>;
+    using vec_ops_t   = scfd_vector_operations<scfd::backend::cuda<std::ptrdiff_t>, scalar_type>;
     using vector_type = typename vec_ops_t::vector_type;
 
     vec_ops_t                                               vec_ops( 7 );

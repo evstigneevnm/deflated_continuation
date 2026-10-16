@@ -48,7 +48,7 @@ public:
     using scalar_type      = Type;
     using vector_type      = typename traits_type::vector_type;
     using memory_type      = typename Backend::memory_type;
-    using for_each_nd_type = typename Backend::template for_each_nd_type<Dim, arr_ord>;
+    using for_each_nd_type = typename Backend::template for_each_nd_type<Dim>;
     using reduce_type      = typename Backend::reduce_type;
     using matrix_type = scfd::arrays::array_nd<scalar_type, Dim, memory_type, scfd::arrays::first_index_fast_arranger>;
     using multivector_type  = typename std::vector<vector_type>;

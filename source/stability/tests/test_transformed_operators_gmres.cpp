@@ -204,7 +204,7 @@ void run_rotated_case( const std::string &label )
 
 void run_failure_case()
 {
-    using vector_space_type = scfd_vector_operations<scfd::backend::serial_cpu, double>;
+    using vector_space_type = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
     using vector_type       = typename vector_space_type::vector_type;
     using operator_type     = stability::tests::analytical_dense_operator<vector_space_type, double>;
     using identity_type     = stability::eigensolvers::transformations::identity_operator<vector_space_type>;
@@ -259,10 +259,10 @@ void run_failure_case()
 
 int main()
 {
-    run_unrotated_case<scfd::backend::serial_cpu>( "serial" );
-    run_unrotated_case<scfd::backend::omp>( "OMP" );
-    run_rotated_case<scfd::backend::serial_cpu>( "serial" );
-    run_rotated_case<scfd::backend::omp>( "OMP" );
+    run_unrotated_case<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    run_unrotated_case<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
+    run_rotated_case<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    run_rotated_case<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
     run_failure_case();
 
     std::cout << "Checks: " << checks << ", failures: " << failures << '\n';

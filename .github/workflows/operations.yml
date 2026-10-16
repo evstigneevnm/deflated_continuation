@@ -51,6 +51,19 @@ jobs:
           make test_newton_convergence_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_convergence"
           timeout 30s ./"$BUILD_DIR"/newton_convergence/test_newton_convergence_cpu.bin
 
+  nmfd-newton-configuration-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify parameter validation and atomic updates with and without JSON
+        run: |
+          make test_newton_configuration_cpu.bin test_newton_configuration_json_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_configuration"
+          timeout 30s ./"$BUILD_DIR"/newton_configuration/test_newton_configuration_cpu.bin
+          timeout 30s ./"$BUILD_DIR"/newton_configuration/test_newton_configuration_json_cpu.bin
+
   nmfd-newton-vector-ownership-cpu:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -62,6 +75,18 @@ jobs:
         run: |
           make test_newton_vector_ownership_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_ownership"
           timeout 30s ./"$BUILD_DIR"/newton_ownership/test_newton_vector_ownership_cpu.bin
+
+  nmfd-newton-operator-binding-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify bound operators, optional hooks, rebinding, and rollback
+        run: |
+          make test_newton_operator_binding_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_operator_binding"
+          timeout 30s ./"$BUILD_DIR"/newton_operator_binding/test_newton_operator_binding_cpu.bin
 
   nmfd-newton-sanitizers-cpu:
     runs-on: ubuntu-latest
@@ -75,13 +100,13 @@ jobs:
           submodules: recursive
       - name: Run Newton regressions with address and undefined-behavior sanitizers
         run: |
-          make test_newton_failure_reporting_cpu.bin test_newton_backtracking_cpu.bin test_newton_convergence_cpu.bin test_newton_vector_ownership_cpu.bin test_newton_backtracking_json_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_sanitizers" NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-          for test in failure_reporting backtracking convergence vector_ownership backtracking_json; do
+          make test_newton_failure_reporting_cpu.bin test_newton_backtracking_cpu.bin test_newton_convergence_cpu.bin test_newton_vector_ownership_cpu.bin test_newton_backtracking_json_cpu.bin test_newton_configuration_cpu.bin test_newton_configuration_json_cpu.bin test_newton_operator_binding_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_sanitizers" NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          for test in failure_reporting backtracking convergence vector_ownership backtracking_json configuration configuration_json operator_binding; do
             timeout 30s ./"$BUILD_DIR"/newton_sanitizers/"test_newton_${test}_cpu.bin"
           done
 
   nmfd-newton-backend-cpu-omp:
-    needs: [nmfd-newton-failure-reporting-cpu, nmfd-newton-vector-ownership-cpu, scfd-vector-operations-cpu]
+    needs: [nmfd-newton-failure-reporting-cpu, nmfd-newton-configuration-cpu, nmfd-newton-vector-ownership-cpu, nmfd-newton-operator-binding-cpu, scfd-vector-operations-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -113,6 +138,61 @@ jobs:
           fi
           make test_nmfd_newton_backend_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/newton_backend_cuda"
           timeout 60s ./"$BUILD_DIR"/newton_backend_cuda/test_nmfd_newton_backend_cuda.bin
+
+  nmfd-scfd-dense-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify updated SCFD adapters, vector operations, and dense solvers
+        run: |
+          make -j2 test_nmfd_scfd_backend_cpu.bin test_nmfd_dense_gmres_cpu.bin test_nmfd_dense_nonlinear_solver_cpu.bin test_nmfd_dense_direct_solver_cpu.bin test_nmfd_dense_newton_direct_solver_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/scfd_dense_float"
+          timeout 30s ./"$BUILD_DIR"/scfd_dense_float/test_nmfd_scfd_backend_cpu.bin
+          make -j2 test_nmfd_dense_gmres_cpu.bin test_nmfd_dense_nonlinear_solver_cpu.bin test_nmfd_dense_direct_solver_cpu.bin test_nmfd_dense_newton_direct_solver_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/scfd_dense_double" NEWTON_TEST_FLAGS=-DUSE_DOUBLE_PRECISION
+          for precision in float double; do
+            for test in gmres nonlinear_solver direct_solver newton_direct_solver; do
+              timeout 60s ./"$BUILD_DIR"/"scfd_dense_${precision}"/"test_nmfd_dense_${test}_cpu.bin"
+            done
+          done
+      - name: Check dense backend ownership and memory safety
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          make -j2 test_nmfd_scfd_backend_cpu.bin test_nmfd_dense_gmres_cpu.bin test_nmfd_dense_nonlinear_solver_cpu.bin test_nmfd_dense_direct_solver_cpu.bin test_nmfd_dense_newton_direct_solver_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/scfd_dense_sanitizers" NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          timeout 30s ./"$BUILD_DIR"/scfd_dense_sanitizers/test_nmfd_scfd_backend_cpu.bin
+          for test in gmres nonlinear_solver direct_solver newton_direct_solver; do
+            timeout 60s ./"$BUILD_DIR"/scfd_dense_sanitizers/"test_nmfd_dense_${test}_cpu.bin"
+          done
+
+  nmfd-scfd-dense-cuda:
+    needs: nmfd-scfd-dense-cpu
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify updated SCFD dense solvers when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA dense SCFD tests: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA dense SCFD tests: nvcc unavailable"
+            exit 0
+          fi
+          make -j2 test_nmfd_scfd_backend_cuda.bin test_nmfd_dense_gmres_cuda.bin test_nmfd_dense_nonlinear_solver_cuda.bin test_nmfd_dense_direct_solver_cuda.bin test_nmfd_dense_newton_direct_solver_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_dense_cuda_float"
+          timeout 60s ./"$BUILD_DIR"/scfd_dense_cuda_float/test_nmfd_scfd_backend_cuda.bin
+          make -j2 test_nmfd_dense_gmres_cuda.bin test_nmfd_dense_nonlinear_solver_cuda.bin test_nmfd_dense_direct_solver_cuda.bin test_nmfd_dense_newton_direct_solver_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_dense_cuda_double" NEWTON_TEST_FLAGS=-DUSE_DOUBLE_PRECISION
+          for precision in float double; do
+            for test in gmres nonlinear_solver direct_solver newton_direct_solver; do
+              timeout 90s ./"$BUILD_DIR"/"scfd_dense_cuda_${precision}"/"test_nmfd_dense_${test}_cuda.bin"
+            done
+          done
 
   timestepper-tables-explicit-cpu:
     runs-on: ubuntu-latest
@@ -1165,6 +1245,12 @@ jobs:
           ./"$BUILD_DIR"/scfd_cuda_double/test_scfd_vector_operations_cuda.bin auto
           make scfd_vector_operations_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cuda_float" REAL_TYPE=float
           ./"$BUILD_DIR"/scfd_cuda_float/test_scfd_vector_operations_cuda.bin auto
+          CUDA_SANITIZER="$(command -v compute-sanitizer || printf '%s' /usr/local/cuda/bin/compute-sanitizer)"
+          if [ -x "$CUDA_SANITIZER" ]; then
+            for real in double float; do
+              timeout 180s "$CUDA_SANITIZER" --tool memcheck --leak-check full --error-exitcode 99 ./"$BUILD_DIR"/scfd_cuda_"$real"/test_scfd_vector_operations_cuda.bin auto
+            done
+          fi
 
   scfd-vector-operations-hip:
     runs-on: ubuntu-latest

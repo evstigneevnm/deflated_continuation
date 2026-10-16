@@ -29,7 +29,7 @@ public:
     using product_vector_type    = typename product_space_type::vector_type;
     using complex_vector_type    = typename complex_space_type::vector_type;
     using complex_traits         = common::scfd_backend_ext::complex_value_traits<complex_scalar_type>;
-    using for_each_type          = typename backend_type::template for_each_type<ordinal_type>;
+    using for_each_type          = typename backend_type::for_each_type;
 
     static_assert(
         std::is_same<backend_type, typename second_real_space_type::backend_type>::value &&

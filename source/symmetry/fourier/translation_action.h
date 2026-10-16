@@ -46,7 +46,7 @@ void apply_translation(
     using complex_type  = typename SpectralField::value_type;
     using traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
     using math_type     = ::common::scfd_backend_ext::math<Backend, Real>;
-    using for_each_type = typename Backend::template for_each_type<std::ptrdiff_t>;
+    using for_each_type = typename Backend::for_each_type;
     if ( source.size() != destination.size() || source.size() != wavevectors.index_space().complex_size() )
     {
         throw std::invalid_argument( "Fourier translation argument mismatch" );
@@ -84,7 +84,7 @@ void translation_generator(
     using complex_type  = typename SpectralField::value_type;
     using traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
     using real_type     = typename traits::real_type;
-    using for_each_type = typename Backend::template for_each_type<std::ptrdiff_t>;
+    using for_each_type = typename Backend::for_each_type;
     if ( dimension >= WavevectorTable::dimension || source.size() != destination.size() ||
          source.size() != wavevectors.index_space().complex_size() )
     {

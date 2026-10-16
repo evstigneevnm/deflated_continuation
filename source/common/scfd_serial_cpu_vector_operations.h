@@ -6,6 +6,6 @@
 #include <common/scfd_vector_operations.h>
 
 template <class T>
-using scfd_serial_cpu_vector_operations = scfd_vector_operations<scfd::backend::serial_cpu, T>;
+using scfd_serial_cpu_vector_operations = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, T>;
 
 #endif

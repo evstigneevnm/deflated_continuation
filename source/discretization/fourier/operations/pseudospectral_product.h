@@ -22,7 +22,7 @@ public:
     using transform_type      = normalized_r2c_transform<Backend, FFTBackend, T, 2>;
     using physical_field_type = typename transform_type::physical_field_type;
     using spectral_field_type = typename transform_type::spectral_field_type;
-    using for_each_type       = typename Backend::template for_each_type<std::ptrdiff_t>;
+    using for_each_type       = typename Backend::for_each_type;
     using copy_type           = typename Backend::copy_type;
 
     pseudospectral_product_2d( transform_type *transform, DealiasingPolicy dealiasing )

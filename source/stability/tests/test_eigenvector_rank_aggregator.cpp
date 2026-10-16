@@ -131,8 +131,8 @@ void run_backend( const std::string &label )
 
 int main()
 {
-    run_backend<scfd::backend::serial_cpu>( "serial" );
-    run_backend<scfd::backend::omp>( "OMP" );
+    run_backend<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    run_backend<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
     std::cout << "Eigenvector rank aggregation checks: " << checks << ", failures: " << failures << '\n';
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

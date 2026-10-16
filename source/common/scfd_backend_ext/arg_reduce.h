@@ -19,7 +19,9 @@ namespace scfd
 {
 namespace backend
 {
+template <class Ordinal>
 struct cuda;
+template <class Ordinal>
 struct hip;
 }
 }
@@ -94,8 +96,8 @@ std::pair<T, std::size_t> thrust_max_argmax( Ordinal size, const T *input )
     return { result.value, static_cast<std::size_t>( result.index ) };
 }
 
-template <class T, class Ordinal>
-struct arg_reduce<scfd::backend::cuda, T, Ordinal>
+template <class BackendOrdinal, class T, class Ordinal>
+struct arg_reduce<scfd::backend::cuda<BackendOrdinal>, T, Ordinal>
 {
     static std::pair<T, std::size_t> max_argmax( Ordinal size, const T *input )
     {
@@ -103,8 +105,8 @@ struct arg_reduce<scfd::backend::cuda, T, Ordinal>
     }
 };
 
-template <class T, class Ordinal>
-struct arg_reduce<scfd::backend::hip, T, Ordinal>
+template <class BackendOrdinal, class T, class Ordinal>
+struct arg_reduce<scfd::backend::hip<BackendOrdinal>, T, Ordinal>
 {
     static std::pair<T, std::size_t> max_argmax( Ordinal size, const T *input )
     {

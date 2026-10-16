@@ -228,11 +228,11 @@ int main( int argc, char **argv )
     const std::string selector = argc > 1 ? argv[1] : "auto";
     const int         device   = common::init_cuda_from_scfd_selector( selector );
     std::cout << "Using CUDA device " << device << '\n';
-    run_backend<scfd::backend::cuda>( "CUDA" );
+    run_backend<scfd::backend::cuda<std::ptrdiff_t>>( "CUDA" );
 #else
     (void)argc;
     (void)argv;
-    run_backend<scfd::backend::omp>( "OMP" );
+    run_backend<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
 #endif
     std::cout << "Scalar affine inverse checks: " << checks << ", failures: " << failures << '\n';
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;

@@ -6,7 +6,7 @@
 int main()
 {
     namespace test = stability::tests::iterative_factor_solver_bundle_test;
-    test::run_backend<scfd::backend::serial_cpu>( "serial" );
-    test::run_backend<scfd::backend::omp>( "OMP" );
+    test::run_backend<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    test::run_backend<scfd::backend::omp<std::ptrdiff_t>>( "OMP" );
     return test::finish();
 }

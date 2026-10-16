@@ -22,12 +22,12 @@
 #if defined( KS1D_VECTOR_BACKEND_OMP )
 #    define KS1D_BACKEND_NAME "scfd_omp_fftw"
 typedef SCALAR_TYPE                                      real;
-typedef scfd_vector_operations<scfd::backend::omp, real> vec_ops_real;
+typedef scfd_vector_operations<scfd::backend::omp<std::ptrdiff_t>, real> vec_ops_real;
 typedef external_libraries::fft::fftw_backend            fft_backend_t;
 #elif defined( KS1D_VECTOR_BACKEND_CUDA )
 #    define KS1D_BACKEND_NAME "scfd_cuda_cufft"
 typedef SCALAR_TYPE                                       real;
-typedef scfd_vector_operations<scfd::backend::cuda, real> vec_ops_real;
+typedef scfd_vector_operations<scfd::backend::cuda<std::ptrdiff_t>, real> vec_ops_real;
 typedef external_libraries::fft::cufft_backend            fft_backend_t;
 #endif
 

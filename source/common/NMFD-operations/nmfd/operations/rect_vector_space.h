@@ -37,7 +37,7 @@ public:
 
     using backend_type = Backend;
 
-    using for_each_nd_type = typename Backend::template for_each_nd_type<Dim, Ordinal>;
+    using for_each_nd_type = typename Backend::template for_each_nd_type<Dim>;
     using reduce_type      = typename Backend::reduce_type;
     using memory_type      = typename Backend::memory_type;
 

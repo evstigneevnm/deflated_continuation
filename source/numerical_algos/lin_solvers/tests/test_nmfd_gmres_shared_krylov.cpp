@@ -161,7 +161,7 @@ void run_complex_solve_case( const std::string &label )
 void run_failure_case()
 {
     using scalar_type       = double;
-    using vector_space_type = scfd_vector_operations<scfd::backend::serial_cpu, scalar_type>;
+    using vector_space_type = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, scalar_type>;
     using vector_type       = typename vector_space_type::vector_type;
     using log_type          = scfd::utils::log_std;
     using operator_type     = stability::tests::analytical_dense_operator<vector_space_type, scalar_type>;
@@ -199,12 +199,12 @@ void run_failure_case()
 
 int main()
 {
-    run_solve_case<scfd::backend::serial_cpu>( "serial MGS", "mgs", "none" );
-    run_solve_case<scfd::backend::serial_cpu>( "serial MGS/DGKS", "mgs", "dgks" );
-    run_solve_case<scfd::backend::serial_cpu>( "serial CGS2", "cgs", "always" );
-    run_solve_case<scfd::backend::omp>( "OMP MGS/DGKS", "mgs", "dgks" );
-    run_complex_solve_case<scfd::backend::serial_cpu>( "serial complex MGS/DGKS" );
-    run_complex_solve_case<scfd::backend::omp>( "OMP complex MGS/DGKS" );
+    run_solve_case<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial MGS", "mgs", "none" );
+    run_solve_case<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial MGS/DGKS", "mgs", "dgks" );
+    run_solve_case<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial CGS2", "cgs", "always" );
+    run_solve_case<scfd::backend::omp<std::ptrdiff_t>>( "OMP MGS/DGKS", "mgs", "dgks" );
+    run_complex_solve_case<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial complex MGS/DGKS" );
+    run_complex_solve_case<scfd::backend::omp<std::ptrdiff_t>>( "OMP complex MGS/DGKS" );
     run_failure_case();
 
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;

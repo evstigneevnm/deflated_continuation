@@ -37,7 +37,7 @@ public:
         using complex_type  = typename SpectralField::value_type;
         using traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
         using scalar_type   = typename traits::real_type;
-        using for_each_type = typename Backend::template for_each_type<std::ptrdiff_t>;
+        using for_each_type = typename Backend::for_each_type;
 
         if ( static_cast<std::ptrdiff_t>( spectrum.size() ) != nx_ * my_ )
         {

@@ -5,13 +5,13 @@
 #include <stdexcept>
 #ifdef TEST_VECTOR_BACKEND_CUDA
 #    include <scfd/backend/cuda.h>
-using backend_type = scfd::backend::cuda;
+using backend_type = scfd::backend::cuda<std::ptrdiff_t>;
 #elif defined( TEST_VECTOR_BACKEND_OMP )
 #    include <scfd/backend/omp.h>
-using backend_type = scfd::backend::omp;
+using backend_type = scfd::backend::omp<std::ptrdiff_t>;
 #else
 #    include <scfd/backend/serial_cpu.h>
-using backend_type = scfd::backend::serial_cpu;
+using backend_type = scfd::backend::serial_cpu<std::ptrdiff_t>;
 #endif
 #include <common/scfd_vector_operations.h>
 #include <scfd/utils/log_std.h>
@@ -205,6 +205,53 @@ void test( bool full_check )
     );
     problem.apply( *state, *residual );
     require( operations->norm_l2( *residual ) == T( 0 ), "backend projection recovery root is incorrect" );
+
+    solver.set_nonlinear_operator( &problem );
+    require( solver.solve( *initial, *state ), "backend bound out-of-place solve failed" );
+    problem.apply( *state, *residual );
+    require( operations->norm_l2( *residual ) == T( 0 ), "backend bound solve root is incorrect" );
+    const auto projection_calls = projection.calls;
+    solver.set_project_operator( &projection );
+    operations->assign( *initial, *state );
+    require(
+        solver.solve( *state ) && projection.calls == projection_calls + 1,
+        "backend bound in-place solve did not use the projection"
+    );
+    solver.set_project_operator( nullptr );
+    require(
+        solver.solve( *initial, *state ) && projection.calls == projection_calls + 1,
+        "backend optional projection was not cleared"
+    );
+    linear->converged = false;
+    require(
+        !solver.solve( *initial, *state ) && strategy->get_result_status() == 6,
+        "backend bound solve lost the linear failure status"
+    );
+    operations->assign_lin_comb( T( 1 ), *state, T( -1 ), *initial, *residual );
+    require( operations->norm_l2( *residual ) == T( 0 ), "backend bound failure did not restore input" );
+    linear->converged = true;
+    require( solver.solve( *initial, *state ), "backend bound solve did not restart after failure" );
+
+    auto                        owned_problem    = std::make_shared<problem_type>( *operations );
+    auto                        owned_projection = std::make_shared<projection_type>( projection_type{ *operations } );
+    std::weak_ptr<problem_type> retained_problem = owned_problem;
+    std::weak_ptr<projection_type> retained_projection = owned_projection;
+    solver.set_nonlinear_operator( owned_problem );
+    solver.set_project_operator( owned_projection );
+    owned_problem.reset();
+    owned_projection.reset();
+    require(
+        !retained_problem.expired() && !retained_projection.expired() && solver.solve( *initial, *state ),
+        "backend shared bindings did not preserve lifetime or solve correctly"
+    );
+    problem.apply( *state, *residual );
+    require( operations->norm_l2( *residual ) == T( 0 ), "backend shared solve root is incorrect" );
+    solver.set_project_operator( nullptr );
+    solver.set_nonlinear_operator( &problem );
+    require(
+        retained_problem.expired() && retained_projection.expired() && solver.solve( *initial, *state ),
+        "backend borrowed rebinding did not release shared owners"
+    );
 }
 
 int main()

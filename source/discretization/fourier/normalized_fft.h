@@ -69,7 +69,7 @@ public:
     using physical_field_type = physical_field<backend_type, scalar_type, Dimension>;
     using spectral_field_type = spectral_field<backend_type, complex_type, Dimension>;
     using copy_type           = typename backend_type::copy_type;
-    using for_each_type       = typename backend_type::template for_each_type<std::ptrdiff_t>;
+    using for_each_type       = typename backend_type::for_each_type;
 
     explicit normalized_r2c_transform( const extent_type &physical_extent )
         : physical_extent_( physical_extent ), spectral_extent_( detail::make_spectral_extent( physical_extent ) ),

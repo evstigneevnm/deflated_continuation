@@ -35,7 +35,7 @@ void require( bool condition, const std::string &message )
     }
 }
 
-using vector_space_type = scfd_vector_operations<scfd::backend::omp, double>;
+using vector_space_type = scfd_vector_operations<scfd::backend::omp<std::ptrdiff_t>, double>;
 using vector_type       = typename vector_space_type::vector_type;
 using problem_type      = nonlinear_operators::bratu<vector_space_type>;
 using operator_type     = nonlinear_operators::linear_operator_bratu<vector_space_type, problem_type>;

@@ -19,11 +19,11 @@ using real = SCALAR_TYPE;
 
 #if defined( KS2D_VECTOR_BACKEND_OMP )
 #    define KS2D_BACKEND_NAME "scfd_omp_fftw"
-using vec_ops_real  = scfd_vector_operations<scfd::backend::omp, real>;
+using vec_ops_real  = scfd_vector_operations<scfd::backend::omp<std::ptrdiff_t>, real>;
 using fft_backend_t = external_libraries::fft::fftw_backend;
 #elif defined( KS2D_VECTOR_BACKEND_CUDA )
 #    define KS2D_BACKEND_NAME "scfd_cuda_cufft"
-using vec_ops_real  = scfd_vector_operations<scfd::backend::cuda, real>;
+using vec_ops_real  = scfd_vector_operations<scfd::backend::cuda<std::ptrdiff_t>, real>;
 using fft_backend_t = external_libraries::fft::cufft_backend;
 #endif
 

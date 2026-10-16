@@ -14,6 +14,6 @@ int main( int argc, char **argv )
     std::cout << "CUDA device: " << device << '\n';
 
     namespace test = stability::tests::matrix_free_complexification_test;
-    test::run_backend<scfd::backend::cuda>( "CUDA" );
+    test::run_backend<scfd::backend::cuda<std::ptrdiff_t>>( "CUDA" );
     return test::finish();
 }

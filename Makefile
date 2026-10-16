@@ -177,8 +177,8 @@ test_multivector.bin: source/common/tests/test_multivector.cpp $(SCFD_SERIAL_VEC
 test_file_operations.bin: source/common/tests/test_file_operations.cpp $(COMMON_FILE_OPS_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/common/tests/test_file_operations.cpp $(OPENMP) -o $(BUILD_DIR)/test_file_operations.bin 2>$(RESULTS)
 
-test_file_operations_cuda.bin: source/common/tests/test_file_operations_cuda.cu $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) source/common/cuda_init_scfd.h
-	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/tests/test_file_operations_cuda.cu $(LIBS1) -o $(BUILD_DIR)/test_file_operations_cuda.bin 2>$(RESULTS)
+test_file_operations_cuda.bin: source/common/tests/test_file_operations_cuda.cu $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/tests/test_file_operations_cuda.cu $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/test_file_operations_cuda.bin 2>$(RESULTS)
 
 test_fftw_operations.bin: source/external_libraries/tests/test_fftw_operations.cpp source/external_libraries/fftw_wrap.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/external_libraries/tests/test_fftw_operations.cpp $(LFFTW) -o $(BUILD_DIR)/test_fftw_operations.bin 2>$(RESULTS)
@@ -929,7 +929,7 @@ NEWTON_TEST_FLAGS ?=
 test_newton_%_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_newton_%.cpp $(NEWTON_TEST_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) $< -o $(BUILD_DIR)/$@
 
-test_newton_backtracking_json_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_newton_backtracking.cpp $(NEWTON_TEST_HEADERS) $(CONTRIB_NMFD_NEWTON)/contrib/json/nlohmann/json.hpp
+test_newton_%_json_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_newton_%.cpp $(NEWTON_TEST_HEADERS) $(CONTRIB_NMFD_NEWTON)/contrib/json/nlohmann/json.hpp
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) -DNMFD_ENABLE_NLOHMANN -I$(CONTRIB_NMFD_NEWTON)/contrib/json $< -o $(BUILD_DIR)/$@
 
 test_nmfd_newton_backend_cpu_omp.bin: source/common/tests/test_nmfd_newton_backend.cpp $(NEWTON_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
@@ -938,6 +938,21 @@ test_nmfd_newton_backend_cpu_omp.bin: source/common/tests/test_nmfd_newton_backe
 test_nmfd_newton_backend_cuda.bin: source/common/tests/test_nmfd_newton_backend.cpp $(NEWTON_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_nmfd_newton_backend_cuda.o
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_nmfd_newton_backend_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
+
+NMFD_DENSE_TEST_HEADERS = $(NEWTON_TEST_HEADERS) $(wildcard $(CONTRIB_NMFD_NEWTON)/include/nmfd/backend/*.h $(CONTRIB_NMFD_NEWTON)/include/nmfd/operations/*.h $(CONTRIB_NMFD_NEWTON)/include/nmfd/operations/detail/*.h $(CONTRIB_NMFD_NEWTON)/include/nmfd/operations/kernels/*.h)
+NMFD_DENSE_CUDA_INSTANTIATIONS = $(CONTRIB_NMFD_NEWTON)/test/solvers/dense_solvers_cuda_inst.cu
+
+test_nmfd_scfd_backend_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/operations/test_scfd_backend.cpp $(NMFD_DENSE_TEST_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) -DPLATFORM_SERIAL_CPU $< -o $(BUILD_DIR)/$@
+
+test_nmfd_scfd_backend_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/operations/test_scfd_backend.cpp $(NMFD_DENSE_TEST_HEADERS) $(NMFD_DENSE_CUDA_INSTANTIATIONS)
+	$(NVCC) $(NVCCFLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) -DPLATFORM_CUDA -x cu $< $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(LCUDA) -lcublas -lcusolver -o $(BUILD_DIR)/$@
+
+test_nmfd_dense_%_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_dense.cpp $(NMFD_DENSE_TEST_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) -DPLATFORM_SERIAL_CPU $< -o $(BUILD_DIR)/$@
+
+test_nmfd_dense_%_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_dense.cpp $(NMFD_DENSE_TEST_HEADERS) $(NMFD_DENSE_CUDA_INSTANTIATIONS)
+	$(NVCC) $(NVCCFLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) -DPLATFORM_CUDA -x cu $< $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(LCUDA) -lcublas -lcusolver -o $(BUILD_DIR)/$@
 
 TIME_STEPPER_HEADERS = $(wildcard source/time_stepper/runge_kutta/*.h source/time_stepper/integration/*.h source/time_stepper/detail/*.h)
 TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS = $(wildcard source/time_stepper/tests/explicit_*_problem.h)

@@ -30,15 +30,15 @@ typedef typename vec_ops_real::scalar_type                        real;
 #elif defined( STAR_SHAPED_VECTOR_BACKEND_OMP )
 #    define STAR_SHAPED_BACKEND_NAME "scfd_omp"
 typedef SCALAR_TYPE                                      real;
-typedef scfd_vector_operations<scfd::backend::omp, real> vec_ops_real;
+typedef scfd_vector_operations<scfd::backend::omp<std::ptrdiff_t>, real> vec_ops_real;
 #elif defined( STAR_SHAPED_VECTOR_BACKEND_HIP )
 #    define STAR_SHAPED_BACKEND_NAME "scfd_hip"
 typedef SCALAR_TYPE                                      real;
-typedef scfd_vector_operations<scfd::backend::hip, real> vec_ops_real;
+typedef scfd_vector_operations<scfd::backend::hip<std::ptrdiff_t>, real> vec_ops_real;
 #else
 #    define STAR_SHAPED_BACKEND_NAME "scfd_cuda"
 typedef SCALAR_TYPE                                       real;
-typedef scfd_vector_operations<scfd::backend::cuda, real> vec_ops_real;
+typedef scfd_vector_operations<scfd::backend::cuda<std::ptrdiff_t>, real> vec_ops_real;
 #endif
 
 typedef scfd::utils::log_std log_t;

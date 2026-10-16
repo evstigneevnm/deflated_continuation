@@ -68,7 +68,7 @@ struct scfd_transform_max_op
 }
 }
 
-template <class Backend, class T, class Ordinal = std::ptrdiff_t>
+template <class Backend, class T, class Ordinal = typename Backend::ordinal_type>
 class scfd_vector_operations : public nmfd::operations::vector_space_base<
                                    T, scfd::arrays::array<T, typename Backend::memory_type>,
                                    std::vector<scfd::arrays::array<T, typename Backend::memory_type>>, Ordinal,
@@ -89,7 +89,7 @@ public:
     using host_view_traits      = common::scfd_backend_ext::host_view_traits<vector_type>;
     using vector_host_view_type = typename host_view_traits::scoped_view_type;
     using host_view_traits_real = common::scfd_backend_ext::host_view_traits<vector_type_real>;
-    using for_each_type         = typename backend_type::template for_each_type<ordinal_type>;
+    using for_each_type         = typename backend_type::for_each_type;
     using reduce_type           = typename backend_type::reduce_type;
     using copy_type             = typename backend_type::copy_type;
     using high_precision_reduction_type =
@@ -103,7 +103,7 @@ public:
     using nmfd_parent_type::scalar_prod_l2;
 
     explicit scfd_vector_operations( std::size_t sz )
-        : sz_( sz ), high_precision_reduction_( static_cast<ordinal_type>( sz ) )
+        : sz_( checked_size( sz ) ), high_precision_reduction_( static_cast<ordinal_type>( sz_ ) )
     {
         helper_scalar_.init( static_cast<ordinal_type>( sz_ ) );
         helper_real_.init( static_cast<ordinal_type>( sz_ ) );
@@ -202,7 +202,7 @@ public:
     {
         if ( x.is_free() )
         {
-            const std::size_t sz_l = sz_p > 0 ? sz_p : sz_;
+            const std::size_t sz_l = checked_size( sz_p > 0 ? sz_p : sz_ );
             x.init( static_cast<ordinal_type>( sz_l ) );
         }
     }
@@ -970,6 +970,27 @@ public:
     }
 
 private:
+    template <class Index>
+    static void validate_size( std::size_t size )
+    {
+        static_assert( std::is_integral<Index>::value, "SCFD ordinal types must be integral" );
+        if constexpr ( std::numeric_limits<Index>::digits < std::numeric_limits<std::size_t>::digits )
+        {
+            if ( size > static_cast<std::size_t>( std::numeric_limits<Index>::max() ) )
+            {
+                throw std::invalid_argument( "SCFD vector size exceeds an ordinal range" );
+            }
+        }
+    }
+
+    static std::size_t checked_size( std::size_t size )
+    {
+        validate_size<ordinal_type>( size );
+        validate_size<typename backend_type::ordinal_type>( size );
+        validate_size<scfd::arrays::ordinal_type>( size );
+        return size;
+    }
+
     static std::size_t checked_multivector_index( ordinal_type m, ordinal_type k )
     {
         if ( k < ordinal_type( 0 ) || k >= m )

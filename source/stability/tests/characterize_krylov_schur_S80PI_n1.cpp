@@ -62,7 +62,7 @@ int main( int argc, char **argv )
 {
     try
     {
-        using vector_space_type = scfd_vector_operations<scfd::backend::omp, double>;
+        using vector_space_type = scfd_vector_operations<scfd::backend::omp<std::ptrdiff_t>, double>;
         using vector_type       = typename vector_space_type::vector_type;
         using lapack_type       = nmfd::operations::linalg::host_small_dense_lapack<double>;
         using solver_type       = stability::eigensolvers::krylov_schur<vector_space_type, lapack_type>;

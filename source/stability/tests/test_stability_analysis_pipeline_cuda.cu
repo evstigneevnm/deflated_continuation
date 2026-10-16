@@ -33,7 +33,7 @@ void require( bool condition, const std::string &message )
     }
 }
 
-using vector_space_type = scfd_vector_operations<scfd::backend::cuda, double>;
+using vector_space_type = scfd_vector_operations<scfd::backend::cuda<std::ptrdiff_t>, double>;
 using vector_type       = typename vector_space_type::vector_type;
 
 class parameterized_problem

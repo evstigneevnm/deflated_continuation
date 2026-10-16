@@ -89,7 +89,7 @@ void run_case(
 
 void run_failure_cases()
 {
-    using vector_space_type = scfd_vector_operations<scfd::backend::serial_cpu, double>;
+    using vector_space_type = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
     using vector_type       = typename vector_space_type::vector_type;
 
     const auto        problem = stability::tests::diagonal_eigenproblem<double>();
@@ -141,13 +141,13 @@ void run_failure_cases()
 
 int main()
 {
-    run_case<scfd::backend::serial_cpu>(
+    run_case<scfd::backend::serial_cpu<std::ptrdiff_t>>(
         "serial unshifted diagonal", stability::tests::diagonal_eigenproblem<double>(), 0.0, -1.0
     );
-    run_case<scfd::backend::serial_cpu>(
+    run_case<scfd::backend::serial_cpu<std::ptrdiff_t>>(
         "serial shifted symmetric", stability::tests::symmetric_eigenproblem<double>(), 0.75, 1.0
     );
-    run_case<scfd::backend::omp>(
+    run_case<scfd::backend::omp<std::ptrdiff_t>>(
         "OMP shifted nonnormal", stability::tests::nonnormal_eigenproblem<double>(), 1.75, 2.0
     );
     run_failure_cases();

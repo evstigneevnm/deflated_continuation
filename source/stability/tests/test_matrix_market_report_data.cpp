@@ -91,7 +91,7 @@ void check_fingerprint( const std::string &name, const matrix_type &matrix, cons
 
 void check_scfd_adapter( const matrix_type &matrix )
 {
-    using vector_space_type = scfd_vector_operations<scfd::backend::omp, double>;
+    using vector_space_type = scfd_vector_operations<scfd::backend::omp<std::ptrdiff_t>, double>;
     using vector_type       = typename vector_space_type::vector_type;
     const std::size_t                                      dimension = static_cast<std::size_t>( matrix.rows() );
     vector_space_type                                      vector_space( dimension );

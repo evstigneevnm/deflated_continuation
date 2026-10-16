@@ -82,7 +82,7 @@ private:
     static T_vec allocate_device( size_t size )
     {
         void *ptr = nullptr;
-        CUDA_SAFE_CALL( cudaMalloc( &ptr, sizeof( T ) * size ) );
+        SCFD_CUDA_SAFE_CALL( cudaMalloc( &ptr, sizeof( T ) * size ) );
         return static_cast<T_vec>( ptr );
     }
 
@@ -91,24 +91,24 @@ private:
         void *ptr = nullptr;
         if ( size != 0 )
         {
-            CUDA_SAFE_CALL( cudaMallocHost( &ptr, sizeof( T ) * size, cudaHostAllocDefault ) );
+            SCFD_CUDA_SAFE_CALL( cudaMallocHost( &ptr, sizeof( T ) * size, cudaHostAllocDefault ) );
         }
         return static_cast<T_vec>( ptr );
     }
 
     static void free_device( T_vec ptr )
     {
-        CUDA_SAFE_CALL( cudaFree( static_cast<void *>( ptr ) ) );
+        SCFD_CUDA_SAFE_CALL( cudaFree( static_cast<void *>( ptr ) ) );
     }
 
     static void free_host( T_vec ptr )
     {
-        CUDA_SAFE_CALL( cudaFreeHost( static_cast<void *>( ptr ) ) );
+        SCFD_CUDA_SAFE_CALL( cudaFreeHost( static_cast<void *>( ptr ) ) );
     }
 
     static void copy_device_to_host( T_vec host, const T_vec device, size_t size )
     {
-        CUDA_SAFE_CALL( cudaMemcpy( host, device, sizeof( T ) * size, cudaMemcpyDeviceToHost ) );
+        SCFD_CUDA_SAFE_CALL( cudaMemcpy( host, device, sizeof( T ) * size, cudaMemcpyDeviceToHost ) );
     }
 
 

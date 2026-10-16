@@ -1,5 +1,6 @@
 #include <cmath>
 #include <complex>
+#include <cstddef>
 #include <iostream>
 #include <string>
 #include <type_traits>
@@ -70,11 +71,12 @@ int main()
     using common::scfd_backend_ext::complex_t;
 
     require(
-        ( std::is_same<complex_t<scfd::backend::serial_cpu, double>, std::complex<double>>::value ),
+        ( std::is_same<complex_t<scfd::backend::serial_cpu<std::ptrdiff_t>, double>, std::complex<double>>::value ),
         "serial_cpu complex_t<double>"
     );
     require(
-        ( std::is_same<complex_t<scfd::backend::omp, float>, std::complex<float>>::value ), "omp complex_t<float>"
+        ( std::is_same<complex_t<scfd::backend::omp<std::ptrdiff_t>, float>, std::complex<float>>::value ),
+        "omp complex_t<float>"
     );
 
     test_complex_type<std::complex<float>>( "std::complex<float>" );
@@ -82,10 +84,12 @@ int main()
 
 #ifdef COMMON_SCFD_BACKEND_EXT_HAS_THRUST_COMPLEX
     require(
-        ( std::is_same<complex_t<scfd::backend::cuda, float>, thrust::complex<float>>::value ), "cuda complex_t<float>"
+        ( std::is_same<complex_t<scfd::backend::cuda<std::ptrdiff_t>, float>, thrust::complex<float>>::value ),
+        "cuda complex_t<float>"
     );
     require(
-        ( std::is_same<complex_t<scfd::backend::hip, double>, thrust::complex<double>>::value ), "hip complex_t<double>"
+        ( std::is_same<complex_t<scfd::backend::hip<std::ptrdiff_t>, double>, thrust::complex<double>>::value ),
+        "hip complex_t<double>"
     );
     test_complex_type<thrust::complex<float>>( "thrust::complex<float>" );
     test_complex_type<thrust::complex<double>>( "thrust::complex<double>" );

@@ -17,7 +17,7 @@ struct cuda_memory
 
     static void copy_to_host( size_t size, const_pointer_type src, pointer_type dst )
     {
-        CUDA_SAFE_CALL( cudaMemcpy( dst, src, size, cudaMemcpyDeviceToHost ) );
+        SCFD_CUDA_SAFE_CALL( cudaMemcpy( dst, src, size, cudaMemcpyDeviceToHost ) );
     }
 };
 

@@ -19,7 +19,7 @@ void add_spectra( const SpectralField &left, const SpectralField &right, Spectra
 {
     using complex_type  = typename SpectralField::value_type;
     using traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
-    using for_each_type = typename Backend::template for_each_type<std::ptrdiff_t>;
+    using for_each_type = typename Backend::for_each_type;
     if ( left.size() != right.size() || left.size() != output.size() )
     {
         throw std::invalid_argument( "add_spectra size mismatch" );

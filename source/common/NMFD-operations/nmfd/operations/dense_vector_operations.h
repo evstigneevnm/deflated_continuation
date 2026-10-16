@@ -27,7 +27,7 @@ public:
     using vector_type      = typename VectorTraits::vector_type;
     using ordinal_type     = Ordinal;
     using Ord              = Ordinal;
-    using for_each_type    = typename Backend::template for_each_type<Ordinal>;
+    using for_each_type    = typename Backend::for_each_type;
     using reduce_type      = typename Backend::reduce_type;
     using memory_type      = typename Backend::memory_type;
 

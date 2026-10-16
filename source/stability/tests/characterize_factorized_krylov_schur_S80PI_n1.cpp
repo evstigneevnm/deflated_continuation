@@ -94,7 +94,7 @@ int main( int argc, char **argv )
 {
     try
     {
-        using backend_type                 = scfd::backend::omp;
+        using backend_type                 = scfd::backend::omp<std::ptrdiff_t>;
         using component_space_type         = scfd_vector_operations<backend_type, double>;
         using product_space_type           = nmfd::operations::two_block_vector_space<component_space_type>;
         using product_vector_type          = typename product_space_type::vector_type;

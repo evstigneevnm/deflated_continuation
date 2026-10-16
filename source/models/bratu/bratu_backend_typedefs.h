@@ -26,7 +26,7 @@ typedef typename vec_ops_real::scalar_type                  real;
 #elif defined( BRATU_VECTOR_BACKEND_OMP )
 #    define BRATU_BACKEND_NAME "scfd_omp"
 typedef SCALAR_TYPE                                      real;
-typedef scfd_vector_operations<scfd::backend::omp, real> vec_ops_real;
+typedef scfd_vector_operations<scfd::backend::omp<std::ptrdiff_t>, real> vec_ops_real;
 #endif
 
 typedef scfd::utils::log_std log_t;

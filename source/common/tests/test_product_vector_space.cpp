@@ -92,8 +92,8 @@ void run_case( const std::string &label )
 
 int main()
 {
-    run_case<scfd::backend::serial_cpu>( "serial" );
-    run_case<scfd::backend::omp>( "omp" );
+    run_case<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
+    run_case<scfd::backend::omp<std::ptrdiff_t>>( "omp" );
 
     std::cout << "Checks: " << checks << ", failures: " << failures << '\n';
     if ( failures != 0 )

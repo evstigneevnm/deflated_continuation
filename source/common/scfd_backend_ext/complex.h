@@ -20,9 +20,13 @@ namespace scfd
 {
 namespace backend
 {
+template <class Ordinal>
 struct cuda;
+template <class Ordinal>
 struct hip;
+template <class Ordinal>
 struct omp;
+template <class Ordinal>
 struct serial_cpu;
 }
 }
@@ -44,28 +48,28 @@ struct dependent_false : std::false_type
 };
 
 #ifdef COMMON_SCFD_BACKEND_EXT_HAS_THRUST_COMPLEX
-template <class Real>
-struct complex<scfd::backend::cuda, Real>
+template <class BackendOrdinal, class Real>
+struct complex<scfd::backend::cuda<BackendOrdinal>, Real>
 {
     using type = thrust::complex<Real>;
 };
 #else
-template <class Real>
-struct complex<scfd::backend::cuda, Real>
+template <class BackendOrdinal, class Real>
+struct complex<scfd::backend::cuda<BackendOrdinal>, Real>
 {
     static_assert( dependent_false<Real>::value, "CUDA complex type requires thrust::complex." );
 };
 #endif
 
 #ifdef COMMON_SCFD_BACKEND_EXT_HAS_THRUST_COMPLEX
-template <class Real>
-struct complex<scfd::backend::hip, Real>
+template <class BackendOrdinal, class Real>
+struct complex<scfd::backend::hip<BackendOrdinal>, Real>
 {
     using type = thrust::complex<Real>;
 };
 #else
-template <class Real>
-struct complex<scfd::backend::hip, Real>
+template <class BackendOrdinal, class Real>
+struct complex<scfd::backend::hip<BackendOrdinal>, Real>
 {
     static_assert( dependent_false<Real>::value, "HIP complex type requires thrust::complex." );
 };

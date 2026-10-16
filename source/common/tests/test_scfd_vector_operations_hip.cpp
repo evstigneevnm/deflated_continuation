@@ -65,7 +65,7 @@ int main( int argc, char **argv )
     const std::string                    test_selector   = ( argc > 2 ) ? argv[2] : "all";
 
     using real        = SCALAR_TYPE;
-    using hip_complex = common::scfd_backend_ext::complex_t<scfd::backend::hip, real>;
+    using hip_complex = common::scfd_backend_ext::complex_t<scfd::backend::hip<std::ptrdiff_t>, real>;
 
     const int device = common::init_hip_from_scfd_selector( device_selector );
     std::cout << "HIP device: " << device << std::endl;
@@ -73,11 +73,11 @@ int main( int argc, char **argv )
     const std::vector<std::size_t> sizes = { 1, 2, 7, 31, 32, 33, 64, 1025, 4097 };
     if ( test_selector == "all" || test_selector == "real" )
     {
-        run_scfd_type<scfd::backend::hip, real>( "SCFD HIP real", sizes, report );
+        run_scfd_type<scfd::backend::hip<std::ptrdiff_t>, real>( "SCFD HIP real", sizes, report );
     }
     if ( test_selector == "all" || test_selector == "complex" )
     {
-        run_scfd_type<scfd::backend::hip, hip_complex>( "SCFD HIP complex", sizes, report );
+        run_scfd_type<scfd::backend::hip<std::ptrdiff_t>, hip_complex>( "SCFD HIP complex", sizes, report );
     }
 
     std::cout << "Checks: " << report.checks << ", failures: " << report.failures << std::endl;

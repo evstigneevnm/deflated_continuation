@@ -199,7 +199,7 @@ void run_case(
 
 void run_failure_case()
 {
-    using vector_space_type = scfd_vector_operations<scfd::backend::serial_cpu, double>;
+    using vector_space_type = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
     using vector_type       = typename vector_space_type::vector_type;
     using lapack_type       = nmfd::operations::linalg::host_small_dense_lapack<double>;
     using solver_type       = stability::eigensolvers::krylov_schur<vector_space_type, lapack_type>;
@@ -239,9 +239,13 @@ void run_failure_case()
 
 int main()
 {
-    run_case<scfd::backend::serial_cpu>( "serial restarted diagonal", restarted_diagonal_problem(), 6, 4 );
-    run_case<scfd::backend::omp>( "OMP restarted diagonal", restarted_diagonal_problem(), 6, 4 );
-    run_case<scfd::backend::serial_cpu>( "serial restarted complex pair", restarted_complex_pair_problem(), 4, 2 );
+    run_case<scfd::backend::serial_cpu<std::ptrdiff_t>>(
+        "serial restarted diagonal", restarted_diagonal_problem(), 6, 4
+    );
+    run_case<scfd::backend::omp<std::ptrdiff_t>>( "OMP restarted diagonal", restarted_diagonal_problem(), 6, 4 );
+    run_case<scfd::backend::serial_cpu<std::ptrdiff_t>>(
+        "serial restarted complex pair", restarted_complex_pair_problem(), 4, 2
+    );
     run_failure_case();
 
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;

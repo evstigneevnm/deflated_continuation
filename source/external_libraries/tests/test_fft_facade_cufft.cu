@@ -70,7 +70,7 @@ class device_buffer
 public:
     explicit device_buffer( std::size_t size ) : size_( size )
     {
-        CUDA_SAFE_CALL( cudaMalloc( reinterpret_cast<void **>( &ptr_ ), sizeof( T ) * size_ ) );
+        SCFD_CUDA_SAFE_CALL( cudaMalloc( reinterpret_cast<void **>( &ptr_ ), sizeof( T ) * size_ ) );
     }
 
     device_buffer( const device_buffer & )            = delete;
@@ -91,12 +91,12 @@ public:
 
     void copy_from( const std::vector<T> &host )
     {
-        CUDA_SAFE_CALL( cudaMemcpy( ptr_, host.data(), sizeof( T ) * size_, cudaMemcpyHostToDevice ) );
+        SCFD_CUDA_SAFE_CALL( cudaMemcpy( ptr_, host.data(), sizeof( T ) * size_, cudaMemcpyHostToDevice ) );
     }
 
     void copy_to( std::vector<T> &host ) const
     {
-        CUDA_SAFE_CALL( cudaMemcpy( host.data(), ptr_, sizeof( T ) * size_, cudaMemcpyDeviceToHost ) );
+        SCFD_CUDA_SAFE_CALL( cudaMemcpy( host.data(), ptr_, sizeof( T ) * size_, cudaMemcpyDeviceToHost ) );
     }
 
 private:

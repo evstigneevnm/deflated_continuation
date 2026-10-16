@@ -40,6 +40,9 @@ void run_scfd_type(
     const std::string &label, const std::vector<std::size_t> &sizes, vector_operations_tests::test_report &report
 )
 {
+    static_assert(
+        std::is_same<typename scfd_vector_operations<Backend, T>::ordinal_type, typename Backend::ordinal_type>::value
+    );
     for ( const auto n : sizes )
     {
         scfd_vector_operations<Backend, T> vec_ops( n );
@@ -62,14 +65,53 @@ int main()
     vector_operations_tests::test_report report;
 
     using real           = SCALAR_TYPE;
-    using serial_complex = common::scfd_backend_ext::complex_t<scfd::backend::serial_cpu, real>;
-    using omp_complex    = common::scfd_backend_ext::complex_t<scfd::backend::omp, real>;
+    using serial_complex = common::scfd_backend_ext::complex_t<scfd::backend::serial_cpu<std::ptrdiff_t>, real>;
+    using omp_complex    = common::scfd_backend_ext::complex_t<scfd::backend::omp<std::ptrdiff_t>, real>;
 
     const std::vector<std::size_t> sizes = { 1, 2, 7, 31, 32, 33, 64, 1025, 4097 };
-    run_scfd_type<scfd::backend::serial_cpu, real>( "SCFD serial real", sizes, report );
-    run_scfd_type<scfd::backend::serial_cpu, serial_complex>( "SCFD serial complex", sizes, report );
-    run_scfd_type<scfd::backend::omp, real>( "SCFD OMP real", sizes, report );
-    run_scfd_type<scfd::backend::omp, omp_complex>( "SCFD OMP complex", sizes, report );
+    run_scfd_type<scfd::backend::serial_cpu<std::ptrdiff_t>, real>( "SCFD serial real", sizes, report );
+    run_scfd_type<scfd::backend::serial_cpu<std::ptrdiff_t>, serial_complex>( "SCFD serial complex", sizes, report );
+    run_scfd_type<scfd::backend::omp<std::ptrdiff_t>, real>( "SCFD OMP real", sizes, report );
+    run_scfd_type<scfd::backend::omp<std::ptrdiff_t>, omp_complex>( "SCFD OMP complex", sizes, report );
+    run_scfd_type<scfd::backend::serial_cpu<int>, real>( "SCFD serial int real", sizes, report );
+    run_scfd_type<scfd::backend::serial_cpu<int>, serial_complex>( "SCFD serial int complex", sizes, report );
+    run_scfd_type<scfd::backend::omp<int>, real>( "SCFD OMP int real", sizes, report );
+    run_scfd_type<scfd::backend::omp<int>, omp_complex>( "SCFD OMP int complex", sizes, report );
+
+    for ( bool narrow_backend : { false, true } )
+    {
+        bool rejected = false;
+        try
+        {
+            if ( narrow_backend )
+            {
+                scfd_vector_operations<scfd::backend::serial_cpu<signed char>, real> invalid( 128 );
+            }
+            else
+            {
+                scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, real, signed char> invalid( 128 );
+            }
+        }
+        catch ( const std::invalid_argument & )
+        {
+            rejected = true;
+        }
+        report.require( rejected, "oversized vector is rejected before narrowing or allocation" );
+    }
+    {
+        scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, real, signed char> operations( 1 );
+        decltype( operations )::vector_type                                                  vector;
+        bool                                                                                 rejected = false;
+        try
+        {
+            operations.start_use_vector( vector, 128 );
+        }
+        catch ( const std::invalid_argument & )
+        {
+            rejected = true;
+        }
+        report.require( rejected && vector.is_free(), "oversized vector activation leaves storage unallocated" );
+    }
 
     std::cout << "Checks: " << report.checks << ", failures: " << report.failures << std::endl;
     if ( report.failures == 0 )

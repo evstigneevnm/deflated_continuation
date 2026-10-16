@@ -15,6 +15,6 @@ int main( int argc, char **argv )
 
     namespace test = stability::tests::complex_affine_transformations_test;
     test::run_factorization_tests( "host" );
-    test::run_backend<scfd::backend::cuda>( "CUDA" );
+    test::run_backend<scfd::backend::cuda<std::ptrdiff_t>>( "CUDA" );
     return test::finish();
 }

@@ -20,7 +20,7 @@ void fill_low_mode_odd_physical_field_2d(
     const Scalar linear_high_order_coefficient, const std::uint64_t seed_id
 )
 {
-    using for_each_type = typename Backend::template for_each_type<std::ptrdiff_t>;
+    using for_each_type = typename Backend::for_each_type;
     using math_type     = ::common::scfd_backend_ext::math<Backend, Scalar>;
     using scalar_traits = ::common::scfd_backend_ext::scalar_traits<Backend, Scalar>;
 

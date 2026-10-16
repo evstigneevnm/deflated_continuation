@@ -197,10 +197,14 @@ int main()
     using method = nmfd::solvers::krylov::orthogonalization_method;
     using reorth = nmfd::solvers::krylov::reorthogonalization_policy;
 
-    run_arnoldi_case<scfd::backend::serial_cpu>( "serial MGS/DGKS", method::modified_gram_schmidt, reorth::dgks );
-    run_arnoldi_case<scfd::backend::serial_cpu>( "serial CGS2", method::classical_gram_schmidt, reorth::always );
-    run_arnoldi_case<scfd::backend::omp>( "OMP MGS/DGKS", method::modified_gram_schmidt, reorth::dgks );
-    run_operator_failure_case<scfd::backend::serial_cpu>( "serial" );
+    run_arnoldi_case<scfd::backend::serial_cpu<std::ptrdiff_t>>(
+        "serial MGS/DGKS", method::modified_gram_schmidt, reorth::dgks
+    );
+    run_arnoldi_case<scfd::backend::serial_cpu<std::ptrdiff_t>>(
+        "serial CGS2", method::classical_gram_schmidt, reorth::always
+    );
+    run_arnoldi_case<scfd::backend::omp<std::ptrdiff_t>>( "OMP MGS/DGKS", method::modified_gram_schmidt, reorth::dgks );
+    run_operator_failure_case<scfd::backend::serial_cpu<std::ptrdiff_t>>( "serial" );
 
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;
     if ( failures != 0 )

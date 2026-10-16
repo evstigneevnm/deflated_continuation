@@ -702,7 +702,7 @@ void gpu_reduction_ogita<T, T_vec, BLOCK_SIZE, threads_r>::wrapper_reduce_asum(
     dim3 dimBlock( threads, 1, 1 );
     dim3 dimGrid( blocks, 1, 1 );
 
-    if ( isPow2( N ) )
+    if ( N > 1 && isPow2( N ) )
     {
         switch ( threads )
         {
@@ -903,7 +903,7 @@ void gpu_reduction_ogita<T, T_vec, BLOCK_SIZE, threads_r>::wrapper_reduce_sum(
     dim3 dimGrid( blocks, 1, 1 );
 
 
-    if ( isPow2( N ) )
+    if ( N > 1 && isPow2( N ) )
     {
         switch ( threads )
         {
@@ -1105,7 +1105,7 @@ void gpu_reduction_ogita<T, T_vec, BLOCK_SIZE, threads_r>::wrapper_reduce_dot(
     dim3 dimBlock( threads, 1, 1 );
     dim3 dimGrid( blocks, 1, 1 );
 
-    if ( isPow2( N ) )
+    if ( N > 1 && isPow2( N ) )
     {
         switch ( threads )
         {

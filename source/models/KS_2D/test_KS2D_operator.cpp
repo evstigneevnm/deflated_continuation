@@ -669,9 +669,9 @@ int main()
     {
 #if defined( TEST_VECTOR_BACKEND_CUDA )
         common::init_cuda_from_scfd_selector( "auto" );
-        return run<scfd::backend::cuda, external_libraries::fft::cufft_backend>( "scfd_cuda_cufft" );
+        return run<scfd::backend::cuda<std::ptrdiff_t>, external_libraries::fft::cufft_backend>( "scfd_cuda_cufft" );
 #else
-        return run<scfd::backend::omp, external_libraries::fft::fftw_backend>( "scfd_omp_fftw" );
+        return run<scfd::backend::omp<std::ptrdiff_t>, external_libraries::fft::fftw_backend>( "scfd_omp_fftw" );
 #endif
     }
     catch ( const std::exception &error )
