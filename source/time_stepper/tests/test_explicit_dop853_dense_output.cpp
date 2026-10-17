@@ -1,3 +1,4 @@
+#include <memory>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -66,8 +67,8 @@ struct counting_operations : operations_type
 
 struct exponential_growth
 {
-    operations_type &operations;
-    unsigned int     calls = 0;
+    std::shared_ptr<operations_type> operations;
+    unsigned int                     calls = 0;
 
     static double exact( double time )
     {
@@ -77,15 +78,15 @@ struct exponential_growth
     void apply( const vector_type &in, vector_type &out )
     {
         ++calls;
-        operations.assign( in, out );
+        operations->assign( in, out );
     }
 };
 
 struct forced_growth
 {
-    operations_type &operations;
-    unsigned int     calls = 0, fail_call = 0;
-    double           time = 0;
+    std::shared_ptr<operations_type> operations;
+    unsigned int                     calls = 0, fail_call = 0;
+    double                           time = 0;
 
     static double exact( double time )
     {
@@ -100,19 +101,19 @@ struct forced_growth
     void apply( const vector_type &in, vector_type &out )
     {
         ++calls;
-        operations.assign( in, out );
-        operations.add_mul_scalar( time, 1., out );
+        operations->assign( in, out );
+        operations->add_mul_scalar( time, 1., out );
         if ( calls == fail_call )
         {
-            operations.assign_scalar( std::numeric_limits<double>::infinity(), out );
+            operations->assign_scalar( std::numeric_limits<double>::infinity(), out );
         }
     }
 };
 
 struct quadratic_growth
 {
-    operations_type &operations;
-    unsigned int     calls = 0;
+    std::shared_ptr<operations_type> operations;
+    unsigned int                     calls = 0;
 
     static double exact( double time )
     {
@@ -122,7 +123,7 @@ struct quadratic_growth
     void apply( const vector_type &in, vector_type &out )
     {
         ++calls;
-        operations.mul_pointwise( 1., in, 1., in, out );
+        operations->mul_pointwise( 1., in, 1., in, out );
     }
 };
 
@@ -134,10 +135,11 @@ struct sample_row
 
 template <class Problem>
 void check_order(
-    operations_type &operations, double start, double coarse_step, unsigned int problem_id,
+    std::shared_ptr<operations_type> operations_owner, double start, double coarse_step, unsigned int problem_id,
     std::vector<sample_row> &rows
 )
 {
+    auto                                      &operations = *operations_owner;
     nmfd::detail::vector_wrap<operations_type> initial( operations ), result( operations ), sample( operations );
     initial.start_use();
     result.start_use();
@@ -146,14 +148,20 @@ void check_order(
     double errors[3]{};
     for ( int level = 0; level < 3; ++level )
     {
-        counting_operations counted( 1 );
-        Problem             problem{ counted };
-        const auto          dt = coarse_step / ( 1 << level );
-        adaptation_type     adaptation( { std::abs( dt ) } );
+        auto       counted_owner = std::make_shared<counting_operations>( 1 );
+        auto      &counted       = *counted_owner;
+        auto       problem_owner = std::make_shared<Problem>( Problem{ counted_owner } );
+        auto      &problem       = *problem_owner;
+        const auto dt            = coarse_step / ( 1 << level );
+        auto adaptation_owner = std::make_shared<adaptation_type>( typename adaptation_type::params{ std::abs( dt ) } );
+        auto &adaptation      = *adaptation_owner;
         using step_type =
             nmfd::time_steppers::runge_kutta::explicit_time_step<counting_operations, Problem, adaptation_type, true>;
         {
-            step_type step( counted, problem, adaptation, { "DOP853" } );
+            auto step_owner = std::make_shared<step_type>(
+                counted_owner, problem_owner, adaptation_owner, typename step_type::params{ "DOP853" }
+            );
+            auto &step = *step_owner;
             require(
                 step.dense_output_order() == 7 && counted.live == 18,
                 "DOP853 dense output adds only the initial state and three derivatives"
@@ -268,22 +276,29 @@ struct retry_adaptation : adaptation_type
     }
 };
 
-void check_lifecycle( operations_type &operations )
+void check_lifecycle( std::shared_ptr<operations_type> operations_owner )
 {
+    auto                                      &operations = *operations_owner;
     nmfd::detail::vector_wrap<operations_type> initial( operations ), result( operations ), sample( operations );
     initial.start_use();
     result.start_use();
     sample.start_use();
     operations.assign_scalar( 1., *initial );
-    counting_operations counted( 1 );
-    forced_growth       problem{ counted };
-    adaptation_type     adaptation( { .5 } );
+    auto  counted_owner    = std::make_shared<counting_operations>( 1 );
+    auto &counted          = *counted_owner;
+    auto  problem_owner    = std::make_shared<forced_growth>( forced_growth{ counted_owner } );
+    auto &problem          = *problem_owner;
+    auto  adaptation_owner = std::make_shared<adaptation_type>( typename adaptation_type::params{ .5 } );
+    auto &adaptation       = *adaptation_owner;
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<counting_operations, forced_growth, adaptation_type, true>;
     using plain_step =
         nmfd::time_steppers::runge_kutta::explicit_time_step<counting_operations, forced_growth, adaptation_type>;
     {
-        plain_step step( counted, problem, adaptation, { "DOP853" } );
+        auto step_owner = std::make_shared<plain_step>(
+            counted_owner, problem_owner, adaptation_owner, typename plain_step::params{ "DOP853" }
+        );
+        auto &step = *step_owner;
         require(
             counted.live == 14 && step.dense_output_order() == 0, "Disabled dense output removes all four vectors"
         );
@@ -291,7 +306,10 @@ void check_lifecycle( operations_type &operations )
         require( problem.calls == 13, "Disabled dense output does not evaluate extra stages" );
     }
     require( counted.live == 0, "Disabled dense storage release" );
-    step_type step( counted, problem, adaptation, { "DOP853" } );
+    auto step_owner = std::make_shared<step_type>(
+        counted_owner, problem_owner, adaptation_owner, typename step_type::params{ "DOP853" }
+    );
+    auto &step = *step_owner;
     step.apply( *initial, *initial );
     const auto first = step.get_continuous_integration();
     first.evaluate( 0, *sample );
@@ -340,10 +358,13 @@ void check_lifecycle( operations_type &operations )
     {
         for ( const bool aliased : { false, true } )
         {
-            forced_growth bad{ operations, 0, fail_call };
+            auto bad_owner     = std::make_shared<forced_growth>( forced_growth{ operations_owner, 0, fail_call } );
             using failing_step = nmfd::time_steppers::runge_kutta::explicit_time_step<
                 operations_type, forced_growth, adaptation_type, true>;
-            failing_step failed( operations, bad, adaptation, { "DOP853" } );
+            auto failed_owner = std::make_shared<failing_step>(
+                operations_owner, bad_owner, adaptation_owner, typename failing_step::params{ "DOP853" }
+            );
+            auto &failed = *failed_owner;
             operations.assign_scalar( 1., *initial );
             operations.assign_scalar( 77., *result );
             failed.apply( *initial, aliased ? *initial : *result );
@@ -364,11 +385,16 @@ void check_lifecycle( operations_type &operations )
             require( refused, "Failed dense preparation must not publish an interpolant" );
         }
     }
-    forced_growth    transient{ operations, 0, 14 };
-    retry_adaptation recovery;
+    auto  transient_owner = std::make_shared<forced_growth>( forced_growth{ operations_owner, 0, 14 } );
+    auto &transient       = *transient_owner;
+    auto  recovery_owner  = std::make_shared<retry_adaptation>();
+    auto &recovery        = *recovery_owner;
     using recovering_step =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, retry_adaptation, true>;
-    recovering_step recovered( operations, transient, recovery, { "DOP853" } );
+    auto recovered_owner = std::make_shared<recovering_step>(
+        operations_owner, transient_owner, recovery_owner, typename recovering_step::params{ "DOP853" }
+    );
+    auto &recovered = *recovered_owner;
     recovered.apply( *initial, *result );
     require(
         recovered.get_status() == step_status::converged && recovered.get_attempts() == 2 && recovery.rejections == 1 &&
@@ -379,8 +405,11 @@ void check_lifecycle( operations_type &operations )
     require( read( operations, *sample ) == 1, "Retried dense output must retain the original initial state" );
     recovered.finalize( adaptation_status::accepted, .25, *result );
     recovered.reset();
-    transient.calls = 0;
-    recovering_step budgeted( operations, transient, recovery, { "DOP853", 1 } );
+    transient.calls     = 0;
+    auto budgeted_owner = std::make_shared<recovering_step>(
+        operations_owner, transient_owner, recovery_owner, typename recovering_step::params{ "DOP853", 1 }
+    );
+    auto &budgeted = *budgeted_owner;
     operations.assign_scalar( 77., *result );
     budgeted.apply( *initial, *result );
     require(
@@ -388,10 +417,15 @@ void check_lifecycle( operations_type &operations )
             recovery.rejections == 1,
         "Dense-stage recovery must respect the numerical attempt budget"
     );
-    forced_growth    valid{ operations };
-    retry_adaptation reject_first;
+    auto  valid_owner               = std::make_shared<forced_growth>( forced_growth{ operations_owner } );
+    auto &valid                     = *valid_owner;
+    auto  reject_first_owner        = std::make_shared<retry_adaptation>();
+    auto &reject_first              = *reject_first_owner;
     reject_first.reject_first_trial = true;
-    recovering_step rejected( operations, valid, reject_first, { "DOP853" } );
+    auto rejected_owner             = std::make_shared<recovering_step>(
+        operations_owner, valid_owner, reject_first_owner, typename recovering_step::params{ "DOP853" }
+    );
+    auto &rejected = *rejected_owner;
     rejected.apply( *initial, *result );
     require(
         rejected.get_status() == step_status::converged && rejected.get_attempts() == 2 &&
@@ -405,15 +439,16 @@ try
 {
     require( argc <= 2, "Usage: test_explicit_dop853_dense_output [samples.txt]" );
     backend_type::init_device();
-    operations_type         operations( 1 );
+    auto                    operations_owner = std::make_shared<operations_type>( 1 );
+    auto                   &operations       = *operations_owner;
     std::vector<sample_row> rows;
-    check_order<exponential_growth>( operations, .4, .8, 0, rows );
-    check_order<exponential_growth>( operations, .4, -.8, 0, rows );
-    check_order<forced_growth>( operations, .4, .8, 1, rows );
-    check_order<forced_growth>( operations, .4, -.8, 1, rows );
-    check_order<quadratic_growth>( operations, 0, .4, 2, rows );
-    check_order<quadratic_growth>( operations, 0, -.2, 2, rows );
-    check_lifecycle( operations );
+    check_order<exponential_growth>( operations_owner, .4, .8, 0, rows );
+    check_order<exponential_growth>( operations_owner, .4, -.8, 0, rows );
+    check_order<forced_growth>( operations_owner, .4, .8, 1, rows );
+    check_order<forced_growth>( operations_owner, .4, -.8, 1, rows );
+    check_order<quadratic_growth>( operations_owner, 0, .4, 2, rows );
+    check_order<quadratic_growth>( operations_owner, 0, -.2, 2, rows );
+    check_lifecycle( operations_owner );
     if ( argc == 2 )
     {
         std::ofstream file( argv[1] );

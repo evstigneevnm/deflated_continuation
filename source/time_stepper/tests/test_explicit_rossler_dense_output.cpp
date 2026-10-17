@@ -1,3 +1,4 @@
+#include <memory>
 #include "explicit_rossler_problem.h"
 #include <algorithm>
 #include <cmath>
@@ -43,20 +44,20 @@ void require( bool ok, const char *message )
     }
 }
 
-// The manager borrows the step; the integrator needs no dense-output-specific hooks.
+// The manager retains its dependencies; interpolation views remain borrowed.
 template <class Step>
 struct external_manager
 {
-    operations_type                           &ops;
-    Step                                      &step;
+    std::shared_ptr<operations_type>           ops;
+    std::shared_ptr<Step>                      step;
     nmfd::detail::vector_wrap<operations_type> sample;
     double                                     start = 0, *end = nullptr, error = 0;
     unsigned int                               samples = 0, interior_samples = 0;
     bool                                       stop   = false;
     integration_status                         status = integration_status::running;
 
-    external_manager( operations_type &operations, Step &method )
-        : ops( operations ), step( method ), sample( operations )
+    external_manager( std::shared_ptr<operations_type> operations, std::shared_ptr<Step> method )
+        : ops( std::move( operations ) ), step( std::move( method ) ), sample( *ops )
     {
         sample.start_use();
     }
@@ -77,11 +78,11 @@ struct external_manager
 
     bool apply( const vector_type &, vector_type &out )
     {
-        const auto dense = step.get_continuous_integration();
+        const auto dense = step->get_continuous_integration();
         while ( samples < 5 && sample_times[samples] <= *end )
         {
             require( sample_times[samples] >= start, "Skipped sample time" );
-            const auto theta = std::clamp( ( sample_times[samples] - start ) / step.get_dt(), 0., 1. );
+            const auto theta = std::clamp( ( sample_times[samples] - start ) / step->get_dt(), 0., 1. );
             const auto time  = dense.evaluate( theta, *sample );
             require( std::abs( time - sample_times[samples] ) < 1e-14, "Dense sample time" );
             if ( theta > 0 && theta < 1 )
@@ -89,7 +90,7 @@ struct external_manager
                 ++interior_samples;
             }
             scfd::static_vec::vec<double, 3> values;
-            ops.get( *sample, values.d );
+            ops->get( *sample, values.d );
             for ( int i = 0; i < 3; ++i )
             {
                 error = std::max( error, std::abs( values[i] - reference[samples][i] ) );
@@ -97,7 +98,7 @@ struct external_manager
             ++samples;
             if ( stop && samples == 4 )
             {
-                ops.assign( *sample, out );
+                ops->assign( *sample, out );
                 *end   = time;
                 status = integration_status::stopped_by_external_operation;
                 return true;
@@ -114,20 +115,26 @@ struct external_manager
 
 template <class Adaptation, class Problem>
 void check_adaptive(
-    operations_type &ops, Problem &problem, const vector_type &initial, vector_type &result, const char *method
+    std::shared_ptr<operations_type> ops_owner, std::shared_ptr<Problem> problem_owner, const vector_type &initial,
+    vector_type &result, const char *method
 )
 {
+    auto                       &ops     = *ops_owner;
+    auto                       &problem = *problem_owner;
     typename Adaptation::params p;
-    p.initial_step       = duration;
-    p.relative_tolerance = 1e-11;
-    p.absolute_tolerance = 1e-13;
-    Adaptation adaptation( ops, p );
+    p.initial_step        = duration;
+    p.relative_tolerance  = 1e-11;
+    p.absolute_tolerance  = 1e-13;
+    auto adaptation_owner = std::make_shared<Adaptation>( ops_owner, p );
     using step_type = nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, Problem, Adaptation, true>;
-    step_type                   step( ops, problem, adaptation, { method } );
-    external_manager<step_type> external( ops, step );
-    nmfd::time_steppers::integration::time_integrator<operations_type, step_type, decltype( external )> integrator(
-        ops, step, {}, &external
-    );
+    auto step_owner =
+        std::make_shared<step_type>( ops_owner, problem_owner, adaptation_owner, typename step_type::params{ method } );
+    auto &step           = *step_owner;
+    auto  external_owner = std::make_shared<external_manager<step_type>>( ops_owner, step_owner );
+    auto &external       = *external_owner;
+    nmfd::time_steppers::integration::time_integrator<
+        operations_type, step_type, std::remove_reference_t<decltype( external )>>
+        integrator( ops_owner, step_owner, {}, external_owner );
     integrator.set_time_interval( 0, duration );
     for ( int run = 0; run < 3; ++run )
     {
@@ -159,26 +166,36 @@ int main()
 try
 {
     backend_type::init_device();
-    operations_type                            ops( 3 );
+    auto                                       ops_owner = std::make_shared<operations_type>( 3 );
+    auto                                      &ops       = *ops_owner;
     nmfd::detail::vector_wrap<operations_type> initial( ops ), result( ops );
     initial.start_use();
     result.start_use();
     const scfd::static_vec::vec<double, 3> values{ 2, 0, 0 };
     ops.set( values.d, *initial );
-    nmfd::time_steppers::tests::explicit_rossler_problem<operations_type> problem;
-    using fixed_type = nmfd::time_steppers::integration::time_step_adaptation_constant<operations_type>;
-    using fixed_step =
-        nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, decltype( problem ), fixed_type, true>;
+    using problem_type  = nmfd::time_steppers::tests::explicit_rossler_problem<operations_type>;
+    auto  problem_owner = std::make_shared<problem_type>();
+    auto &problem       = *problem_owner;
+    using fixed_type    = nmfd::time_steppers::integration::time_step_adaptation_constant<operations_type>;
+    using fixed_step    = nmfd::time_steppers::runge_kutta::explicit_time_step<
+           operations_type, std::remove_reference_t<decltype( problem )>, fixed_type, true>;
     for ( const auto *method : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK4", "RK64SSP", "RK45", "DOP853" } )
     {
         double errors[2]{};
         for ( int level = 0; level < 2; ++level )
         {
-            fixed_type                   fixed( { duration / ( 10 * ( level + 1 ) ) } );
-            fixed_step                   step( ops, problem, fixed, { method } );
-            external_manager<fixed_step> external( ops, step );
-            nmfd::time_steppers::integration::time_integrator<operations_type, fixed_step, decltype( external )>
-                integrator( ops, step, {}, &external );
+            auto fixed_owner =
+                std::make_shared<fixed_type>( typename fixed_type::params{ duration / ( 10 * ( level + 1 ) ) } );
+            auto &fixed      = *fixed_owner;
+            auto  step_owner = std::make_shared<fixed_step>(
+                ops_owner, problem_owner, fixed_owner, typename fixed_step::params{ method }
+            );
+            auto &step           = *step_owner;
+            auto  external_owner = std::make_shared<external_manager<fixed_step>>( ops_owner, step_owner );
+            auto &external       = *external_owner;
+            nmfd::time_steppers::integration::time_integrator<
+                operations_type, fixed_step, std::remove_reference_t<decltype( external )>>
+                integrator( ops_owner, step_owner, {}, external_owner );
             integrator.set_time_interval( 0, duration );
             integrator.apply( *initial, *result );
             require(
@@ -210,10 +227,10 @@ try
     using matlab_type = nmfd::time_steppers::integration::time_step_adaptation_matlab<operations_type>;
     for ( const auto *method : { "RK45", "RK23" } )
     {
-        check_adaptive<matlab_type>( ops, problem, *initial, *result, method );
+        check_adaptive<matlab_type>( ops_owner, problem_owner, *initial, *result, method );
     }
     using scipy_type = nmfd::time_steppers::integration::time_step_adaptation_scipy<operations_type>;
-    check_adaptive<scipy_type>( ops, problem, *initial, *result, "DOP853" );
+    check_adaptive<scipy_type>( ops_owner, problem_owner, *initial, *result, "DOP853" );
     std::cout << "rossler: dense output, nine fixed methods, adaptive restart and external endpoint refinement PASS\n";
 }
 catch ( const std::exception &e )

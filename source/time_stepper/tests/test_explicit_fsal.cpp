@@ -1,3 +1,4 @@
+#include <memory>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -68,10 +69,10 @@ struct counting_operations : operations_type
 // Autonomous u'=u or non-autonomous u'=u+t, with one injected nonfinite evaluation.
 struct growth
 {
-    counting_operations &operations;
-    bool                 forced = false, quadratic = false;
-    double               time = 0, rate = 1;
-    std::size_t          calls = 0, initial_calls = 0, fail_call = 0;
+    std::shared_ptr<counting_operations> operations;
+    bool                                 forced = false, quadratic = false;
+    double                               time = 0, rate = 1;
+    std::size_t                          calls = 0, initial_calls = 0, fail_call = 0;
 
     void set_time( double t )
     {
@@ -84,20 +85,20 @@ struct growth
         initial_calls += time == 0;
         if ( calls == fail_call )
         {
-            operations.assign_scalar( std::numeric_limits<double>::quiet_NaN(), out );
+            operations->assign_scalar( std::numeric_limits<double>::quiet_NaN(), out );
             return;
         }
         if ( quadratic )
         {
-            operations.mul_pointwise( rate, in, 1., in, out );
+            operations->mul_pointwise( rate, in, 1., in, out );
         }
         else
         {
-            operations.assign_mul( rate, in, out );
+            operations->assign_mul( rate, in, out );
         }
         if ( forced )
         {
-            operations.add_mul_scalar( time, 1., out );
+            operations->add_mul_scalar( time, 1., out );
         }
     }
 };
@@ -117,19 +118,32 @@ double read( counting_operations &operations, const vector_type &x )
 
 template <bool DenseOutput>
 void check_trajectory(
-    counting_operations &operations, vector_type &x, vector_type &reference, vector_type &sample,
+    std::shared_ptr<counting_operations> operations_owner, vector_type &x, vector_type &reference, vector_type &sample,
     vector_type &reference_sample, const std::string &method, bool forced, bool quadratic, double direction
 )
 {
+    auto &operations = *operations_owner;
     operations.assign_scalar( 1., x );
     operations.assign_scalar( 1., reference );
-    growth     problem{ operations, forced, quadratic }, reference_problem{ operations, forced, quadratic };
-    fixed_type adaptation( { .05 } ), reference_adaptation( { .05 } );
-    using method_type  = step_type<fixed_type, DenseOutput>;
-    const auto  before = operations.allocations;
-    method_type baseline( operations, reference_problem, reference_adaptation, { method } );
-    const auto  baseline_storage = operations.allocations - before;
-    method_type reused( operations, problem, adaptation, { method, 32, true } );
+    auto  problem_owner              = std::make_shared<growth>( growth{ operations_owner, forced, quadratic } );
+    auto &problem                    = *problem_owner;
+    auto  reference_problem_owner    = std::make_shared<growth>( growth{ operations_owner, forced, quadratic } );
+    auto &reference_problem          = *reference_problem_owner;
+    auto  adaptation_owner           = std::make_shared<fixed_type>( typename fixed_type::params{ .05 } );
+    auto &adaptation                 = *adaptation_owner;
+    auto  reference_adaptation_owner = std::make_shared<fixed_type>( typename fixed_type::params{ .05 } );
+    auto &reference_adaptation       = *reference_adaptation_owner;
+    using method_type                = step_type<fixed_type, DenseOutput>;
+    const auto before                = operations.allocations;
+    auto       baseline_owner        = std::make_shared<method_type>(
+        operations_owner, reference_problem_owner, reference_adaptation_owner, typename method_type::params{ method }
+    );
+    auto      &baseline         = *baseline_owner;
+    const auto baseline_storage = operations.allocations - before;
+    auto       reused_owner     = std::make_shared<method_type>(
+        operations_owner, problem_owner, adaptation_owner, typename method_type::params{ method, 32, true }
+    );
+    auto &reused = *reused_owner;
     require( operations.allocations - before == 2 * baseline_storage, "FSAL adds no trajectory vectors" );
     const auto allocated = operations.allocations;
     double     time      = 0;
@@ -201,15 +215,28 @@ void check_trajectory(
 }
 
 void check_invalidation(
-    counting_operations &operations, vector_type &x, vector_type &reference, vector_type &out,
+    std::shared_ptr<counting_operations> operations_owner, vector_type &x, vector_type &reference, vector_type &out,
     vector_type &reference_out, const std::string &method
 )
 {
-    using method_type = step_type<fixed_type, true>;
-    growth      problem{ operations, true }, reference_problem{ operations, true };
-    fixed_type  adaptation( { .05 } ), reference_adaptation( { .05 } );
-    method_type reused( operations, problem, adaptation, { method, 32, true } );
-    method_type baseline( operations, reference_problem, reference_adaptation, { method } );
+    auto &operations                 = *operations_owner;
+    using method_type                = step_type<fixed_type, true>;
+    auto  problem_owner              = std::make_shared<growth>( growth{ operations_owner, true } );
+    auto &problem                    = *problem_owner;
+    auto  reference_problem_owner    = std::make_shared<growth>( growth{ operations_owner, true } );
+    auto &reference_problem          = *reference_problem_owner;
+    auto  adaptation_owner           = std::make_shared<fixed_type>( typename fixed_type::params{ .05 } );
+    auto &adaptation                 = *adaptation_owner;
+    auto  reference_adaptation_owner = std::make_shared<fixed_type>( typename fixed_type::params{ .05 } );
+    auto &reference_adaptation       = *reference_adaptation_owner;
+    auto  reused_owner               = std::make_shared<method_type>(
+        operations_owner, problem_owner, adaptation_owner, typename method_type::params{ method, 32, true }
+    );
+    auto &reused         = *reused_owner;
+    auto  baseline_owner = std::make_shared<method_type>(
+        operations_owner, reference_problem_owner, reference_adaptation_owner, typename method_type::params{ method }
+    );
+    auto &baseline = *baseline_owner;
     operations.assign_scalar( 1., x );
     operations.assign_scalar( 1., reference );
     double time   = 0;
@@ -300,19 +327,32 @@ void check_invalidation(
 
 template <bool DenseOutput>
 void check_retries(
-    counting_operations &operations, vector_type &x, vector_type &reference, vector_type &out,
+    std::shared_ptr<counting_operations> operations_owner, vector_type &x, vector_type &reference, vector_type &out,
     vector_type &reference_out, const std::string &method
 )
 {
-    using method_type = step_type<adaptive_type, DenseOutput>;
-    growth                problem{ operations, true }, reference_problem{ operations, true };
+    auto &operations                              = *operations_owner;
+    using method_type                             = step_type<adaptive_type, DenseOutput>;
+    auto                  problem_owner           = std::make_shared<growth>( growth{ operations_owner, true } );
+    auto                 &problem                 = *problem_owner;
+    auto                  reference_problem_owner = std::make_shared<growth>( growth{ operations_owner, true } );
+    auto                 &reference_problem       = *reference_problem_owner;
     adaptive_type::params p;
-    p.initial_step       = 1;
-    p.relative_tolerance = 1e-12;
-    p.absolute_tolerance = 1e-14;
-    adaptive_type adaptation( operations, p ), reference_adaptation( operations, p );
-    method_type   reused( operations, problem, adaptation, { method, 32, true } );
-    method_type   baseline( operations, reference_problem, reference_adaptation, { method } );
+    p.initial_step                   = 1;
+    p.relative_tolerance             = 1e-12;
+    p.absolute_tolerance             = 1e-14;
+    auto  adaptation_owner           = std::make_shared<adaptive_type>( operations_owner, p );
+    auto &adaptation                 = *adaptation_owner;
+    auto  reference_adaptation_owner = std::make_shared<adaptive_type>( operations_owner, p );
+    auto &reference_adaptation       = *reference_adaptation_owner;
+    auto  reused_owner               = std::make_shared<method_type>(
+        operations_owner, problem_owner, adaptation_owner, typename method_type::params{ method, 32, true }
+    );
+    auto &reused         = *reused_owner;
+    auto  baseline_owner = std::make_shared<method_type>(
+        operations_owner, reference_problem_owner, reference_adaptation_owner, typename method_type::params{ method }
+    );
+    auto &baseline = *baseline_owner;
     operations.assign_scalar( 1., x );
     operations.assign_scalar( 1., reference );
     double time = 0;
@@ -354,21 +394,28 @@ void check_retries(
     }
 }
 
-void check_failures( counting_operations &operations, vector_type &in, vector_type &out )
+void check_failures( std::shared_ptr<counting_operations> operations_owner, vector_type &in, vector_type &out )
 {
+    auto &operations = *operations_owner;
     operations.assign_scalar( 1., in );
     for ( const auto *method : { "RK23", "RK45", "DOP853" } )
     {
         for ( const std::size_t fail_call : { 1u, 2u } )
         {
-            growth problem{ operations, true };
-            problem.fail_call = fail_call;
+            auto  problem_owner = std::make_shared<growth>( growth{ operations_owner, true } );
+            auto &problem       = *problem_owner;
+            problem.fail_call   = fail_call;
             adaptive_type::params p;
-            p.initial_step       = .5;
-            p.relative_tolerance = .01;
-            p.absolute_tolerance = .001;
-            adaptive_type            adaptation( operations, p );
-            step_type<adaptive_type> recovered( operations, problem, adaptation, { method, 32, true } );
+            p.initial_step         = .5;
+            p.relative_tolerance   = .01;
+            p.absolute_tolerance   = .001;
+            auto  adaptation_owner = std::make_shared<adaptive_type>( operations_owner, p );
+            auto &adaptation       = *adaptation_owner;
+            auto  recovered_owner  = std::make_shared<step_type<adaptive_type>>(
+                operations_owner, problem_owner, adaptation_owner,
+                typename step_type<adaptive_type>::params{ method, 32, true }
+            );
+            auto &recovered = *recovered_owner;
             recovered.apply( in, out );
             require(
                 recovered.get_status() == step_status::converged && recovered.get_attempts() == 2 &&
@@ -380,10 +427,15 @@ void check_failures( counting_operations &operations, vector_type &in, vector_ty
                 "A nonfinite first derivative must never be reused"
             );
         }
-        growth problem{ operations, true };
-        problem.fail_call = 2;
-        fixed_type            fixed( { .1 } );
-        step_type<fixed_type> failed( operations, problem, fixed, { method, 32, true } );
+        auto  problem_owner = std::make_shared<growth>( growth{ operations_owner, true } );
+        auto &problem       = *problem_owner;
+        problem.fail_call   = 2;
+        auto  fixed_owner   = std::make_shared<fixed_type>( typename fixed_type::params{ .1 } );
+        auto &fixed         = *fixed_owner;
+        auto  failed_owner  = std::make_shared<step_type<fixed_type>>(
+            operations_owner, problem_owner, fixed_owner, typename step_type<fixed_type>::params{ method, 32, true }
+        );
+        auto &failed = *failed_owner;
         operations.assign_scalar( 77., out );
         failed.apply( in, out );
         require(
@@ -397,14 +449,20 @@ void check_failures( counting_operations &operations, vector_type &in, vector_ty
             "A terminal failure must discard the derivative cache"
         );
     }
-    growth problem{ operations, true };
-    problem.fail_call = 14;
+    auto  problem_owner = std::make_shared<growth>( growth{ operations_owner, true } );
+    auto &problem       = *problem_owner;
+    problem.fail_call   = 14;
     adaptive_type::params p;
-    p.initial_step       = .5;
-    p.relative_tolerance = .01;
-    p.absolute_tolerance = .001;
-    adaptive_type                  adaptation( operations, p );
-    step_type<adaptive_type, true> dense_retry( operations, problem, adaptation, { "DOP853", 32, true } );
+    p.initial_step          = .5;
+    p.relative_tolerance    = .01;
+    p.absolute_tolerance    = .001;
+    auto  adaptation_owner  = std::make_shared<adaptive_type>( operations_owner, p );
+    auto &adaptation        = *adaptation_owner;
+    auto  dense_retry_owner = std::make_shared<step_type<adaptive_type, true>>(
+        operations_owner, problem_owner, adaptation_owner,
+        typename step_type<adaptive_type, true>::params{ "DOP853", 32, true }
+    );
+    auto &dense_retry = *dense_retry_owner;
     dense_retry.apply( in, out );
     require(
         dense_retry.get_status() == step_status::converged && dense_retry.get_attempts() == 2 &&
@@ -415,8 +473,8 @@ void check_failures( counting_operations &operations, vector_type &in, vector_ty
 
 struct section_manager
 {
-    step_type<fixed_type, true> &step;
-    double                      *end = nullptr;
+    std::shared_ptr<step_type<fixed_type, true>> step;
+    double                                      *end = nullptr;
 
     void set_time_interval( double, double &finish )
     {
@@ -425,7 +483,7 @@ struct section_manager
 
     bool apply( const vector_type &, vector_type &out )
     {
-        *end = step.get_continuous_integration().evaluate( .5, out );
+        *end = step->get_continuous_integration().evaluate( .5, out );
         return true;
     }
 
@@ -435,16 +493,23 @@ struct section_manager
     }
 };
 
-void check_external_manager( counting_operations &operations, vector_type &in, vector_type &out )
+void check_external_manager( std::shared_ptr<counting_operations> operations_owner, vector_type &in, vector_type &out )
 {
+    auto &operations = *operations_owner;
     operations.assign_scalar( 1., in );
-    growth     problem{ operations, true };
-    fixed_type fixed( { .1 } );
-    using method_type = step_type<fixed_type, true>;
-    method_type     step( operations, problem, fixed, { "RK45", 32, true } );
-    section_manager section{ step };
+    auto  problem_owner = std::make_shared<growth>( growth{ operations_owner, true } );
+    auto &problem       = *problem_owner;
+    auto  fixed_owner   = std::make_shared<fixed_type>( typename fixed_type::params{ .1 } );
+    auto &fixed         = *fixed_owner;
+    using method_type   = step_type<fixed_type, true>;
+    auto step_owner     = std::make_shared<method_type>(
+        operations_owner, problem_owner, fixed_owner, typename method_type::params{ "RK45", 32, true }
+    );
+    auto &step          = *step_owner;
+    auto  section_owner = std::make_shared<section_manager>( section_manager{ step_owner } );
+    auto &section       = *section_owner;
     nmfd::time_steppers::integration::time_integrator<counting_operations, method_type, section_manager> integrator(
-        operations, step, {}, &section
+        operations_owner, step_owner, {}, section_owner
     );
     for ( unsigned int run = 0; run < 2; ++run )
     {
@@ -469,7 +534,8 @@ int main()
 try
 {
     backend_type::init_device();
-    counting_operations                            operations( 1 );
+    auto                                           operations_owner = std::make_shared<counting_operations>( 1 );
+    auto                                          &operations       = *operations_owner;
     nmfd::detail::vector_wrap<counting_operations> x( operations ), reference( operations ), sample( operations ),
         reference_sample( operations );
     x.start_use();
@@ -483,23 +549,23 @@ try
             for ( const double direction : { 1., -1. } )
             {
                 check_trajectory<false>(
-                    operations, *x, *reference, *sample, *reference_sample, method, forced, false, direction
+                    operations_owner, *x, *reference, *sample, *reference_sample, method, forced, false, direction
                 );
                 check_trajectory<true>(
-                    operations, *x, *reference, *sample, *reference_sample, method, forced, false, direction
+                    operations_owner, *x, *reference, *sample, *reference_sample, method, forced, false, direction
                 );
             }
         }
-        check_trajectory<true>( operations, *x, *reference, *sample, *reference_sample, method, false, true, 1. );
+        check_trajectory<true>( operations_owner, *x, *reference, *sample, *reference_sample, method, false, true, 1. );
     }
     for ( const auto *method : { "RK23", "RK45", "DOP853" } )
     {
-        check_invalidation( operations, *x, *reference, *sample, *reference_sample, method );
-        check_retries<false>( operations, *x, *reference, *sample, *reference_sample, method );
-        check_retries<true>( operations, *x, *reference, *sample, *reference_sample, method );
+        check_invalidation( operations_owner, *x, *reference, *sample, *reference_sample, method );
+        check_retries<false>( operations_owner, *x, *reference, *sample, *reference_sample, method );
+        check_retries<true>( operations_owner, *x, *reference, *sample, *reference_sample, method );
     }
-    check_failures( operations, *x, *sample );
-    check_external_manager( operations, *x, *sample );
+    check_failures( operations_owner, *x, *sample );
+    check_external_manager( operations_owner, *x, *sample );
     require( operations.live == 4, "FSAL releases all internal vectors" );
     std::cout << "FSAL stage reuse, allocation, invalidation, retry, dense output and external section tests: PASS\n";
 }

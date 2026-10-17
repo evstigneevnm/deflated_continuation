@@ -1,3 +1,4 @@
+#include <memory>
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -68,9 +69,9 @@ struct counting_operations : operations_type
 
 struct forced_growth
 {
-    operations_type &operations;
-    unsigned int     calls = 0, fail_call = 0;
-    double           time = 0;
+    std::shared_ptr<operations_type> operations;
+    unsigned int                     calls = 0, fail_call = 0;
+    double                           time = 0;
 
     static double exact( double time )
     {
@@ -85,18 +86,18 @@ struct forced_growth
     void apply( const vector_type &in, vector_type &out )
     {
         ++calls;
-        operations.assign( in, out );
-        operations.add_mul_scalar( time, 1., out );
+        operations->assign( in, out );
+        operations->add_mul_scalar( time, 1., out );
         if ( calls == fail_call )
         {
-            operations.assign_scalar( std::numeric_limits<double>::infinity(), out );
+            operations->assign_scalar( std::numeric_limits<double>::infinity(), out );
         }
     }
 };
 
 struct quadratic_growth
 {
-    operations_type &operations;
+    std::shared_ptr<operations_type> operations;
 
     static double exact( double time )
     {
@@ -105,12 +106,13 @@ struct quadratic_growth
 
     void apply( const vector_type &in, vector_type &out )
     {
-        operations.mul_pointwise( 1., in, 1., in, out );
+        operations->mul_pointwise( 1., in, 1., in, out );
     }
 };
 
-void check_estimator( operations_type &operations, vector_type &initial, vector_type &result )
+void check_estimator( std::shared_ptr<operations_type> operations_owner, vector_type &initial, vector_type &result )
 {
+    auto &operations = *operations_owner;
     // Independent SciPy rk_step at h=+/-0.5, y(0)=1, f(t,y)=y+t.
     const double candidates[] = { 1.7974425410584143, .71306131960354979 };
     const double errors5[]    = { -4.1973993792493447e-7, -4.2002260698063149e-7 };
@@ -118,15 +120,20 @@ void check_estimator( operations_type &operations, vector_type &initial, vector_
     for ( int direction = 0; direction < 2; ++direction )
     {
         adaptation_type::params p;
-        p.initial_step       = .5;
-        p.maximum_step       = 2;
-        p.relative_tolerance = 1e-5;
-        p.absolute_tolerance = 1e-7;
-        adaptation_type adaptation( operations, p );
-        forced_growth   problem{ operations };
+        p.initial_step         = .5;
+        p.maximum_step         = 2;
+        p.relative_tolerance   = 1e-5;
+        p.absolute_tolerance   = 1e-7;
+        auto  adaptation_owner = std::make_shared<adaptation_type>( operations_owner, p );
+        auto &adaptation       = *adaptation_owner;
+        auto  problem_owner    = std::make_shared<forced_growth>( forced_growth{ operations_owner } );
+        auto &problem          = *problem_owner;
         using step_type =
             nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, adaptation_type>;
-        step_type step( operations, problem, adaptation, { "DOP853" } );
+        auto step_owner = std::make_shared<step_type>(
+            operations_owner, problem_owner, adaptation_owner, typename step_type::params{ "DOP853" }
+        );
+        auto &step = *step_owner;
         step.set_target_time( direction == 0 ? .5 : -.5 );
         step.apply( initial, result );
         require(
@@ -162,19 +169,28 @@ void check_estimator( operations_type &operations, vector_type &initial, vector_
 }
 
 template <bool DenseOutput>
-void check_storage_and_retry( operations_type &operations, vector_type &initial, vector_type &result )
+void check_storage_and_retry(
+    std::shared_ptr<operations_type> operations_owner, vector_type &initial, vector_type &result
+)
 {
-    counting_operations     counted( 1 );
-    forced_growth           problem{ counted };
+    auto                   &operations    = *operations_owner;
+    auto                    counted_owner = std::make_shared<counting_operations>( 1 );
+    auto                   &counted       = *counted_owner;
+    auto                    problem_owner = std::make_shared<forced_growth>( forced_growth{ counted_owner } );
+    auto                   &problem       = *problem_owner;
     adaptation_type::params p;
-    p.initial_step       = 1;
-    p.relative_tolerance = 1e-10;
-    p.absolute_tolerance = 1e-12;
-    adaptation_type adaptation( counted, p );
-    using step_type = nmfd::time_steppers::runge_kutta::explicit_time_step<
-        counting_operations, forced_growth, adaptation_type, DenseOutput>;
+    p.initial_step         = 1;
+    p.relative_tolerance   = 1e-10;
+    p.absolute_tolerance   = 1e-12;
+    auto  adaptation_owner = std::make_shared<adaptation_type>( counted_owner, p );
+    auto &adaptation       = *adaptation_owner;
+    using step_type        = nmfd::time_steppers::runge_kutta::explicit_time_step<
+               counting_operations, forced_growth, adaptation_type, DenseOutput>;
     {
-        step_type step( counted, problem, adaptation, { "DOP853" } );
+        auto step_owner = std::make_shared<step_type>(
+            counted_owner, problem_owner, adaptation_owner, typename step_type::params{ "DOP853" }
+        );
+        auto &step = *step_owner;
         require(
             counted.live == ( DenseOutput ? 20u : 16u ),
             "Adaptive DOP853 owns two error vectors independently of optional dense storage"
@@ -206,17 +222,18 @@ void check_storage_and_retry( operations_type &operations, vector_type &initial,
         require( counted.allocations == allocated, "Adaptive attempts and interpolation must reuse allocations" );
     }
     require( counted.live == 0, "Adaptive error buffers must release their storage" );
-    using fixed_type = nmfd::time_steppers::integration::time_step_adaptation_constant<operations_type>;
-    fixed_type fixed( { .1 } );
+    using fixed_type  = nmfd::time_steppers::integration::time_step_adaptation_constant<operations_type>;
+    auto  fixed_owner = std::make_shared<fixed_type>( typename fixed_type::params{ .1 } );
+    auto &fixed       = *fixed_owner;
     {
         nmfd::time_steppers::runge_kutta::explicit_time_step<counting_operations, forced_growth, fixed_type> step(
-            counted, problem, fixed, { "DOP853" }
+            counted_owner, problem_owner, fixed_owner, { "DOP853" }
         );
         require( counted.live == 14, "Supporting adaptive DOP853 must not add error storage to fixed DOP853" );
     }
     {
         nmfd::time_steppers::runge_kutta::explicit_time_step<counting_operations, forced_growth, adaptation_type> step(
-            counted, problem, adaptation, { "RK45" }
+            counted_owner, problem_owner, adaptation_owner, { "RK45" }
         );
         require( counted.live == 9, "Ordinary embedded RK must retain its single error vector" );
     }
@@ -224,8 +241,9 @@ void check_storage_and_retry( operations_type &operations, vector_type &initial,
 }
 
 template <class Problem>
-void check_integration( operations_type &operations, double end_time )
+void check_integration( std::shared_ptr<operations_type> operations_owner, double end_time )
 {
+    auto                                      &operations = *operations_owner;
     nmfd::detail::vector_wrap<operations_type> initial( operations ), result( operations );
     initial.start_use();
     result.start_use();
@@ -233,16 +251,23 @@ void check_integration( operations_type &operations, double end_time )
     double previous_error = 1;
     for ( const double tolerance : { 1e-5, 1e-8, 1e-11 } )
     {
-        Problem                 problem{ operations };
+        auto                    problem_owner = std::make_shared<Problem>( Problem{ operations_owner } );
+        auto                   &problem       = *problem_owner;
         adaptation_type::params p;
-        p.initial_step       = 1;
-        p.relative_tolerance = tolerance;
-        p.absolute_tolerance = tolerance / 100;
-        adaptation_type adaptation( operations, p );
+        p.initial_step         = 1;
+        p.relative_tolerance   = tolerance;
+        p.absolute_tolerance   = tolerance / 100;
+        auto  adaptation_owner = std::make_shared<adaptation_type>( operations_owner, p );
+        auto &adaptation       = *adaptation_owner;
         using step_type =
             nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, Problem, adaptation_type>;
-        step_type step( operations, problem, adaptation, { "DOP853" } );
-        nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator( operations, step );
+        auto step_owner = std::make_shared<step_type>(
+            operations_owner, problem_owner, adaptation_owner, typename step_type::params{ "DOP853" }
+        );
+        auto                                                                         &step = *step_owner;
+        nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator(
+            operations_owner, step_owner
+        );
         integrator.set_time_interval( 0, end_time );
         for ( int run = 0; run < 2; ++run )
         {
@@ -272,17 +297,23 @@ void check_integration( operations_type &operations, double end_time )
     }
 }
 
-void check_failures( operations_type &operations, vector_type &initial, vector_type &result )
+void check_failures( std::shared_ptr<operations_type> operations_owner, vector_type &initial, vector_type &result )
 {
-    forced_growth           problem{ operations };
+    auto                   &operations    = *operations_owner;
+    auto                    problem_owner = std::make_shared<forced_growth>( forced_growth{ operations_owner } );
+    auto                   &problem       = *problem_owner;
     adaptation_type::params p;
-    p.initial_step       = 1;
-    p.relative_tolerance = 1e-10;
-    p.absolute_tolerance = 1e-12;
-    adaptation_type adaptation( operations, p );
+    p.initial_step         = 1;
+    p.relative_tolerance   = 1e-10;
+    p.absolute_tolerance   = 1e-12;
+    auto  adaptation_owner = std::make_shared<adaptation_type>( operations_owner, p );
+    auto &adaptation       = *adaptation_owner;
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, adaptation_type>;
-    step_type budgeted( operations, problem, adaptation, { "DOP853", 1 } );
+    auto budgeted_owner = std::make_shared<step_type>(
+        operations_owner, problem_owner, adaptation_owner, typename step_type::params{ "DOP853", 1 }
+    );
+    auto &budgeted = *budgeted_owner;
     operations.assign_scalar( 77., result );
     budgeted.apply( initial, result );
     require(
@@ -293,8 +324,11 @@ void check_failures( operations_type &operations, vector_type &initial, vector_t
     p.minimum_step       = .5;
     p.relative_tolerance = 1e-14;
     p.absolute_tolerance = 1e-16;
-    adaptation_type limited( operations, p );
-    step_type       failed( operations, problem, limited, { "DOP853" } );
+    auto limited_owner   = std::make_shared<adaptation_type>( operations_owner, p );
+    auto failed_owner    = std::make_shared<step_type>(
+        operations_owner, problem_owner, limited_owner, typename step_type::params{ "DOP853" }
+    );
+    auto &failed = *failed_owner;
     failed.apply( initial, result );
     require(
         failed.get_status() == step_status::failed_minimum_dt && read( operations, result ) == 77,
@@ -302,9 +336,9 @@ void check_failures( operations_type &operations, vector_type &initial, vector_t
     );
 
     using matlab_type = nmfd::time_steppers::integration::time_step_adaptation_matlab<operations_type>;
-    matlab_type matlab( operations );
+    auto matlab_owner = std::make_shared<matlab_type>( operations_owner );
     nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, matlab_type> unsupported(
-        operations, problem, matlab, { "DOP853" }
+        operations_owner, problem_owner, matlab_owner, { "DOP853" }
     );
     const auto calls = problem.calls;
     unsupported.apply( initial, result );
@@ -314,14 +348,15 @@ void check_failures( operations_type &operations, vector_type &initial, vector_t
         "Controllers without combined assessment must fail before evaluating DOP853"
     );
 
-    p                    = {};
-    p.initial_step       = .5;
-    p.relative_tolerance = .01;
-    p.absolute_tolerance = .001;
-    adaptation_type recovery( operations, p );
-    forced_growth   transient{ operations, 0, 14 };
+    p                     = {};
+    p.initial_step        = .5;
+    p.relative_tolerance  = .01;
+    p.absolute_tolerance  = .001;
+    auto  recovery_owner  = std::make_shared<adaptation_type>( operations_owner, p );
+    auto  transient_owner = std::make_shared<forced_growth>( forced_growth{ operations_owner, 0, 14 } );
+    auto &transient       = *transient_owner;
     nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, adaptation_type, true>
-        recovered( operations, transient, recovery, { "DOP853" } );
+        recovered( operations_owner, transient_owner, recovery_owner, { "DOP853" } );
     recovered.apply( initial, result );
     require(
         recovered.get_status() == step_status::converged && recovered.get_attempts() == 2 && transient.calls == 30 &&
@@ -334,17 +369,18 @@ int main()
 try
 {
     backend_type::init_device();
-    operations_type                            operations( 1 );
+    auto                                       operations_owner = std::make_shared<operations_type>( 1 );
+    auto                                      &operations       = *operations_owner;
     nmfd::detail::vector_wrap<operations_type> initial( operations ), result( operations );
     initial.start_use();
     result.start_use();
     operations.assign_scalar( 1., *initial );
-    check_estimator( operations, *initial, *result );
-    check_storage_and_retry<false>( operations, *initial, *result );
-    check_storage_and_retry<true>( operations, *initial, *result );
-    check_integration<forced_growth>( operations, 2 );
-    check_integration<quadratic_growth>( operations, .5 );
-    check_failures( operations, *initial, *result );
+    check_estimator( operations_owner, *initial, *result );
+    check_storage_and_retry<false>( operations_owner, *initial, *result );
+    check_storage_and_retry<true>( operations_owner, *initial, *result );
+    check_integration<forced_growth>( operations_owner, 2 );
+    check_integration<quadratic_growth>( operations_owner, .5 );
+    check_failures( operations_owner, *initial, *result );
     std::cout << "Adaptive DOP853 estimator, optional storage, tolerance, restart and failure tests: PASS\n";
 }
 catch ( const std::exception &error )

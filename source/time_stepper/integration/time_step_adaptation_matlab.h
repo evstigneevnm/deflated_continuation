@@ -2,6 +2,7 @@
 #define NMFD_TIME_STEPPERS_ADAPTATION_MATLAB_H
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <stdexcept>
 #include <utility>
 #include <time_stepper/detail/scaled_error_mapping.h>
@@ -28,9 +29,11 @@ public:
         scalar_type maximum_step       = scalar_type( 1 );
     };
 
-    time_step_adaptation_matlab( VectorOperations &operations, const params &p = {} )
-        : operations_( operations ), params_( p )
+    time_step_adaptation_matlab( std::shared_ptr<VectorOperations> operations, const params &p = {} )
+        : operations_( std::move( operations ) ), params_( p )
     {
+        if ( !operations_ )
+            throw std::invalid_argument( "Adaptation requires vector operations" );
         const scalar_type values[] = {
             p.relative_tolerance, p.absolute_tolerance, p.initial_step, p.minimum_step, p.maximum_step
         };
@@ -82,7 +85,7 @@ public:
         const detail::scaled_error_mapping<scalar_type> mapping{
             params_.absolute_tolerance / params_.relative_tolerance
         };
-        const auto err = operations_.transform_reduce_max( mapping, *error, in, out ) / params_.relative_tolerance;
+        const auto err = operations_->transform_reduce_max( mapping, *error, in, out ) / params_.relative_tolerance;
         const auto h   = std::abs( dt_used );
         if ( !std::isfinite( err ) )
         {
@@ -133,10 +136,10 @@ public:
     }
 
 private:
-    VectorOperations &operations_;
-    params            params_;
-    scalar_type       dt_;
-    bool              rejected_;
+    std::shared_ptr<VectorOperations> operations_;
+    params                            params_;
+    scalar_type                       dt_;
+    bool                              rejected_;
 };
 }
 }

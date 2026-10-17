@@ -1,3 +1,4 @@
+#include <memory>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -48,9 +49,9 @@ double read( const operations_type &ops, const vector_type &x )
 
 struct growth
 {
-    operations_type &ops;
-    double           time  = 0;
-    unsigned int     calls = 0, fail_call = 0;
+    std::shared_ptr<operations_type> ops;
+    double                           time  = 0;
+    unsigned int                     calls = 0, fail_call = 0;
 
     void set_time( double t )
     {
@@ -60,11 +61,11 @@ struct growth
     void apply( const vector_type &in, vector_type &out )
     {
         ++calls;
-        ops.assign( in, out );
-        ops.add_mul_scalar( time, 1., out );
+        ops->assign( in, out );
+        ops->add_mul_scalar( time, 1., out );
         if ( calls == fail_call )
         {
-            ops.assign_scalar( std::numeric_limits<double>::infinity(), out );
+            ops->assign_scalar( std::numeric_limits<double>::infinity(), out );
         }
     }
 };
@@ -108,8 +109,9 @@ using disabled_step = nmfd::time_steppers::runge_kutta::explicit_time_step<opera
 using dense_step    = nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, growth, fixed_type, true>;
 static_assert( !has_dense<disabled_step>::value && has_dense<dense_step>::value );
 
-void check_methods( operations_type &ops, vector_type &in, vector_type &out, vector_type &sample )
+void check_methods( std::shared_ptr<operations_type> ops_owner, vector_type &in, vector_type &out, vector_type &sample )
 {
+    auto &ops = *ops_owner;
     for ( const auto *method : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK4", "RK64SSP", "RK45" } )
     {
         for ( const double direction : { 1., -1. } )
@@ -118,14 +120,21 @@ void check_methods( operations_type &ops, vector_type &in, vector_type &out, vec
             unsigned int order = 0;
             for ( int level = 0; level < 3; ++level )
             {
-                counting_operations counted( 1 );
-                growth              problem{ counted };
-                fixed_type          fixed( { .2 / std::pow( 2., level ) } );
+                auto  counted_owner = std::make_shared<counting_operations>( 1 );
+                auto &counted       = *counted_owner;
+                auto  problem_owner = std::make_shared<growth>( growth{ counted_owner } );
+                auto &problem       = *problem_owner;
+                auto  fixed_owner =
+                    std::make_shared<fixed_type>( typename fixed_type::params{ .2 / std::pow( 2., level ) } );
+                auto &fixed = *fixed_owner;
                 using step_type =
                     nmfd::time_steppers::runge_kutta::explicit_time_step<counting_operations, growth, fixed_type, true>;
                 {
-                    step_type step( counted, problem, fixed, { method } );
-                    order = step.dense_output_order();
+                    auto step_owner = std::make_shared<step_type>(
+                        counted_owner, problem_owner, fixed_owner, typename step_type::params{ method }
+                    );
+                    auto &step = *step_owner;
+                    order      = step.dense_output_order();
                     if ( std::string( method ) == "RK4" )
                     {
                         require( order == 3, "RK4 uses third-order Hermite dense output" );
@@ -192,17 +201,22 @@ void check_methods( operations_type &ops, vector_type &in, vector_type &out, vec
     }
 }
 
-void check_lifecycle( operations_type &ops, vector_type &in, vector_type &out, vector_type &sample )
+void check_lifecycle(
+    std::shared_ptr<operations_type> ops_owner, vector_type &in, vector_type &out, vector_type &sample
+)
 {
-    growth                problem{ ops };
+    auto                 &ops           = *ops_owner;
+    auto                  problem_owner = std::make_shared<growth>( growth{ ops_owner } );
+    auto                 &problem       = *problem_owner;
     adaptive_type::params p;
-    p.initial_step       = 1;
-    p.relative_tolerance = 1e-11;
-    p.absolute_tolerance = 1e-13;
-    adaptive_type adaptation( ops, p );
+    p.initial_step        = 1;
+    p.relative_tolerance  = 1e-11;
+    p.absolute_tolerance  = 1e-13;
+    auto adaptation_owner = std::make_shared<adaptive_type>( ops_owner, p );
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, growth, adaptive_type, true>;
-    step_type step( ops, problem, adaptation );
+    auto  step_owner = std::make_shared<step_type>( ops_owner, problem_owner, adaptation_owner );
+    auto &step       = *step_owner;
     require( step.get_status() == nmfd::time_steppers::single_step_status::idle, "New dense step is idle" );
     bool refused = false;
     try
@@ -270,9 +284,12 @@ void check_lifecycle( operations_type &ops, vector_type &in, vector_type &out, v
     require( refused, "Old dense handle cannot observe a new pending step" );
 
     // SSP33's stages succeed but the extra endpoint derivative fails.
-    fixed_type fixed( { .1 } );
-    growth     bad{ ops, 0, 0, 4 };
-    dense_step failed( ops, bad, fixed, { "RK33SSP" } );
+    auto  fixed_owner = std::make_shared<fixed_type>( typename fixed_type::params{ .1 } );
+    auto &fixed       = *fixed_owner;
+    auto  bad_owner   = std::make_shared<growth>( growth{ ops_owner, 0, 0, 4 } );
+    auto  failed_owner =
+        std::make_shared<dense_step>( ops_owner, bad_owner, fixed_owner, typename dense_step::params{ "RK33SSP" } );
+    auto &failed = *failed_owner;
     ops.assign_scalar( 77., out );
     failed.apply( in, out );
     require(
@@ -293,11 +310,11 @@ void check_lifecycle( operations_type &ops, vector_type &in, vector_type &out, v
 
 struct section_manager
 {
-    operations_type   &ops;
-    dense_step        &step;
-    double             start  = 0;
-    double            *end    = nullptr;
-    integration_status status = integration_status::running;
+    std::shared_ptr<operations_type> ops;
+    std::shared_ptr<dense_step>      step;
+    double                           start  = 0;
+    double                          *end    = nullptr;
+    integration_status               status = integration_status::running;
 
     void set_time_interval( const double &t, double &next )
     {
@@ -308,17 +325,17 @@ struct section_manager
     bool apply( const vector_type &in, vector_type &out )
     {
         const auto threshold = exact( .35 );
-        if ( read( ops, in ) > threshold || read( ops, out ) < threshold )
+        if ( read( *ops, in ) > threshold || read( *ops, out ) < threshold )
         {
             return false;
         }
-        const auto dense = step.get_continuous_integration();
+        const auto dense = step->get_continuous_integration();
         double     left = 0, right = 1;
         for ( int i = 0; i < 45; ++i )
         {
             const auto theta = ( left + right ) / 2;
             dense.evaluate( theta, out );
-            if ( read( ops, out ) < threshold )
+            if ( read( *ops, out ) < threshold )
             {
                 left = theta;
             }
@@ -342,19 +359,24 @@ int main()
 try
 {
     backend_type::init_device();
-    operations_type                            ops( 1 );
+    auto                                       ops_owner = std::make_shared<operations_type>( 1 );
+    auto                                      &ops       = *ops_owner;
     nmfd::detail::vector_wrap<operations_type> in( ops ), out( ops ), sample( ops );
     in.start_use();
     out.start_use();
     sample.start_use();
-    check_methods( ops, *in, *out, *sample );
-    check_lifecycle( ops, *in, *out, *sample );
-    growth          problem{ ops };
-    fixed_type      fixed( { .1 } );
-    dense_step      step( ops, problem, fixed );
-    section_manager external{ ops, step };
+    check_methods( ops_owner, *in, *out, *sample );
+    check_lifecycle( ops_owner, *in, *out, *sample );
+    auto  problem_owner  = std::make_shared<growth>( growth{ ops_owner } );
+    auto &problem        = *problem_owner;
+    auto  fixed_owner    = std::make_shared<fixed_type>( typename fixed_type::params{ .1 } );
+    auto &fixed          = *fixed_owner;
+    auto  step_owner     = std::make_shared<dense_step>( ops_owner, problem_owner, fixed_owner );
+    auto &step           = *step_owner;
+    auto  external_owner = std::make_shared<section_manager>( section_manager{ ops_owner, step_owner } );
+    auto &external       = *external_owner;
     nmfd::time_steppers::integration::time_integrator<operations_type, dense_step, section_manager> integrator(
-        ops, step, {}, &external
+        ops_owner, step_owner, {}, external_owner
     );
     ops.assign_scalar( 1., *in );
     integrator.set_time_interval( 0, 1 );

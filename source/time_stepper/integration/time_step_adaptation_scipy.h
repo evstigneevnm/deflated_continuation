@@ -4,8 +4,10 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
 #include <time_stepper/detail/scipy_error_mapping.h>
 #include <time_stepper/detail/status.h>
 
@@ -33,9 +35,11 @@ public:
         scalar_type maximum_step       = scalar_type( 1 );
     };
 
-    time_step_adaptation_scipy( VectorOperations &operations, const params &p = {} )
-        : operations_( operations ), params_( p )
+    time_step_adaptation_scipy( std::shared_ptr<VectorOperations> operations, const params &p = {} )
+        : operations_( std::move( operations ) ), params_( p )
     {
+        if ( !operations_ )
+            throw std::invalid_argument( "Adaptation requires vector operations" );
         const scalar_type values[] = {
             p.relative_tolerance, p.absolute_tolerance, p.initial_step, p.minimum_step, p.maximum_step
         };
@@ -46,7 +50,7 @@ public:
                 throw std::invalid_argument( "Adaptive-step parameters must be positive and finite" );
             }
         }
-        if ( p.minimum_step > p.maximum_step || operations_.get_vector_size() == 0 )
+        if ( p.minimum_step > p.maximum_step || operations_->get_vector_size() == 0 )
         {
             throw std::invalid_argument( "Inverted adaptive-step bounds or empty vector space" );
         }
@@ -101,15 +105,15 @@ public:
         {
             return adaptation_status::failed;
         }
-        const auto count = static_cast<scalar_type>( operations_.get_vector_size() );
+        const auto count = static_cast<scalar_type>( operations_->get_vector_size() );
         const detail::scipy_error_square_mapping<scalar_type> mapping{
             params_.absolute_tolerance, params_.relative_tolerance
         };
-        const auto square = operations_.transform_reduce_sum( mapping, *error, in, out );
+        const auto square = operations_->transform_reduce_sum( mapping, *error, in, out );
         auto       ratio  = std::sqrt( square / count );
         if ( error3 )
         {
-            const auto square3 = operations_.transform_reduce_sum( mapping, *error3, in, out );
+            const auto square3 = operations_->transform_reduce_sum( mapping, *error3, in, out );
             if ( !std::isfinite( square ) || !std::isfinite( square3 ) )
             {
                 const auto decision = reject_step( dt_used );
@@ -142,10 +146,10 @@ public:
     }
 
 private:
-    VectorOperations &operations_;
-    params            params_;
-    scalar_type       dt_;
-    bool              rejected_;
+    std::shared_ptr<VectorOperations> operations_;
+    params                            params_;
+    scalar_type                       dt_;
+    bool                              rejected_;
 
     adaptation_status reject_with_step( scalar_type next )
     {

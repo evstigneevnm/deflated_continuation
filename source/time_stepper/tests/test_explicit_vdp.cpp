@@ -1,3 +1,4 @@
+#include <memory>
 #include "explicit_vdp_problem.h"
 #include <cmath>
 #include <iostream>
@@ -23,8 +24,9 @@ int main()
 try
 {
     backend_type::init_device();
-    using operations_type = scfd_vector_operations<backend_type, double>;
-    operations_type                            operations( 2 );
+    using operations_type                                       = scfd_vector_operations<backend_type, double>;
+    auto                                       operations_owner = std::make_shared<operations_type>( 2 );
+    auto                                      &operations       = *operations_owner;
     nmfd::detail::vector_wrap<operations_type> initial_wrap( operations ), result_wrap( operations );
     initial_wrap.start_use();
     result_wrap.start_use();
@@ -34,19 +36,25 @@ try
     // SciPy DOP853, rtol=3e-14, atol=1e-14; independently cross-checked with Radau.
     const scfd::static_vec::vec<double, 2> reference{ 1.5081442369756097, -.78021807462969694 };
     operations.set( initial_values.d, initial );
-    nmfd::time_steppers::tests::explicit_vdp_problem<operations_type> problem;
+    using problem_type    = nmfd::time_steppers::tests::explicit_vdp_problem<operations_type>;
+    auto  problem_owner   = std::make_shared<problem_type>();
+    auto &problem         = *problem_owner;
     using adaptation_type = nmfd::time_steppers::integration::time_step_adaptation_matlab<operations_type>;
     adaptation_type::params p;
-    p.relative_tolerance = 1e-10;
-    p.absolute_tolerance = 1e-12;
-    p.initial_step       = .1;
-    adaptation_type adaptation( operations, p );
+    p.relative_tolerance  = 1e-10;
+    p.absolute_tolerance  = 1e-12;
+    p.initial_step        = .1;
+    auto adaptation_owner = std::make_shared<adaptation_type>( operations_owner, p );
     using step_type =
-        nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, decltype( problem ), adaptation_type>;
+        nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, problem_type, adaptation_type>;
     for ( const auto *method : { "RK45", "RK23" } )
     {
-        step_type step( operations, problem, adaptation, { method } );
-        nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator( operations, step );
+        auto step_owner = std::make_shared<step_type>(
+            operations_owner, problem_owner, adaptation_owner, typename step_type::params{ method }
+        );
+        nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator(
+            operations_owner, step_owner
+        );
         integrator.set_time_interval( 0, 1 );
         for ( int run = 0; run < 2; ++run )
         {
@@ -69,16 +77,19 @@ try
     }
     using constant_type = nmfd::time_steppers::integration::time_step_adaptation_constant<operations_type>;
     using fixed_step_type =
-        nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, decltype( problem ), constant_type>;
+        nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, problem_type, constant_type>;
     for ( const auto *method : { "EE", "HE", "RK23", "RK33SSP", "RK43SSP", "RK4", "RK64SSP", "RK45" } )
     {
         double errors[2]{};
         for ( int resolution = 0; resolution < 2; ++resolution )
         {
-            constant_type   constant( { 1.0 / ( 100 * ( resolution + 1 ) ) } );
-            fixed_step_type fixed_step( operations, problem, constant, { method } );
+            auto constant_owner =
+                std::make_shared<constant_type>( typename constant_type::params{ 1.0 / ( 100 * ( resolution + 1 ) ) } );
+            auto fixed_step_owner = std::make_shared<fixed_step_type>(
+                operations_owner, problem_owner, constant_owner, typename fixed_step_type::params{ method }
+            );
             nmfd::time_steppers::integration::time_integrator<operations_type, fixed_step_type> fixed(
-                operations, fixed_step
+                operations_owner, fixed_step_owner
             );
             fixed.set_time_interval( 0, 1 );
             fixed.apply( initial, result );

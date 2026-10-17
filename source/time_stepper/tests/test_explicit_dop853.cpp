@@ -1,3 +1,4 @@
+#include <memory>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -41,21 +42,21 @@ double read( const operations_type &operations, const vector_type &state )
 
 struct linear_growth
 {
-    operations_type &operations;
-    std::size_t      calls = 0;
+    std::shared_ptr<operations_type> operations;
+    std::size_t                      calls = 0;
 
     void apply( const vector_type &in, vector_type &out )
     {
         ++calls;
-        operations.assign( in, out );
+        operations->assign( in, out );
     }
 };
 
 struct forced_growth
 {
-    operations_type &operations;
-    std::size_t      calls = 0;
-    double           time  = 0;
+    std::shared_ptr<operations_type> operations;
+    std::size_t                      calls = 0;
+    double                           time  = 0;
 
     void set_time( double value )
     {
@@ -65,27 +66,27 @@ struct forced_growth
     void apply( const vector_type &in, vector_type &out )
     {
         ++calls;
-        operations.assign( in, out );
-        operations.add_mul_scalar( time, 1., out );
+        operations->assign( in, out );
+        operations->add_mul_scalar( time, 1., out );
     }
 };
 
 struct quadratic_growth
 {
-    operations_type &operations;
-    std::size_t      calls = 0;
+    std::shared_ptr<operations_type> operations;
+    std::size_t                      calls = 0;
 
     void apply( const vector_type &in, vector_type &out )
     {
         ++calls;
-        operations.mul_pointwise( 1., in, 1., in, out );
+        operations->mul_pointwise( 1., in, 1., in, out );
     }
 };
 
 struct limited_rate
 {
-    operations_type &operations;
-    double           time = 0;
+    std::shared_ptr<operations_type> operations;
+    double                           time = 0;
 
     void set_time( double value )
     {
@@ -94,15 +95,18 @@ struct limited_rate
 
     void apply( const vector_type &, vector_type &out )
     {
-        operations.assign_scalar( time > .75 ? std::numeric_limits<double>::infinity() : 1., out );
+        operations->assign_scalar( time > .75 ? std::numeric_limits<double>::infinity() : 1., out );
     }
 };
 
 template <class Problem>
 void check_convergence(
-    operations_type &operations, Problem &problem, double end_time, double coarse_step, double exact, const char *name
+    std::shared_ptr<operations_type> operations_owner, std::shared_ptr<Problem> problem_owner, double end_time,
+    double coarse_step, double exact, const char *name
 )
 {
+    auto                                      &operations = *operations_owner;
+    auto                                      &problem    = *problem_owner;
     nmfd::detail::vector_wrap<operations_type> initial( operations ), result( operations );
     initial.start_use();
     result.start_use();
@@ -110,11 +114,18 @@ void check_convergence(
     double errors[3]{};
     for ( int level = 0; level < 3; ++level )
     {
-        adaptation_type adaptation( { coarse_step / ( 1 << level ) } );
+        auto adaptation_owner =
+            std::make_shared<adaptation_type>( typename adaptation_type::params{ coarse_step / ( 1 << level ) } );
+        auto &adaptation = *adaptation_owner;
         using step_type =
             nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, Problem, adaptation_type>;
-        step_type step( operations, problem, adaptation, { "DOP853" } );
-        nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator( operations, step );
+        auto step_owner = std::make_shared<step_type>(
+            operations_owner, problem_owner, adaptation_owner, typename step_type::params{ "DOP853" }
+        );
+        auto                                                                         &step = *step_owner;
+        nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator(
+            operations_owner, step_owner
+        );
         problem.calls = 0;
         integrator.set_time_interval( 0, end_time );
         integrator.apply( *initial, *result );
@@ -141,17 +152,23 @@ void check_convergence(
     }
 }
 
-void check_lifecycle( operations_type &operations )
+void check_lifecycle( std::shared_ptr<operations_type> operations_owner )
 {
+    auto                                      &operations = *operations_owner;
     nmfd::detail::vector_wrap<operations_type> initial( operations ), result( operations );
     initial.start_use();
     result.start_use();
     operations.assign_scalar( 1., *initial );
-    linear_growth   problem{ operations };
-    adaptation_type adaptation( { .5 } );
+    auto  problem_owner    = std::make_shared<linear_growth>( linear_growth{ operations_owner } );
+    auto &problem          = *problem_owner;
+    auto  adaptation_owner = std::make_shared<adaptation_type>( typename adaptation_type::params{ .5 } );
+    auto &adaptation       = *adaptation_owner;
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, linear_growth, adaptation_type>;
-    step_type step( operations, problem, adaptation, { "DOP853" } );
+    auto step_owner = std::make_shared<step_type>(
+        operations_owner, problem_owner, adaptation_owner, typename step_type::params{ "DOP853" }
+    );
+    auto &step = *step_owner;
     step.apply( *initial, *result );
     require(
         step.get_status() == step_status::converged && problem.calls == 13 && step.dense_output_order() == 0,
@@ -179,7 +196,9 @@ void check_lifecycle( operations_type &operations )
     require( refused, "Pending DOP853 candidates must be finalized before reuse" );
     step.finalize( adaptation_status::accepted, .5, *result );
 
-    nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator( operations, step );
+    nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator(
+        operations_owner, step_owner
+    );
     integrator.set_time_interval( 0, .75 );
     for ( int run = 0; run < 2; ++run )
     {
@@ -208,7 +227,9 @@ void check_lifecycle( operations_type &operations )
     );
 
     operations.assign_scalar( 1., *initial );
-    nmfd::time_steppers::integration::time_integrator<operations_type, step_type> budgeted( operations, step, { 1 } );
+    nmfd::time_steppers::integration::time_integrator<operations_type, step_type> budgeted(
+        operations_owner, step_owner, { 1 }
+    );
     budgeted.apply( *initial, *result );
     require(
         budgeted.get_status() == integration_status::attempt_limit_reached && budgeted.get_final_time() == .5 &&
@@ -217,9 +238,9 @@ void check_lifecycle( operations_type &operations )
     );
 
     using adaptive_type = nmfd::time_steppers::integration::time_step_adaptation_matlab<operations_type>;
-    adaptive_type adaptive( operations );
+    auto adaptive_owner = std::make_shared<adaptive_type>( operations_owner );
     nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, linear_growth, adaptive_type> unsupported(
-        operations, problem, adaptive, { "DOP853" }
+        operations_owner, problem_owner, adaptive_owner, { "DOP853" }
     );
     operations.assign_scalar( 77., *result );
     const auto calls = problem.calls;
@@ -239,11 +260,16 @@ void check_lifecycle( operations_type &operations )
         "DOP853 detects floating-point time stagnation without changing output"
     );
 
-    limited_rate bad{ operations };
+    auto bad_owner = std::make_shared<limited_rate>( limited_rate{ operations_owner } );
     using failing_step =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, limited_rate, adaptation_type>;
-    failing_step failed( operations, bad, adaptation, { "DOP853" } );
-    nmfd::time_steppers::integration::time_integrator<operations_type, failing_step> failure( operations, failed );
+    auto failed_owner = std::make_shared<failing_step>(
+        operations_owner, bad_owner, adaptation_owner, typename failing_step::params{ "DOP853" }
+    );
+    auto                                                                            &failed = *failed_owner;
+    nmfd::time_steppers::integration::time_integrator<operations_type, failing_step> failure(
+        operations_owner, failed_owner
+    );
     failure.apply( *initial, *initial );
     require(
         failure.get_status() == integration_status::step_failure &&
@@ -257,14 +283,15 @@ int main()
 try
 {
     backend_type::init_device();
-    operations_type  operations( 1 );
-    linear_growth    linear{ operations };
-    forced_growth    forced{ operations };
-    quadratic_growth nonlinear{ operations };
-    check_convergence( operations, linear, 2, 1, std::exp( 2. ), "u'=u" );
-    check_convergence( operations, forced, 2, 1, 2 * std::exp( 2. ) - 3, "u'=u+t" );
-    check_convergence( operations, nonlinear, .5, .25, 2, "u'=u^2" );
-    check_lifecycle( operations );
+    auto  operations_owner = std::make_shared<operations_type>( 1 );
+    auto &operations       = *operations_owner;
+    auto  linear_owner     = std::make_shared<linear_growth>( linear_growth{ operations_owner } );
+    auto  forced_owner     = std::make_shared<forced_growth>( forced_growth{ operations_owner } );
+    auto  nonlinear_owner  = std::make_shared<quadratic_growth>( quadratic_growth{ operations_owner } );
+    check_convergence( operations_owner, linear_owner, 2, 1, std::exp( 2. ), "u'=u" );
+    check_convergence( operations_owner, forced_owner, 2, 1, 2 * std::exp( 2. ) - 3, "u'=u+t" );
+    check_convergence( operations_owner, nonlinear_owner, .5, .25, 2, "u'=u^2" );
+    check_lifecycle( operations_owner );
     std::cout << "Fixed DOP853 analytical order, endpoint, restart, capability and failure tests: PASS\n";
 }
 catch ( const std::exception &e )

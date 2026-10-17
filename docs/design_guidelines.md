@@ -31,6 +31,12 @@ not require changes to unrelated algorithm interfaces.
   adjoints, and stationary/transient formulations reuse kernels and prepared data.
 - Use RAII ownership and explicit non-owning lifetimes. Keep reusable workspaces
   inside their owners, not in public evaluation argument lists.
+- Updated classes retain externally supplied computational dependencies through
+  `std::shared_ptr`. Loggers are non-owning `Log*` pointers and must outlive every
+  object using them. Evaluation methods borrow references or optional pointers.
+  Internal workspaces remain values/RAII objects. Borrowed views must not outlive
+  their owner. Do not create ownership cycles or wrap stack objects with no-op
+  shared-pointer deleters.
 - Reuse allocations, sparse patterns, FFT plans, and preconditioner resources.
   Avoid hidden copies, transfers, and synchronization; measure performance.
 - Use SCFD `operator()` indexing and backend operations for large vector mappings.

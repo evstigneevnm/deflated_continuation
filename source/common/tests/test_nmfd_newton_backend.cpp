@@ -126,9 +126,10 @@ void test( bool full_check )
     typename strategy_type::params p;
     p.perform_full_check      = full_check;
     p.max_backtracking_trials = 3;
-    auto         strategy     = std::make_shared<strategy_type>( operations, nullptr, p );
-    solver_type  solver( operations, nullptr, iteration, strategy );
-    problem_type problem( *operations );
+    auto        strategy      = std::make_shared<strategy_type>( operations, nullptr, p );
+    solver_type solver( operations, nullptr, iteration, strategy );
+    auto        problem_owner = std::make_shared<problem_type>( *operations );
+    auto       &problem       = *problem_owner;
     nmfd::detail::vector_wrap<operations_type, false, false> initial( *operations ), state( *operations ),
         residual( *operations );
     initial.init();
@@ -184,8 +185,9 @@ void test( bool full_check )
         );
     }
     operations->assign_scalar( T( 2 ), *initial );
-    projection_type projection{ *operations, 0, 3 };
-    const auto      residual_calls = problem.residual_calls;
+    auto       projection_owner = std::make_shared<projection_type>( projection_type{ *operations, 0, 3 } );
+    auto      &projection       = *projection_owner;
+    const auto residual_calls   = problem.residual_calls;
     require(
         !solver.solve( &problem, &projection, nullptr, *initial, *state ) &&
             strategy->get_result_status() == ( full_check ? 10 : 3 ) && projection.calls == 3,
@@ -206,12 +208,12 @@ void test( bool full_check )
     problem.apply( *state, *residual );
     require( operations->norm_l2( *residual ) == T( 0 ), "backend projection recovery root is incorrect" );
 
-    solver.set_nonlinear_operator( &problem );
+    solver.set_nonlinear_operator( problem_owner );
     require( solver.solve( *initial, *state ), "backend bound out-of-place solve failed" );
     problem.apply( *state, *residual );
     require( operations->norm_l2( *residual ) == T( 0 ), "backend bound solve root is incorrect" );
     const auto projection_calls = projection.calls;
-    solver.set_project_operator( &projection );
+    solver.set_project_operator( projection_owner );
     operations->assign( *initial, *state );
     require(
         solver.solve( *state ) && projection.calls == projection_calls + 1,
@@ -247,10 +249,10 @@ void test( bool full_check )
     problem.apply( *state, *residual );
     require( operations->norm_l2( *residual ) == T( 0 ), "backend shared solve root is incorrect" );
     solver.set_project_operator( nullptr );
-    solver.set_nonlinear_operator( &problem );
+    solver.set_nonlinear_operator( problem_owner );
     require(
         retained_problem.expired() && retained_projection.expired() && solver.solve( *initial, *state ),
-        "backend borrowed rebinding did not release shared owners"
+        "backend shared rebinding did not release shared owners"
     );
 }
 

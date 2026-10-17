@@ -30,8 +30,14 @@ committed output. `apply()` on the integrator starts a fresh trajectory.
 Construction and `reset()` report `idle`. A successful single-step `apply()`
 reports `converged`; `finalize()` retains that numerical result status.
 External managers own their own reset policy and receive the actual step interval.
-Vector operations, problem, adaptation, step, and external manager must outlive
-their non-owning consumers. Do not share mutable instances between trajectories.
+Constructors retain vector operations, problem, adaptation, step, and optional
+external manager through `std::shared_ptr`. Required dependencies cannot be null.
+Loggers, where used, remain borrowed `Log*` pointers and must outlive their users.
+Problem objects and external managers use the same shared ownership for retained
+dependencies. Callback time references are valid only during the current step's
+external processing; continuous-integration handles remain borrowed views.
+Evaluation methods borrow vectors; internal stages still use `vector_wrap`.
+Do not share mutable instances between concurrent trajectories or create owner cycles.
 
 Primary and embedded orders are separate. The error vector includes the step
 size, and `error_order()` is its scaling exponent. `SDIRK3(1)3` retains the legacy
@@ -74,6 +80,7 @@ Endpoint derivative reuse is opt-in for RK23, RK45, and the extended DOP853 tabl
 step_type::params p;
 p.method = "RK45";
 p.reuse_endpoint_rate = true;
+// operations, problem, and adaptation are shared_ptr instances.
 step_type step(operations, problem, adaptation, p);
 ```
 
@@ -106,7 +113,8 @@ auto dense = step.get_continuous_integration();
 const auto sample_time = dense.evaluate(theta, sample); // theta in [0,1]
 ```
 
-The manager borrows the stepper. No changes to the problem or integration interface
+The manager can retain the stepper; each interpolation view borrows its pending step.
+No changes to the problem or integration interface
 are required. A view is valid only for its pending step; `finalize()`, `reset()`,
 or the next `apply()` invalidate it, including when a newer step is pending.
 The stepper must stay alive at the same address while a view is used.

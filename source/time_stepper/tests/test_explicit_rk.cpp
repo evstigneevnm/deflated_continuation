@@ -1,3 +1,4 @@
+#include <memory>
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -38,7 +39,8 @@ void test_error_scaling()
     using vector_operations_type = scfd_vector_operations<backend_type, T>;
     using adaptation_type = nmfd::time_steppers::integration::time_step_adaptation_matlab<vector_operations_type>;
     using status_type     = nmfd::time_steppers::adaptation_status;
-    vector_operations_type                            operations( 3 );
+    auto                                              operations_owner = std::make_shared<vector_operations_type>( 3 );
+    auto                                             &operations       = *operations_owner;
     nmfd::detail::vector_wrap<vector_operations_type> previous( operations ), candidate( operations ),
         error( operations );
     previous.start_use();
@@ -49,11 +51,12 @@ void test_error_scaling()
     operations.set( x.d, *previous );
     operations.set( y.d, *candidate );
     typename adaptation_type::params p;
-    p.absolute_tolerance = T( .02 );
-    p.relative_tolerance = T( .01 );
-    adaptation_type adaptation( operations, p );
-    const T         tolerance = 64 * std::numeric_limits<T>::epsilon();
-    T               next      = 0;
+    p.absolute_tolerance     = T( .02 );
+    p.relative_tolerance     = T( .01 );
+    auto    adaptation_owner = std::make_shared<adaptation_type>( operations_owner, p );
+    auto   &adaptation       = *adaptation_owner;
+    const T tolerance        = 64 * std::numeric_limits<T>::epsilon();
+    T       next             = 0;
     for ( const T ratio : { T( .25 ), T( 4 ) } )
     {
         T expected = 0;
@@ -140,7 +143,7 @@ void test_error_scaling()
             bool refused                                                                           = false;
             try
             {
-                adaptation_type invalid_adaptation( operations, invalid_params );
+                auto invalid_adaptation_owner = std::make_shared<adaptation_type>( operations_owner, invalid_params );
             }
             catch ( const std::invalid_argument & )
             {
@@ -181,8 +184,8 @@ struct counting_operations : operations_type
 // Non-autonomous exact solution u(t)=2*exp(t)-t-1, u(0)=1.
 struct forced_growth
 {
-    operations_type &operations;
-    double           time = 0;
+    std::shared_ptr<operations_type> operations;
+    double                           time = 0;
 
     void set_time( double t )
     {
@@ -191,25 +194,25 @@ struct forced_growth
 
     void apply( const vector_type &in, vector_type &out )
     {
-        operations.assign( in, out );
-        operations.add_mul_scalar( time, 1., out );
+        operations->assign( in, out );
+        operations->add_mul_scalar( time, 1., out );
     }
 };
 
 struct constant_rate
 {
-    operations_type &operations;
+    std::shared_ptr<operations_type> operations;
 
     void apply( const vector_type &, vector_type &out )
     {
-        operations.assign_scalar( 1., out );
+        operations->assign_scalar( 1., out );
     }
 };
 
 struct limited_rate
 {
-    operations_type &operations;
-    double           time = 0;
+    std::shared_ptr<operations_type> operations;
+    double                           time = 0;
 
     void set_time( double t )
     {
@@ -218,13 +221,13 @@ struct limited_rate
 
     void apply( const vector_type &, vector_type &out )
     {
-        operations.assign_scalar( time > .08 ? std::numeric_limits<double>::infinity() : 1., out );
+        operations->assign_scalar( time > .08 ? std::numeric_limits<double>::infinity() : 1., out );
     }
 };
 
 struct stop_at_section
 {
-    operations_type                        &operations;
+    std::shared_ptr<operations_type>        operations;
     double                                  start  = 0;
     double                                 *end    = nullptr;
     nmfd::time_steppers::integration_status status = nmfd::time_steppers::integration_status::running;
@@ -246,8 +249,8 @@ struct stop_at_section
             return false;
         }
         *end = .35;
-        operations.assign( in, out );
-        operations.add_mul_scalar( *end - start, 1., out );
+        operations->assign( in, out );
+        operations->add_mul_scalar( *end - start, 1., out );
         status = nmfd::time_steppers::integration_status::stopped_by_external_operation;
         return true;
     }
@@ -260,8 +263,8 @@ struct stop_at_section
 
 struct failed_callback
 {
-    operations_type &operations;
-    double           fail_after = 0, start = 0;
+    std::shared_ptr<operations_type> operations;
+    double                           fail_after = 0, start = 0;
 
     void set_time_interval( const double &time, double & )
     {
@@ -274,7 +277,7 @@ struct failed_callback
         {
             return false;
         }
-        operations.assign_scalar( 42., out );
+        operations->assign_scalar( 42., out );
         return true;
     }
 
@@ -287,18 +290,22 @@ struct failed_callback
 
 void test_storage( const vector_type &initial, vector_type &result )
 {
-    counting_operations operations( 1 );
-    forced_growth       problem{ operations };
-    using adaptation_type = nmfd::time_steppers::integration::time_step_adaptation_matlab<counting_operations>;
+    auto  operations_owner = std::make_shared<counting_operations>( 1 );
+    auto &operations       = *operations_owner;
+    auto  problem_owner    = std::make_shared<forced_growth>( forced_growth{ operations_owner } );
+    auto &problem          = *problem_owner;
+    using adaptation_type  = nmfd::time_steppers::integration::time_step_adaptation_matlab<counting_operations>;
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<counting_operations, forced_growth, adaptation_type>;
     {
-        adaptation_type adaptation( operations );
+        auto  adaptation_owner = std::make_shared<adaptation_type>( operations_owner );
+        auto &adaptation       = *adaptation_owner;
         require( operations.allocations == 0, "Adaptation must not allocate trajectory vectors" );
-        step_type step( operations, problem, adaptation );
+        auto  step_owner = std::make_shared<step_type>( operations_owner, problem_owner, adaptation_owner );
+        auto &step       = *step_owner;
         require( operations.live_vectors == step.table().size() + 2, "RK storage: derivatives, work, embedded error" );
         nmfd::time_steppers::integration::time_integrator<counting_operations, step_type> integrator(
-            operations, step
+            operations_owner, step_owner
         );
         require( operations.live_vectors == 10, "RK45 integration must own 10 vectors, not 14" );
         integrator.set_time_interval( 0, .25 );
@@ -315,11 +322,15 @@ void test_storage( const vector_type &initial, vector_type &result )
     {
         using fixed_step =
             nmfd::time_steppers::runge_kutta::explicit_time_step<counting_operations, forced_growth, constant_type>;
-        constant_type constant( { .1 } );
-        fixed_step    step( operations, problem, constant, { "EE" } );
+        auto  constant_owner = std::make_shared<constant_type>( typename constant_type::params{ .1 } );
+        auto &constant       = *constant_owner;
+        auto  step_owner     = std::make_shared<fixed_step>(
+            operations_owner, problem_owner, constant_owner, typename fixed_step::params{ "EE" }
+        );
+        auto &step = *step_owner;
         require( operations.live_vectors == 2, "Unembedded RK must not allocate an error vector" );
         nmfd::time_steppers::integration::time_integrator<counting_operations, fixed_step> integrator(
-            operations, step
+            operations_owner, step_owner
         );
         integrator.set_time_interval( 0, .2 );
         integrator.apply( initial, result );
@@ -339,8 +350,12 @@ void test_storage( const vector_type &initial, vector_type &result )
     {
         using fixed_step =
             nmfd::time_steppers::runge_kutta::explicit_time_step<counting_operations, forced_growth, constant_type>;
-        constant_type constant( { .1 } );
-        fixed_step    step( operations, problem, constant, { "RK4" } );
+        auto  constant_owner = std::make_shared<constant_type>( typename constant_type::params{ .1 } );
+        auto &constant       = *constant_owner;
+        auto  step_owner     = std::make_shared<fixed_step>(
+            operations_owner, problem_owner, constant_owner, typename fixed_step::params{ "RK4" }
+        );
+        auto &step = *step_owner;
         require( operations.live_vectors == 5, "RK4 owns four derivatives and work, no embedded error vector" );
         step.apply( initial, result );
         require( step.get_status() == nmfd::time_steppers::single_step_status::converged, "Classical RK4 fixed step" );
@@ -348,17 +363,25 @@ void test_storage( const vector_type &initial, vector_type &result )
     require( operations.live_vectors == 0, "RK4 storage release" );
 }
 
-void test_rk23_error( operations_type &operations, const vector_type &initial, vector_type &result )
+void test_rk23_error(
+    std::shared_ptr<operations_type> operations_owner, const vector_type &initial, vector_type &result
+)
 {
-    forced_growth problem{ operations };
+    auto &operations    = *operations_owner;
+    auto  problem_owner = std::make_shared<forced_growth>( forced_growth{ operations_owner } );
+    auto &problem       = *problem_owner;
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, constant_type>;
     double errors[2]{};
     for ( int level = 0; level < 2; ++level )
     {
-        const double  h = .1 / ( level + 1 );
-        constant_type adaptation( { h } );
-        step_type     step( operations, problem, adaptation, { "RK23" } );
+        const double h                = .1 / ( level + 1 );
+        auto         adaptation_owner = std::make_shared<constant_type>( typename constant_type::params{ h } );
+        auto        &adaptation       = *adaptation_owner;
+        auto         step_owner       = std::make_shared<step_type>(
+            operations_owner, problem_owner, adaptation_owner, typename step_type::params{ "RK23" }
+        );
+        auto &step = *step_owner;
         step.apply( initial, result );
         require( step.get_status() == nmfd::time_steppers::single_step_status::converged, "RK23 fixed step" );
         double value = 0;
@@ -377,13 +400,17 @@ void test_rk23_error( operations_type &operations, const vector_type &initial, v
     require( errors[0] / errors[1] > 8 && errors[0] / errors[1] < 8.5, "RK23 embedded state error scales as h^3" );
 
     adaptive_type::params p;
-    p.initial_step       = .5;
-    p.relative_tolerance = 1e-9;
-    p.absolute_tolerance = 1e-11;
-    adaptive_type adaptation( operations, p );
+    p.initial_step         = .5;
+    p.relative_tolerance   = 1e-9;
+    p.absolute_tolerance   = 1e-11;
+    auto  adaptation_owner = std::make_shared<adaptive_type>( operations_owner, p );
+    auto &adaptation       = *adaptation_owner;
     using adaptive_step =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, adaptive_type>;
-    adaptive_step step( operations, problem, adaptation, { "RK23" } );
+    auto step_owner = std::make_shared<adaptive_step>(
+        operations_owner, problem_owner, adaptation_owner, typename adaptive_step::params{ "RK23" }
+    );
+    auto &step = *step_owner;
     step.apply( initial, result );
     require(
         step.get_status() == nmfd::time_steppers::single_step_status::converged && step.get_attempts() > 1,
@@ -405,7 +432,8 @@ try
     backend_type::init_device();
     test_error_scaling<float>();
     test_error_scaling<double>();
-    operations_type                            operations( 1 );
+    auto                                       operations_owner = std::make_shared<operations_type>( 1 );
+    auto                                      &operations       = *operations_owner;
     nmfd::detail::vector_wrap<operations_type> initial_wrap( operations ), result_wrap( operations ),
         coarse_wrap( operations );
     initial_wrap.start_use();
@@ -416,8 +444,9 @@ try
     auto &coarse  = *coarse_wrap;
     operations.assign_scalar( 1., initial );
     test_storage( initial, result );
-    test_rk23_error( operations, initial, result );
-    forced_growth problem{ operations };
+    test_rk23_error( operations_owner, initial, result );
+    auto  problem_owner = std::make_shared<forced_growth>( forced_growth{ operations_owner } );
+    auto &problem       = *problem_owner;
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, constant_type>;
     const auto exact = 2 * std::exp( .5 ) - 1.5;
@@ -426,15 +455,20 @@ try
         double errors[2]{};
         for ( int level = 0; level < 2; ++level )
         {
-            constant_type adaptation( { .1 / ( level + 1 ) } );
-            step_type     step( operations, problem, adaptation, { name } );
+            auto adaptation_owner =
+                std::make_shared<constant_type>( typename constant_type::params{ .1 / ( level + 1 ) } );
+            auto &adaptation = *adaptation_owner;
+            auto  step_owner = std::make_shared<step_type>(
+                operations_owner, problem_owner, adaptation_owner, typename step_type::params{ name }
+            );
+            auto &step = *step_owner;
             require(
                 step.get_status() == nmfd::time_steppers::single_step_status::idle && step.get_dt() == 0 &&
                     step.get_attempts() == 0,
                 "New step is idle"
             );
             nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator(
-                operations, step
+                operations_owner, step_owner
             );
             integrator.set_time_interval( 0, .5 );
             integrator.apply( initial, result );
@@ -448,9 +482,13 @@ try
         const auto order = nmfd::time_steppers::runge_kutta::make_butcher_table( name ).order();
         require( errors[0] / errors[1] > std::pow( 2., order - .6 ), "Non-autonomous convergence order" );
     }
-    constant_type                                                                 constant( { .1 } );
-    step_type                                                                     step( operations, problem, constant );
-    nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator( operations, step );
+    auto  constant_owner = std::make_shared<constant_type>( typename constant_type::params{ .1 } );
+    auto &constant       = *constant_owner;
+    auto  step_owner     = std::make_shared<step_type>( operations_owner, problem_owner, constant_owner );
+    auto &step           = *step_owner;
+    nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator(
+        operations_owner, step_owner
+    );
     integrator.set_time_interval( .5, 0 );
     operations.assign_scalar( exact, coarse );
     integrator.apply( coarse, result );
@@ -522,8 +560,9 @@ try
         step.get_status() == nmfd::time_steppers::single_step_status::converged,
         "Finalization preserves the numerical result status"
     );
-    constant_type half( { .05 } );
-    step_type     half_step( operations, problem, half );
+    auto  half_owner      = std::make_shared<constant_type>( typename constant_type::params{ .05 } );
+    auto  half_step_owner = std::make_shared<step_type>( operations_owner, problem_owner, half_owner );
+    auto &half_step       = *half_step_owner;
     half_step.set_target_time( 1 );
     half_step.apply( initial, coarse );
     operations.get( half_step.error_estimate(), &value );
@@ -534,13 +573,15 @@ try
     half_step.finalize( nmfd::time_steppers::adaptation_status::accepted, .05, coarse );
 
     adaptive_type::params p;
-    p.initial_step       = 1;
-    p.relative_tolerance = 1e-12;
-    p.absolute_tolerance = 1e-14;
-    adaptive_type adaptation( operations, p );
+    p.initial_step         = 1;
+    p.relative_tolerance   = 1e-12;
+    p.absolute_tolerance   = 1e-14;
+    auto  adaptation_owner = std::make_shared<adaptive_type>( operations_owner, p );
+    auto &adaptation       = *adaptation_owner;
     using adaptive_step =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, adaptive_type>;
-    adaptive_step adaptive( operations, problem, adaptation );
+    auto  adaptive_owner = std::make_shared<adaptive_step>( operations_owner, problem_owner, adaptation_owner );
+    auto &adaptive       = *adaptive_owner;
     adaptive.set_target_time( 1 );
     adaptive.apply( initial, result );
     require(
@@ -550,7 +591,10 @@ try
     operations.get( initial, &value );
     require( value == 1, "Rejection modified input" );
     adaptive.finalize( nmfd::time_steppers::adaptation_status::accepted, adaptive.get_dt(), result );
-    adaptive_step no_error( operations, problem, adaptation, { "EE" } );
+    auto no_error_owner = std::make_shared<adaptive_step>(
+        operations_owner, problem_owner, adaptation_owner, typename adaptive_step::params{ "EE" }
+    );
+    auto &no_error = *no_error_owner;
     operations.assign_scalar( 77., result );
     no_error.apply( initial, result );
     operations.get( result, &value );
@@ -558,14 +602,20 @@ try
         value == 77 && no_error.get_status() == nmfd::time_steppers::single_step_status::error_estimate_unavailable,
         "Do not adapt an unembedded method using a zero error vector"
     );
-    adaptive_step rk4_no_error( operations, problem, adaptation, { "RK4" } );
+    auto rk4_no_error_owner = std::make_shared<adaptive_step>(
+        operations_owner, problem_owner, adaptation_owner, typename adaptive_step::params{ "RK4" }
+    );
+    auto &rk4_no_error = *rk4_no_error_owner;
     rk4_no_error.apply( initial, result );
     operations.get( result, &value );
     require(
         value == 77 && rk4_no_error.get_status() == nmfd::time_steppers::single_step_status::error_estimate_unavailable,
         "RK4 cannot use embedded-error adaptation without an estimator"
     );
-    adaptive_step limited( operations, problem, adaptation, { "RK45", 1 } );
+    auto limited_owner = std::make_shared<adaptive_step>(
+        operations_owner, problem_owner, adaptation_owner, typename adaptive_step::params{ "RK45", 1 }
+    );
+    auto &limited = *limited_owner;
     limited.reset();
     limited.apply( initial, result );
     require(
@@ -580,11 +630,12 @@ try
         "Reset clears the last failed step"
     );
 
-    limited_rate nonfinite{ operations };
-    p.initial_step = .1;
-    adaptive_type recovery( operations, p );
+    auto nonfinite_owner = std::make_shared<limited_rate>( limited_rate{ operations_owner } );
+    p.initial_step       = .1;
+    auto  recovery_owner = std::make_shared<adaptive_type>( operations_owner, p );
+    auto &recovery       = *recovery_owner;
     nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, limited_rate, adaptive_type> recover(
-        operations, nonfinite, recovery
+        operations_owner, nonfinite_owner, recovery_owner
     );
     recover.apply( initial, result );
     require(
@@ -593,13 +644,14 @@ try
     );
     recover.finalize( nmfd::time_steppers::adaptation_status::accepted, recover.get_dt(), result );
 
-    constant_rate rate{ operations };
+    auto rate_owner = std::make_shared<constant_rate>( constant_rate{ operations_owner } );
     using rate_step =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, constant_rate, constant_type>;
-    rate_step       autonomous( operations, rate, constant );
-    stop_at_section stop{ operations };
+    auto  autonomous_owner = std::make_shared<rate_step>( operations_owner, rate_owner, constant_owner );
+    auto &autonomous       = *autonomous_owner;
+    auto  stop_owner       = std::make_shared<stop_at_section>( stop_at_section{ operations_owner } );
     nmfd::time_steppers::integration::time_integrator<operations_type, rate_step, stop_at_section> stopped(
-        operations, autonomous, {}, &stop
+        operations_owner, autonomous_owner, {}, stop_owner
     );
     operations.assign_scalar( 0., initial );
     for ( int run = 0; run < 2; ++run )
@@ -612,9 +664,10 @@ try
             "Refined callback commit/reset"
         );
     }
-    failed_callback failure{ operations };
+    auto  failure_owner = std::make_shared<failed_callback>( failed_callback{ operations_owner } );
+    auto &failure       = *failure_owner;
     nmfd::time_steppers::integration::time_integrator<operations_type, rate_step, failed_callback> failed(
-        operations, autonomous, {}, &failure
+        operations_owner, autonomous_owner, {}, failure_owner
     );
     failed.apply( initial, result );
     operations.get( result, &value );
@@ -633,7 +686,7 @@ try
     );
     operations.assign_scalar( 0., initial );
     nmfd::time_steppers::integration::time_integrator<operations_type, rate_step> budgeted(
-        operations, autonomous, { 1 }
+        operations_owner, autonomous_owner, { 1 }
     );
     budgeted.apply( initial, result );
     operations.get( result, &value );
@@ -644,9 +697,9 @@ try
     );
     using failing_step =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, limited_rate, constant_type>;
-    failing_step fail_later( operations, nonfinite, half );
+    auto fail_later_owner = std::make_shared<failing_step>( operations_owner, nonfinite_owner, half_owner );
     nmfd::time_steppers::integration::time_integrator<operations_type, failing_step> numerical_failure(
-        operations, fail_later
+        operations_owner, fail_later_owner
     );
     numerical_failure.apply( initial, result );
     operations.get( result, &value );
@@ -666,7 +719,10 @@ try
     refused = false;
     try
     {
-        rate_step invalid( operations, rate, constant, { "IE" } );
+        auto invalid_owner = std::make_shared<rate_step>(
+            operations_owner, rate_owner, constant_owner, typename rate_step::params{ "IE" }
+        );
+        auto &invalid = *invalid_owner;
     }
     catch ( const std::invalid_argument & )
     {

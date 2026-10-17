@@ -1,3 +1,4 @@
+#include <memory>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -32,7 +33,8 @@ void check_assessment()
 {
     using operations_type = scfd_vector_operations<backend_type, T>;
     using adaptation_type = nmfd::time_steppers::integration::time_step_adaptation_scipy<operations_type>;
-    operations_type                            operations( 3 );
+    auto                                       operations_owner = std::make_shared<operations_type>( 3 );
+    auto                                      &operations       = *operations_owner;
     nmfd::detail::vector_wrap<operations_type> previous( operations ), candidate( operations ), error( operations ),
         error3( operations );
     previous.start_use();
@@ -42,9 +44,10 @@ void check_assessment()
     const scfd::static_vec::vec<T, 3> x{ 0, -4, T( .25 ) }, y{ 0, 1, -8 };
     const scfd::static_vec::vec<T, 3> ratios{ T( -.25 ), T( .5 ), T( -.75 ) }, ratios3{ 1, -2, 4 };
     typename adaptation_type::params  p;
-    p.absolute_tolerance = T( .02 );
-    p.relative_tolerance = T( .01 );
-    adaptation_type             adaptation( operations, p );
+    p.absolute_tolerance                         = T( .02 );
+    p.relative_tolerance                         = T( .01 );
+    auto                        adaptation_owner = std::make_shared<adaptation_type>( operations_owner, p );
+    auto                       &adaptation       = *adaptation_owner;
     scfd::static_vec::vec<T, 3> e, e3;
     T                           sum = 0, sum3 = 0;
     for ( int i = 0; i < 3; ++i )
@@ -124,19 +127,21 @@ void check_control()
 {
     using operations_type = scfd_vector_operations<backend_type, T>;
     using adaptation_type = nmfd::time_steppers::integration::time_step_adaptation_scipy<operations_type>;
-    operations_type                            operations( 3 );
+    auto                                       operations_owner = std::make_shared<operations_type>( 3 );
+    auto                                      &operations       = *operations_owner;
     nmfd::detail::vector_wrap<operations_type> state( operations ), error( operations ), error3( operations );
     state.start_use();
     error.start_use();
     error3.start_use();
     operations.assign_scalar( 0, *state );
     typename adaptation_type::params p;
-    p.absolute_tolerance = 1;
-    p.relative_tolerance = T( .1 );
-    p.initial_step       = T( .1 );
-    adaptation_type adaptation( operations, p );
-    const auto      tolerance = T( 128 ) * std::numeric_limits<T>::epsilon();
-    T               next      = 0;
+    p.absolute_tolerance        = 1;
+    p.relative_tolerance        = T( .1 );
+    p.initial_step              = T( .1 );
+    auto       adaptation_owner = std::make_shared<adaptation_type>( operations_owner, p );
+    auto      &adaptation       = *adaptation_owner;
+    const auto tolerance        = T( 128 ) * std::numeric_limits<T>::epsilon();
+    T          next             = 0;
     operations.assign_scalar( 1, *error );
     require(
         adaptation.assess( 0, T( .1 ), *state, *state, next, 5, &*error ) == adaptation_status::rejected &&
@@ -206,8 +211,9 @@ void check_control()
         );
     }
 
-    p.minimum_step = T( .05 );
-    adaptation_type limited( operations, p );
+    p.minimum_step      = T( .05 );
+    auto  limited_owner = std::make_shared<adaptation_type>( operations_owner, p );
+    auto &limited       = *limited_owner;
     require(
         limited.reject_step( T( .1 ) ) == adaptation_status::failed,
         "An inadmissibly small retry fails rather than clamping and looping"
@@ -217,8 +223,9 @@ void check_control()
         limited.assess( 0, T( .01 ), *state, *state, next, 5, &*error ) == adaptation_status::accepted,
         "A clipped terminal step below the minimum can be accepted when accurate"
     );
-    p.maximum_step = T( .2 );
-    adaptation_type bounded( operations, p );
+    p.maximum_step      = T( .2 );
+    auto  bounded_owner = std::make_shared<adaptation_type>( operations_owner, p );
+    auto &bounded       = *bounded_owner;
     bounded.assess( 0, T( .1 ), *state, *state, next, 5, &*error );
     require( next == p.maximum_step, "Accepted growth respects the maximum step" );
     require(
@@ -227,7 +234,8 @@ void check_control()
         "Initial proposals respect configured bounds"
     );
     p.relative_tolerance = std::numeric_limits<T>::epsilon();
-    adaptation_type precise( operations, p );
+    auto  precise_owner  = std::make_shared<adaptation_type>( operations_owner, p );
+    auto &precise        = *precise_owner;
     require(
         precise.relative_tolerance() == T( 100 ) * std::numeric_limits<T>::epsilon(),
         "Effective relative tolerance respects scalar precision"
@@ -247,7 +255,7 @@ void check_control()
             bool refused   = false;
             try
             {
-                adaptation_type invalid_adaptation( operations, bad );
+                auto invalid_adaptation_owner = std::make_shared<adaptation_type>( operations_owner, bad );
             }
             catch ( const std::invalid_argument & )
             {
@@ -262,8 +270,8 @@ using operations_type = scfd_vector_operations<backend_type, double>;
 
 struct forced_growth
 {
-    operations_type &operations;
-    double           time = 0;
+    std::shared_ptr<operations_type> operations;
+    double                           time = 0;
 
     void set_time( double value )
     {
@@ -272,37 +280,44 @@ struct forced_growth
 
     void apply( const operations_type::vector_type &in, operations_type::vector_type &out )
     {
-        operations.assign( in, out );
-        operations.add_mul_scalar( time, 1., out );
+        operations->assign( in, out );
+        operations->add_mul_scalar( time, 1., out );
     }
 };
 
 void check_integration()
 {
-    using adaptation_type = nmfd::time_steppers::integration::time_step_adaptation_scipy<operations_type>;
-    operations_type                            operations( 1 );
-    forced_growth                              problem{ operations };
+    using adaptation_type  = nmfd::time_steppers::integration::time_step_adaptation_scipy<operations_type>;
+    auto  operations_owner = std::make_shared<operations_type>( 1 );
+    auto &operations       = *operations_owner;
+    auto  problem_owner    = std::make_shared<forced_growth>( forced_growth{ operations_owner } );
     nmfd::detail::vector_wrap<operations_type> initial( operations ), result( operations );
     initial.start_use();
     result.start_use();
     operations.assign_scalar( 1., *initial );
     adaptation_type::params p;
-    p.initial_step       = 1;
-    p.relative_tolerance = 1e-10;
-    p.absolute_tolerance = 1e-12;
-    adaptation_type adaptation( operations, p );
+    p.initial_step         = 1;
+    p.relative_tolerance   = 1e-10;
+    p.absolute_tolerance   = 1e-12;
+    auto  adaptation_owner = std::make_shared<adaptation_type>( operations_owner, p );
+    auto &adaptation       = *adaptation_owner;
     using step_type =
         nmfd::time_steppers::runge_kutta::explicit_time_step<operations_type, forced_growth, adaptation_type>;
     for ( const auto *method : { "RK23", "RK45", "DOP853" } )
     {
-        step_type step( operations, problem, adaptation, { method } );
+        auto step_owner = std::make_shared<step_type>(
+            operations_owner, problem_owner, adaptation_owner, typename step_type::params{ method }
+        );
+        auto &step = *step_owner;
         step.apply( *initial, *result );
         require(
             step.get_status() == nmfd::time_steppers::single_step_status::converged && step.get_attempts() > 1,
             "SciPy adaptation retries an initially excessive RK step"
         );
         step.finalize( adaptation_status::accepted, step.get_dt(), *result );
-        nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator( operations, step );
+        nmfd::time_steppers::integration::time_integrator<operations_type, step_type> integrator(
+            operations_owner, step_owner
+        );
         integrator.set_time_interval( 0, .5 );
         for ( int run = 0; run < 2; ++run )
         {

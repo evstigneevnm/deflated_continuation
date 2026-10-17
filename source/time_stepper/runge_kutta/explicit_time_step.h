@@ -1,6 +1,8 @@
 #ifndef NMFD_TIME_STEPPERS_EXPLICIT_TIME_STEP_H
 #define NMFD_TIME_STEPPERS_EXPLICIT_TIME_STEP_H
 #include <cmath>
+#include <memory>
+#include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -89,13 +91,21 @@ public:
     );
 
     explicit_time_step(
-        VectorOperations &operations, Problem &problem, TimeStepAdaptation &adaptation, const params &p = {}
+        std::shared_ptr<VectorOperations> operations, std::shared_ptr<Problem> problem,
+        std::shared_ptr<TimeStepAdaptation> adaptation, const params &p = {}
     )
-        : operations_( operations ), problem_( problem ), adaptation_( adaptation ), params_( p ),
-          table_( make_butcher_table( p.method ) ), combined_error_( use_combined_error() ), work_( operations ),
-          error_( operations, table_.is_embedded() || ( combined_error_ && supports_combined_error ) ),
-          secondary_error_( operations, combined_error_ && supports_combined_error ),
-          dense_( operations, !table_.has_dense_output() )
+        : operations_(
+              operations ? std::move( operations ) : throw std::invalid_argument( "RK requires vector operations" )
+          ),
+          problem_( problem ? std::move( problem ) : throw std::invalid_argument( "RK requires a problem" ) ),
+          adaptation_(
+              adaptation ? std::move( adaptation ) : throw std::invalid_argument( "RK requires time adaptation" )
+          ),
+          params_( p ), table_( make_butcher_table( p.method ) ), combined_error_( use_combined_error() ),
+          work_( *operations_ ),
+          error_( *operations_, table_.is_embedded() || ( combined_error_ && supports_combined_error ) ),
+          secondary_error_( *operations_, combined_error_ && supports_combined_error ),
+          dense_( *operations_, !table_.has_dense_output() )
     {
         if ( table_.type() != butcher_table::scheme_type::explicit_rk )
         {
@@ -120,7 +130,7 @@ public:
         stage_slots_.reserve( stage_count );
         for ( std::size_t i = 0; i < stage_count; ++i )
         {
-            stages_.emplace_back( operations );
+            stages_.emplace_back( *operations_ );
             stages_.back().start_use();
             stage_slots_.push_back( i );
         }
@@ -228,7 +238,7 @@ public:
 
     void reset()
     {
-        adaptation_.reset();
+        adaptation_->reset();
         invalidate_rhs_cache();
         initialized_ = pending_ = false;
         ++generation_;
@@ -249,7 +259,7 @@ public:
         trial_rhs_generation_ = rhs_generation_;
         if constexpr ( detail::has_error_requirement<TimeStepAdaptation>::value )
         {
-            if ( adaptation_.requires_error_estimate() && !table_.has_error_estimate() )
+            if ( adaptation_->requires_error_estimate() && !table_.has_error_estimate() )
             {
                 status_ = single_step_status::error_estimate_unavailable;
                 return;
@@ -262,14 +272,14 @@ public:
         }
         if ( !initialized_ )
         {
-            adaptation_.initialize( time_, in );
+            adaptation_->initialize( time_, in );
             initialized_ = true;
         }
         status_ = single_step_status::attempt_limit_reached;
         for ( attempts_ = 0; attempts_ < params_.maximum_attempts; )
         {
             ++attempts_;
-            const auto proposed  = adaptation_.get_dt();
+            const auto proposed  = adaptation_->get_dt();
             const auto remaining = target_ - time_;
             dt_                  = std::copysign( std::min( proposed, std::abs( remaining ) ), remaining );
             if ( !std::isfinite( proposed ) || proposed <= 0 || !std::isfinite( dt_ ) || time_ + dt_ == time_ )
@@ -280,12 +290,12 @@ public:
             if ( !compute( in, first_rate_valid ) )
             {
                 // No assessment/callback may inspect an invalid numerical candidate.
-                if ( adaptation_.reject_step( dt_ ) != adaptation_status::rejected )
+                if ( adaptation_->reject_step( dt_ ) != adaptation_status::rejected )
                 {
                     status_ = single_step_status::failed_nonfinite;
                     return;
                 }
-                adaptation_.update( adaptation_status::rejected, time_, dt_, in );
+                adaptation_->update( adaptation_status::rejected, time_, dt_, in );
                 continue;
             }
             scalar_type next_dt  = proposed;
@@ -296,21 +306,21 @@ public:
                 {
                     if ( !prepare_dense( in ) )
                     {
-                        if ( adaptation_.reject_step( dt_ ) != adaptation_status::rejected )
+                        if ( adaptation_->reject_step( dt_ ) != adaptation_status::rejected )
                         {
                             status_ = single_step_status::failed_nonfinite;
                             return;
                         }
-                        adaptation_.update( adaptation_status::rejected, time_, dt_, in );
+                        adaptation_->update( adaptation_status::rejected, time_, dt_, in );
                         continue;
                     }
                 }
-                operations_.assign( *work_, out );
+                operations_->assign( *work_, out );
                 status_  = single_step_status::converged;
                 pending_ = true;
                 return;
             }
-            adaptation_.update( decision, time_, dt_, in );
+            adaptation_->update( decision, time_, dt_, in );
             if ( decision != adaptation_status::rejected )
             {
                 status_ = single_step_status::failed_minimum_dt;
@@ -331,7 +341,7 @@ public:
         {
             throw std::invalid_argument( "Committed time is outside the pending RK step" );
         }
-        adaptation_.update( outcome, committed_time, elapsed, state );
+        adaptation_->update( outcome, committed_time, elapsed, state );
         pending_           = false;
         cached_rate_valid_ = reuse_endpoint_rate_ && outcome == adaptation_status::accepted &&
                              committed_time == time_ + dt_ && trial_rhs_generation_ == rhs_generation_;
@@ -347,9 +357,9 @@ private:
     using vector_wrap_type = nmfd::detail::vector_wrap<VectorOperations>;
     static constexpr bool supports_combined_error =
         detail::has_dual_error_assessment<TimeStepAdaptation, scalar_type, vector_type>::value;
-    VectorOperations                                    &operations_;
-    Problem                                             &problem_;
-    TimeStepAdaptation                                  &adaptation_;
+    std::shared_ptr<VectorOperations>                    operations_;
+    std::shared_ptr<Problem>                             problem_;
+    std::shared_ptr<TimeStepAdaptation>                  adaptation_;
     params                                               params_;
     butcher_table                                        table_;
     bool                                                 combined_error_;
@@ -386,7 +396,7 @@ private:
         }
         if constexpr ( detail::has_error_requirement<TimeStepAdaptation>::value )
         {
-            return adaptation_.requires_error_estimate();
+            return adaptation_->requires_error_estimate();
         }
         return supports_combined_error;
     }
@@ -397,12 +407,12 @@ private:
         {
             if ( combined_error_ )
             {
-                return adaptation_.assess(
+                return adaptation_->assess(
                     time_, dt_, in, *work_, next_dt, table_.error_order(), &*error_, &*secondary_error_
                 );
             }
         }
-        return adaptation_.assess(
+        return adaptation_->assess(
             time_, dt_, in, *work_, next_dt, table_.error_order(), table_.is_embedded() ? &*error_ : nullptr
         );
     }
@@ -420,21 +430,21 @@ private:
         }
         if ( theta == 0 )
         {
-            operations_.assign( *dense_.previous, out );
+            operations_->assign( *dense_.previous, out );
         }
         else if ( theta == 1 )
         {
-            operations_.assign( *work_, out );
+            operations_->assign( *work_, out );
         }
         else if ( table_.has_dense_output() )
         {
-            operations_.assign( *dense_.previous, out );
+            operations_->assign( *dense_.previous, out );
             for ( std::size_t i = 0; i < table_.dense_outout_stage_count(); ++i )
             {
                 const auto weight = static_cast<scalar_type>( table_.dense_b( i, theta ) );
                 if ( weight != 0 )
                 {
-                    operations_.add_mul( dt_ * weight, stage( i ), out );
+                    operations_->add_mul( dt_ * weight, stage( i ), out );
                 }
             }
         }
@@ -442,9 +452,9 @@ private:
         {
             const auto a = theta * theta * ( 3 - 2 * theta ), b = theta * ( 1 - theta ) * ( 1 - theta ),
                        c = -theta * theta * ( 1 - theta );
-            operations_.assign_mul( 1 - a, *dense_.previous, a, *work_, out );
-            operations_.add_mul( dt_ * b, stage( 0 ), out );
-            operations_.add_mul( dt_ * c, *dense_.endpoint_rate, out );
+            operations_->assign_mul( 1 - a, *dense_.previous, a, *work_, out );
+            operations_->add_mul( dt_ * b, stage( 0 ), out );
+            operations_->add_mul( dt_ * c, *dense_.endpoint_rate, out );
         }
         return time_ + theta * dt_;
     }
@@ -456,43 +466,43 @@ private:
         auto &scratch = *dense_.previous;
         for ( std::size_t i = table_.size(); i < table_.dense_outout_stage_count(); ++i )
         {
-            operations_.assign( in, scratch );
+            operations_->assign( in, scratch );
             for ( std::size_t j = 0; j < i; ++j )
             {
                 const auto weight = static_cast<scalar_type>( table_.dense_outout_a( i, j ) );
                 if ( weight != 0 )
                 {
-                    operations_.add_mul( dt_ * weight, stage( j ), scratch );
+                    operations_->add_mul( dt_ * weight, stage( j ), scratch );
                 }
             }
-            if ( !operations_.check_is_valid_number( scratch ) )
+            if ( !operations_->check_is_valid_number( scratch ) )
             {
                 return false;
             }
             if constexpr ( detail::has_set_time<Problem, scalar_type>::value )
             {
-                problem_.set_time( time_ + dt_ * static_cast<scalar_type>( table_.dense_outout_c( i ) ) );
+                problem_->set_time( time_ + dt_ * static_cast<scalar_type>( table_.dense_outout_c( i ) ) );
             }
-            problem_.apply( scratch, stage( i ) );
-            if ( !operations_.check_is_valid_number( stage( i ) ) )
+            problem_->apply( scratch, stage( i ) );
+            if ( !operations_->check_is_valid_number( stage( i ) ) )
             {
                 return false;
             }
         }
         if constexpr ( detail::has_set_time<Problem, scalar_type>::value )
         {
-            problem_.set_time( time_ + dt_ );
+            problem_->set_time( time_ + dt_ );
         }
         if ( !table_.has_dense_output() )
         {
-            problem_.apply( *work_, *dense_.endpoint_rate );
-            if ( !operations_.check_is_valid_number( *dense_.endpoint_rate ) )
+            problem_->apply( *work_, *dense_.endpoint_rate );
+            if ( !operations_->check_is_valid_number( *dense_.endpoint_rate ) )
             {
                 return false;
             }
         }
         // Snapshot before publishing the candidate: step.apply(x, x) is supported.
-        operations_.assign( in, scratch );
+        operations_->assign( in, scratch );
         return true;
     }
 
@@ -503,22 +513,22 @@ private:
         {
             if constexpr ( detail::has_set_time<Problem, scalar_type>::value )
             {
-                problem_.set_time( time_ + dt_ * static_cast<scalar_type>( table_.c( i ) ) );
+                problem_->set_time( time_ + dt_ * static_cast<scalar_type>( table_.c( i ) ) );
             }
             if ( i == 0 && first_rate_valid )
             {
                 continue;
             }
-            operations_.assign( in, work );
+            operations_->assign( in, work );
             for ( std::size_t j = 0; j < i; ++j )
             {
                 if ( table_.a( i, j ) != 0 )
                 {
-                    operations_.add_mul( dt_ * static_cast<scalar_type>( table_.a( i, j ) ), stage( j ), work );
+                    operations_->add_mul( dt_ * static_cast<scalar_type>( table_.a( i, j ) ), stage( j ), work );
                 }
             }
-            problem_.apply( work, stage( i ) );
-            if ( !operations_.check_is_valid_number( stage( i ) ) )
+            problem_->apply( work, stage( i ) );
+            if ( !operations_->check_is_valid_number( stage( i ) ) )
             {
                 return false;
             }
@@ -528,36 +538,36 @@ private:
             }
         }
         // All derivatives are retained; the last stage state can become the candidate.
-        operations_.assign( in, work );
+        operations_->assign( in, work );
         const bool primary_error = table_.is_embedded() || combined_error_;
         if ( primary_error )
         {
-            operations_.assign_scalar( scalar_type( 0 ), *error_ );
+            operations_->assign_scalar( scalar_type( 0 ), *error_ );
         }
         if ( combined_error_ )
         {
-            operations_.assign_scalar( scalar_type( 0 ), *secondary_error_ );
+            operations_->assign_scalar( scalar_type( 0 ), *secondary_error_ );
         }
         for ( std::size_t i = 0; i < table_.size(); ++i )
         {
             if ( table_.b( i ) != 0 )
             {
-                operations_.add_mul( dt_ * static_cast<scalar_type>( table_.b( i ) ), stage( i ), work );
+                operations_->add_mul( dt_ * static_cast<scalar_type>( table_.b( i ) ), stage( i ), work );
             }
             if ( primary_error && table_.error_b( i ) != 0 )
             {
-                operations_.add_mul( dt_ * static_cast<scalar_type>( table_.error_b( i ) ), stage( i ), *error_ );
+                operations_->add_mul( dt_ * static_cast<scalar_type>( table_.error_b( i ) ), stage( i ), *error_ );
             }
             if ( combined_error_ && table_.secondary_error_b( i ) != 0 )
             {
-                operations_.add_mul(
+                operations_->add_mul(
                     dt_ * static_cast<scalar_type>( table_.secondary_error_b( i ) ), stage( i ), *secondary_error_
                 );
             }
         }
-        return operations_.check_is_valid_number( work ) &&
-               ( !primary_error || operations_.check_is_valid_number( *error_ ) ) &&
-               ( !combined_error_ || operations_.check_is_valid_number( *secondary_error_ ) );
+        return operations_->check_is_valid_number( work ) &&
+               ( !primary_error || operations_->check_is_valid_number( *error_ ) ) &&
+               ( !combined_error_ || operations_->check_is_valid_number( *secondary_error_ ) );
     }
 };
 }

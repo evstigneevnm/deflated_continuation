@@ -88,6 +88,18 @@ jobs:
           make test_newton_operator_binding_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_operator_binding"
           timeout 30s ./"$BUILD_DIR"/newton_operator_binding/test_newton_operator_binding_cpu.bin
 
+  nmfd-newton-dependency-ownership-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify shared dependency lifetimes, borrowed loggers, and null guards
+        run: |
+          make test_newton_dependency_ownership_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_dependencies"
+          timeout 30s ./"$BUILD_DIR"/newton_dependencies/test_newton_dependency_ownership_cpu.bin
+
   nmfd-newton-sanitizers-cpu:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -100,13 +112,13 @@ jobs:
           submodules: recursive
       - name: Run Newton regressions with address and undefined-behavior sanitizers
         run: |
-          make test_newton_failure_reporting_cpu.bin test_newton_backtracking_cpu.bin test_newton_convergence_cpu.bin test_newton_vector_ownership_cpu.bin test_newton_backtracking_json_cpu.bin test_newton_configuration_cpu.bin test_newton_configuration_json_cpu.bin test_newton_operator_binding_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_sanitizers" NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-          for test in failure_reporting backtracking convergence vector_ownership backtracking_json configuration configuration_json operator_binding; do
+          make test_newton_failure_reporting_cpu.bin test_newton_backtracking_cpu.bin test_newton_convergence_cpu.bin test_newton_vector_ownership_cpu.bin test_newton_backtracking_json_cpu.bin test_newton_configuration_cpu.bin test_newton_configuration_json_cpu.bin test_newton_operator_binding_cpu.bin test_newton_dependency_ownership_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_sanitizers" NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          for test in failure_reporting backtracking convergence vector_ownership backtracking_json configuration configuration_json operator_binding dependency_ownership; do
             timeout 30s ./"$BUILD_DIR"/newton_sanitizers/"test_newton_${test}_cpu.bin"
           done
 
   nmfd-newton-backend-cpu-omp:
-    needs: [nmfd-newton-failure-reporting-cpu, nmfd-newton-configuration-cpu, nmfd-newton-vector-ownership-cpu, nmfd-newton-operator-binding-cpu, scfd-vector-operations-cpu]
+    needs: [nmfd-newton-failure-reporting-cpu, nmfd-newton-configuration-cpu, nmfd-newton-vector-ownership-cpu, nmfd-newton-operator-binding-cpu, nmfd-newton-dependency-ownership-cpu, scfd-vector-operations-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -239,6 +251,41 @@ jobs:
           make test_explicit_rk_cpu.bin test_explicit_rk_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_rk"
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rk/test_explicit_rk_cpu.bin
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rk/test_explicit_rk_cpu_omp.bin
+
+  timestepper-ownership-cpu:
+    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify retained timestepper dependencies on serial CPU and OMP
+        run: |
+          make test_explicit_ownership_cpu.bin test_explicit_ownership_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/timestepper_ownership"
+          OMP_NUM_THREADS=4 timeout 30s ./"$BUILD_DIR"/timestepper_ownership/test_explicit_ownership_cpu.bin
+          OMP_NUM_THREADS=4 timeout 30s ./"$BUILD_DIR"/timestepper_ownership/test_explicit_ownership_cpu_omp.bin
+
+  timestepper-ownership-cuda:
+    needs: [timestepper-ownership-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify retained timestepper dependencies when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA ownership tests: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA ownership tests: nvcc unavailable"
+            exit 0
+          fi
+          make test_explicit_ownership_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/timestepper_ownership_cuda"
+          timeout 60s ./"$BUILD_DIR"/timestepper_ownership_cuda/test_explicit_ownership_cuda.bin
 
   timestepper-fsal-cpu:
     needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]

@@ -1,3 +1,4 @@
+#include <memory>
 #include "explicit_lorenz_problem.h"
 #include <cmath>
 #include <fstream>
@@ -50,8 +51,8 @@ public:
         std::string filename;
     };
 
-    external_manager( VectorOperations &operations, const params &p, const nlohmann::json &metadata )
-        : operations_( operations ), params_( p ), metadata_( metadata )
+    external_manager( std::shared_ptr<VectorOperations> operations, const params &p, const nlohmann::json &metadata )
+        : operations_( std::move( operations ) ), params_( p ), metadata_( metadata )
     {
         trajectory_.reserve( 1024 );
     }
@@ -106,15 +107,15 @@ private:
         scfd::static_vec::vec<scalar_type, 3> state;
     };
 
-    VectorOperations   &operations_;
-    params              params_;
-    nlohmann::json      metadata_;
-    std::vector<sample> trajectory_;
-    scalar_type         start_ = 0, end_ = 0;
+    std::shared_ptr<VectorOperations> operations_;
+    params                            params_;
+    nlohmann::json                    metadata_;
+    std::vector<sample>               trajectory_;
+    scalar_type                       start_ = 0, end_ = 0;
 
     void record( scalar_type time, const vector_type &state )
     {
-        const auto view = operations_.view( state );
+        const auto view = operations_->view( state );
         trajectory_.push_back( { time, { view( 0 ), view( 1 ), view( 2 ) } } );
     }
 };
@@ -124,10 +125,13 @@ private:
 
 template <class Adaptation>
 void run_simulation(
-    operations_type &operations, double end_time, const std::string &filename, const std::string &method,
-    const std::string &controller, Adaptation &adaptation, const nlohmann::json &adaptation_settings
+    std::shared_ptr<operations_type> operations_owner, double end_time, const std::string &filename,
+    const std::string &method, const std::string &controller, std::shared_ptr<Adaptation> adaptation_owner,
+    const nlohmann::json &adaptation_settings
 )
 {
+    auto &operations      = *operations_owner;
+    auto &adaptation      = *adaptation_owner;
     using problem_type    = nmfd::time_steppers::tests::explicit_lorenz_problem<operations_type>;
     using adaptation_type = Adaptation;
     using step_type =
@@ -136,14 +140,18 @@ void run_simulation(
     using integrator_type =
         nmfd::time_steppers::integration::time_integrator<operations_type, step_type, external_type>;
 
-    problem_type                               problem;
+    auto                                       problem_owner = std::make_shared<problem_type>();
+    auto                                      &problem       = *problem_owner;
     nmfd::detail::vector_wrap<operations_type> initial( operations ), result( operations );
     initial.start_use();
     result.start_use();
     const scfd::static_vec::vec<double, 3> initial_values{ 2.2, 30.5, 2.5 };
     operations.set( initial_values.d, *initial );
 
-    step_type            step( operations, problem, adaptation, { method } );
+    auto step_owner = std::make_shared<step_type>(
+        operations_owner, problem_owner, adaptation_owner, typename step_type::params{ method }
+    );
+    auto                &step     = *step_owner;
     const nlohmann::json metadata = {
         { "format", "nmfd.lorenz_trajectory.v1" },
         { "problem", "lorenz" },
@@ -161,8 +169,10 @@ void run_simulation(
             { "delta", problem.delta } } },
         { "adaptation", adaptation_settings }
     };
-    external_type   external( operations, { filename }, metadata );
-    integrator_type integrator( operations, step, {}, &external );
+    auto external_owner =
+        std::make_shared<external_type>( operations_owner, typename external_type::params{ filename }, metadata );
+    auto           &external = *external_owner;
+    integrator_type integrator( operations_owner, step_owner, {}, external_owner );
     integrator.set_time_interval( 0, end_time );
     integrator.apply( *initial, *result );
     if ( integrator.get_status() != nmfd::time_steppers::integration_status::completed ||
@@ -177,10 +187,11 @@ void run_simulation(
 
 template <class Adaptation>
 void run_adaptive_simulation(
-    operations_type &operations, double end_time, const std::string &filename, const std::string &method,
-    const std::string &controller, double initial_step
+    std::shared_ptr<operations_type> operations_owner, double end_time, const std::string &filename,
+    const std::string &method, const std::string &controller, double initial_step
 )
 {
+    auto                       &operations = *operations_owner;
     typename Adaptation::params p;
     p.relative_tolerance = 1e-10;
     p.absolute_tolerance = 1e-12;
@@ -188,9 +199,10 @@ void run_adaptive_simulation(
     {
         p.initial_step = initial_step;
     }
-    Adaptation adaptation( operations, p );
+    auto  adaptation_owner = std::make_shared<Adaptation>( operations_owner, p );
+    auto &adaptation       = *adaptation_owner;
     run_simulation(
-        operations, end_time, filename, method, controller, adaptation,
+        operations_owner, end_time, filename, method, controller, adaptation_owner,
         { { "relative_tolerance", p.relative_tolerance },
           { "absolute_tolerance", p.absolute_tolerance },
           { "initial_step", p.initial_step },
@@ -240,26 +252,28 @@ try
     const double end_time  = positive_time( argv[1] );
     const double step_size = argc == 6 ? positive_time( argv[5] ) : 0;
     backend_type::init_device();
-    operations_type operations( 3 );
+    auto  operations_owner = std::make_shared<operations_type>( 3 );
+    auto &operations       = *operations_owner;
     if ( controller == "constant" )
     {
-        using adaptation_type      = nmfd::time_steppers::integration::time_step_adaptation_constant<operations_type>;
-        const double    fixed_step = step_size > 0 ? step_size : .001;
-        adaptation_type adaptation( { fixed_step } );
+        using adaptation_type   = nmfd::time_steppers::integration::time_step_adaptation_constant<operations_type>;
+        const double fixed_step = step_size > 0 ? step_size : .001;
+        auto  adaptation_owner  = std::make_shared<adaptation_type>( typename adaptation_type::params{ fixed_step } );
+        auto &adaptation        = *adaptation_owner;
         run_simulation(
-            operations, end_time, argv[2], method, controller, adaptation, { { "step_size", fixed_step } }
+            operations_owner, end_time, argv[2], method, controller, adaptation_owner, { { "step_size", fixed_step } }
         );
     }
     else if ( controller == "scipy" )
     {
         run_adaptive_simulation<nmfd::time_steppers::integration::time_step_adaptation_scipy<operations_type>>(
-            operations, end_time, argv[2], method, controller, step_size
+            operations_owner, end_time, argv[2], method, controller, step_size
         );
     }
     else
     {
         run_adaptive_simulation<nmfd::time_steppers::integration::time_step_adaptation_matlab<operations_type>>(
-            operations, end_time, argv[2], method, controller, step_size
+            operations_owner, end_time, argv[2], method, controller, step_size
         );
     }
 }
