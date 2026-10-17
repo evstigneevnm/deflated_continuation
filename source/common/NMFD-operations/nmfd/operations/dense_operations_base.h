@@ -4,6 +4,7 @@
 #include <memory>
 
 #include <scfd/arrays/array_nd.h>
+#include <scfd/utils/todo.h>
 
 #include <nmfd/operations/default_multivector_operations_base.h>
 #include <nmfd/operations/detail/scfd_array_traits.h>
@@ -209,10 +210,10 @@ public:
         parent_t::verify_max_loc_size( total );
 
         matrix_type sq_dst;
-        sq_dst.init_by_raw_data( parent_t::vt_.get_raw_ptr( parent_t::helper_ ), sz );
+        sq_dst.init_by_raw_data( parent_t::helper_.raw_ptr(), sz );
 
         for_each_nd_inst_( matrix_sq_2d_kernel{ mat, sq_dst }, mat.size_nd() );
-        const auto *raw_ptr = parent_t::vt_.get_raw_ptr( parent_t::helper_ );
+        const auto *raw_ptr = parent_t::helper_.raw_ptr();
         return std::sqrt( parent_t::reduce_inst_( total, raw_ptr, scalar_type{ 0 } ) );
     }
 
@@ -273,7 +274,7 @@ public:
         parent_t::verify_max_loc_size( n * n );
 
         matrix_type A;
-        A.init_by_raw_data( parent_t::vt_.get_raw_ptr( parent_t::helper_ ), mat.size_nd() );
+        A.init_by_raw_data( parent_t::helper_.raw_ptr(), mat.size_nd() );
 
         parent_t::assign( b, x );
         assign_matrix( mat, A );

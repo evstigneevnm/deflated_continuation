@@ -17,6 +17,8 @@ class static_vector_traits
 public:
     using scalar_type = T;
     using vector_type = std::array<T, Dim>;
+    template <class U>
+    using rebind = static_vector_traits<U, Dim>;
 
 public:
     void alloc( size_t loc_sz, vector_type &v ) const

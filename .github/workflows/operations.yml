@@ -848,6 +848,64 @@ jobs:
           make scfd_vector_operations_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cpu_float" REAL_TYPE=float
           ./"$BUILD_DIR"/scfd_cpu_float/test_scfd_vector_operations_cpu.bin
 
+  nmfd-vector-space-hierarchy-cpu:
+    needs: [scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify operations, space factories, and workspace reuse
+        run: |
+          make test_nmfd_vector_space_hierarchy_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/vector_hierarchy"
+          OMP_NUM_THREADS=4 timeout 60s ./"$BUILD_DIR"/vector_hierarchy/test_nmfd_vector_space_hierarchy_cpu.bin
+      - name: Verify dense solvers and Newton with common operations
+        run: |
+          for precision in float double; do
+            flags=""
+            if [ "$precision" = double ]; then flags=-DUSE_DOUBLE_PRECISION; fi
+            directory="$BUILD_DIR/common_dense_$precision"
+            make -j2 test_common_nmfd_dense_gmres_cpu.bin test_common_nmfd_dense_direct_solver_cpu.bin test_common_nmfd_dense_nonlinear_solver_cpu.bin test_common_nmfd_dense_newton_direct_solver_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$directory" NEWTON_TEST_FLAGS="$flags"
+            for test in gmres direct_solver nonlinear_solver newton_direct_solver; do
+              timeout 60s ./"$directory"/test_common_nmfd_dense_"$test"_cpu.bin
+            done
+          done
+      - name: Verify hierarchy ownership with sanitizers
+        run: |
+          make test_nmfd_vector_space_hierarchy_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/vector_hierarchy_sanitizers" NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          ASAN_OPTIONS=detect_leaks=1 OMP_NUM_THREADS=4 timeout 60s ./"$BUILD_DIR"/vector_hierarchy_sanitizers/test_nmfd_vector_space_hierarchy_cpu.bin
+
+  nmfd-vector-space-hierarchy-cuda:
+    needs: [scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify common operations and solvers when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA hierarchy: no usable NVIDIA device"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA hierarchy: nvcc not found"
+            exit 0
+          fi
+          make test_nmfd_vector_space_hierarchy_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/vector_hierarchy_cuda"
+          timeout 90s ./"$BUILD_DIR"/vector_hierarchy_cuda/test_nmfd_vector_space_hierarchy_cuda.bin
+          for precision in float double; do
+            flags=""
+            if [ "$precision" = double ]; then flags=-DUSE_DOUBLE_PRECISION; fi
+            directory="$BUILD_DIR/common_dense_cuda_$precision"
+            make -j2 test_common_nmfd_dense_gmres_cuda.bin test_common_nmfd_dense_direct_solver_cuda.bin test_common_nmfd_dense_nonlinear_solver_cuda.bin test_common_nmfd_dense_newton_direct_solver_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$directory" NEWTON_TEST_FLAGS="$flags"
+            for test in gmres direct_solver nonlinear_solver newton_direct_solver; do
+              timeout 90s ./"$directory"/test_common_nmfd_dense_"$test"_cuda.bin
+            done
+          done
+
   continuation-core-cpu:
     needs: [scfd-vector-operations-cpu]
     runs-on: ubuntu-latest

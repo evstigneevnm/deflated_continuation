@@ -2,6 +2,7 @@
 #define __NMFD_DEFAULT_MULTIVECTOR_FACTORY_BASE_H__
 
 #include <vector>
+#include <stdexcept>
 #include "vector_factory_base.h"
 
 namespace nmfd
@@ -30,6 +31,8 @@ public:
     /// multivector interface
     void init_multivector( multivector_type &x, Ord m ) const
     {
+        if ( m < Ord( 0 ) )
+            throw std::invalid_argument( "Multivector count must be nonnegative" );
         x.resize( m );
         for ( Ord i = 0; i < m; ++i )
         {
@@ -38,6 +41,7 @@ public:
     }
     void free_multivector( multivector_type &x, Ord m ) const
     {
+        check_count( x, m );
         for ( Ord i = 0; i < m; ++i )
         {
             static_cast<const DerivedSpace *>( this )->free_vector( x[i] );
@@ -46,6 +50,7 @@ public:
     }
     void start_use_multivector( multivector_type &x, Ord m ) const
     {
+        check_count( x, m );
         for ( Ord i = 0; i < m; ++i )
         {
             static_cast<const DerivedSpace *>( this )->start_use_vector( x[i] );
@@ -53,10 +58,18 @@ public:
     }
     void stop_use_multivector( multivector_type &x, Ord m ) const
     {
+        check_count( x, m );
         for ( Ord i = 0; i < m; ++i )
         {
             static_cast<const DerivedSpace *>( this )->stop_use_vector( x[i] );
         }
+    }
+
+private:
+    static void check_count( const multivector_type &vectors, Ord count )
+    {
+        if ( count < Ord( 0 ) || static_cast<std::size_t>( count ) > vectors.size() )
+            throw std::out_of_range( "Multivector count exceeds allocated storage" );
     }
 };
 

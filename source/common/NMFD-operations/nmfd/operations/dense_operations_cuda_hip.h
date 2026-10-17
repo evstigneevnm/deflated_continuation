@@ -74,7 +74,7 @@ public:
         const auto n = mat.size_nd()[0];
         parent_t::verify_max_loc_size( n * n + n );
 
-        scalar_type *const A_buf = parent_t::vt_.get_raw_ptr( parent_t::helper_ );
+        scalar_type *const A_buf = parent_t::helper_.raw_ptr();
         scalar_type *const tau   = A_buf + n * n;
 
         memory_type::copy( sizeof( scalar_type ) * n * n, mat.raw_ptr(), A_buf );

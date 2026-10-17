@@ -18,6 +18,8 @@ public:
     using scalar_type = T;
     using memory_type = Memory;
     using vector_type = scfd::arrays::array<scalar_type, memory_type>;
+    template <class U>
+    using rebind = scfd_array_traits<U, memory_type>;
 
 public:
     scfd_array_traits() = default;
@@ -32,7 +34,13 @@ public:
 
     void dealloc( vector_type &v ) const
     {
-        v.free();
+        if ( !v.is_free() )
+        {
+            if ( v.is_own() )
+                v.free();
+            else
+                v = vector_type();
+        }
     }
 
     scalar_type *get_raw_ptr( vector_type &v ) const

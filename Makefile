@@ -99,7 +99,8 @@ IBOOST = -I$(BOOST_ROOT_PATH)/include
 HIGH_PRECISION_BLAS1_CUDA_HEADERS = source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita.h source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_type.h source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl.cuh source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_functions.cuh source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_shmem.cuh
 HIGH_PRECISION_BLAS1_HIP_HEADERS = source/common/NMFD-operations/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita.h
 HIGH_PRECISION_BLAS1_HEADERS = source/common/NMFD-operations/nmfd/operations/blas1/high_precision/compensated_reduction.h $(HIGH_PRECISION_BLAS1_CUDA_HEADERS) $(HIGH_PRECISION_BLAS1_HIP_HEADERS)
-SCFD_VECTOR_OPS_HEADERS = source/common/scfd_vector_operations.h source/common/NMFD-operations/nmfd/operations/scfd_vector_operations.h $(HIGH_PRECISION_BLAS1_HEADERS) source/common/NMFD-operations/nmfd/operations/vector_operations_base.h source/common/NMFD-operations/nmfd/operations/vector_space_base.h
+NMFD_VECTOR_SPACE_HEADERS = $(addprefix $(COMMON_NMFD_OPERATIONS)/nmfd/operations/,dense_vector_operations.h dense_vector_space.h scfd_vector_space.h vector_operations_base.h vector_factory_base.h vector_space_base.h default_multivector_operations_base.h default_multivector_factory_base.h detail/scfd_array_traits.h detail/static_vector_traits.h)
+SCFD_VECTOR_OPS_HEADERS = source/common/scfd_vector_operations.h source/common/NMFD-operations/nmfd/operations/scfd_vector_operations.h $(HIGH_PRECISION_BLAS1_HEADERS) $(NMFD_VECTOR_SPACE_HEADERS)
 SCFD_SERIAL_VECTOR_OPS_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/scfd_serial_cpu_vector_operations.h
 SCFD_VECTOR_OPS_TEST_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/tests/scfd_vector_operations_high_precision_tests.h source/common/tests/scfd_vector_operations_nmfd_interface_tests.h
 CPU_VECTOR_OPS_VAR_PREC_HEADERS = source/common/cpu_vector_operations_var_prec.h source/common/NMFD-operations/nmfd/operations/cpu_vector_operations_var_prec.h source/common/NMFD-operations/nmfd/operations/vector_operations_base.h source/common/NMFD-operations/nmfd/operations/vector_space_base.h
@@ -935,6 +936,13 @@ test_newton_%_json_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_newton_%.cp
 test_nmfd_newton_backend_cpu_omp.bin: source/common/tests/test_nmfd_newton_backend.cpp $(NEWTON_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) -o $(BUILD_DIR)/$@
 
+test_nmfd_vector_space_hierarchy_cpu.bin: source/common/tests/test_nmfd_vector_space_hierarchy.cpp $(SCFD_VECTOR_OPS_HEADERS) $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/vector_wrap.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/detail/static_vector_traits.h
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_nmfd_vector_space_hierarchy_cuda.bin: source/common/tests/test_nmfd_vector_space_hierarchy.cpp $(SCFD_VECTOR_OPS_HEADERS) $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/vector_wrap.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_nmfd_vector_space_hierarchy_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_nmfd_vector_space_hierarchy_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
+
 test_nmfd_newton_backend_cuda.bin: source/common/tests/test_nmfd_newton_backend.cpp $(NEWTON_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_nmfd_newton_backend_cuda.o
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_nmfd_newton_backend_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
@@ -950,6 +958,13 @@ test_nmfd_scfd_backend_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/operations/test_scf
 
 test_nmfd_dense_%_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_dense.cpp $(NMFD_DENSE_TEST_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) -DPLATFORM_SERIAL_CPU $< -o $(BUILD_DIR)/$@
+
+test_common_nmfd_dense_%_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_dense.cpp $(NMFD_DENSE_TEST_HEADERS) $(NMFD_VECTOR_SPACE_HEADERS) $(wildcard $(COMMON_NMFD_OPERATIONS)/nmfd/operations/dense_operations*.h)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) -DPLATFORM_SERIAL_CPU $< -o $(BUILD_DIR)/$@
+
+test_common_nmfd_dense_%_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_dense.cpp $(NMFD_DENSE_TEST_HEADERS) $(NMFD_VECTOR_SPACE_HEADERS) $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(wildcard $(COMMON_NMFD_OPERATIONS)/nmfd/operations/dense_operations*.h) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -DPLATFORM_CUDA -x cu $< -c -o $(BUILD_DIR)/test_common_nmfd_dense_$*_cuda_main.o
+	$(NVCC) $(NVCCFLAGS) $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) $(BUILD_DIR)/test_common_nmfd_dense_$*_cuda_main.o $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LCUDA) -lcublas -lcusolver -o $(BUILD_DIR)/$@
 
 test_nmfd_dense_%_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_dense.cpp $(NMFD_DENSE_TEST_HEADERS) $(NMFD_DENSE_CUDA_INSTANTIATIONS)
 	$(NVCC) $(NVCCFLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) -DPLATFORM_CUDA -x cu $< $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(LCUDA) -lcublas -lcusolver -o $(BUILD_DIR)/$@
