@@ -7,3 +7,6 @@
 [submodule "source/contrib/nmfd-linsolvers"]
 	path = source/contrib/nmfd-linsolvers
 	url = git@github.com:evstigneevnm/NMFD-linsolvers.git
+[submodule "source/contrib/nmfd-operations"]
+	path = source/contrib/nmfd-operations
+	url = https://github.com/evstigneevnm/NMFD-operations.git
