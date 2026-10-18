@@ -151,10 +151,10 @@ void gpu_vector_operations<thrust::complex<float>, BLOCK_SIZE_1D>::scale_adapter
 
 
 template <typename T>
-__global__ void check_is_valid_number_kernel( size_t N, const T *x, bool *result );
+__global__ void is_valid_number_kernel( size_t N, const T *x, bool *result );
 
 template <>
-__global__ void check_is_valid_number_kernel( size_t N, const float *x, bool *result )
+__global__ void is_valid_number_kernel( size_t N, const float *x, bool *result )
 {
 
     size_t j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -169,7 +169,7 @@ __global__ void check_is_valid_number_kernel( size_t N, const float *x, bool *re
 }
 
 template <>
-__global__ void check_is_valid_number_kernel( size_t N, const double *x, bool *result )
+__global__ void is_valid_number_kernel( size_t N, const double *x, bool *result )
 {
 
     size_t j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -184,7 +184,7 @@ __global__ void check_is_valid_number_kernel( size_t N, const double *x, bool *r
 }
 
 template <>
-__global__ void check_is_valid_number_kernel( size_t N, const thrust::complex<double> *x, bool *result )
+__global__ void is_valid_number_kernel( size_t N, const thrust::complex<double> *x, bool *result )
 {
 
     size_t j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -199,7 +199,7 @@ __global__ void check_is_valid_number_kernel( size_t N, const thrust::complex<do
 }
 
 template <>
-__global__ void check_is_valid_number_kernel( size_t N, const thrust::complex<float> *x, bool *result )
+__global__ void is_valid_number_kernel( size_t N, const thrust::complex<float> *x, bool *result )
 {
 
     size_t j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -214,12 +214,12 @@ __global__ void check_is_valid_number_kernel( size_t N, const thrust::complex<fl
 }
 
 // template <typename T, int BLOCK_SIZE>
-// bool gpu_vector_operations<T, BLOCK_SIZE>::check_is_valid_number(const vector_type& x)const
+// bool gpu_vector_operations<T, BLOCK_SIZE>::is_valid_number(const vector_type& x)const
 // {
 //     bool result_h=true, *result_d;
 //     result_d=device_allocate<bool>(1);
 //     host_2_device_cpy<bool>(result_d, &result_h, 1);
-//     check_is_valid_number_kernel<T><<<dimGrid, dimBlock>>>(sz, x, result_d);
+//     is_valid_number_kernel<T><<<dimGrid, dimBlock>>>(sz, x, result_d);
 //     device_2_host_cpy<bool>(&result_h, result_d, 1);
 //     CUDA_SAFE_CALL(cudaFree(result_d));
 //     return result_h;

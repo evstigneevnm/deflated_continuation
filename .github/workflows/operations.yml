@@ -37,6 +37,31 @@ jobs:
             CONFIG_FILE=build_configs/config_cpu.inc \
             BUILD_DIR=build/operations_integration
 
+  nmfd-newton-linsolvers-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify Newton linear-solver API and include-order independence
+        run: make -C source/contrib/nmfd-newton -j2 check_linsolvers BUILD_DIR=build/linsolvers_interface
+
+  nmfd-newton-cahn-hilliard-cpu:
+    name: Cahn-Hilliard / ${{ matrix.backend }} / NMFD-linsolvers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [serial, omp]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify coupled Cahn-Hilliard Newton solves
+        run: make -C source/contrib/nmfd-newton -j2 'check_ch_${{ matrix.backend }}' BUILD_DIR=build/ch_solver_interface
+
   nmfd-linsolvers-operations-cpu:
     runs-on: ubuntu-latest
     timeout-minutes: 10

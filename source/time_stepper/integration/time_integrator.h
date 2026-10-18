@@ -73,7 +73,7 @@ public:
         operations_->assign( in, candidate );
         operations_->assign( candidate, out );
         const auto &current = out;
-        if ( !operations_->check_is_valid_number( current ) )
+        if ( !operations_->is_valid_number( current ) )
         {
             status_ = integration_status::step_failure;
             return;
@@ -111,7 +111,7 @@ public:
             }
             const auto direction = end_ > time_ ? scalar_type( 1 ) : scalar_type( -1 );
             if ( !std::isfinite( next_time ) || direction * ( next_time - time_ ) <= 0 ||
-                 direction * ( next_time - trial_time ) > 0 || !operations_->check_is_valid_number( candidate ) ||
+                 direction * ( next_time - trial_time ) > 0 || !operations_->is_valid_number( candidate ) ||
                  ( status_ != integration_status::running && status_ != integration_status::completed &&
                    status_ != integration_status::stopped_by_external_operation ) )
             {

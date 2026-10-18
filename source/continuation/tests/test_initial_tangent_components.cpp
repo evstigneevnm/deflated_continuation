@@ -86,7 +86,7 @@ struct mock_vector_operations
         const double vector_norm = norm( vector );
         return std::sqrt( vector_norm * vector_norm + scalar * scalar );
     }
-    bool check_is_valid_number( const vector_type &vector ) const
+    bool is_valid_number( const vector_type &vector ) const
     {
         for ( const double value : vector )
         {

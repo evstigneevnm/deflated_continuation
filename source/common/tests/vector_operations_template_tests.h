@@ -504,19 +504,6 @@ struct has_norm_l_inf<
 };
 
 template <class VecOps, class = void>
-struct has_is_valid_number : std::false_type
-{
-};
-
-template <class VecOps>
-struct has_is_valid_number<
-    VecOps, std::void_t<decltype( std::declval<VecOps &>()
-                                      .is_valid_number( std::declval<const typename VecOps::vector_type &>() ) )>>
-    : std::true_type
-{
-};
-
-template <class VecOps, class = void>
 struct has_set_value_at_point_sized : std::false_type
 {
 };
@@ -1104,19 +1091,11 @@ void run_core_vector_operations_suite(
         );
     }
 
-    report.require( vec_ops.check_is_valid_number( x ), label + " check_is_valid_number accepts finite" );
-    if constexpr ( has_is_valid_number<VecOps>::value )
-    {
-        report.require( vec_ops.is_valid_number( x ), label + " is_valid_number accepts finite" );
-    }
+    report.require( vec_ops.is_valid_number( x ), label + " is_valid_number accepts finite" );
     auto invalid   = hx0;
     invalid.back() = invalid_scalar<scalar_type>();
     access.write( vec_ops, x, invalid );
-    report.require( !vec_ops.check_is_valid_number( x ), label + " check_is_valid_number rejects NaN" );
-    if constexpr ( has_is_valid_number<VecOps>::value )
-    {
-        report.require( !vec_ops.is_valid_number( x ), label + " is_valid_number rejects NaN" );
-    }
+    report.require( !vec_ops.is_valid_number( x ), label + " is_valid_number rejects NaN" );
 
     if constexpr ( has_assign_random<VecOps>::value )
     {

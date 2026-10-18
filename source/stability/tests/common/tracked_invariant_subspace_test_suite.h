@@ -59,7 +59,7 @@ public:
             }
             vector_space_.add_lin_comb( value, **coordinates_[row], scalar_type( 1 ), destination );
         }
-        return vector_space_.check_is_valid_number( destination );
+        return vector_space_.is_valid_number( destination );
     }
 
 private:

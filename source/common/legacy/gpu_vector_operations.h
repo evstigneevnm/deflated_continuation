@@ -356,10 +356,6 @@ struct gpu_vector_operations
     {
         return std::isfinite( norm( x ) );
     }
-    bool check_is_valid_number( const vector_type &x ) const
-    {
-        return is_valid_number( x );
-    }
 
     void scalar_prod( const vector_type &x, const vector_type &y, scalar_type *result )
     {

@@ -135,21 +135,19 @@ int main( int argc, char const *argv[] )
     printf( "is result finite?:\n" );
     printf( "        v1, v2, v3\n" );
     printf(
-        "R vecs: %s, %s, %s\n", true == vec_ops_R->check_is_valid_number( u1_d ) ? "T" : "F",
-        true == vec_ops_R->check_is_valid_number( u2_d ) ? "T" : "F",
-        true == vec_ops_R->check_is_valid_number( u3_d ) ? "T" : "F"
+        "R vecs: %s, %s, %s\n", true == vec_ops_R->is_valid_number( u1_d ) ? "T" : "F",
+        true == vec_ops_R->is_valid_number( u2_d ) ? "T" : "F", true == vec_ops_R->is_valid_number( u3_d ) ? "T" : "F"
     );
-    if ( vec_ops_R->check_is_valid_number( u3_d ) )
+    if ( vec_ops_R->is_valid_number( u3_d ) )
     {
         std::cout << "failed" << std::endl;
         flag_ok = false;
     }
     printf(
-        "C vecs: %s, %s, %s\n", true == vec_ops_C->check_is_valid_number( z1_d ) ? "T" : "F",
-        true == vec_ops_C->check_is_valid_number( z2_d ) ? "T" : "F",
-        true == vec_ops_C->check_is_valid_number( z3_d ) ? "T" : "F"
+        "C vecs: %s, %s, %s\n", true == vec_ops_C->is_valid_number( z1_d ) ? "T" : "F",
+        true == vec_ops_C->is_valid_number( z2_d ) ? "T" : "F", true == vec_ops_C->is_valid_number( z3_d ) ? "T" : "F"
     );
-    if ( vec_ops_C->check_is_valid_number( z2_d ) )
+    if ( vec_ops_C->is_valid_number( z2_d ) )
     {
         std::cout << "failed" << std::endl;
         flag_ok = false;

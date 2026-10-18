@@ -12,7 +12,7 @@ template <class VectorOperations, class Vector, class Scalar>
 bool normalize_rank1_tangent( VectorOperations *vec_ops, Vector &vector_component, Scalar &parameter_component )
 {
     if ( vec_ops == nullptr || !common::scalar_math::isfinite( parameter_component ) ||
-         !vec_ops->check_is_valid_number( vector_component ) )
+         !vec_ops->is_valid_number( vector_component ) )
     {
         return false;
     }
@@ -26,7 +26,7 @@ bool normalize_rank1_tangent( VectorOperations *vec_ops, Vector &vector_componen
 
     parameter_component /= norm;
     vec_ops->scale( Scalar( 1 ) / norm, vector_component );
-    return common::scalar_math::isfinite( parameter_component ) && vec_ops->check_is_valid_number( vector_component );
+    return common::scalar_math::isfinite( parameter_component ) && vec_ops->is_valid_number( vector_component );
 }
 
 } // namespace continuation

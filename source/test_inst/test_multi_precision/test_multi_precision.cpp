@@ -91,7 +91,7 @@ int main( int argc, char const *argv[] )
     std::cout << " add mul scalar y norm(y) = " << vec_ops.norm( y ) << std::endl;
     vec_ops.assign( y, z );
     std::cout << " assigned y->z norm(z) = " << vec_ops.norm( z ) << std::endl;
-    std::cout << " is result valid?: " << vec_ops.check_is_valid_number( z ) << std::endl;
+    std::cout << " is result valid?: " << vec_ops.is_valid_number( z ) << std::endl;
     vec_ops.assign_mul( static_cast<T>( 3.0 ), y, z );
     std::cout << " assign_mul 3y->z norm(z) = " << vec_ops.norm( z ) << std::endl;
     vec_ops.assign_mul( static_cast<T>( 6.0 ), x, static_cast<T>( -3.0 ), y, z );

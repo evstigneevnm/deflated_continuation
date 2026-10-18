@@ -218,11 +218,11 @@ void run_var_prec_tests( test_report &report )
         vec_ops.div_pointwise( T( 1 ), x, T( 1 ), y_long, z );
     } );
 
-    report.require( vec_ops.check_is_valid_number( x ), "check_is_valid_number accepts finite values" );
+    report.require( vec_ops.is_valid_number( x ), "is_valid_number accepts finite values" );
     x[2] = std::numeric_limits<T>::quiet_NaN();
-    report.require( !vec_ops.check_is_valid_number( x ), "check_is_valid_number rejects NaN" );
+    report.require( !vec_ops.is_valid_number( x ), "is_valid_number rejects NaN" );
     x[2] = std::numeric_limits<T>::infinity();
-    report.require( !vec_ops.check_is_valid_number( x ), "check_is_valid_number rejects infinity" );
+    report.require( !vec_ops.is_valid_number( x ), "is_valid_number rejects infinity" );
 
     vec_ops.stop_use_vectors( x, y, z, y_long, z_long, short_x, normal_x );
     vec_ops.free_vectors( x, y, z, y_long, z_long, short_x, normal_x );

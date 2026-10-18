@@ -144,7 +144,7 @@ void test( bool full_check )
         require( solver.solve( &problem, nullptr, nullptr, *initial, *state ), "backend Newton solve failed" );
         problem.apply( *state, *residual );
         require(
-            operations->norm_l2( *residual ) == T( 0 ) && operations->check_is_valid_number( *state ),
+            operations->norm_l2( *residual ) == T( 0 ) && operations->is_valid_number( *state ),
             "backend Newton root is incorrect"
         );
     }
@@ -180,7 +180,7 @@ void test( bool full_check )
         );
         require(
             problem.residual_calls == residual_calls + ( full_check ? 0u : 1u ) &&
-                !operations->check_is_valid_number( *state ),
+                !operations->is_valid_number( *state ),
             "backend input validation evaluated an invalid state or failed to restore it"
         );
     }

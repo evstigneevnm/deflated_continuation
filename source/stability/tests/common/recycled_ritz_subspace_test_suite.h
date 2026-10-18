@@ -30,7 +30,7 @@ public:
     bool apply( const vector_type &source, vector_type &destination ) const
     {
         vector_space_.mul_pointwise( 1.0, source, 1.0, *diagonal_, destination );
-        return vector_space_.check_is_valid_number( destination );
+        return vector_space_.is_valid_number( destination );
     }
 
 private:
@@ -63,7 +63,7 @@ public:
             return false;
         const scalar_type coefficient = vector_space_.scalar_prod( *source_coordinate_, source );
         vector_space_.add_lin_comb( coefficient, *target_coordinate_, scalar_type( 1 ), destination );
-        return vector_space_.check_is_valid_number( destination );
+        return vector_space_.is_valid_number( destination );
     }
 
 private:

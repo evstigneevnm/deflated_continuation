@@ -88,7 +88,7 @@ struct vector_ops
         return std::sqrt( scalar_prod( value, value ) + scalar * scalar );
     }
 
-    bool check_is_valid_number( const vector_type &value ) const
+    bool is_valid_number( const vector_type &value ) const
     {
         for ( const auto entry : value )
         {

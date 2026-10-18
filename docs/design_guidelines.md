@@ -93,7 +93,8 @@ formulations may bypass time integration.
   Legacy-only operations live in `source/common/legacy`; refactored modules must not
   depend on them. Shared infrastructure and still-used compatibility headers stay in `common`.
 - Spaces define `scalar_type`, `vector_type`, `norm_type`, lifetime operations,
-  assignment, combinations, reductions, norms, and finite-number validation.
+  assignment, combinations, reductions, norms, and finite-number validation
+  through `bool is_valid_number(const vector_type&) const`.
 - Domain X and codomain Y may differ. Inner products define the adjoint:
   `<Jv,w>_Y = <v,J*w>_X`; weighted adjoints are not plain matrix transposes.
 - Use explicit RAII host views, with lightweight host-backend pass-through.

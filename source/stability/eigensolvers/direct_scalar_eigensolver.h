@@ -99,12 +99,12 @@ private:
         if constexpr ( std::is_void<return_type>::value )
         {
             linear_operator_.apply( source, destination );
-            return vector_space_.check_is_valid_number( destination );
+            return vector_space_.is_valid_number( destination );
         }
         else
         {
             return static_cast<bool>( linear_operator_.apply( source, destination ) ) &&
-                   vector_space_.check_is_valid_number( destination );
+                   vector_space_.is_valid_number( destination );
         }
     }
 };

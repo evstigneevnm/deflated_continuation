@@ -86,7 +86,7 @@ public:
     }
     T check_solution_quality( const T_vec &x ) const
     {
-        bool finite = vec_ops_->check_is_valid_number( x );
+        bool finite = vec_ops_->is_valid_number( x );
         return finite;
     }
 

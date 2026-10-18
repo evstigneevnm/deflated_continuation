@@ -76,7 +76,7 @@ public:
     {
         ++apply_calls_;
         const bool succeeded = apply_factor_preconditioner( right_hand_side );
-        if ( !succeeded || !vector_space_.check_is_valid_number( *temporary_ ) )
+        if ( !succeeded || !vector_space_.is_valid_number( *temporary_ ) )
         {
             ++failed_applications_;
             return false;

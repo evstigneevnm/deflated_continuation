@@ -38,7 +38,7 @@ public:
             return false;
         }
         vector_operations_.scale( scale_, destination );
-        return vector_operations_.check_is_valid_number( destination );
+        return vector_operations_.is_valid_number( destination );
     }
 
     scalar_type scale() const

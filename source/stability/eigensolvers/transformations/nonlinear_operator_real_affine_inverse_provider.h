@@ -54,7 +54,7 @@ public:
                 nonlinear_operator_.preconditioner_jacobian_affine_u( solution, jacobian_scale, identity_shift )
             );
         }
-        succeeded = succeeded && vector_operations_.check_is_valid_number( solution );
+        succeeded = succeeded && vector_operations_.is_valid_number( solution );
         if ( !succeeded )
             ++failed_applications_;
         return succeeded;

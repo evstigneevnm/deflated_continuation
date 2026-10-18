@@ -32,7 +32,7 @@ public:
         }
         vector_space_.assign_scalar( scalar_type( 1 ), *inverse_diagonal_ );
         vector_space_.div_pointwise( *inverse_diagonal_, scalar_type( 1 ), diagonal );
-        if ( !vector_space_.check_is_valid_number( *inverse_diagonal_ ) )
+        if ( !vector_space_.is_valid_number( *inverse_diagonal_ ) )
         {
             throw std::invalid_argument( "pointwise diagonal preconditioner has a zero or invalid diagonal" );
         }

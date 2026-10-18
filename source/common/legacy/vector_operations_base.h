@@ -86,7 +86,7 @@ public:
     }*/
 
 
-    [[nodiscard]] virtual bool check_is_valid_number( const vector_type &x ) const = 0;
+    [[nodiscard]] virtual bool is_valid_number( const vector_type &x ) const = 0;
     //reduction operations:
     [[nodiscard]] virtual scalar_type scalar_prod( const vector_type &x, const vector_type &y ) const = 0;
     [[nodiscard]] virtual scalar_type sum( const vector_type &x ) const                               = 0;

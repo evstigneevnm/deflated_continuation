@@ -44,7 +44,7 @@ public:
     bool estimate_timestep(const T_vec& x_p, const T_vec& x_new_p, const T_vec& f_err_p)
     {
         //this implements timestep strategy adaptation. It is void for the constant time step.
-        if(vec_ops_->check_is_valid_number(x_new_p))
+        if(vec_ops_->is_valid_number(x_new_p))
         {
             return true;     
         }

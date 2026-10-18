@@ -95,7 +95,7 @@ G++FLAGS = -std=$(CPPSTD) $(TARGET_GCC)
 ICUDA = -I$(CUDA_ROOT_PATH)/include
 IPROJECT = -I $(COMMON_NMFD_OPERATIONS) -I source/ -I $(CONTRIB_SCFD)/include
 INMFD_LINSOLVERS = -I $(CONTRIB_NMFD_LINSOLVERS)/include
-INMFD_NEWTON = -I $(CONTRIB_NMFD_NEWTON)/include
+INMFD_NEWTON = -I $(CONTRIB_NMFD_NEWTON)/include $(INMFD_LINSOLVERS)
 IBOOST = -I$(BOOST_ROOT_PATH)/include
 HIGH_PRECISION_BLAS1_CUDA_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_type.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl.cuh $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_functions.cuh $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_shmem.cuh
 HIGH_PRECISION_BLAS1_HIP_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita.h
@@ -926,7 +926,7 @@ abc_flow_lyapunov_exponents: source/models/abc_flow/abc_flow_lyapunov_exponents.
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_lyapunov_exponents.cpp $(BUILD_DIR)/abc_flow_ker.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(LIBS2) -o $(BUILD_DIR)/abc_flow_lyapunov_exponents.bin 2>$(RESULTS)
 
 
-NEWTON_TEST_HEADERS = $(CONTRIB_NMFD_NEWTON)/test/solvers/newton_test_fixture.h $(wildcard $(CONTRIB_NMFD_NEWTON)/include/nmfd/solvers/*.h $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/*.h) $(COMMON_NMFD_OPERATIONS)/nmfd/operations/static_vector_space.h $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
+NEWTON_TEST_HEADERS = $(CONTRIB_NMFD_NEWTON)/test/solvers/newton_test_fixture.h $(wildcard $(CONTRIB_NMFD_NEWTON)/include/nmfd/solvers/*.h $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/*.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/*.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/preconditioners/*.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/detail/*.h) $(COMMON_NMFD_OPERATIONS)/nmfd/operations/static_vector_space.h $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 NEWTON_TEST_INCLUDES = -I$(COMMON_NMFD_OPERATIONS) $(INMFD_NEWTON) -I$(CONTRIB_SCFD)/include -I$(CONTRIB_NMFD_NEWTON)/contrib/json
 NEWTON_TEST_FLAGS ?=
 

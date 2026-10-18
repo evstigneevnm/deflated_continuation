@@ -112,9 +112,9 @@ void test_hierarchy()
         );
         require( project_space.norm2_sq( *x ) == norm_type( 4 ), "Project normalized squared norm" );
         operations.assign_scalar( T( std::numeric_limits<norm_type>::max() / norm_type( 2 ) ), *x );
-        require( operations.check_is_valid_number( *x ), "Finite validation does not square large values" );
+        require( operations.is_valid_number( *x ), "Finite validation does not square large values" );
         operations.set_value_at_point( T( std::numeric_limits<norm_type>::infinity() ), 0, *x );
-        require( !operations.check_is_valid_number( *x ), "Finite validation catches nonfinite values" );
+        require( !operations.is_valid_number( *x ), "Finite validation catches nonfinite values" );
     }
 
     space_type                            space( 2 );

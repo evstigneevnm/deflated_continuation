@@ -475,7 +475,7 @@ private:
                     operations_->add_mul( dt_ * weight, stage( j ), scratch );
                 }
             }
-            if ( !operations_->check_is_valid_number( scratch ) )
+            if ( !operations_->is_valid_number( scratch ) )
             {
                 return false;
             }
@@ -484,7 +484,7 @@ private:
                 problem_->set_time( time_ + dt_ * static_cast<scalar_type>( table_.dense_outout_c( i ) ) );
             }
             problem_->apply( scratch, stage( i ) );
-            if ( !operations_->check_is_valid_number( stage( i ) ) )
+            if ( !operations_->is_valid_number( stage( i ) ) )
             {
                 return false;
             }
@@ -496,7 +496,7 @@ private:
         if ( !table_.has_dense_output() )
         {
             problem_->apply( *work_, *dense_.endpoint_rate );
-            if ( !operations_->check_is_valid_number( *dense_.endpoint_rate ) )
+            if ( !operations_->is_valid_number( *dense_.endpoint_rate ) )
             {
                 return false;
             }
@@ -528,7 +528,7 @@ private:
                 }
             }
             problem_->apply( work, stage( i ) );
-            if ( !operations_->check_is_valid_number( stage( i ) ) )
+            if ( !operations_->is_valid_number( stage( i ) ) )
             {
                 return false;
             }
@@ -565,9 +565,8 @@ private:
                 );
             }
         }
-        return operations_->check_is_valid_number( work ) &&
-               ( !primary_error || operations_->check_is_valid_number( *error_ ) ) &&
-               ( !combined_error_ || operations_->check_is_valid_number( *secondary_error_ ) );
+        return operations_->is_valid_number( work ) && ( !primary_error || operations_->is_valid_number( *error_ ) ) &&
+               ( !combined_error_ || operations_->is_valid_number( *secondary_error_ ) );
     }
 };
 }

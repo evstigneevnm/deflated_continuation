@@ -75,17 +75,17 @@ int main( int argc, char const *argv[] )
     KS2D->jacobian_alpha( dalpha_out_hat );                                  //apply J_{alpha}
 
 
-    bool        input_finit  = vec_ops_C->check_is_valid_number( u_in_hat );
-    bool        output_finit = vec_ops_C->check_is_valid_number( u_out_hat );
+    bool        input_finit  = vec_ops_C->is_valid_number( u_in_hat );
+    bool        output_finit = vec_ops_C->is_valid_number( u_out_hat );
     std::string test_in( true == (bool)input_finit ? "Ok" : "fail" );
     std::string test_out( true == (bool)output_finit ? "Ok" : "fail" );
     std::cout << test_in << " " << test_out << std::endl;
-    input_finit  = vec_ops_C->check_is_valid_number( du_in_hat );
-    output_finit = vec_ops_C->check_is_valid_number( du_out_hat );
+    input_finit  = vec_ops_C->is_valid_number( du_in_hat );
+    output_finit = vec_ops_C->is_valid_number( du_out_hat );
     std::string test_din( true == (bool)input_finit ? "Ok" : "fail" );
     std::string test_dout( true == (bool)output_finit ? "Ok" : "fail" );
     std::cout << test_din << " " << test_dout << std::endl;
-    output_finit = vec_ops_C->check_is_valid_number( dalpha_out_hat );
+    output_finit = vec_ops_C->is_valid_number( dalpha_out_hat );
     std::string test_ain( true == (bool)output_finit ? "Ok" : "fail" );
     std::cout << test_ain << std::endl;
     device_2_host_cpy<complex>( u_hat_h, u_out_hat, Nx * My );
