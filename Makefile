@@ -86,7 +86,8 @@ NVOPENMP = -Xcompiler $(OPENMP)
 CONTRIB_SCFD = source/contrib/scfd
 CONTRIB_NMFD_LINSOLVERS = source/contrib/nmfd-linsolvers
 CONTRIB_NMFD_NEWTON = source/contrib/nmfd-newton
-COMMON_NMFD_OPERATIONS = source/common/NMFD-operations
+CONTRIB_NMFD_OPERATIONS = source/contrib/nmfd-operations
+COMMON_NMFD_OPERATIONS = $(CONTRIB_NMFD_OPERATIONS)/include
 
 G++ = $(GCC_ROOT_PATH)/g++
 LIBFLAGS = --compiler-options -fPIC
@@ -96,28 +97,29 @@ IPROJECT = -I $(COMMON_NMFD_OPERATIONS) -I source/ -I $(CONTRIB_SCFD)/include
 INMFD_LINSOLVERS = -I $(CONTRIB_NMFD_LINSOLVERS)/include
 INMFD_NEWTON = -I $(CONTRIB_NMFD_NEWTON)/include
 IBOOST = -I$(BOOST_ROOT_PATH)/include
-HIGH_PRECISION_BLAS1_CUDA_HEADERS = source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita.h source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_type.h source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl.cuh source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_functions.cuh source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_shmem.cuh
-HIGH_PRECISION_BLAS1_HIP_HEADERS = source/common/NMFD-operations/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita.h
-HIGH_PRECISION_BLAS1_HEADERS = source/common/NMFD-operations/nmfd/operations/blas1/high_precision/compensated_reduction.h $(HIGH_PRECISION_BLAS1_CUDA_HEADERS) $(HIGH_PRECISION_BLAS1_HIP_HEADERS)
+HIGH_PRECISION_BLAS1_CUDA_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_type.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl.cuh $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_functions.cuh $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_shmem.cuh
+HIGH_PRECISION_BLAS1_HIP_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita.h
+HIGH_PRECISION_BLAS1_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/compensated_reduction.h $(HIGH_PRECISION_BLAS1_CUDA_HEADERS) $(HIGH_PRECISION_BLAS1_HIP_HEADERS)
 NMFD_VECTOR_SPACE_HEADERS = $(addprefix $(COMMON_NMFD_OPERATIONS)/nmfd/operations/,dense_vector_operations.h dense_vector_space.h scfd_vector_space.h vector_operations_base.h vector_factory_base.h vector_space_base.h default_multivector_operations_base.h default_multivector_factory_base.h detail/scfd_array_traits.h detail/static_vector_traits.h)
-SCFD_VECTOR_OPS_HEADERS = source/common/scfd_vector_operations.h source/common/NMFD-operations/nmfd/operations/scfd_vector_operations.h $(HIGH_PRECISION_BLAS1_HEADERS) $(NMFD_VECTOR_SPACE_HEADERS)
+SCFD_BACKEND_EXT_HEADERS = $(wildcard source/common/scfd_backend_ext/*.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/detail/scfd_backend_ext/*.h)
+SCFD_VECTOR_OPS_HEADERS = source/common/scfd_vector_operations.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/scfd_vector_operations.h $(HIGH_PRECISION_BLAS1_HEADERS) $(NMFD_VECTOR_SPACE_HEADERS) $(SCFD_BACKEND_EXT_HEADERS)
 SCFD_SERIAL_VECTOR_OPS_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/scfd_serial_cpu_vector_operations.h
 SCFD_VECTOR_OPS_TEST_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/tests/scfd_vector_operations_high_precision_tests.h source/common/tests/scfd_vector_operations_nmfd_interface_tests.h
-CPU_VECTOR_OPS_VAR_PREC_HEADERS = source/common/cpu_vector_operations_var_prec.h source/common/NMFD-operations/nmfd/operations/cpu_vector_operations_var_prec.h source/common/NMFD-operations/nmfd/operations/vector_operations_base.h source/common/NMFD-operations/nmfd/operations/vector_space_base.h
-COMMON_FILE_OPS_HEADERS = source/common/file_operations.h source/common/cpu_file_operations.h source/common/cpu_matrix_file_operations.h source/common/gpu_file_operations.h source/common/gpu_matrix_file_operations.h source/common/NMFD-operations/nmfd/operations/io/file_operations.h source/common/NMFD-operations/nmfd/operations/io/vector_file_operations.h source/common/NMFD-operations/nmfd/operations/io/matrix_file_operations.h
-SMALL_DENSE_LINALG_HEADERS = source/common/NMFD-operations/nmfd/operations/linalg/small_dense.h
-HOST_SMALL_DENSE_HEADERS = source/common/NMFD-operations/nmfd/operations/linalg/host_small_dense_backend.h source/common/NMFD-operations/nmfd/operations/linalg/host_small_dense_lapack.h source/contrib/scfd/include/scfd/external_libraries/lapack_wrap.h
-MATRIX_MARKET_HEADERS = source/common/NMFD-operations/nmfd/operations/io/matrix_market.h source/common/NMFD-operations/nmfd/operations/sparse/host_csr_matrix.h
+CPU_VECTOR_OPS_VAR_PREC_HEADERS = source/common/cpu_vector_operations_var_prec.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/cpu_vector_operations_var_prec.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/vector_operations_base.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/vector_space_base.h
+COMMON_FILE_OPS_HEADERS = source/common/file_operations.h source/common/cpu_file_operations.h source/common/cpu_matrix_file_operations.h source/common/gpu_file_operations.h source/common/gpu_matrix_file_operations.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/io/file_operations.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/io/vector_file_operations.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/io/matrix_file_operations.h
+SMALL_DENSE_LINALG_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/linalg/small_dense.h
+HOST_SMALL_DENSE_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/linalg/host_small_dense_backend.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/linalg/host_small_dense_lapack.h source/contrib/scfd/include/scfd/external_libraries/lapack_wrap.h
+MATRIX_MARKET_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/io/matrix_market.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/sparse/host_csr_matrix.h
 NMFD_KRYLOV_HEADERS = source/contrib/nmfd-linsolvers/include/nmfd/solvers/krylov/operator_apply.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/krylov/orthogonalization.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/krylov/arnoldi.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/krylov/basis_storage.h
 ANALYTICAL_EIGENPROBLEM_HEADERS = source/stability/tests/common/analytical_eigenproblem.h source/stability/tests/common/analytical_dense_operator.h source/stability/tests/common/analytical_real_affine_inverse_model.h source/stability/tests/common/eigensolver_test_harness.h
 EIGENSOLVER_HEADERS = source/stability/eigensolvers/eigensolver_result.h source/stability/eigensolvers/eigenvalue_target.h source/stability/eigensolvers/inverse_iteration.h source/stability/eigensolvers/ritz_recovery.h source/stability/eigensolvers/detail/ordered_real_schur.h source/stability/eigensolvers/krylov_schur.h source/stability/eigensolvers/matrix_free_factorized_krylov_schur.h
 STABILITY_ANALYSIS_HEADERS = source/stability/model_adapter_contract.h source/stability/analysis/stability_point_result.h source/stability/analysis/spectrum_classifier.h source/stability/analysis/spectrum_scan_aggregator.h source/stability/analysis/validated_spectrum_union.h source/stability/analysis/eigenvector_rank_aggregator.h source/stability/analysis/recycled_ritz_subspace.h source/stability/analysis/eigensolver_adapter.h source/stability/analysis/dimension_guarded_eigensolver.h source/stability/analysis/matrix_free_stability_config.h source/stability/analysis/matrix_free_stability_configuration.h source/stability/analysis/matrix_free_stability_solver.h source/stability/analysis/matrix_free_stability_scan.h source/stability/analysis/initial_vector_policy.h source/stability/analysis/detail/vector_workspace.h source/stability/analysis/transition_state_alignment.h source/stability/analysis/source_parameter_path.h source/stability/analysis/source_parameter_state_marcher.h source/stability/analysis/stability_evaluator.h source/stability/analysis/stability_transition_refiner.h source/stability/tracking/principal_angles.h source/stability/tracking/tracked_invariant_subspace.h source/stability/persistence/classification_uncertainty_registry.h source/stability/stability_analysis.hpp
 AFFINE_PRECONDITIONER_HEADERS = source/stability/eigensolvers/transformations/affine_inverse_health.h source/stability/eigensolvers/transformations/complex_affine_preconditioner.h source/stability/eigensolvers/transformations/complexified_real_affine_preconditioner.h source/stability/eigensolvers/transformations/complexified_real_operator.h source/stability/eigensolvers/transformations/matrix_free_complex_factor_solver_bundle.h source/stability/eigensolvers/transformations/nonlinear_operator_real_affine_inverse_provider.h source/stability/eigensolvers/transformations/scaled_real_operator.h source/stability/eigensolvers/transformations/scaled_real_affine_inverse_provider.h
 EIGENSOLVER_TRANSFORMATION_HEADERS = source/stability/eigensolvers/transformations/identity_operator.h source/stability/eigensolvers/transformations/affine_pencil_operator.h source/stability/eigensolvers/transformations/inverse_composed_operator.h source/stability/eigensolvers/transformations/inexact_exponential_operator.h source/stability/eigensolvers/transformations/stability_polynomial_operator.h source/stability/eigensolvers/transformations/complex_affine_factor.h source/stability/eigensolvers/transformations/complex_affine_block_operator.h source/stability/eigensolvers/transformations/complex_shift_block_operator.h source/stability/eigensolvers/transformations/pointwise_diagonal_preconditioner.h $(AFFINE_PRECONDITIONER_HEADERS) source/stability/eigensolvers/transformations/complex_solver_product_adapter.h source/stability/eigensolvers/transformations/tracked_linear_solver.h source/stability/eigensolvers/transformations/factor_solver_statistics.h source/stability/eigensolvers/transformations/iterative_factor_solver_bundle.h source/stability/eigensolvers/transformations/spectral_mapping.h source/stability/eigensolvers/transformations/polynomial_denominator_factorization.h source/stability/eigensolvers/transformations/stability_polynomial_factorization.h source/stability/eigensolvers/transformations/euler_polynomial_factorization.h source/stability/eigensolvers/transformations/factorized_inverse_solver.h source/stability/eigensolvers/projected_spectrum_recovery.h source/stability/eigensolvers/rotated_projected_spectrum_recovery.h
-PRODUCT_VECTOR_SPACE_HEADERS = source/common/NMFD-operations/nmfd/operations/product_vector_space.h source/common/NMFD-operations/nmfd/operations/scfd_complex_vector_bridge.h
+PRODUCT_VECTOR_SPACE_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/product_vector_space.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/scfd_complex_vector_bridge.h
 NMFD_GMRES_HEADERS = source/contrib/nmfd-linsolvers/include/nmfd/solvers/gmres.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/iter_solver_base.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/default_monitor.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/monitor_krylov.h $(NMFD_KRYLOV_HEADERS) $(HOST_SMALL_DENSE_HEADERS)
 NMFD_GMRES_BASELINE_HEADERS = source/numerical_algos/lin_solvers/tests/nmfd_cpu_reference_vector_space.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_advection.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_diffusion.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_elliptic.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_advection.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_diffusion.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_elliptic.h source/contrib/nmfd-linsolvers/test/solvers/residual_regularization_test.h
-COMPLEX_TRAITS_HEADERS = source/common/scfd_backend_ext/complex.h
+COMPLEX_TRAITS_HEADERS = $(SCFD_BACKEND_EXT_HEADERS)
 CONTINUATION_SYMMETRY_HEADERS = source/symmetry/translation/orbit_type.h source/symmetry/continuation/continuation_chart_state.h source/symmetry/continuation/geometry_traits.h source/symmetry/continuation/identity_continuation_chart.h source/symmetry/continuation/isotropy_transition.h source/symmetry/continuation/local_representative_policy.h
 CONTINUATION_CHART_HEADERS = source/continuation/chart_helpers.h source/continuation/predictor_chart_validation.h source/continuation/predictor_chart_probe.h source/continuation/predictor_chart_diagnostics.h source/continuation/corrector_retry_policy.h source/continuation/progress_monitor.h source/continuation/continuation_step_state.h source/continuation/continuation_endpoint_state.h source/continuation/observational_knot_sample.h source/continuation/pending_branch_event.h source/continuation/initial_tangent_candidates.h source/continuation/initial_tangent_chart_validator.h source/continuation/initial_tangent_secant_builder.h source/continuation/semicurve_tangent_cache.h source/continuation/tangent_normalization.h $(CONTINUATION_SYMMETRY_HEADERS)
 SYMMETRY_LINEARIZATION_HEADERS = source/symmetry/linearization/projected_linear_operator.h source/symmetry/linearization/projected_stability_linear_operator.h source/symmetry/linearization/projected_preconditioner.h source/symmetry/linearization/projected_affine_inverse_provider.h source/symmetry/linearization/projected_linearization_provider.h source/symmetry/linearization/projected_stability_gauge.h
@@ -526,7 +528,7 @@ test_symmetry_solution_storage.bin: source/deflation/tests/test_symmetry_solutio
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/deflation/tests/test_symmetry_solution_storage.cpp $(OPENMP) -o $(BUILD_DIR)/test_symmetry_solution_storage.bin 2>$(RESULTS)
 
 
-test_cpu_glued_vector_operations.bin: source/common/tests/test_cpu_glued_vector_operations.cpp $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
+test_cpu_glued_vector_operations.bin: source/common/tests/test_cpu_glued_vector_operations.cpp $(SCFD_SERIAL_VECTOR_OPS_HEADERS) source/common/glued_vector_operations.h source/common/glued_vector_space.h $(wildcard $(COMMON_NMFD_OPERATIONS)/nmfd/operations/glued_*.h)
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_cpu_glued_vector_operations.cpp $(OPENMP) -o $(BUILD_DIR)/test_cpu_glued_vector_operations.bin 2>$(RESULTS)
 
 test_multi_precision.bin: source/test_inst/test_multi_precision/test_multi_precision.cpp $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
@@ -603,11 +605,11 @@ test_vector_snapshot_queue.bin: source/common/tests/test_vector_snapshot_queue.c
 
 gpu_reduction_ogita_ker: $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 
-$(BUILD_DIR)/gpu_reduction_ogita_kernels.o: source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_kernels.cu $(HIGH_PRECISION_BLAS1_HEADERS) | $(BUILD_STAMP)
-	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)  source/common/NMFD-operations/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_kernels.cu -c -o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o 2>$(RESULTS)
+$(BUILD_DIR)/gpu_reduction_ogita_kernels.o: $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_kernels.cu $(HIGH_PRECISION_BLAS1_HEADERS) | $(BUILD_STAMP)
+	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)  $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_kernels.cu -c -o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o 2>$(RESULTS)
 
-$(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o: source/common/NMFD-operations/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita_kernels.cu $(HIGH_PRECISION_BLAS1_HEADERS) | $(BUILD_STAMP)
-	$(HIPCC) $(HIPFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/common/NMFD-operations/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita_kernels.cu -c -o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o 2>$(RESULTS)
+$(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o: $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita_kernels.cu $(HIGH_PRECISION_BLAS1_HEADERS) | $(BUILD_STAMP)
+	$(HIPCC) $(HIPFLAGS) $(SCALAR_TYPE) $(IPROJECT) $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita_kernels.cu -c -o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o 2>$(RESULTS)
 
 gpu_vector_operations_ker: $(BUILD_DIR)/gpu_vector_operations_kernels.o
 
@@ -923,8 +925,8 @@ abc_flow_lyapunov_exponents: source/models/abc_flow/abc_flow_lyapunov_exponents.
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/abc_flow/abc_flow_lyapunov_exponents.cpp $(BUILD_DIR)/abc_flow_ker.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(LIBS2) -o $(BUILD_DIR)/abc_flow_lyapunov_exponents.bin 2>$(RESULTS)
 
 
-NEWTON_TEST_HEADERS = $(CONTRIB_NMFD_NEWTON)/test/solvers/newton_test_fixture.h $(wildcard $(CONTRIB_NMFD_NEWTON)/include/nmfd/solvers/*.h $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/*.h) $(CONTRIB_NMFD_NEWTON)/include/nmfd/operations/static_vector_space.h
-NEWTON_TEST_INCLUDES = $(INMFD_NEWTON) -I$(CONTRIB_NMFD_NEWTON)/contrib/SCFD/include
+NEWTON_TEST_HEADERS = $(CONTRIB_NMFD_NEWTON)/test/solvers/newton_test_fixture.h $(wildcard $(CONTRIB_NMFD_NEWTON)/include/nmfd/solvers/*.h $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/*.h) $(COMMON_NMFD_OPERATIONS)/nmfd/operations/static_vector_space.h $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
+NEWTON_TEST_INCLUDES = -I$(COMMON_NMFD_OPERATIONS) $(INMFD_NEWTON) -I$(CONTRIB_SCFD)/include -I$(CONTRIB_NMFD_NEWTON)/contrib/json
 NEWTON_TEST_FLAGS ?=
 
 test_newton_%_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_newton_%.cpp $(NEWTON_TEST_HEADERS)
@@ -936,10 +938,10 @@ test_newton_%_json_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_newton_%.cp
 test_nmfd_newton_backend_cpu_omp.bin: source/common/tests/test_nmfd_newton_backend.cpp $(NEWTON_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) -o $(BUILD_DIR)/$@
 
-test_nmfd_vector_space_hierarchy_cpu.bin: source/common/tests/test_nmfd_vector_space_hierarchy.cpp $(SCFD_VECTOR_OPS_HEADERS) $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/vector_wrap.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/detail/static_vector_traits.h
+test_nmfd_vector_space_hierarchy_cpu.bin: source/common/tests/test_nmfd_vector_space_hierarchy.cpp $(SCFD_VECTOR_OPS_HEADERS) $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/detail/static_vector_traits.h
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) -o $(BUILD_DIR)/$@
 
-test_nmfd_vector_space_hierarchy_cuda.bin: source/common/tests/test_nmfd_vector_space_hierarchy.cpp $(SCFD_VECTOR_OPS_HEADERS) $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/vector_wrap.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+test_nmfd_vector_space_hierarchy_cuda.bin: source/common/tests/test_nmfd_vector_space_hierarchy.cpp $(SCFD_VECTOR_OPS_HEADERS) $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_nmfd_vector_space_hierarchy_cuda.o
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_nmfd_vector_space_hierarchy_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
 
@@ -947,14 +949,15 @@ test_nmfd_newton_backend_cuda.bin: source/common/tests/test_nmfd_newton_backend.
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_nmfd_newton_backend_cuda.o
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_nmfd_newton_backend_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
 
-NMFD_DENSE_TEST_HEADERS = $(NEWTON_TEST_HEADERS) $(wildcard $(CONTRIB_NMFD_NEWTON)/include/nmfd/backend/*.h $(CONTRIB_NMFD_NEWTON)/include/nmfd/operations/*.h $(CONTRIB_NMFD_NEWTON)/include/nmfd/operations/detail/*.h $(CONTRIB_NMFD_NEWTON)/include/nmfd/operations/kernels/*.h)
+NMFD_DENSE_TEST_HEADERS = $(NEWTON_TEST_HEADERS) $(wildcard $(CONTRIB_NMFD_NEWTON)/include/nmfd/backend/*.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/*.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/detail/*.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/kernels/*.h)
 NMFD_DENSE_CUDA_INSTANTIATIONS = $(CONTRIB_NMFD_NEWTON)/test/solvers/dense_solvers_cuda_inst.cu
 
 test_nmfd_scfd_backend_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/operations/test_scfd_backend.cpp $(NMFD_DENSE_TEST_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) -DPLATFORM_SERIAL_CPU $< -o $(BUILD_DIR)/$@
 
-test_nmfd_scfd_backend_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/operations/test_scfd_backend.cpp $(NMFD_DENSE_TEST_HEADERS) $(NMFD_DENSE_CUDA_INSTANTIATIONS)
-	$(NVCC) $(NVCCFLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) -DPLATFORM_CUDA -x cu $< $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(LCUDA) -lcublas -lcusolver -o $(BUILD_DIR)/$@
+test_nmfd_scfd_backend_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/operations/test_scfd_backend.cpp $(NMFD_DENSE_TEST_HEADERS) $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) -DPLATFORM_CUDA -x cu $< -c -o $(BUILD_DIR)/test_nmfd_scfd_backend_cuda_main.o
+	$(NVCC) $(NVCCFLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) $(BUILD_DIR)/test_nmfd_scfd_backend_cuda_main.o $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LCUDA) -lcublas -lcusolver -o $(BUILD_DIR)/$@
 
 test_nmfd_dense_%_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_dense.cpp $(NMFD_DENSE_TEST_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) -DPLATFORM_SERIAL_CPU $< -o $(BUILD_DIR)/$@
@@ -966,12 +969,13 @@ test_common_nmfd_dense_%_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_de
 	$(NVCC) $(NVCCFLAGS) --extended-lambda $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -DPLATFORM_CUDA -x cu $< -c -o $(BUILD_DIR)/test_common_nmfd_dense_$*_cuda_main.o
 	$(NVCC) $(NVCCFLAGS) $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) $(BUILD_DIR)/test_common_nmfd_dense_$*_cuda_main.o $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LCUDA) -lcublas -lcusolver -o $(BUILD_DIR)/$@
 
-test_nmfd_dense_%_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_dense.cpp $(NMFD_DENSE_TEST_HEADERS) $(NMFD_DENSE_CUDA_INSTANTIATIONS)
-	$(NVCC) $(NVCCFLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) -DPLATFORM_CUDA -x cu $< $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(LCUDA) -lcublas -lcusolver -o $(BUILD_DIR)/$@
+test_nmfd_dense_%_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_dense.cpp $(NMFD_DENSE_TEST_HEADERS) $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) -DPLATFORM_CUDA -x cu $< -c -o $(BUILD_DIR)/test_nmfd_dense_$*_cuda_main.o
+	$(NVCC) $(NVCCFLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) $(BUILD_DIR)/test_nmfd_dense_$*_cuda_main.o $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LCUDA) -lcublas -lcusolver -o $(BUILD_DIR)/$@
 
 TIME_STEPPER_HEADERS = $(wildcard source/time_stepper/runge_kutta/*.h source/time_stepper/integration/*.h source/time_stepper/detail/*.h)
 TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS = $(wildcard source/time_stepper/tests/explicit_*_problem.h)
-TIME_STEPPER_VECTOR_WRAP_HEADER = $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/vector_wrap.h
+TIME_STEPPER_VECTOR_WRAP_HEADER = $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 
 test_rk_tables_%.bin: source/time_stepper/tests/test_butcher_tables_%.cpp source/time_stepper/tests/table_order_checks.h $(TIME_STEPPER_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) $< -o $(BUILD_DIR)/$@ 2>$(RESULTS)

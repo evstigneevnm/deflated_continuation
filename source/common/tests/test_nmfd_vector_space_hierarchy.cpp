@@ -16,6 +16,7 @@
 #include <nmfd/detail/vector_wrap.h>
 #include <nmfd/operations/detail/static_vector_traits.h>
 #include <nmfd/operations/scfd_vector_operations.h>
+#include <common/scfd_backend_ext/complex.h>
 
 namespace
 {
@@ -126,10 +127,10 @@ void test_hierarchy()
     algebra.assign_lin_comb( T( 4 ), *x, *y );
     require( algebra.norm_sq( *y ) == norm_type( 32 ), "Common operation base dispatches correctly" );
     algebra.set_high_precision();
-    algebra.scalar_prod( *x, *y );
+    (void)algebra.scalar_prod( *x, *y );
     require( space.last_reduction_used_high_precision(), "Base precision control reaches the implementation" );
     algebra.set_regular_precision();
-    algebra.scalar_prod( *x, *y );
+    (void)algebra.scalar_prod( *x, *y );
     require( !space.last_reduction_used_high_precision(), "Base precision control restores ordinary reduction" );
     vector_type extra;
     factory.init_vector( extra );

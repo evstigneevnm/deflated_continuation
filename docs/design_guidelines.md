@@ -81,10 +81,12 @@ formulations may bypass time integration.
 
 ## Vector Spaces And Operators
 
-- Common implementations live in `source/common/NMFD-operations`: vector operations
+- Common implementations live in `source/contrib/nmfd-operations/include`: vector operations
   supply algebra and reusable scratch; vector spaces add factories and dimensions.
   `dense_vector_operations` and `dense_vector_space` bind storage traits to a backend.
   The SCFD project space retains its existing activation and normalized-norm conventions.
+  The old `source/common/NMFD-operations` paths forward to this submodule; do not add
+  implementations there. Standalone operations must not include parent-project headers.
 - Spaces define `scalar_type`, `vector_type`, `norm_type`, lifetime operations,
   assignment, combinations, reductions, norms, and finite-number validation.
 - Domain X and codomain Y may differ. Inner products define the adjoint:

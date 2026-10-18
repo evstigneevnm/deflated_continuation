@@ -2,5 +2,6 @@
 #define __COMMON_SCFD_VECTOR_OPERATIONS_WRAPPER_H__
 
 #include <nmfd/operations/scfd_vector_operations.h>
+#include <common/scfd_backend_ext/math.h>
 
 #endif

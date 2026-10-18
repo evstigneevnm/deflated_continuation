@@ -1,8 +1,7 @@
-#include <nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl.cuh>
-#include <thrust/complex.h>
+#ifndef __COMMON_NMFD_FORWARD_NMFD_OPERATIONS_BLAS1_HIGH_PRECISION_CUDA_GPU_REDUCTION_OGITA_KERNELS_CU__
+#define __COMMON_NMFD_FORWARD_NMFD_OPERATIONS_BLAS1_HIGH_PRECISION_CUDA_GPU_REDUCTION_OGITA_KERNELS_CU__
 
+// Compatibility include; implementation lives in the NMFD-operations submodule.
+#include "../../../../../../../contrib/nmfd-operations/include/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_kernels.cu"
 
-template class gpu_reduction_ogita<float, float *>;
-template class gpu_reduction_ogita<double, double *>;
-template class gpu_reduction_ogita<thrust::complex<float>, thrust::complex<float> *>;
-template class gpu_reduction_ogita<thrust::complex<double>, thrust::complex<double> *>;
+#endif

@@ -14,6 +14,44 @@ defaults:
     shell: bash
 
 jobs:
+  nmfd-newton-operations-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify standalone Newton with canonical operations
+        run: |
+          make -C source/contrib/nmfd-newton -j2 test_cpu check_headers_cpu \
+            CONFIG_FILE=build_configs/config_cpu.inc \
+            BUILD_DIR=build/operations_integration
+
+  nmfd-linsolvers-operations-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify standalone linear solvers with canonical operations
+        run: |
+          make -C source/contrib/nmfd-linsolvers -j2 check_operations_cpu check_public_headers_cpu \
+            CONFIG_FILE=build_configs/config_github_ubuntu_gcc.inc \
+            BUILD_DIR=build/operations_integration TEST_OMP_NUM_THREADS=2
+
+  nmfd-operations-standalone-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install standalone test dependencies
+        run: sudo apt-get update && sudo apt-get install -y libboost-dev
+      - name: Verify the operations submodule without parent include paths
+        run: make -C source/contrib/nmfd-operations -j2 test-cpu test-multiprecision check-headers CONFIG_FILE=build_configs/config_cpu.inc
+
   nmfd-newton-failure-reporting-cpu:
     runs-on: ubuntu-latest
     timeout-minutes: 5
