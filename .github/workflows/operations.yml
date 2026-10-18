@@ -81,6 +81,56 @@ jobs:
             CONFIG_FILE=build_configs/config_github_ubuntu_gcc.inc \
             BUILD_DIR=build/operations_integration TEST_OMP_NUM_THREADS=2
 
+  nmfd-short-recurrence-cpu:
+    name: NMFD linear solvers / ${{ matrix.solver }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        solver: [bicgstab, bicgstabl, cgs]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify solver, canonical CPU/OMP backends, and JSON
+        run: |
+          make -C source/contrib/nmfd-linsolvers -j2 \
+            'check_${{ matrix.solver }}_cpu' 'check_${{ matrix.solver }}_json_cpu' \
+            CONFIG_FILE=build_configs/config_github_ubuntu_gcc.inc \
+            JSON_INCLUDE="$GITHUB_WORKSPACE/source/contrib/nmfd-newton/contrib/json" \
+            BUILD_DIR=build/short_recurrence/${{ matrix.solver }} TEST_OMP_NUM_THREADS=2
+
+  nmfd-short-recurrence-baseline-cpu:
+    name: NMFD linear solvers / production parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Compare against existing production solver implementations
+        run: |
+          make test_nmfd_short_recurrence_baseline_cpu.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
+            BUILD_DIR="$BUILD_DIR/short_recurrence_baseline"
+          OMP_NUM_THREADS=2 timeout 60s "$BUILD_DIR/short_recurrence_baseline/test_nmfd_short_recurrence_baseline_cpu.bin"
+
+  nmfd-newton-short-recurrence-cpu:
+    name: Newton / migrated short-recurrence solvers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify Newton convergence, hierarchy construction, and linear failure rollback
+        run: |
+          make test_nmfd_newton_short_recurrence_cpu.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
+            BUILD_DIR="$BUILD_DIR/newton_short_recurrence"
+          timeout 60s "$BUILD_DIR/newton_short_recurrence/test_nmfd_newton_short_recurrence_cpu.bin"
+
   nmfd-operations-standalone-cpu:
     runs-on: ubuntu-latest
     timeout-minutes: 10

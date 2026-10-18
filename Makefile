@@ -930,6 +930,12 @@ NEWTON_TEST_HEADERS = $(CONTRIB_NMFD_NEWTON)/test/solvers/newton_test_fixture.h 
 NEWTON_TEST_INCLUDES = -I$(COMMON_NMFD_OPERATIONS) $(INMFD_NEWTON) -I$(CONTRIB_SCFD)/include -I$(CONTRIB_NMFD_NEWTON)/contrib/json
 NEWTON_TEST_FLAGS ?=
 
+test_nmfd_newton_short_recurrence_cpu.bin: source/common/tests/test_nmfd_newton_short_recurrence.cpp $(NEWTON_TEST_HEADERS) $(wildcard $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/detail/*.h)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@
+
+test_nmfd_short_recurrence_baseline_cpu.bin: source/numerical_algos/lin_solvers/tests/test_nmfd_short_recurrence.cpp $(NEWTON_TEST_HEADERS) $(wildcard $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/detail/*.h source/numerical_algos/lin_solvers/*.h)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) $< $(OPENMP) -o $(BUILD_DIR)/$@
+
 test_newton_%_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_newton_%.cpp $(NEWTON_TEST_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) $< -o $(BUILD_DIR)/$@
 
