@@ -45,7 +45,10 @@ jobs:
         with:
           submodules: recursive
       - name: Verify Newton linear-solver API and include-order independence
-        run: make -C source/contrib/nmfd-newton -j2 check_linsolvers BUILD_DIR=build/linsolvers_interface
+        run: |
+          make -C source/contrib/nmfd-newton -j2 check_linsolvers \
+            CONFIG_FILE=build_configs/config_cpu.inc \
+            BUILD_DIR=build/linsolvers_interface
 
   nmfd-newton-cahn-hilliard-cpu:
     name: Cahn-Hilliard / ${{ matrix.backend }} / NMFD-linsolvers
@@ -60,7 +63,10 @@ jobs:
         with:
           submodules: recursive
       - name: Verify coupled Cahn-Hilliard Newton solves
-        run: make -C source/contrib/nmfd-newton -j2 'check_ch_${{ matrix.backend }}' BUILD_DIR=build/ch_solver_interface
+        run: |
+          make -C source/contrib/nmfd-newton -j2 'check_ch_${{ matrix.backend }}' \
+            CONFIG_FILE=build_configs/config_cpu.inc \
+            BUILD_DIR=build/ch_solver_interface
 
   nmfd-linsolvers-operations-cpu:
     runs-on: ubuntu-latest
