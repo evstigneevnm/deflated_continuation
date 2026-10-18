@@ -13,7 +13,7 @@ using backend_type = scfd::backend::omp<std::ptrdiff_t>;
 #    include <scfd/backend/serial_cpu.h>
 using backend_type = scfd::backend::serial_cpu<std::ptrdiff_t>;
 #endif
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <time_stepper/integration/time_integrator.h>
 #include <time_stepper/integration/time_step_adaptation_constant.h>
 #include <time_stepper/integration/time_step_adaptation_matlab.h>
@@ -26,9 +26,9 @@ void require( bool passed, const char *message )
         throw std::runtime_error( message );
 }
 
-struct operations_type : scfd_vector_operations<backend_type, double>
+struct operations_type : nmfd::operations::scfd_vector_space<backend_type, double>
 {
-    using base_type = scfd_vector_operations<backend_type, double>;
+    using base_type = nmfd::operations::scfd_vector_space<backend_type, double>;
     using base_type::base_type;
     mutable unsigned int allocations = 0, live = 0;
     void                 start_use_vector( vector_type &x ) const override

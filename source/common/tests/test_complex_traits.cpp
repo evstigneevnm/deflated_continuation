@@ -5,7 +5,7 @@
 #include <string>
 #include <type_traits>
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 
 namespace
 {
@@ -39,7 +39,7 @@ void require_near( const std::string &label, T value, T expected, T tol )
 template <class Complex>
 void test_complex_type( const std::string &name )
 {
-    using traits    = common::scfd_backend_ext::complex_value_traits<Complex>;
+    using traits    = nmfd::operations::backend::complex_value_traits<Complex>;
     using real_type = typename traits::real_type;
 
     const real_type tol = std::is_same<real_type, float>::value ? real_type( 1e-6 ) : real_type( 1e-13 );
@@ -61,14 +61,14 @@ void test_complex_type( const std::string &name )
     require_near( name + " add real", traits::real( added ), real_type( 5 ), tol );
     require_near( name + " add imag", traits::imag( added ), real_type( -4 ), tol );
 
-    require( common::scfd_backend_ext::is_complex_type<Complex>::value, name + " is_complex_type" );
+    require( nmfd::operations::backend::is_complex_type<Complex>::value, name + " is_complex_type" );
 }
 
 } // namespace
 
 int main()
 {
-    using common::scfd_backend_ext::complex_t;
+    using nmfd::operations::backend::complex_t;
 
     require(
         ( std::is_same<complex_t<scfd::backend::serial_cpu<std::ptrdiff_t>, double>, std::complex<double>>::value ),

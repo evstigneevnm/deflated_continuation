@@ -16,7 +16,7 @@
 #    include <scfd/backend/omp.h>
 #endif
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 #include <discretization/fourier/normalized_fft.h>
 #include <discretization/fourier/periodic_grid.h>
 #include <discretization/fourier/r2c_index_space.h>
@@ -104,7 +104,7 @@ int run( const std::string &backend_name )
     using extent_type         = discretization::common::structured_extent<2>;
     using transform_type      = discretization::fourier::normalized_r2c_transform<Backend, FFTBackend, scalar_type, 2>;
     using complex_type        = typename transform_type::complex_type;
-    using complex_traits      = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using complex_traits      = ::nmfd::operations::backend::complex_value_traits<complex_type>;
     using physical_field_type = typename transform_type::physical_field_type;
     using spectral_field_type = typename transform_type::spectral_field_type;
     using copy_type           = typename Backend::copy_type;

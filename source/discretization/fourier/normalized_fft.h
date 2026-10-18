@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <string>
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 #include <discretization/common/structured_extent.h>
 #include <discretization/fourier/spectral_field.h>
 #include <external_libraries/fft_facade.h>
@@ -133,7 +133,7 @@ public:
         require_extent( destination.extent(), physical_extent_, "forward_adjoint destination" );
         copy_type()( static_cast<std::ptrdiff_t>( complex_size() ), source.data(), spectral_stage_.data() );
 
-        using complex_traits                    = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
+        using complex_traits                    = ::nmfd::operations::backend::complex_value_traits<complex_type>;
         complex_type        *values             = spectral_stage_.data();
         const std::ptrdiff_t last_spectral_size = static_cast<std::ptrdiff_t>( spectral_extent_[Dimension - 1] );
         const std::ptrdiff_t last_physical_size = static_cast<std::ptrdiff_t>( physical_extent_[Dimension - 1] );
@@ -163,7 +163,7 @@ public:
         copy_type()( static_cast<std::ptrdiff_t>( physical_size() ), source.data(), physical_stage_.data() );
         fft_.forward( physical_stage_.data(), spectral_stage_.data() );
 
-        using complex_traits                    = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
+        using complex_traits                    = ::nmfd::operations::backend::complex_value_traits<complex_type>;
         complex_type        *values             = spectral_stage_.data();
         const std::ptrdiff_t last_spectral_size = static_cast<std::ptrdiff_t>( spectral_extent_[Dimension - 1] );
         const std::ptrdiff_t last_physical_size = static_cast<std::ptrdiff_t>( physical_extent_[Dimension - 1] );

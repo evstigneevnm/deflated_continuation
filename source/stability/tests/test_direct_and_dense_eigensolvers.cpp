@@ -8,7 +8,7 @@
 #include <scfd/backend/omp.h>
 #include <scfd/backend/serial_cpu.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/operations/linalg/host_small_dense_lapack.h>
 #include <stability/analysis/dimension_guarded_eigensolver.h>
 #include <stability/eigensolvers/direct_scalar_eigensolver.h>
@@ -91,7 +91,7 @@ private:
 template <class Backend>
 void run_backend( const std::string &label )
 {
-    using scalar_space_type = scfd_vector_operations<Backend, double>;
+    using scalar_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     scalar_space_type                  scalar_space( 1 );
     scalar_operator<scalar_space_type> scalar_op( scalar_space, -3.25 );
     stability::eigensolvers::direct_scalar_eigensolver<scalar_space_type, scalar_operator<scalar_space_type>> direct(
@@ -111,7 +111,7 @@ void run_backend( const std::string &label )
     scalar_space.stop_use_vector( initial );
     scalar_space.free_vector( initial );
 
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     const auto        problem = stability::tests::symmetric_eigenproblem<double>();
     vector_space_type vector_space( problem.dimension() );
     stability::tests::analytical_dense_operator<vector_space_type, double> matrix_operator( vector_space, problem );

@@ -11,7 +11,7 @@
 #include <scfd/backend/omp.h>
 #include <scfd/backend/serial_cpu.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/operations/product_vector_space.h>
 #include <nmfd/operations/linalg/host_small_dense_lapack.h>
 #include <stability/eigensolvers/krylov_schur.h>
@@ -94,7 +94,7 @@ get_vector( const VectorSpace &vector_space, const typename VectorSpace::vector_
 template <class Backend>
 void run_cayley_case( const std::string &label )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type       = typename vector_space_type::vector_type;
     using operator_type     = stability::tests::analytical_dense_operator<vector_space_type, double>;
     using identity_type     = stability::eigensolvers::transformations::identity_operator<vector_space_type>;
@@ -162,7 +162,7 @@ void run_cayley_case( const std::string &label )
 template <class Backend>
 void run_inexact_exponential_case( const std::string &label )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type       = typename vector_space_type::vector_type;
     using operator_type     = stability::tests::analytical_dense_operator<vector_space_type, double>;
     using identity_type     = stability::eigensolvers::transformations::identity_operator<vector_space_type>;
@@ -300,7 +300,7 @@ void run_inexact_exponential_case( const std::string &label )
 template <class Backend>
 void run_rotated_inexact_exponential_case( const std::string &label )
 {
-    using component_space_type    = scfd_vector_operations<Backend, double>;
+    using component_space_type    = nmfd::operations::scfd_vector_space<Backend, double>;
     using product_space_type      = nmfd::operations::two_block_vector_space<component_space_type>;
     using component_operator_type = stability::tests::analytical_dense_operator<component_space_type, double>;
     using polynomial_type         = stability::eigensolvers::transformations::inexact_exponential_operator<

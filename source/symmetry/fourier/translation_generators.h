@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <stdexcept>
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 #include <scfd/utils/device_tag.h>
 
 namespace symmetry
@@ -15,20 +15,20 @@ namespace fourier
 
 template <class Complex>
 __DEVICE_TAG__ Complex scale_complex(
-    const Complex &value, const typename common::scfd_backend_ext::complex_value_traits<Complex>::real_type scale
+    const Complex &value, const typename nmfd::operations::backend::complex_value_traits<Complex>::real_type scale
 )
 {
-    using traits_type = common::scfd_backend_ext::complex_value_traits<Complex>;
+    using traits_type = nmfd::operations::backend::complex_value_traits<Complex>;
     return traits_type::make( scale * traits_type::real( value ), scale * traits_type::imag( value ) );
 }
 
 template <class Complex>
 __DEVICE_TAG__ Complex rotate_1d_mode(
-    const std::size_t mode, const typename common::scfd_backend_ext::complex_value_traits<Complex>::real_type shift,
+    const std::size_t mode, const typename nmfd::operations::backend::complex_value_traits<Complex>::real_type shift,
     const Complex &value
 )
 {
-    using traits_type = common::scfd_backend_ext::complex_value_traits<Complex>;
+    using traits_type = nmfd::operations::backend::complex_value_traits<Complex>;
     using real_type   = typename traits_type::real_type;
 
     const real_type phase     = static_cast<real_type>( mode ) * shift;
@@ -42,7 +42,7 @@ __DEVICE_TAG__ Complex rotate_1d_mode(
 template <class Complex>
 __DEVICE_TAG__ Complex translation_generator_1d_mode( const std::size_t mode, const Complex &coefficient )
 {
-    using traits_type = common::scfd_backend_ext::complex_value_traits<Complex>;
+    using traits_type = nmfd::operations::backend::complex_value_traits<Complex>;
     using real_type   = typename traits_type::real_type;
 
     const real_type k         = static_cast<real_type>( mode );

@@ -14,7 +14,7 @@
 #    include <common/cuda_init_scfd.h>
 #endif
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 
 #include <nmfd/operations/linalg/host_small_dense_lapack.h>
 #include <nmfd/solvers/gmres.h>
@@ -42,8 +42,8 @@ namespace
 {
 
 using backend_type        = typename vec_ops_real::backend_type;
-using complex_scalar_type = common::scfd_backend_ext::complex_t<backend_type, real>;
-using complex_space_type  = scfd_vector_operations<backend_type, complex_scalar_type>;
+using complex_scalar_type = nmfd::operations::backend::complex_t<backend_type, real>;
+using complex_space_type  = nmfd::operations::scfd_vector_space<backend_type, complex_scalar_type>;
 using vector_type         = typename vec_ops_real::vector_type;
 
 std::size_t checks   = 0;

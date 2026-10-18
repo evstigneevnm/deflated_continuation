@@ -28,7 +28,7 @@
 
 
 #include <common/gpu_file_operations_functions.h>
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 
 #define Blocks_x_ 64
 #define Blocks_y_ 16

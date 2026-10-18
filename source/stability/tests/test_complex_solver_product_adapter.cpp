@@ -9,8 +9,8 @@
 #include <scfd/backend/omp.h>
 #include <scfd/backend/serial_cpu.h>
 
-#include <common/scfd_backend_ext/complex.h>
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/backend/complex.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/operations/product_vector_space.h>
 #include <nmfd/operations/scfd_complex_vector_bridge.h>
 #include <stability/eigensolvers/transformations/complex_solver_product_adapter.h>
@@ -39,11 +39,11 @@ struct diagonal_operator_tag
 template <class Backend>
 void run_backend( const std::string &label )
 {
-    using real_space_type    = scfd_vector_operations<Backend, double>;
+    using real_space_type    = nmfd::operations::scfd_vector_space<Backend, double>;
     using product_space_type = nmfd::operations::two_block_vector_space<real_space_type>;
-    using complex_type       = common::scfd_backend_ext::complex_t<Backend, double>;
-    using complex_traits     = common::scfd_backend_ext::complex_value_traits<complex_type>;
-    using complex_space_type = scfd_vector_operations<Backend, complex_type>;
+    using complex_type       = nmfd::operations::backend::complex_t<Backend, double>;
+    using complex_traits     = nmfd::operations::backend::complex_value_traits<complex_type>;
+    using complex_space_type = nmfd::operations::scfd_vector_space<Backend, complex_type>;
     using bridge_type        = nmfd::operations::scfd_complex_vector_bridge<product_space_type, complex_space_type>;
     using solver_type        = stability::eigensolvers::transformations::pointwise_diagonal_preconditioner<
                complex_space_type, diagonal_operator_tag>;

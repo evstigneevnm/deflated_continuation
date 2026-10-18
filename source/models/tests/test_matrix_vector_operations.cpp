@@ -7,10 +7,10 @@
 #include <thrust/complex.h>
 #include <utils/cuda_support.h>
 #include <external_libraries/cublas_wrap.h>
-#include <common/gpu_vector_operations.h>
-#include <common/gpu_matrix_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
+#include <common/legacy/gpu_matrix_vector_operations.h>
 #include <common/gpu_file_operations.h>
-#include <common/gpu_matrix_file_operations.h>
+#include <common/legacy/gpu_matrix_file_operations.h>
 #include <external_libraries/lapack_wrap.h>
 
 

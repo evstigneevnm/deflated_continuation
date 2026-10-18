@@ -24,8 +24,8 @@
 
 #include <common/macros.h>
 #include <common/gpu_file_operations.h>
-#include <common/gpu_vector_operations.h>
-#include <common/gpu_matrix_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
+#include <common/legacy/gpu_matrix_vector_operations.h>
 
 std::string get_file_name( const std::string &filename )
 {

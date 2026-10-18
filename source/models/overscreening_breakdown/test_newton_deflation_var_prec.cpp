@@ -29,9 +29,9 @@
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
 #include <common/macros.h>
-#include <common/cpu_file_operations.h>
+#include <common/legacy/cpu_file_operations.h>
 #include <common/cpu_vector_operations_var_prec.h>
-#include <common/cpu_matrix_vector_operations_var_prec.h>
+#include <common/legacy/cpu_matrix_vector_operations_var_prec.h>
 #include <contrib/scfd/include/scfd/utils/system_timer_event.h>
 
 #include <models/overscreening_breakdown/test_newton_deflation_var_prec.h>

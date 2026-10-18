@@ -15,8 +15,9 @@
 
 #include <nmfd/detail/vector_wrap.h>
 #include <nmfd/operations/detail/static_vector_traits.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/operations/scfd_vector_operations.h>
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 
 namespace
 {
@@ -69,7 +70,6 @@ void test_hierarchy()
     static_assert( !has_factory<operations_type>::value, "Operations must not require a space factory" );
     static_assert( has_factory<space_type>::value, "A space must provide its factory" );
     static_assert( std::is_base_of_v<typename space_type::parent_t, space_type> );
-    static_assert( std::is_same_v<scfd_vector_operations<Backend, T>, project_space_type> );
     static_assert( std::is_floating_point_v<norm_type> );
     static_assert( !std::is_copy_constructible_v<operations_type> );
 
@@ -221,7 +221,7 @@ int main()
         test_hierarchy<scfd::backend::serial_cpu<std::ptrdiff_t>, double>();
         test_hierarchy<backend_type, float>();
         test_hierarchy<backend_type, double>();
-        using complex_type = common::scfd_backend_ext::complex_t<backend_type, double>;
+        using complex_type = nmfd::operations::backend::complex_t<backend_type, double>;
         test_hierarchy<backend_type, complex_type>();
         test_static_traits<float>();
         test_static_traits<double>();

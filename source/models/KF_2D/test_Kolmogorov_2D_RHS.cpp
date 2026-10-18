@@ -9,7 +9,7 @@
 #include <nonlinear_operators/Kolmogorov_flow_2D/Kolmogorov_2D.h>
 #include <common/macros.h>
 #include <common/gpu_file_operations.h>
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 
 #define Blocks_x_ 32
 #define Blocks_y_ 16

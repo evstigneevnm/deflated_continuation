@@ -14,8 +14,8 @@
 
 #include <scfd/utils/log.h>
 
-#include <common/scfd_backend_ext/complex.h>
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/backend/complex.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/detail/vector_wrap.h>
 #include <nmfd/operations/linalg/host_small_dense_lapack.h>
 #include <nmfd/solvers/gmres.h>
@@ -129,9 +129,9 @@ template <class Backend>
 void test_complex_pair_recovery( const std::string &label )
 {
     using real_type           = double;
-    using real_space_type     = scfd_vector_operations<Backend, real_type>;
-    using complex_scalar_type = common::scfd_backend_ext::complex_t<Backend, real_type>;
-    using complex_space_type  = scfd_vector_operations<Backend, complex_scalar_type>;
+    using real_space_type     = nmfd::operations::scfd_vector_space<Backend, real_type>;
+    using complex_scalar_type = nmfd::operations::backend::complex_t<Backend, real_type>;
+    using complex_space_type  = nmfd::operations::scfd_vector_space<Backend, complex_scalar_type>;
     using real_operator_type  = analytical_dense_operator<real_space_type, real_type>;
     using model_type          = analytical_real_affine_inverse_model<real_space_type>;
     using provider_type = stability::eigensolvers::transformations::nonlinear_operator_real_affine_inverse_provider<
@@ -498,9 +498,9 @@ template <class Backend>
 void test_projected_quotient_recovery( const std::string &label )
 {
     using real_type           = double;
-    using real_space_type     = scfd_vector_operations<Backend, real_type>;
-    using complex_scalar_type = common::scfd_backend_ext::complex_t<Backend, real_type>;
-    using complex_space_type  = scfd_vector_operations<Backend, complex_scalar_type>;
+    using real_space_type     = nmfd::operations::scfd_vector_space<Backend, real_type>;
+    using complex_scalar_type = nmfd::operations::backend::complex_t<Backend, real_type>;
+    using complex_space_type  = nmfd::operations::scfd_vector_space<Backend, complex_scalar_type>;
     using base_operator_type  = analytical_dense_operator<real_space_type, real_type>;
     using quotient_model_type = coordinate_quotient_model<real_space_type, base_operator_type>;
     using real_operator_type = symmetry::linearization::projected_linear_operator<real_space_type, quotient_model_type>;
@@ -595,9 +595,9 @@ template <class Backend>
 void test_inner_failure( const std::string &label )
 {
     using real_type           = double;
-    using real_space_type     = scfd_vector_operations<Backend, real_type>;
-    using complex_scalar_type = common::scfd_backend_ext::complex_t<Backend, real_type>;
-    using complex_space_type  = scfd_vector_operations<Backend, complex_scalar_type>;
+    using real_space_type     = nmfd::operations::scfd_vector_space<Backend, real_type>;
+    using complex_scalar_type = nmfd::operations::backend::complex_t<Backend, real_type>;
+    using complex_space_type  = nmfd::operations::scfd_vector_space<Backend, complex_scalar_type>;
     using real_operator_type  = analytical_dense_operator<real_space_type, real_type>;
     using model_type          = analytical_real_affine_inverse_model<real_space_type>;
     using provider_type = stability::eigensolvers::transformations::nonlinear_operator_real_affine_inverse_provider<

@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include <common/scfd_backend_ext/math.h>
+#include <nmfd/operations/backend/math.h>
 #include <scfd/utils/device_tag.h>
 
 namespace discretization
@@ -21,8 +21,8 @@ void fill_low_mode_odd_physical_field_2d(
 )
 {
     using for_each_type = typename Backend::for_each_type;
-    using math_type     = ::common::scfd_backend_ext::math<Backend, Scalar>;
-    using scalar_traits = ::common::scfd_backend_ext::scalar_traits<Backend, Scalar>;
+    using math_type     = ::nmfd::operations::backend::math<Backend, Scalar>;
+    using scalar_traits = ::nmfd::operations::backend::scalar_traits<Backend, Scalar>;
 
     Scalar            *values  = field.data();
     const unsigned int profile = static_cast<unsigned int>( seed_id % 8 );

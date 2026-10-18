@@ -4,7 +4,8 @@
 #include <string>
 #include <vector>
 
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 #include <common/tests/vector_operations_template_tests.h>
 
 namespace
@@ -33,7 +34,7 @@ struct cpu_vector_access
 template <class T>
 void run_slice_tests( vector_operations_tests::test_report &report )
 {
-    using vec_ops_t = scfd_serial_cpu_vector_operations<T>;
+    using vec_ops_t = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, T>;
     using vec_t     = typename vec_ops_t::vector_type;
 
     vec_ops_t vec_ops( 10 );
@@ -76,7 +77,7 @@ void run_cpu_type(
 {
     for ( const auto n : sizes )
     {
-        scfd_serial_cpu_vector_operations<T> vec_ops( n );
+        nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, T> vec_ops( n );
         vector_operations_tests::run_vector_operations_template_tests(
             vec_ops, cpu_vector_access{}, n, label + " n=" + std::to_string( n ), report
         );

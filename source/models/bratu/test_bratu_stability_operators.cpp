@@ -8,7 +8,7 @@
 
 #include <scfd/backend/omp.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/operations/linalg/host_small_dense_lapack.h>
 
 #include <nonlinear_operators/bratu/bratu.h>
@@ -35,7 +35,7 @@ void require( bool condition, const std::string &message )
     }
 }
 
-using vector_space_type = scfd_vector_operations<scfd::backend::omp<std::ptrdiff_t>, double>;
+using vector_space_type = nmfd::operations::scfd_vector_space<scfd::backend::omp<std::ptrdiff_t>, double>;
 using vector_type       = typename vector_space_type::vector_type;
 using problem_type      = nonlinear_operators::bratu<vector_space_type>;
 using operator_type     = nonlinear_operators::linear_operator_bratu<vector_space_type, problem_type>;

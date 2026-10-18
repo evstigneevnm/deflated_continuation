@@ -9,7 +9,7 @@
 #include <scfd/backend/omp.h>
 #include <scfd/backend/serial_cpu.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/detail/vector_wrap.h>
 #include <stability/analysis/eigenvector_rank_aggregator.h>
 
@@ -67,7 +67,7 @@ estimate( std::complex<double> value, std::size_t vector_index, double relative_
 template <class Backend>
 void run_backend( const std::string &label )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using storage_type      = stability::eigensolvers::ritz_vector_storage<vector_space_type>;
     using aggregator_type   = stability::analysis::eigenvector_rank_aggregator<vector_space_type>;
     using result_type       = stability::eigensolvers::eigensolver_result<double>;

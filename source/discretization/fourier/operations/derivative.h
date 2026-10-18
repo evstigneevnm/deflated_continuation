@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <stdexcept>
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 #include <discretization/fourier/wavevector_table.h>
 #include <scfd/utils/device_tag.h>
 
@@ -21,7 +21,7 @@ void derivative(
 )
 {
     using complex_type  = typename SpectralField::value_type;
-    using traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using traits        = ::nmfd::operations::backend::complex_value_traits<complex_type>;
     using scalar_type   = typename traits::real_type;
     using for_each_type = typename Backend::for_each_type;
     if ( dimension > 1 || input.size() != output.size() || input.size() != wavevectors.index_space().complex_size() )
@@ -51,7 +51,7 @@ void derivative_adjoint(
 )
 {
     using complex_type  = typename SpectralField::value_type;
-    using traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using traits        = ::nmfd::operations::backend::complex_value_traits<complex_type>;
     using scalar_type   = typename traits::real_type;
     using for_each_type = typename Backend::for_each_type;
     if ( dimension > 1 || input.size() != output.size() || input.size() != wavevectors.index_space().complex_size() )

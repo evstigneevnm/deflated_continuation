@@ -85,8 +85,13 @@ formulations may bypass time integration.
   supply algebra and reusable scratch; vector spaces add factories and dimensions.
   `dense_vector_operations` and `dense_vector_space` bind storage traits to a backend.
   The SCFD project space retains its existing activation and normalized-norm conventions.
-  The old `source/common/NMFD-operations` paths forward to this submodule; do not add
-  implementations there. Standalone operations must not include parent-project headers.
+  Include these headers directly; do not restore parent-project forwarding trees.
+  Backend utilities use `nmfd/operations/backend/*` and `nmfd::operations::backend`;
+  applications must not depend on internal backend-extension headers or namespaces.
+  Standalone operations must not include parent-project headers. Two common glued-vector
+  aliases remain only for frozen timestepper code; new callers use canonical NMFD types.
+  Legacy-only operations live in `source/common/legacy`; refactored modules must not
+  depend on them. Shared infrastructure and still-used compatibility headers stay in `common`.
 - Spaces define `scalar_type`, `vector_type`, `norm_type`, lifetime operations,
   assignment, combinations, reductions, norms, and finite-number validation.
 - Domain X and codomain Y may differ. Inner products define the adjoint:

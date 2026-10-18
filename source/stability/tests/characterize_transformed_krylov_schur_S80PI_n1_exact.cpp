@@ -14,7 +14,7 @@
 
 #include <scfd/backend/omp.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/operations/io/matrix_market.h>
 #include <nmfd/operations/linalg/host_small_dense_lapack.h>
 #include <nmfd/operations/product_vector_space.h>
@@ -100,7 +100,7 @@ int main( int argc, char **argv )
 {
     try
     {
-        using component_space_type = scfd_vector_operations<scfd::backend::omp<std::ptrdiff_t>, double>;
+        using component_space_type = nmfd::operations::scfd_vector_space<scfd::backend::omp<std::ptrdiff_t>, double>;
         using product_space_type   = nmfd::operations::two_block_vector_space<component_space_type>;
         using product_vector_type  = typename product_space_type::vector_type;
         using matrix_type          = nmfd::operations::sparse::host_csr_matrix<double>;

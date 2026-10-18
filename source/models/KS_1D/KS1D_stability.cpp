@@ -6,7 +6,7 @@
 #include <string>
 
 #include <common/gpu_file_operations.h>
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h>
@@ -70,8 +70,8 @@ int main( int argc, char **argv )
         }
 
         using backend_type         = typename vec_ops_real::backend_type;
-        using complex_scalar_type  = common::scfd_backend_ext::complex_t<backend_type, real>;
-        using complex_space_type   = scfd_vector_operations<backend_type, complex_scalar_type>;
+        using complex_scalar_type  = nmfd::operations::backend::complex_t<backend_type, real>;
+        using complex_space_type   = nmfd::operations::scfd_vector_space<backend_type, complex_scalar_type>;
         using file_operations_type = gpu_file_operations<vec_ops_real>;
         using nonlinear_operator_type =
             nonlinear_operators::kuramoto_sivashinskiy_1d<vec_ops_real, fft_backend_t, Blocks_x_>;

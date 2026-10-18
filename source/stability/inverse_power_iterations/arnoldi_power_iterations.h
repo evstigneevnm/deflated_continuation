@@ -14,7 +14,7 @@
 #include <algorithm>
 #include <complex>
 //debug
-#include <common/gpu_matrix_file_operations.h>
+#include <common/legacy/gpu_matrix_file_operations.h>
 #include <utils/cuda_support.h>
 #include <stability/Galerkin_projection.h>
 

@@ -15,7 +15,7 @@
 
 #include <scfd/utils/log.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/detail/vector_wrap.h>
 #include <nmfd/operations/product_vector_space.h>
 #include <nmfd/solvers/gmres.h>
@@ -319,7 +319,7 @@ std::vector<std::complex<double>> expected_solution(
 template <class Backend>
 void run_backend( const std::string &label )
 {
-    using component_space_type = scfd_vector_operations<Backend, double>;
+    using component_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using product_space_type   = nmfd::operations::two_block_vector_space<component_space_type>;
     using real_operator_type   = stability::tests::analytical_dense_operator<component_space_type, double>;
     using factor_operator_type = controlled_affine_operator<product_space_type, real_operator_type>;

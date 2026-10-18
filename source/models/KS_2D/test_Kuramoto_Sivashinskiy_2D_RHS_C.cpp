@@ -8,7 +8,7 @@
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/Kuramoto_Sivashinskiy_2D.h>
 #include <common/macros.h>
 #include <common/file_operations.h>
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 
 #define Blocks_x_ 64
 #define Blocks_y_ 16

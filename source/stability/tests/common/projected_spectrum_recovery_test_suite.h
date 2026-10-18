@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/detail/vector_wrap.h>
 #include <nmfd/operations/linalg/host_small_dense_lapack.h>
 #include <stability/eigensolvers/projected_spectrum_recovery.h>
@@ -127,7 +127,7 @@ double physical_residual(
 template <class Backend>
 void test_complex_pair_recovery( const std::string &label )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using operator_type     = stability::tests::analytical_dense_operator<vector_space_type, double>;
     using lapack_type       = nmfd::operations::linalg::host_small_dense_lapack<double>;
     using recovery_type     = stability::eigensolvers::projected_spectrum_recovery<vector_space_type, lapack_type>;
@@ -205,7 +205,7 @@ void test_complex_pair_recovery( const std::string &label )
 template <class Backend>
 void test_noninvariant_subspace( const std::string &label )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using operator_type     = stability::tests::analytical_dense_operator<vector_space_type, double>;
     using lapack_type       = nmfd::operations::linalg::host_small_dense_lapack<double>;
     using recovery_type     = stability::eigensolvers::projected_spectrum_recovery<vector_space_type, lapack_type>;
@@ -247,7 +247,7 @@ void test_noninvariant_subspace( const std::string &label )
 template <class Backend>
 void test_operator_failure( const std::string &label )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using operator_type     = stability::tests::analytical_dense_operator<vector_space_type, double>;
     using lapack_type       = nmfd::operations::linalg::host_small_dense_lapack<double>;
     using recovery_type     = stability::eigensolvers::projected_spectrum_recovery<vector_space_type, lapack_type>;

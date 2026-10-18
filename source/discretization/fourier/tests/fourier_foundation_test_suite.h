@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#include <common/NMFD-operations/nmfd/operations/scfd_vector_operations.h>
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <nmfd/operations/backend/complex.h>
 #include <discretization/fourier/codecs/full_real_field.h>
 #include <discretization/fourier/codecs/inversion_odd_field.h>
 #include <discretization/fourier/codecs/translation_equivariant_real_field.h>
@@ -69,10 +69,10 @@ int run_fourier_foundation_tests( const std::string &backend_name )
     using extent_type            = discretization::common::structured_extent<2>;
     using transform_type         = normalized_r2c_transform<Backend, FFTBackend, scalar_type, 2>;
     using complex_type           = typename transform_type::complex_type;
-    using complex_traits         = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using complex_traits         = ::nmfd::operations::backend::complex_value_traits<complex_type>;
     using physical_field_type    = typename transform_type::physical_field_type;
     using spectral_field_type    = typename transform_type::spectral_field_type;
-    using vector_operations_type = scfd_vector_operations<Backend, scalar_type>;
+    using vector_operations_type = nmfd::operations::scfd_vector_space<Backend, scalar_type>;
     using copy_type              = typename Backend::copy_type;
 
     constexpr std::size_t    nx = 12;

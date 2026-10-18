@@ -47,8 +47,8 @@
 #include <nonlinear_operators/Taylor_Green/Taylor_Green_ker.h>
 #include <nonlinear_operators/Taylor_Green/plot_solution.h>
 
-#include <common/vector_wrap.h>
-#include <common/vector_pool.h>
+#include <common/legacy/vector_wrap.h>
+#include <common/legacy/vector_pool.h>
 
 #include <tuple>
 #include <limits>

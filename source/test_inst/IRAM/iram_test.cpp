@@ -1,7 +1,7 @@
 #include <limits>
-#include <common/gpu_vector_operations.h>
-#include <common/gpu_matrix_vector_operations.h>
-#include <common/gpu_matrix_file_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
+#include <common/legacy/gpu_matrix_vector_operations.h>
+#include <common/legacy/gpu_matrix_file_operations.h>
 #include <common/gpu_file_operations.h>
 #include <common/file_operations.h>
 #include <utils/cuda_support.h>

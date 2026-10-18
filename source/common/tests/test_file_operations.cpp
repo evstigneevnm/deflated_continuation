@@ -8,13 +8,14 @@
 #include <utility>
 #include <vector>
 
-#include <common/cpu_file_operations.h>
-#include <common/cpu_matrix_file_operations.h>
+#include <common/legacy/cpu_file_operations.h>
+#include <common/legacy/cpu_matrix_file_operations.h>
 #include <common/file_operations.h>
 #include <common/gpu_file_operations.h>
-#include <common/gpu_matrix_file_operations.h>
+#include <common/legacy/gpu_matrix_file_operations.h>
 #include <common/macros.h>
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 
 #include <nmfd/operations/io/matrix_file_operations.h>
 #include <nmfd/operations/io/vector_file_operations.h>
@@ -213,7 +214,7 @@ void test_match_file_names( test_report &report, const std::filesystem::path &di
 
 void test_wrappers_with_scfd_serial( test_report &report, const std::filesystem::path &dir )
 {
-    using vec_ops_t = scfd_serial_cpu_vector_operations<double>;
+    using vec_ops_t = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
     using vec_t     = typename vec_ops_t::vector_type;
 
     vec_ops_t                                               vec_ops( 3 );

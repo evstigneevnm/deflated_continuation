@@ -13,7 +13,7 @@ using backend_type = scfd::backend::omp<std::ptrdiff_t>;
 #    include <scfd/backend/serial_cpu.h>
 using backend_type = scfd::backend::serial_cpu<std::ptrdiff_t>;
 #endif
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <scfd/utils/log_std.h>
 #include <nmfd/solvers/newton_iteration.h>
 #include <nmfd/solvers/nonlinear_solver.h>
@@ -111,7 +111,7 @@ struct trial_projection
 template <class T>
 void test( bool full_check )
 {
-    using operations_type = scfd_vector_operations<backend_type, T>;
+    using operations_type = nmfd::operations::scfd_vector_space<backend_type, T>;
     using problem_type    = affine_problem<operations_type>;
     using linear_type     = diagonal_solver<operations_type, problem_type>;
     using projection_type = trial_projection<operations_type>;

@@ -101,12 +101,13 @@ HIGH_PRECISION_BLAS1_CUDA_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/bl
 HIGH_PRECISION_BLAS1_HIP_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita.h
 HIGH_PRECISION_BLAS1_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/compensated_reduction.h $(HIGH_PRECISION_BLAS1_CUDA_HEADERS) $(HIGH_PRECISION_BLAS1_HIP_HEADERS)
 NMFD_VECTOR_SPACE_HEADERS = $(addprefix $(COMMON_NMFD_OPERATIONS)/nmfd/operations/,dense_vector_operations.h dense_vector_space.h scfd_vector_space.h vector_operations_base.h vector_factory_base.h vector_space_base.h default_multivector_operations_base.h default_multivector_factory_base.h detail/scfd_array_traits.h detail/static_vector_traits.h)
-SCFD_BACKEND_EXT_HEADERS = $(wildcard source/common/scfd_backend_ext/*.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/detail/scfd_backend_ext/*.h)
-SCFD_VECTOR_OPS_HEADERS = source/common/scfd_vector_operations.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/scfd_vector_operations.h $(HIGH_PRECISION_BLAS1_HEADERS) $(NMFD_VECTOR_SPACE_HEADERS) $(SCFD_BACKEND_EXT_HEADERS)
-SCFD_SERIAL_VECTOR_OPS_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/scfd_serial_cpu_vector_operations.h
+NMFD_BACKEND_HEADERS = $(wildcard $(COMMON_NMFD_OPERATIONS)/nmfd/operations/backend/*.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/detail/scfd_backend_ext/*.h)
+SCFD_VECTOR_OPS_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/scfd_vector_operations.h $(HIGH_PRECISION_BLAS1_HEADERS) $(NMFD_VECTOR_SPACE_HEADERS) $(NMFD_BACKEND_HEADERS)
+SCFD_SERIAL_VECTOR_OPS_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) $(CONTRIB_SCFD)/include/scfd/backend/serial_cpu.h
 SCFD_VECTOR_OPS_TEST_HEADERS = $(SCFD_VECTOR_OPS_HEADERS) source/common/tests/scfd_vector_operations_high_precision_tests.h source/common/tests/scfd_vector_operations_nmfd_interface_tests.h
 CPU_VECTOR_OPS_VAR_PREC_HEADERS = source/common/cpu_vector_operations_var_prec.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/cpu_vector_operations_var_prec.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/vector_operations_base.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/vector_space_base.h
-COMMON_FILE_OPS_HEADERS = source/common/file_operations.h source/common/cpu_file_operations.h source/common/cpu_matrix_file_operations.h source/common/gpu_file_operations.h source/common/gpu_matrix_file_operations.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/io/file_operations.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/io/vector_file_operations.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/io/matrix_file_operations.h
+COMMON_FILE_OPS_HEADERS = source/common/file_operations.h source/common/gpu_file_operations.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/io/file_operations.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/io/vector_file_operations.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/io/matrix_file_operations.h
+LEGACY_FILE_OPS_HEADERS = source/common/legacy/cpu_file_operations.h source/common/legacy/cpu_matrix_file_operations.h source/common/legacy/gpu_matrix_file_operations.h
 SMALL_DENSE_LINALG_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/linalg/small_dense.h
 HOST_SMALL_DENSE_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/linalg/host_small_dense_backend.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/linalg/host_small_dense_lapack.h source/contrib/scfd/include/scfd/external_libraries/lapack_wrap.h
 MATRIX_MARKET_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/io/matrix_market.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/sparse/host_csr_matrix.h
@@ -119,7 +120,7 @@ EIGENSOLVER_TRANSFORMATION_HEADERS = source/stability/eigensolvers/transformatio
 PRODUCT_VECTOR_SPACE_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/product_vector_space.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/scfd_complex_vector_bridge.h
 NMFD_GMRES_HEADERS = source/contrib/nmfd-linsolvers/include/nmfd/solvers/gmres.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/iter_solver_base.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/default_monitor.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/monitor_krylov.h $(NMFD_KRYLOV_HEADERS) $(HOST_SMALL_DENSE_HEADERS)
 NMFD_GMRES_BASELINE_HEADERS = source/numerical_algos/lin_solvers/tests/nmfd_cpu_reference_vector_space.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_advection.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_diffusion.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_elliptic.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_advection.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_diffusion.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_elliptic.h source/contrib/nmfd-linsolvers/test/solvers/residual_regularization_test.h
-COMPLEX_TRAITS_HEADERS = $(SCFD_BACKEND_EXT_HEADERS)
+COMPLEX_TRAITS_HEADERS = $(NMFD_BACKEND_HEADERS)
 CONTINUATION_SYMMETRY_HEADERS = source/symmetry/translation/orbit_type.h source/symmetry/continuation/continuation_chart_state.h source/symmetry/continuation/geometry_traits.h source/symmetry/continuation/identity_continuation_chart.h source/symmetry/continuation/isotropy_transition.h source/symmetry/continuation/local_representative_policy.h
 CONTINUATION_CHART_HEADERS = source/continuation/chart_helpers.h source/continuation/predictor_chart_validation.h source/continuation/predictor_chart_probe.h source/continuation/predictor_chart_diagnostics.h source/continuation/corrector_retry_policy.h source/continuation/progress_monitor.h source/continuation/continuation_step_state.h source/continuation/continuation_endpoint_state.h source/continuation/observational_knot_sample.h source/continuation/pending_branch_event.h source/continuation/initial_tangent_candidates.h source/continuation/initial_tangent_chart_validator.h source/continuation/initial_tangent_secant_builder.h source/continuation/semicurve_tangent_cache.h source/continuation/tangent_normalization.h $(CONTINUATION_SYMMETRY_HEADERS)
 SYMMETRY_LINEARIZATION_HEADERS = source/symmetry/linearization/projected_linear_operator.h source/symmetry/linearization/projected_stability_linear_operator.h source/symmetry/linearization/projected_preconditioner.h source/symmetry/linearization/projected_affine_inverse_provider.h source/symmetry/linearization/projected_linearization_provider.h source/symmetry/linearization/projected_stability_gauge.h
@@ -177,10 +178,10 @@ test_cpu_vector_operations_var_prec.bin: source/common/tests/test_cpu_vector_ope
 test_multivector.bin: source/common/tests/test_multivector.cpp $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_multivector.cpp $(OPENMP) -o $(BUILD_DIR)/test_multivector.bin 2>$(RESULTS)
 
-test_file_operations.bin: source/common/tests/test_file_operations.cpp $(COMMON_FILE_OPS_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
+test_file_operations.bin: source/common/tests/test_file_operations.cpp $(COMMON_FILE_OPS_HEADERS) $(LEGACY_FILE_OPS_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/common/tests/test_file_operations.cpp $(OPENMP) -o $(BUILD_DIR)/test_file_operations.bin 2>$(RESULTS)
 
-test_file_operations_cuda.bin: source/common/tests/test_file_operations_cuda.cu $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+test_file_operations_cuda.bin: source/common/tests/test_file_operations_cuda.cu $(COMMON_FILE_OPS_HEADERS) $(LEGACY_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/common/tests/test_file_operations_cuda.cu $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/test_file_operations_cuda.bin 2>$(RESULTS)
 
 test_fftw_operations.bin: source/external_libraries/tests/test_fftw_operations.cpp source/external_libraries/fftw_wrap.h
@@ -528,10 +529,10 @@ test_symmetry_solution_storage.bin: source/deflation/tests/test_symmetry_solutio
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/deflation/tests/test_symmetry_solution_storage.cpp $(OPENMP) -o $(BUILD_DIR)/test_symmetry_solution_storage.bin 2>$(RESULTS)
 
 
-test_cpu_glued_vector_operations.bin: source/common/tests/test_cpu_glued_vector_operations.cpp $(SCFD_SERIAL_VECTOR_OPS_HEADERS) source/common/glued_vector_operations.h source/common/glued_vector_space.h $(wildcard $(COMMON_NMFD_OPERATIONS)/nmfd/operations/glued_*.h)
+test_cpu_glued_vector_operations.bin: source/common/tests/test_cpu_glued_vector_operations.cpp $(SCFD_SERIAL_VECTOR_OPS_HEADERS) $(wildcard $(COMMON_NMFD_OPERATIONS)/nmfd/operations/glued_*.h)
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/common/tests/test_cpu_glued_vector_operations.cpp $(OPENMP) -o $(BUILD_DIR)/test_cpu_glued_vector_operations.bin 2>$(RESULTS)
 
-test_multi_precision.bin: source/test_inst/test_multi_precision/test_multi_precision.cpp $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
+test_multi_precision.bin: source/test_inst/test_multi_precision/test_multi_precision.cpp $(CPU_VECTOR_OPS_VAR_PREC_HEADERS) source/common/legacy/cpu_matrix_vector_operations_var_prec.h source/common/legacy/cpu_matrix_file_operations.h
 	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) $(ICUDA) source/test_inst/test_multi_precision/test_multi_precision.cpp -o $(BUILD_DIR)/test_multi_precision.bin $(OPENMP)
 
 
@@ -613,13 +614,13 @@ $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o: $(COMMON_NMFD_OPERATIONS)/nmfd/o
 
 gpu_vector_operations_ker: $(BUILD_DIR)/gpu_vector_operations_kernels.o
 
-$(BUILD_DIR)/gpu_vector_operations_kernels.o: source/common/gpu_vector_operations_kernels.cu | $(BUILD_STAMP)
-	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)  source/common/gpu_vector_operations_kernels.cu -c -o $(BUILD_DIR)/gpu_vector_operations_kernels.o 2>$(RESULTS)
+$(BUILD_DIR)/gpu_vector_operations_kernels.o: source/common/legacy/gpu_vector_operations_kernels.cu source/common/legacy/gpu_vector_operations.h source/common/legacy/gpu_vector_operations_impl.cuh source/common/macros.h $(HIGH_PRECISION_BLAS1_CUDA_HEADERS) | $(BUILD_STAMP)
+	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)  source/common/legacy/gpu_vector_operations_kernels.cu -c -o $(BUILD_DIR)/gpu_vector_operations_kernels.o 2>$(RESULTS)
 
 gpu_matrix_vector_operations_ker: $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o
 
-$(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o: source/common/gpu_matrix_vector_operations_kernels.cu | $(BUILD_STAMP)
-	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)   source/common/gpu_matrix_vector_operations_kernels.cu -c -o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o 2>$(RESULTS)
+$(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o: source/common/legacy/gpu_matrix_vector_operations_kernels.cu source/common/legacy/gpu_matrix_vector_operations.h source/common/legacy/gpu_matrix_vector_operations_impl.cuh source/common/macros.h | $(BUILD_STAMP)
+	$(NVCC) $(LIBFLAGS) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT)   source/common/legacy/gpu_matrix_vector_operations_kernels.cu -c -o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o 2>$(RESULTS)
 gpu_matrix_vector_operations.bin:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/models/tests/test_matrix_vector_operations.cpp $(LLAPACK) $(LIBS3) $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o -o $(BUILD_DIR)/test_matrix_vector_operations.bin 2>$(RESULTS)
 

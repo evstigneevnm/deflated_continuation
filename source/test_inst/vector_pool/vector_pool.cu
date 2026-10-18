@@ -4,8 +4,8 @@
 #include <iostream>
 
 #include <external_libraries/cublas_wrap.h>
-#include <common/gpu_vector_operations.h>
-#include <common/vector_wrap.h>
+#include <common/legacy/gpu_vector_operations.h>
+#include <common/legacy/vector_wrap.h>
 
 
 template <class T>

@@ -9,12 +9,13 @@
 #include <numerical_algos/lin_solvers/cgs.h>
 #include <numerical_algos/lin_solvers/bicgstab_real_resid.h>
 #include <numerical_algos/lin_solvers/bicgstabl_real_resid.h>
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 
 using namespace numerical_algos::lin_solvers;
 
 typedef SCALAR_TYPE real;
-using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
+using vec_ops_t = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real>;
 using vector_t  = typename vec_ops_t::vector_type;
 
 //TODO now works only for a > 0

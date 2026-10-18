@@ -5,7 +5,7 @@
 #include <scfd/backend/omp.h>
 #include <scfd/backend/serial_cpu.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 
 #include "common/tracked_invariant_subspace_test_suite.h"
 
@@ -28,7 +28,7 @@ void require( bool condition, const std::string &message )
 template <class Backend>
 void run_backend( const std::string &label )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     vector_space_type vector_space( 3 );
     stability_tests::run_tracked_invariant_subspace_test_suite( vector_space, label, require );
 }

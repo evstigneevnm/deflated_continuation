@@ -25,7 +25,7 @@
 
 #include <common/macros.h>
 #include <common/gpu_file_operations.h>
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 
 #include <time_stepper/legacy/time_step_adaptation_error_control.h>
 #include <time_stepper/legacy/explicit_time_step.h>

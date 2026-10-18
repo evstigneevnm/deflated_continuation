@@ -1,6 +1,8 @@
 #ifndef __SCFD_GLUED_VECTOR_SPACE_H__
 #define __SCFD_GLUED_VECTOR_SPACE_H__
 
+// Frozen timestepper compatibility only. New callers use nmfd::operations directly.
+
 #include <common/glued_vector_operations.h>
 #include <nmfd/operations/glued_vector_space.h>
 

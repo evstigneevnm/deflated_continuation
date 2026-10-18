@@ -12,7 +12,7 @@
 #include <scfd/backend/omp.h>
 #include <scfd/backend/serial_cpu.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/operations/product_vector_space.h>
 #include <stability/eigensolvers/transformations/euler_polynomial_factorization.h>
 #include <stability/eigensolvers/transformations/factorized_inverse_solver.h>
@@ -90,7 +90,7 @@ private:
 template <class Backend>
 void run_backend( const std::string &label )
 {
-    using component_space_type = scfd_vector_operations<Backend, double>;
+    using component_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using product_space_type   = nmfd::operations::two_block_vector_space<component_space_type>;
     using vector_type          = typename product_space_type::vector_type;
     using factor_solver_type   = diagonal_complex_affine_solver<product_space_type>;

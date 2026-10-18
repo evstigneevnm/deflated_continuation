@@ -9,7 +9,7 @@
 #include <scfd/backend/omp.h>
 #include <scfd/backend/serial_cpu.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/operations/linalg/host_small_dense_lapack.h>
 #include <stability/eigensolvers/krylov_schur.h>
 
@@ -90,7 +90,7 @@ void run_case(
     std::size_t krylov_dimension, std::size_t restart_dimension
 )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type       = typename vector_space_type::vector_type;
     using lapack_type       = nmfd::operations::linalg::host_small_dense_lapack<double>;
     using solver_type       = stability::eigensolvers::krylov_schur<vector_space_type, lapack_type>;
@@ -199,7 +199,7 @@ void run_case(
 
 void run_failure_case()
 {
-    using vector_space_type = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
     using vector_type       = typename vector_space_type::vector_type;
     using lapack_type       = nmfd::operations::linalg::host_small_dense_lapack<double>;
     using solver_type       = stability::eigensolvers::krylov_schur<vector_space_type, lapack_type>;

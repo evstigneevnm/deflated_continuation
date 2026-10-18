@@ -28,8 +28,8 @@
 #include <numerical_algos/newton_solvers/newton_solver.h>
 
 #include <common/gpu_file_operations.h>
-#include <common/gpu_vector_operations.h>
-#include <common/gpu_matrix_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
+#include <common/legacy/gpu_matrix_vector_operations.h>
 #include <stability/IRAM/iram_process.hpp>
 
 

@@ -7,7 +7,7 @@
 #include <string>
 
 //debug
-#include <common/gpu_matrix_file_operations.h>
+#include <common/legacy/gpu_matrix_file_operations.h>
 #include <utils/cuda_support.h>
 #include <stability/IRAM/iram_container.h>
 

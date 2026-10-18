@@ -13,10 +13,10 @@
 #include <common/cuda_init_scfd.h>
 #include <common/file_operations.h>
 #include <common/gpu_file_operations.h>
-#include <common/gpu_matrix_file_operations.h>
+#include <common/legacy/gpu_matrix_file_operations.h>
 #include <common/macros.h>
-#include <common/scfd_backend_ext/host_view.h>
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/backend/host_view.h>
+#include <nmfd/operations/scfd_vector_space.h>
 
 #include <nmfd/operations/io/vector_file_operations.h>
 
@@ -67,7 +67,7 @@ public:
     using ordinal_type          = int;
     using matrix_type           = scfd::arrays::array<scalar_type, typename backend_type::memory_type>;
     using vector_type           = matrix_type;
-    using host_view_traits      = common::scfd_backend_ext::host_view_traits<matrix_type>;
+    using host_view_traits      = nmfd::operations::backend::host_view_traits<matrix_type>;
     using matrix_host_view_type = typename host_view_traits::view_type;
     using copy_type             = typename backend_type::copy_type;
     using for_each_type         = typename backend_type::for_each_type;
@@ -200,7 +200,7 @@ private:
 void test_cuda_vector_file_operations( test_report &report, const std::filesystem::path &dir )
 {
     using scalar_type = SCALAR_TYPE;
-    using vec_ops_t   = scfd_vector_operations<scfd::backend::cuda<std::ptrdiff_t>, scalar_type>;
+    using vec_ops_t   = nmfd::operations::scfd_vector_space<scfd::backend::cuda<std::ptrdiff_t>, scalar_type>;
     using vector_type = typename vec_ops_t::vector_type;
 
     vec_ops_t                                               vec_ops( 7 );

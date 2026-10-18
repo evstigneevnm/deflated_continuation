@@ -10,7 +10,7 @@
 #include <solver/detail/algo_utils_hierarchy.h>
 #include <solver/detail/algo_params_hierarchy.h>
 #include <solver/detail/algo_hierarchy_creator.h>
-#include <glued_matrix_operator.h>
+#include <nmfd/operations/glued_matrix_operator.h>
 #include "schur_base.h"
 #include <profiling.h>
 
@@ -23,7 +23,7 @@ namespace preconditioners
 /// braes_sarazin_bfbt//braes_sarazin_simple
 
 template <class Operations>
-using schur_operator = scfd::linspace::glued_matrix_operator<Operations, 2>;
+using schur_operator = nmfd::operations::glued_matrix_operator<Operations, 2>;
 template <class Operations>
 using schur_vector_space = typename schur_operator<Operations>::vector_space_type;
 
@@ -40,7 +40,7 @@ class schur_bfbt : public schur_base<USolver, PSolver, Operations, Log>
 public:
     using operations_type   = Operations;
     using scalar_type       = typename Operations::scalar_type;
-    using operator_type     = scfd::linspace::glued_matrix_operator<Operations, 2>;
+    using operator_type     = nmfd::operations::glued_matrix_operator<Operations, 2>;
     using vector_type       = typename operator_type::vector_type;
     using vector_space_type = typename operator_type::vector_space_type;
 

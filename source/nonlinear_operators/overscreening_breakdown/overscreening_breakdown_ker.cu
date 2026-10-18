@@ -1,6 +1,6 @@
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_impl.cuh>
-#include <common/gpu_vector_operations.h>
-#include <common/gpu_matrix_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
+#include <common/legacy/gpu_matrix_vector_operations.h>
 
 using VecD = gpu_vector_operations<double>;
 using MatD = gpu_matrix_vector_operations<typename VecD::scalar_type, typename VecD::vector_type>;

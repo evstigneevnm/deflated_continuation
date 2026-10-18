@@ -3,7 +3,7 @@
 #include <string>
 #include <iostream>
 //#include <common/gpu_vector_opearations.h>
-//#include <common/vector_wrap.h>
+//#include <common/legacy/vector_wrap.h>
 
 
 double *d_alloc( size_t sz )

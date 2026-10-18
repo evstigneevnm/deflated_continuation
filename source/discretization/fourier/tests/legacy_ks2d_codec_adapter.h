@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <vector>
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 
 namespace discretization
 {
@@ -16,10 +16,10 @@ namespace tests
 // Reproduces the legacy Nx*My-1 mapping for compatibility checks only.
 template <class Complex>
 std::vector<Complex> legacy_ks2d_unpack(
-    const std::vector<typename ::common::scfd_backend_ext::complex_value_traits<Complex>::real_type> &state
+    const std::vector<typename ::nmfd::operations::backend::complex_value_traits<Complex>::real_type> &state
 )
 {
-    using traits    = ::common::scfd_backend_ext::complex_value_traits<Complex>;
+    using traits    = ::nmfd::operations::backend::complex_value_traits<Complex>;
     using real_type = typename traits::real_type;
     std::vector<Complex> spectrum( state.size() + 1, traits::make( real_type( 0 ), real_type( 0 ) ) );
     for ( std::size_t index = 0; index < state.size(); ++index )
@@ -30,10 +30,10 @@ std::vector<Complex> legacy_ks2d_unpack(
 }
 
 template <class Complex>
-std::vector<typename ::common::scfd_backend_ext::complex_value_traits<Complex>::real_type>
+std::vector<typename ::nmfd::operations::backend::complex_value_traits<Complex>::real_type>
 legacy_ks2d_pack( const std::vector<Complex> &spectrum )
 {
-    using traits    = ::common::scfd_backend_ext::complex_value_traits<Complex>;
+    using traits    = ::nmfd::operations::backend::complex_value_traits<Complex>;
     using real_type = typename traits::real_type;
     std::vector<real_type> state( spectrum.size() - 1, real_type( 0 ) );
     for ( std::size_t index = 1; index < spectrum.size(); ++index )

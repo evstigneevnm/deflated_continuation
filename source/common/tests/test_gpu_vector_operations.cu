@@ -6,7 +6,7 @@
 #include <scfd/copy/cuda.h>
 
 #include <common/cuda_init_scfd.h>
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 #include <common/tests/vector_operations_template_tests.h>
 #include <external_libraries/cublas_wrap.h>
 
@@ -19,7 +19,7 @@ struct gpu_vector_access
     void
     write( VecOps &, typename VecOps::vector_type &dst, const std::vector<typename VecOps::scalar_type> &src ) const
     {
-        scfd::cuda_copy<std::size_t>()( src.size(), src.data(), dst );
+        scfd::copy::cuda<std::size_t>()( src.size(), src.data(), dst );
     }
 
     template <class VecOps>
@@ -27,7 +27,7 @@ struct gpu_vector_access
     read( VecOps &, const typename VecOps::vector_type &src, std::size_t n ) const
     {
         std::vector<typename VecOps::scalar_type> host( n );
-        scfd::cuda_copy<std::size_t>()( n, src, host.data() );
+        scfd::copy::cuda<std::size_t>()( n, src, host.data() );
         return host;
     }
 };

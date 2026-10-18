@@ -10,8 +10,9 @@
 #include <scfd/copy/cuda.h>
 
 #include <common/cuda_init_scfd.h>
-#include <common/gpu_vector_operations.h>
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 #include <common/vector_snapshot_queue.h>
 #include <external_libraries/cublas_wrap.h>
 
@@ -55,14 +56,14 @@ template <class T>
 void fill_device( T *device, std::size_t n, T value )
 {
     std::vector<T> host( n, value );
-    scfd::cuda_copy<std::size_t>()( n, host.data(), device );
+    scfd::copy::cuda<std::size_t>()( n, host.data(), device );
 }
 
 template <class T>
 void require_device_vector_value( const T *device, std::size_t n, T expected, const std::string &label )
 {
     std::vector<T> host( n );
-    scfd::cuda_copy<std::size_t>()( n, device, host.data() );
+    scfd::copy::cuda<std::size_t>()( n, device, host.data() );
     require_host_vector_value( host, expected, label );
 }
 
@@ -90,12 +91,13 @@ void test_metadata_queue()
 template <class T>
 void test_cpu_snapshots( std::size_t n )
 {
-    scfd_serial_cpu_vector_operations<T>                       vec_ops( n );
-    typename scfd_serial_cpu_vector_operations<T>::vector_type x;
+    nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, T> vec_ops( n );
+    typename nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, T>::vector_type x;
     vec_ops.init_vector( x );
     vec_ops.start_use_vector( x );
 
-    common::vector_snapshot_queue<scfd_serial_cpu_vector_operations<T>> snapshots( &vec_ops, 2 );
+    common::vector_snapshot_queue<nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, T>>
+        snapshots( &vec_ops, 2 );
 
     vec_ops.assign_scalar( T( 1 ), x );
     snapshots.push( x );

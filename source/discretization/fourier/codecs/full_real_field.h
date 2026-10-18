@@ -6,7 +6,7 @@
 #include <type_traits>
 #include <vector>
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 #include <discretization/fourier/codecs/codec_descriptor_2d.h>
 #include <discretization/fourier/r2c_index_space.h>
 #include <scfd/arrays/array.h>
@@ -29,7 +29,7 @@ public:
     using backend_type           = typename vector_operations_type::backend_type;
     using memory_type            = typename backend_type::memory_type;
     using complex_type           = Complex;
-    using complex_traits         = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using complex_traits         = ::nmfd::operations::backend::complex_value_traits<complex_type>;
     using descriptor_type        = detail::coefficient_orbit_2d;
     using descriptor_array_type  = scfd::arrays::array<descriptor_type, memory_type>;
     using for_each_type          = typename vector_operations_type::for_each_type;

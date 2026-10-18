@@ -9,7 +9,7 @@
 #include <scfd/backend/cuda.h>
 
 #include <common/cuda_init_scfd.h>
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <stability/analysis/initial_vector_policy.h>
 #include <stability/analysis/spectrum_classifier.h>
 #include <stability/analysis/stability_evaluator.h>
@@ -33,7 +33,7 @@ void require( bool condition, const std::string &message )
     }
 }
 
-using vector_space_type = scfd_vector_operations<scfd::backend::cuda<std::ptrdiff_t>, double>;
+using vector_space_type = nmfd::operations::scfd_vector_space<scfd::backend::cuda<std::ptrdiff_t>, double>;
 using vector_type       = typename vector_space_type::vector_type;
 
 class parameterized_problem

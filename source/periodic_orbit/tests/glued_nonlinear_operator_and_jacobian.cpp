@@ -1,5 +1,6 @@
 #include <scfd/utils/log_std.h>
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 #include "../detail/glued_nonlinear_operator_and_jacobian.h"
 #include "rossler_operator.h"
 
@@ -9,7 +10,7 @@ int main( int argc, char const *argv[] )
     using log_t             = scfd::utils::log_std;
     using real              = SCALAR_TYPE;
     using T                 = real;
-    using vec_ops_t         = scfd_serial_cpu_vector_operations<real>;
+    using vec_ops_t         = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real>;
     using vec_t             = typename vec_ops_t::vector_type;
     using nlin_op_t         = nonlinear_operators::rossler<vec_ops_t>;
     using glued_nonlin_op_t = periodic_orbit::detail::glued_nonlinear_operator_and_jacobian<vec_ops_t, nlin_op_t>;

@@ -97,19 +97,19 @@ void host_2_device_cpy( T *device, T *host, int Nx, int Ny, int Nz )
 template <class T>
 void device_2_host_cpy( T *host, T *device, size_t size )
 {
-    scfd::cuda_copy<size_t>()( size, device, host );
+    scfd::copy::cuda<size_t>()( size, device, host );
 }
 
 template <class T>
 void host_2_device_cpy( T *device, T *host, size_t size )
 {
-    scfd::cuda_copy<size_t>()( size, host, device );
+    scfd::copy::cuda<size_t>()( size, host, device );
 }
 
 template <class T>
 void device_2_device_cpy( const T *device_from, T *device_to, size_t size )
 {
-    scfd::cuda_copy<size_t>()( size, device_from, device_to );
+    scfd::copy::cuda<size_t>()( size, device_from, device_to );
 }
 
 

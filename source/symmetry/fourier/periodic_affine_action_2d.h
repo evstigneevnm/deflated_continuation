@@ -9,8 +9,8 @@
 #include <memory>
 #include <stdexcept>
 
-#include <common/scfd_backend_ext/complex.h>
-#include <common/scfd_backend_ext/math.h>
+#include <nmfd/operations/backend/complex.h>
+#include <nmfd/operations/backend/math.h>
 #include <discretization/fourier/r2c_index_space.h>
 #include <discretization/fourier/spectral_field.h>
 #include <scfd/utils/device_tag.h>
@@ -33,8 +33,8 @@ public:
     using ordinal_type           = typename vector_operations_type::ordinal_type;
     using for_each_type          = typename vector_operations_type::for_each_type;
     using complex_type           = Complex;
-    using complex_traits         = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
-    using math_type              = ::common::scfd_backend_ext::math<backend_type, scalar_type>;
+    using complex_traits         = ::nmfd::operations::backend::complex_value_traits<complex_type>;
+    using math_type              = ::nmfd::operations::backend::math<backend_type, scalar_type>;
     using spectral_field_type    = discretization::fourier::spectral_field<backend_type, complex_type, 2>;
     using element_type           = periodic_affine_element_2d;
 

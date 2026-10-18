@@ -9,7 +9,8 @@
 
 #include <scfd/utils/log_std.h>
 #include <common/file_operations.h>
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 #include <time_stepper/legacy/time_step_adaptation_constant.h>
 #include <time_stepper/legacy/time_step_adaptation_error_control.h>
 #include <time_stepper/legacy/explicit_time_step.h>
@@ -28,7 +29,7 @@ int main( int argc, char const *argv[] )
     using real  = SCALAR_TYPE;
     using log_t = scfd::utils::log_std;
 
-    using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
+    using vec_ops_t = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real>;
     using vec_t     = typename vec_ops_t::vector_type;
 
     using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_t, log_t>;

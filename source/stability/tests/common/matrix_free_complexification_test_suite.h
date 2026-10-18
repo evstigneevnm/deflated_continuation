@@ -17,8 +17,8 @@
 
 #include <scfd/utils/log.h>
 
-#include <common/scfd_backend_ext/complex.h>
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/backend/complex.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/detail/vector_wrap.h>
 #include <nmfd/operations/product_vector_space.h>
 #include <nmfd/operations/scfd_complex_vector_bridge.h>
@@ -65,7 +65,7 @@ bool close( const std::complex<Real> &actual, const std::complex<Real> &expected
 }
 
 template <class Backend, class Real>
-using backend_complex_type = common::scfd_backend_ext::complex_t<Backend, Real>;
+using backend_complex_type = nmfd::operations::backend::complex_t<Backend, Real>;
 
 template <class ComplexSpace, class Real>
 void set_complex_vector(
@@ -74,7 +74,7 @@ void set_complex_vector(
 )
 {
     using complex_type = typename ComplexSpace::scalar_type;
-    using traits       = common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using traits       = nmfd::operations::backend::complex_value_traits<complex_type>;
     std::vector<complex_type> converted( host.size() );
     for ( std::size_t index = 0; index < host.size(); ++index )
     {
@@ -89,7 +89,7 @@ get_complex_vector( const ComplexSpace &vector_space, const typename ComplexSpac
 {
     using real_type    = typename ComplexSpace::norm_type;
     using complex_type = typename ComplexSpace::scalar_type;
-    using traits       = common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using traits       = nmfd::operations::backend::complex_value_traits<complex_type>;
     std::vector<complex_type> converted( vector_space.get_default_size() );
     vector_space.get( source, converted.data(), converted.size() );
     std::vector<std::complex<real_type>> result( converted.size() );
@@ -214,10 +214,10 @@ private:
 template <class Backend, class Real>
 void test_operator( const std::string &label )
 {
-    using real_space_type    = scfd_vector_operations<Backend, Real>;
+    using real_space_type    = nmfd::operations::scfd_vector_space<Backend, Real>;
     using product_space_type = nmfd::operations::two_block_vector_space<real_space_type>;
     using complex_type       = backend_complex_type<Backend, Real>;
-    using complex_space_type = scfd_vector_operations<Backend, complex_type>;
+    using complex_space_type = nmfd::operations::scfd_vector_space<Backend, complex_type>;
     using bridge_type        = nmfd::operations::scfd_complex_vector_bridge<product_space_type, complex_space_type>;
     using real_operator_type = analytical_dense_operator<real_space_type, Real>;
     using operator_type      = stability::eigensolvers::transformations::complexified_real_operator<
@@ -270,11 +270,11 @@ template <class Backend>
 void test_true_complex_gmres( const std::string &label )
 {
     using real_type          = double;
-    using real_space_type    = scfd_vector_operations<Backend, real_type>;
+    using real_space_type    = nmfd::operations::scfd_vector_space<Backend, real_type>;
     using product_space_type = nmfd::operations::two_block_vector_space<real_space_type>;
     using complex_type       = backend_complex_type<Backend, real_type>;
-    using complex_traits     = common::scfd_backend_ext::complex_value_traits<complex_type>;
-    using complex_space_type = scfd_vector_operations<Backend, complex_type>;
+    using complex_traits     = nmfd::operations::backend::complex_value_traits<complex_type>;
+    using complex_space_type = nmfd::operations::scfd_vector_space<Backend, complex_type>;
     using bridge_type        = nmfd::operations::scfd_complex_vector_bridge<product_space_type, complex_space_type>;
     using real_operator_type = analytical_dense_operator<real_space_type, real_type>;
     using complexified_operator_type = stability::eigensolvers::transformations::complexified_real_operator<
@@ -330,10 +330,10 @@ template <class Backend>
 void test_factor_bundle( const std::string &label )
 {
     using real_type          = double;
-    using real_space_type    = scfd_vector_operations<Backend, real_type>;
+    using real_space_type    = nmfd::operations::scfd_vector_space<Backend, real_type>;
     using complex_type       = backend_complex_type<Backend, real_type>;
-    using complex_traits     = common::scfd_backend_ext::complex_value_traits<complex_type>;
-    using complex_space_type = scfd_vector_operations<Backend, complex_type>;
+    using complex_traits     = nmfd::operations::backend::complex_value_traits<complex_type>;
+    using complex_space_type = nmfd::operations::scfd_vector_space<Backend, complex_type>;
     using real_operator_type = analytical_dense_operator<real_space_type, real_type>;
     using model_type         = analytical_real_affine_inverse_model<real_space_type>;
     using provider_type = stability::eigensolvers::transformations::nonlinear_operator_real_affine_inverse_provider<

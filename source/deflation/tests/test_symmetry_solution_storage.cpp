@@ -3,7 +3,8 @@
 #include <iostream>
 #include <vector>
 
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 #include <deflation/symmetry_solution_storage.h>
 #include <symmetry/finite_action_registry.h>
 #include <symmetry/finite_quotient_adapter.h>
@@ -59,7 +60,7 @@ std::vector<typename VecOps::scalar_type> get_vector( VecOps &vec_ops, const typ
 int main()
 {
     using real               = double;
-    using vec_ops_t          = scfd_serial_cpu_vector_operations<real>;
+    using vec_ops_t          = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real>;
     using adapter_t          = symmetry::fourier::real_packed_fourier_slice_1d_adapter<vec_ops_t>;
     using finite_actions_t   = symmetry::finite_action_registry<vec_ops_t>;
     using quotient_adapter_t = symmetry::finite_quotient_adapter<vec_ops_t, adapter_t>;

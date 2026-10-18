@@ -9,7 +9,7 @@
 // #include <boost/archive/basic_xml_oarchive.hpp>
 // #include <boost/archive/basic_xml_iarchive.hpp>
 
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 #include <common/gpu_file_operations.h>
 #include <external_libraries/cublas_wrap.h>
 

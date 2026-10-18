@@ -34,7 +34,7 @@
 
 #include <common/macros.h>
 #include <common/gpu_file_operations.h>
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 
 #include <time_stepper/legacy/detail/butcher_tables.h>
 

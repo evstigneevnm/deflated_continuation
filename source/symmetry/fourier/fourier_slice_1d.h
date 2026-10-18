@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 #include <symmetry/fourier/mode_access.h>
 #include <symmetry/fourier/phase_conditions.h>
 #include <symmetry/fourier/translation_generators.h>
@@ -24,7 +24,7 @@ class fourier_slice_1d
 {
 public:
     using complex_type            = Complex;
-    using traits_type             = common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using traits_type             = nmfd::operations::backend::complex_value_traits<complex_type>;
     using real_type               = typename traits_type::real_type;
     using generic_slice_data_type = symmetry::slice_data<real_type, 1>;
 

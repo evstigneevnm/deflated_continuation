@@ -32,8 +32,8 @@
 
 #include <common/macros.h>
 #include <common/gpu_file_operations.h>
-#include <common/gpu_vector_operations.h>
-#include <common/gpu_matrix_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
+#include <common/legacy/gpu_matrix_vector_operations.h>
 #include <contrib/scfd/include/scfd/utils/system_timer_event.h>
 
 #include <models/overscreening_breakdown/test_newton_deflation.h>

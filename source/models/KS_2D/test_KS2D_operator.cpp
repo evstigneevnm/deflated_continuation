@@ -17,7 +17,7 @@
 #    include <scfd/backend/omp.h>
 #endif
 
-#include <common/NMFD-operations/nmfd/operations/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <deflation/symmetry_solution_storage.h>
 #include <discretization/fourier/codecs/full_real_field.h>
 #include <discretization/fourier/codecs/inversion_odd_field.h>
@@ -80,7 +80,7 @@ void run_case(
 )
 {
     using scalar_type            = double;
-    using vector_operations_type = scfd_vector_operations<Backend, scalar_type>;
+    using vector_operations_type = nmfd::operations::scfd_vector_space<Backend, scalar_type>;
     using operator_type = nonlinear_operators::kuramoto_sivashinskiy_2d<vector_operations_type, FFTBackend, StateCodec>;
     using vector_type   = typename vector_operations_type::vector_type;
     using copy_type     = typename vector_operations_type::copy_type;
@@ -536,7 +536,7 @@ template <class Backend, class FFTBackend>
 void run_full_square_symmetry_case( report &result )
 {
     using scalar_type            = double;
-    using vector_operations_type = scfd_vector_operations<Backend, scalar_type>;
+    using vector_operations_type = nmfd::operations::scfd_vector_space<Backend, scalar_type>;
     using operator_type          = nonlinear_operators::kuramoto_sivashinskiy_2d<
                  vector_operations_type, FFTBackend, discretization::fourier::codecs::full_real_field_2d>;
     using vector_type           = typename vector_operations_type::vector_type;

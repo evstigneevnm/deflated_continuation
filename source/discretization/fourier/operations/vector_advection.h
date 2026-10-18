@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <stdexcept>
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 #include <scfd/utils/device_tag.h>
 
 namespace discretization
@@ -18,7 +18,7 @@ template <class Backend, class SpectralField>
 void add_spectra( const SpectralField &left, const SpectralField &right, SpectralField &output )
 {
     using complex_type  = typename SpectralField::value_type;
-    using traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using traits        = ::nmfd::operations::backend::complex_value_traits<complex_type>;
     using for_each_type = typename Backend::for_each_type;
     if ( left.size() != right.size() || left.size() != output.size() )
     {

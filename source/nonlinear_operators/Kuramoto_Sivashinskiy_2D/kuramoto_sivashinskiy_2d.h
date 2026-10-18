@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 #include <discretization/fourier/codecs/inversion_odd_field.h>
 #include <discretization/fourier/dealiasing_policy.h>
 #include <discretization/fourier/initialization/low_mode_odd_field.h>
@@ -54,7 +54,7 @@ public:
     using transform_type =
         discretization::fourier::normalized_r2c_transform<backend_type, fft_backend_type, scalar_type, 2>;
     using complex_type          = typename transform_type::complex_type;
-    using complex_traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using complex_traits        = ::nmfd::operations::backend::complex_value_traits<complex_type>;
     using extent_type           = discretization::common::structured_extent<2>;
     using grid_type             = discretization::fourier::periodic_grid<scalar_type, 2>;
     using index_space_type      = discretization::fourier::r2c_index_space_2d;

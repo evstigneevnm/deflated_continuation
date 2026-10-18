@@ -1,16 +1,17 @@
 // Example program
 #include <iostream>
 #include <vector>
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 #include "curve_container.h"
 
 
 int main()
 {
-    typedef SFLOATTYPE                              real;
-    typedef knots<real>                             knots_t;
-    typedef scfd_serial_cpu_vector_operations<real> cpu_vec_ops_t;
-    typedef typename cpu_vec_ops_t::vector_type     real_vec;
+    typedef SFLOATTYPE                                                                           real;
+    typedef knots<real>                                                                          knots_t;
+    typedef nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real> cpu_vec_ops_t;
+    typedef typename cpu_vec_ops_t::vector_type                                                  real_vec;
     //typedef curve_storage<cpu_vec_ops_t, knots_t> curve_storage_t;
 
     size_t vector_size = 10;

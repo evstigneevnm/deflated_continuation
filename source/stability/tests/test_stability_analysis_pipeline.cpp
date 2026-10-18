@@ -11,7 +11,7 @@
 #include <scfd/backend/omp.h>
 #include <scfd/backend/serial_cpu.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nonlinear_operators/circle/circle.h>
 #include <nonlinear_operators/circle/linear_operator_circle.h>
 #include <stability/analysis/initial_vector_policy.h>
@@ -212,7 +212,7 @@ private:
 template <class Backend>
 void test_distinct_stability_probe_policy( const std::string &label )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type       = typename vector_space_type::vector_type;
     using problem_type      = distinct_stability_probe_problem<vector_space_type>;
     using policy_type       = stability::analysis::nonlinear_operator_random_initial_vector<problem_type>;
@@ -1016,7 +1016,7 @@ private:
 template <class Backend>
 void test_transition_state_alignment( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = parameter_spectrum_adapter<vector_space_type, problem_type>;
@@ -1078,7 +1078,7 @@ void test_transition_state_alignment( const std::string &label )
 template <class Backend>
 void test_evaluator_and_refiner( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = parameter_spectrum_adapter<vector_space_type, problem_type>;
@@ -1179,7 +1179,7 @@ void test_evaluator_and_refiner( const std::string &label )
 template <class Backend>
 void test_classification_retry( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = transient_unmatched_spectrum_adapter<vector_space_type, problem_type>;
@@ -1214,7 +1214,7 @@ void test_classification_retry( const std::string &label )
 template <class Backend>
 void test_classification_fallback( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = classification_fallback_spectrum_adapter<vector_space_type, problem_type>;
@@ -1251,7 +1251,7 @@ void test_classification_fallback( const std::string &label )
 template <class Backend>
 void test_classification_confirmation( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = classification_confirmation_spectrum_adapter<vector_space_type, problem_type>;
@@ -1291,7 +1291,7 @@ void test_classification_confirmation( const std::string &label )
 template <class Backend>
 void test_classification_confirmation_consensus( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = inconsistent_confirmation_spectrum_adapter<vector_space_type, problem_type>;
@@ -1334,7 +1334,7 @@ void test_classification_confirmation_consensus( const std::string &label )
 template <class Backend>
 void test_classification_confirmation_retry_consensus( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = recovering_confirmation_spectrum_adapter<vector_space_type, problem_type>;
@@ -1377,7 +1377,7 @@ void test_classification_confirmation_retry_consensus( const std::string &label 
 template <class Backend>
 void test_classification_confirmation_reconciliation( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = reconciling_confirmation_spectrum_adapter<vector_space_type, problem_type>;
@@ -1425,7 +1425,7 @@ void test_classification_confirmation_reconciliation( const std::string &label )
 template <class Backend>
 void test_failed_classification_confirmation_retry( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = failed_then_recovering_confirmation_spectrum_adapter<vector_space_type, problem_type>;
@@ -1478,7 +1478,7 @@ void test_failed_classification_confirmation_retry( const std::string &label )
 template <class Backend>
 void test_recycling_transaction( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = transactional_spectrum_adapter<vector_space_type, problem_type>;
     using classifier_type     = stability::analysis::spectrum_classifier<double>;
@@ -1542,7 +1542,7 @@ void test_recycling_transaction( const std::string &label )
 template <class Backend>
 void test_unexpected_secant_signature_recovery( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = curved_branch_artifact_spectrum_adapter<vector_space_type, problem_type>;
@@ -1610,7 +1610,7 @@ void test_unexpected_secant_signature_recovery( const std::string &label )
 template <class Backend>
 void test_failed_secant_classification_recovery( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = off_branch_failure_spectrum_adapter<vector_space_type, problem_type>;
@@ -1696,7 +1696,7 @@ void test_failed_secant_classification_recovery( const std::string &label )
 template <class Backend>
 void test_failed_transition_newton_homotopy_recovery( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = curved_branch_artifact_spectrum_adapter<vector_space_type, problem_type>;
@@ -1776,7 +1776,7 @@ void test_failed_transition_newton_homotopy_recovery( const std::string &label )
 template <class Backend>
 void test_transition_fallback_newton( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = curved_branch_artifact_spectrum_adapter<vector_space_type, problem_type>;
@@ -1853,7 +1853,7 @@ void test_transition_fallback_newton( const std::string &label )
 template <class Backend>
 void test_coalescence_before_hopf_refinement( const std::string &label )
 {
-    using vector_space_type   = scfd_vector_operations<Backend, double>;
+    using vector_space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type         = typename vector_space_type::vector_type;
     using problem_type        = parameterized_problem<vector_space_type>;
     using adapter_type        = coalescence_hopf_spectrum_adapter<vector_space_type, problem_type>;
@@ -1959,7 +1959,7 @@ struct quiet_log
 template <class Backend>
 void test_multiple_transition_sequence( const std::string &label )
 {
-    using vector_space_type        = scfd_vector_operations<Backend, double>;
+    using vector_space_type        = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type              = typename vector_space_type::vector_type;
     using problem_type             = parameterized_problem<vector_space_type>;
     using newton_type              = exact_branch_newton<vector_space_type, problem_type>;
@@ -2023,10 +2023,10 @@ void test_multiple_transition_sequence( const std::string &label )
 
 void test_structured_facade()
 {
-    using vector_space_type        = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
-    using vector_type              = typename vector_space_type::vector_type;
-    using problem_type             = parameterized_problem<vector_space_type>;
-    using newton_type              = exact_branch_newton<vector_space_type, problem_type>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
+    using vector_type       = typename vector_space_type::vector_type;
+    using problem_type      = parameterized_problem<vector_space_type>;
+    using newton_type       = exact_branch_newton<vector_space_type, problem_type>;
     using eigensolver_adapter_type = parameter_spectrum_adapter<vector_space_type, problem_type>;
     using facade_type              = stability::stability_analysis<
                      vector_space_type, problem_type, quiet_log, newton_type, eigensolver_adapter_type>;
@@ -2084,7 +2084,7 @@ void test_structured_facade()
 template <class Backend>
 void test_fold_secant_refinement( const std::string &label )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type       = typename vector_space_type::vector_type;
     using problem_type      = nonlinear_operators::circle<vector_space_type>;
     using operator_type     = nonlinear_operators::linear_operator_circle<vector_space_type, problem_type>;
@@ -2162,11 +2162,11 @@ void test_fold_secant_refinement( const std::string &label )
 
 void test_facade_with_separate_linearization_provider()
 {
-    using vector_space_type        = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
-    using vector_type              = typename vector_space_type::vector_type;
-    using problem_type             = parameterized_problem<vector_space_type>;
-    using provider_type            = separate_linearization_provider<vector_space_type>;
-    using newton_type              = exact_branch_newton<vector_space_type, problem_type>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
+    using vector_type       = typename vector_space_type::vector_type;
+    using problem_type      = parameterized_problem<vector_space_type>;
+    using provider_type     = separate_linearization_provider<vector_space_type>;
+    using newton_type       = exact_branch_newton<vector_space_type, problem_type>;
     using eigensolver_adapter_type = parameter_spectrum_adapter<vector_space_type, provider_type>;
     using facade_type              = stability::stability_analysis<
                      vector_space_type, problem_type, quiet_log, newton_type, eigensolver_adapter_type, provider_type>;

@@ -24,8 +24,8 @@
 
 #include <common/macros.h>
 #include <common/gpu_file_operations.h>
-#include <common/gpu_vector_operations.h>
-#include <common/gpu_matrix_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
+#include <common/legacy/gpu_matrix_vector_operations.h>
 #include <stability/stability_analysis.hpp>
 #include <stability/system_operator_Cayley_transform.h>
 

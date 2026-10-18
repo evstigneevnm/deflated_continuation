@@ -1,9 +1,10 @@
 #include <cmath>
 #include <iostream>
 
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 
-using vec_ops_t = scfd_serial_cpu_vector_operations<double>;
+using vec_ops_t = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
 using T         = typename vec_ops_t::scalar_type;
 using vec_t     = typename vec_ops_t::vector_type;
 using mvec_t    = typename vec_ops_t::multivector_type;

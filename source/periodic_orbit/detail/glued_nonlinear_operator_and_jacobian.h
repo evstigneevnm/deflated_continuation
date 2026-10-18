@@ -3,8 +3,8 @@
 
 #include <memory>
 #include <vector>
-#include <common/glued_vector_operations.h>
-#include <common/glued_vector_space.h>
+#include <nmfd/operations/glued_vector_operations.h>
+#include <nmfd/operations/glued_vector_space.h>
 
 namespace periodic_orbit
 {
@@ -26,7 +26,7 @@ private:
     };
 
 public:
-    using glued_vector_operations_type = scfd::linspace::glued_vector_space<VectorOperations, 2>;
+    using glued_vector_operations_type = nmfd::operations::glued_vector_space<VectorOperations, 2>;
     using vector_type                  = typename glued_vector_operations_type::vector_type;
     using scalar_type                  = typename VectorOperations::scalar_type;
 

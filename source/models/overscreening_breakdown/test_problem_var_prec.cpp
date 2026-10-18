@@ -2,12 +2,12 @@
 #include <string>
 #include <sstream>
 #include <common/cpu_vector_operations_var_prec.h>
-#include <common/cpu_matrix_vector_operations_var_prec.h>
+#include <common/legacy/cpu_matrix_vector_operations_var_prec.h>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_params.h>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_ker.h>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown.h>
-#include <common/cpu_matrix_file_operations.h>
-#include <common/cpu_file_operations.h>
+#include <common/legacy/cpu_matrix_file_operations.h>
+#include <common/legacy/cpu_file_operations.h>
 #include <contrib/scfd/include/scfd/utils/device_tag.h>
 #include <contrib/scfd/include/scfd/utils/system_timer_event.h>
 

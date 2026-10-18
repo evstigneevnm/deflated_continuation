@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nonlinear_operators/adjoint_jacobian_capability.h>
 #include <nonlinear_operators/bratu/bratu.h>
 #include <nonlinear_operators/circle/circle.h>
@@ -153,12 +153,12 @@ void verify_adjoint(
 template <class Backend>
 void verify_bratu_adjoint(
     const std::string &label,
-    const typename nonlinear_operators::bratu<scfd_vector_operations<Backend, double>>::spatial_discretization
-        discretization
+    const typename nonlinear_operators::bratu<
+        nmfd::operations::scfd_vector_space<Backend, double>>::spatial_discretization discretization
 )
 {
     constexpr std::size_t size = 17;
-    using vector_space_type    = scfd_vector_operations<Backend, double>;
+    using vector_space_type    = nmfd::operations::scfd_vector_space<Backend, double>;
     using problem_type         = nonlinear_operators::bratu<vector_space_type>;
     using vector_type          = typename vector_space_type::vector_type;
     vector_space_type vector_space( size );
@@ -204,7 +204,7 @@ void verify_bratu_adjoint(
 template <class Backend>
 void run_backend( const std::string &label )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     vector_space_type vector_space( 1 );
 
     nonlinear_operators::circle<vector_space_type> circle( 1.0, 1, &vector_space );

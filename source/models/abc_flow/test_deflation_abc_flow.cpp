@@ -27,7 +27,7 @@
 #include <numerical_algos/newton_solvers/newton_solver.h>
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 
 #include <models/abc_flow/test_deflation_typedefs_abc_flow.h>
 

@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 #include <nmfd/operations/product_vector_space.h>
 #include <nmfd/operations/scfd_complex_vector_bridge.h>
 #include <stability/model_adapter_contract.h>
@@ -231,7 +231,7 @@ private:
     typename bundle_type::components_type make_components( const factor_type &factor )
     {
         using complex_scalar_type = typename complex_space_type::scalar_type;
-        using complex_traits      = common::scfd_backend_ext::complex_value_traits<complex_scalar_type>;
+        using complex_traits      = nmfd::operations::backend::complex_value_traits<complex_scalar_type>;
         return {
             std::make_shared<factor_operator_type>(
                 checked_complex_space(), complexified_operator_, identity_operator_,

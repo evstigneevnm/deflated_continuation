@@ -1,9 +1,10 @@
 #include <iostream>
 #include <string>
 #include <scfd/utils/log_std.h>
-#include <common/glued_vector_operations.h>
-#include <common/glued_vector_space.h>
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/glued_vector_operations.h>
+#include <nmfd/operations/glued_vector_space.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 
 
 int main( int argc, char const *argv[] )
@@ -12,9 +13,9 @@ int main( int argc, char const *argv[] )
 
     using real              = SCALAR_TYPE;
     using T                 = real;
-    using vec_ops_t         = scfd_serial_cpu_vector_operations<real>;
+    using vec_ops_t         = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real>;
     using vec_t             = typename vec_ops_t::vector_type;
-    using glued_vec_space_t = scfd::linspace::glued_vector_space<vec_ops_t, 2>;
+    using glued_vec_space_t = nmfd::operations::glued_vector_space<vec_ops_t, 2>;
     using glued_vec_t       = typename glued_vec_space_t::vector_type;
 
 

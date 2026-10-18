@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <stdexcept>
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 #include <symmetry/fourier/translation_generators.h>
 
 namespace symmetry
@@ -13,7 +13,7 @@ namespace fourier
 {
 
 template <class Complex>
-typename common::scfd_backend_ext::complex_value_traits<Complex>::real_type
+typename nmfd::operations::backend::complex_value_traits<Complex>::real_type
 real_inner_product_packed_positive_modes( const Complex *left, const Complex *right, const std::size_t size )
 {
     if ( left == nullptr || right == nullptr )
@@ -21,7 +21,7 @@ real_inner_product_packed_positive_modes( const Complex *left, const Complex *ri
         throw std::invalid_argument( "real_inner_product_packed_positive_modes got null pointer" );
     }
 
-    using traits_type = common::scfd_backend_ext::complex_value_traits<Complex>;
+    using traits_type = nmfd::operations::backend::complex_value_traits<Complex>;
     using real_type   = typename traits_type::real_type;
 
     real_type result = real_type( 0 );
@@ -44,7 +44,7 @@ void project_slice_tangent_1d(
         throw std::invalid_argument( "project_slice_tangent_1d got null pointer" );
     }
 
-    using traits_type = common::scfd_backend_ext::complex_value_traits<Complex>;
+    using traits_type = nmfd::operations::backend::complex_value_traits<Complex>;
     using real_type   = typename traits_type::real_type;
 
     if ( !data.active() )
@@ -84,7 +84,7 @@ void pullback_slice_tangent_projector_1d(
         throw std::invalid_argument( "pullback_slice_tangent_projector_1d got null pointer" );
     }
 
-    using traits_type = common::scfd_backend_ext::complex_value_traits<Complex>;
+    using traits_type = nmfd::operations::backend::complex_value_traits<Complex>;
     using real_type   = typename traits_type::real_type;
 
     if ( !data.active() )
@@ -167,7 +167,7 @@ void projected_vector_field_differential_1d(
 
     project_slice_tangent_1d( data, state_on_slice, vector_field_derivative_on_slice, work_projected_derivative, size );
 
-    using traits_type = common::scfd_backend_ext::complex_value_traits<Complex>;
+    using traits_type = nmfd::operations::backend::complex_value_traits<Complex>;
     using real_type   = typename traits_type::real_type;
 
     if ( !data.active() )

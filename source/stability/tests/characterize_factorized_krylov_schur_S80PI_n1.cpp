@@ -14,7 +14,7 @@
 #include <scfd/backend/omp.h>
 #include <scfd/utils/log.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/detail/vector_wrap.h>
 #include <nmfd/operations/io/matrix_market.h>
 #include <nmfd/operations/linalg/host_small_dense_lapack.h>
@@ -95,11 +95,11 @@ int main( int argc, char **argv )
     try
     {
         using backend_type                 = scfd::backend::omp<std::ptrdiff_t>;
-        using component_space_type         = scfd_vector_operations<backend_type, double>;
+        using component_space_type         = nmfd::operations::scfd_vector_space<backend_type, double>;
         using product_space_type           = nmfd::operations::two_block_vector_space<component_space_type>;
         using product_vector_type          = typename product_space_type::vector_type;
-        using complex_scalar_type          = common::scfd_backend_ext::complex_t<backend_type, double>;
-        using complex_space_type           = scfd_vector_operations<backend_type, complex_scalar_type>;
+        using complex_scalar_type          = nmfd::operations::backend::complex_t<backend_type, double>;
+        using complex_space_type           = nmfd::operations::scfd_vector_space<backend_type, complex_scalar_type>;
         using matrix_operator_type         = stability::tests::host_csr_operator<component_space_type>;
         using complex_matrix_operator_type = stability::tests::host_csr_operator<complex_space_type>;
         using complex_identity_type = stability::eigensolvers::transformations::identity_operator<complex_space_type>;

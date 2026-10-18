@@ -13,7 +13,7 @@ using backend_type = scfd::backend::omp<std::ptrdiff_t>;
 #    include <scfd/backend/serial_cpu.h>
 using backend_type = scfd::backend::serial_cpu<std::ptrdiff_t>;
 #endif
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/detail/vector_wrap.h>
 
 void require( bool condition, const char *message )
@@ -50,7 +50,7 @@ struct product_mapping
 template <class T>
 void check_sum()
 {
-    using operations_type = scfd_vector_operations<backend_type, T>;
+    using operations_type = nmfd::operations::scfd_vector_space<backend_type, T>;
     operations_type                            operations( 3 );
     nmfd::detail::vector_wrap<operations_type> x( operations ), y( operations ), z( operations );
     x.start_use();

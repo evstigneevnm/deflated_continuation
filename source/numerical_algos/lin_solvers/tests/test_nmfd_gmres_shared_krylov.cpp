@@ -10,7 +10,7 @@
 #include <scfd/backend/serial_cpu.h>
 #include <scfd/utils/log.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/solvers/gmres.h>
 #include <nmfd/solvers/monitor_krylov.h>
 
@@ -39,7 +39,7 @@ void run_solve_case(
 )
 {
     using scalar_type       = double;
-    using vector_space_type = scfd_vector_operations<Backend, scalar_type>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, scalar_type>;
     using vector_type       = typename vector_space_type::vector_type;
     using log_type          = scfd::utils::log_std;
     using operator_type     = stability::tests::analytical_dense_operator<vector_space_type, scalar_type>;
@@ -104,7 +104,7 @@ template <class Backend>
 void run_complex_solve_case( const std::string &label )
 {
     using scalar_type       = std::complex<double>;
-    using vector_space_type = scfd_vector_operations<Backend, scalar_type>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, scalar_type>;
     using vector_type       = typename vector_space_type::vector_type;
     using log_type          = scfd::utils::log_std;
     using operator_type     = stability::tests::analytical_dense_operator<vector_space_type, double>;
@@ -160,13 +160,14 @@ void run_complex_solve_case( const std::string &label )
 
 void run_failure_case()
 {
-    using scalar_type       = double;
-    using vector_space_type = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, scalar_type>;
-    using vector_type       = typename vector_space_type::vector_type;
-    using log_type          = scfd::utils::log_std;
-    using operator_type     = stability::tests::analytical_dense_operator<vector_space_type, scalar_type>;
-    using monitor_type      = nmfd::solvers::monitor_krylov<vector_space_type, log_type>;
-    using solver_type       = nmfd::solvers::gmres<vector_space_type, monitor_type, log_type, operator_type>;
+    using scalar_type = double;
+    using vector_space_type =
+        nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, scalar_type>;
+    using vector_type   = typename vector_space_type::vector_type;
+    using log_type      = scfd::utils::log_std;
+    using operator_type = stability::tests::analytical_dense_operator<vector_space_type, scalar_type>;
+    using monitor_type  = nmfd::solvers::monitor_krylov<vector_space_type, log_type>;
+    using solver_type   = nmfd::solvers::gmres<vector_space_type, monitor_type, log_type, operator_type>;
 
     const auto    problem      = stability::tests::diagonal_eigenproblem<scalar_type>();
     auto          vector_space = std::make_shared<vector_space_type>( problem.dimension() );

@@ -2,7 +2,7 @@
 #define __STABILITY_IRAM_IRAM_CONTAINER_H__
 
 #include <vector>
-#include <common/gpu_matrix_file_operations.h>
+#include <common/legacy/gpu_matrix_file_operations.h>
 #include <utils/cuda_support.h>
 
 

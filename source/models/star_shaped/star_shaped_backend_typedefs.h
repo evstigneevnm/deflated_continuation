@@ -8,13 +8,13 @@
 #if defined( STAR_SHAPED_VECTOR_BACKEND_VAR_PREC )
 #    include <common/cpu_vector_operations_var_prec.h>
 #elif defined( STAR_SHAPED_VECTOR_BACKEND_OMP )
-#    include <common/scfd_vector_operations.h>
+#    include <nmfd/operations/scfd_vector_space.h>
 #    include <scfd/backend/omp.h>
 #elif defined( STAR_SHAPED_VECTOR_BACKEND_HIP )
-#    include <common/scfd_vector_operations.h>
+#    include <nmfd/operations/scfd_vector_space.h>
 #    include <scfd/backend/hip.h>
 #else
-#    include <common/scfd_vector_operations.h>
+#    include <nmfd/operations/scfd_vector_space.h>
 #    include <scfd/backend/cuda.h>
 #endif
 
@@ -29,16 +29,16 @@ typedef cpu_vector_operations_var_prec<STAR_SHAPED_VAR_PREC_BITS> vec_ops_real;
 typedef typename vec_ops_real::scalar_type                        real;
 #elif defined( STAR_SHAPED_VECTOR_BACKEND_OMP )
 #    define STAR_SHAPED_BACKEND_NAME "scfd_omp"
-typedef SCALAR_TYPE                                      real;
-typedef scfd_vector_operations<scfd::backend::omp<std::ptrdiff_t>, real> vec_ops_real;
+typedef SCALAR_TYPE                                                                   real;
+typedef nmfd::operations::scfd_vector_space<scfd::backend::omp<std::ptrdiff_t>, real> vec_ops_real;
 #elif defined( STAR_SHAPED_VECTOR_BACKEND_HIP )
 #    define STAR_SHAPED_BACKEND_NAME "scfd_hip"
-typedef SCALAR_TYPE                                      real;
-typedef scfd_vector_operations<scfd::backend::hip<std::ptrdiff_t>, real> vec_ops_real;
+typedef SCALAR_TYPE                                                                   real;
+typedef nmfd::operations::scfd_vector_space<scfd::backend::hip<std::ptrdiff_t>, real> vec_ops_real;
 #else
 #    define STAR_SHAPED_BACKEND_NAME "scfd_cuda"
-typedef SCALAR_TYPE                                       real;
-typedef scfd_vector_operations<scfd::backend::cuda<std::ptrdiff_t>, real> vec_ops_real;
+typedef SCALAR_TYPE                                                                    real;
+typedef nmfd::operations::scfd_vector_space<scfd::backend::cuda<std::ptrdiff_t>, real> vec_ops_real;
 #endif
 
 typedef scfd::utils::log_std log_t;

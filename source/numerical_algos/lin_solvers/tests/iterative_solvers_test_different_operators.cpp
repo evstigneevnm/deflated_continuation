@@ -1,7 +1,8 @@
 #include <memory>
 #include <cmath>
 #include <scfd/utils/log.h>
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 #include "linear_operator_advection.h"
 #include "linear_operator_diffusion.h"
 #include "linear_operator_elliptic.h"
@@ -20,7 +21,7 @@ int main( int argc, char const *args[] )
 {
     using log_t             = scfd::utils::log_std;
     using T                 = SCALAR_TYPE;
-    using vec_ops_t         = scfd_serial_cpu_vector_operations<T>;
+    using vec_ops_t         = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, T>;
     using T_vec             = typename vec_ops_t::vector_type;
     using lin_op_adv_t      = tests::linear_operator_advection<vec_ops_t, log_t>;
     using lin_op_diff_t     = tests::linear_operator_diffusion<vec_ops_t, log_t>;

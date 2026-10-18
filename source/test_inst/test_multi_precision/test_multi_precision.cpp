@@ -2,8 +2,8 @@
 #include <iostream>
 #include <common/cpu_vector_operations_var_prec.h>
 #include <common/file_operations.h>
-#include <common/cpu_matrix_vector_operations_var_prec.h>
-#include <common/cpu_matrix_file_operations.h>
+#include <common/legacy/cpu_matrix_vector_operations_var_prec.h>
+#include <common/legacy/cpu_matrix_file_operations.h>
 #include <contrib/scfd/include/scfd/utils/device_tag.h>
 #include <contrib/scfd/include/scfd/utils/system_timer_event.h>
 

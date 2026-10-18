@@ -7,7 +7,7 @@
 #include <external_libraries/cublas_wrap.h>
 #include <utils/cuda_support.h>
 #include <nonlinear_operators/abc_flow/abc_flow.h>
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 #include <common/gpu_file_operations.h>
 
 #define Blocks_x_ 32

@@ -9,7 +9,7 @@
 #include <nonlinear_operators/Taylor_Green/Taylor_Green.h>
 #include <common/macros.h>
 #include <common/gpu_file_operations.h>
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 #include <scfd/utils/cuda_ownutils.h>
 
 #define Blocks_x_ 32

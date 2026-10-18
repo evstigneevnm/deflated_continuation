@@ -6,7 +6,7 @@
 #include <initializer_list>
 #include <stdexcept>
 
-#include <common/scfd_backend_ext/complex.h>
+#include <nmfd/operations/backend/complex.h>
 #include <scfd/utils/device_tag.h>
 
 namespace symmetry
@@ -21,7 +21,7 @@ class vector_valued_phase_functional
 
 public:
     using complex_type = Complex;
-    using traits_type  = common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using traits_type  = nmfd::operations::backend::complex_value_traits<complex_type>;
     using real_type    = typename traits_type::real_type;
 
     vector_valued_phase_functional() = default;
@@ -89,17 +89,17 @@ private:
 };
 
 template <class Complex>
-__DEVICE_TAG__ typename common::scfd_backend_ext::complex_value_traits<Complex>::real_type
+__DEVICE_TAG__ typename nmfd::operations::backend::complex_value_traits<Complex>::real_type
 scalar_phase_value( const Complex &coefficient )
 {
-    return common::scfd_backend_ext::complex_value_traits<Complex>::imag( coefficient );
+    return nmfd::operations::backend::complex_value_traits<Complex>::imag( coefficient );
 }
 
 template <class Complex>
-__DEVICE_TAG__ typename common::scfd_backend_ext::complex_value_traits<Complex>::real_type
+__DEVICE_TAG__ typename nmfd::operations::backend::complex_value_traits<Complex>::real_type
 scalar_phase_real_part( const Complex &coefficient )
 {
-    return common::scfd_backend_ext::complex_value_traits<Complex>::real( coefficient );
+    return nmfd::operations::backend::complex_value_traits<Complex>::real( coefficient );
 }
 
 } // namespace fourier

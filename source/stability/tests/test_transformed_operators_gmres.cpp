@@ -12,7 +12,7 @@
 #include <scfd/backend/serial_cpu.h>
 #include <scfd/utils/log.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/operations/product_vector_space.h>
 #include <nmfd/solvers/gmres.h>
 #include <nmfd/solvers/monitor_krylov.h>
@@ -66,7 +66,7 @@ typename Solver::params gmres_parameters( unsigned basis_size, unsigned maximum_
 template <class Backend>
 void run_unrotated_case( const std::string &label )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type       = typename vector_space_type::vector_type;
     using operator_type     = stability::tests::analytical_dense_operator<vector_space_type, double>;
     using polynomial_type =
@@ -132,7 +132,7 @@ void run_unrotated_case( const std::string &label )
 template <class Backend>
 void run_rotated_case( const std::string &label )
 {
-    using component_space_type = scfd_vector_operations<Backend, double>;
+    using component_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using product_space_type   = nmfd::operations::two_block_vector_space<component_space_type>;
     using product_vector_type  = typename product_space_type::vector_type;
     using operator_type        = stability::tests::analytical_dense_operator<component_space_type, double>;
@@ -204,7 +204,7 @@ void run_rotated_case( const std::string &label )
 
 void run_failure_case()
 {
-    using vector_space_type = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
     using vector_type       = typename vector_space_type::vector_type;
     using operator_type     = stability::tests::analytical_dense_operator<vector_space_type, double>;
     using identity_type     = stability::eigensolvers::transformations::identity_operator<vector_space_type>;

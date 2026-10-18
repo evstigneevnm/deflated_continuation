@@ -13,7 +13,7 @@
 #include <type_traits>
 #include <vector>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/operations/product_vector_space.h>
 #include <stability/eigensolvers/transformations/complex_affine_block_operator.h>
 #include <stability/eigensolvers/transformations/complex_shift_block_operator.h>
@@ -208,7 +208,7 @@ get_complex_vector( const ProductSpace &vector_space, const typename ProductSpac
 template <class Backend, class Real>
 void test_affine_operator( const std::string &label )
 {
-    using component_space_type = scfd_vector_operations<Backend, Real>;
+    using component_space_type = nmfd::operations::scfd_vector_space<Backend, Real>;
     using product_space_type   = nmfd::operations::two_block_vector_space<component_space_type>;
     using real_operator_type   = stability::tests::analytical_dense_operator<component_space_type, Real>;
     using affine_operator_type =

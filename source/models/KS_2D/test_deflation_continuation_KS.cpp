@@ -35,7 +35,7 @@
 #include <continuation/convergence_strategy.h>
 
 #include <common/gpu_file_operations.h>
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 #include <models/KS_2D/test_deflation_continuation_typedefs_KS.h>
 
 int main( int argc, char const *argv[] )

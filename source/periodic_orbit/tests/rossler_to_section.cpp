@@ -14,9 +14,10 @@
 
 // #include <common/macros.h>
 // #include <common/gpu_file_operations.h>
-// #include <common/gpu_vector_operations.h>
+// #include <common/legacy/gpu_vector_operations.h>
 #include <common/file_operations.h>
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 
 #include <time_stepper/legacy/time_step_adaptation_constant.h>
 #include <time_stepper/legacy/time_step_adaptation_error_control.h>
@@ -32,7 +33,7 @@ int main( int argc, char const *argv[] )
     using real  = SCALAR_TYPE;
     using log_t = scfd::utils::log_std;
 
-    using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
+    using vec_ops_t = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real>;
     using vec_t     = typename vec_ops_t::vector_type;
 
     using nlin_op_t              = nonlinear_operators::rossler<vec_ops_t>;

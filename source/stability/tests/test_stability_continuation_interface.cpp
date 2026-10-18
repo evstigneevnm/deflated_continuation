@@ -15,7 +15,7 @@
 #include <scfd/utils/log.h>
 
 #include <common/gpu_file_operations.h>
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <containers/bifurcation_diagram/diagram_archive.h>
 #include <containers/bifurcation_diagram.h>
 #include <containers/bifurcation_diagram_curve.h>
@@ -137,8 +137,9 @@ bool contains_temporary_file( const std::filesystem::path &directory )
 
 int main()
 {
-    using real_type               = double;
-    using vector_operations_type  = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, real_type>;
+    using real_type = double;
+    using vector_operations_type =
+        nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real_type>;
     using file_operations_type    = gpu_file_operations<vector_operations_type>;
     using log_type                = scfd::utils::log_std;
     using monitor_type            = numerical_algos::lin_solvers::default_monitor<vector_operations_type, log_type>;

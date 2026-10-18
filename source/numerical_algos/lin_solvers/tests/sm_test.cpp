@@ -7,8 +7,9 @@
 #include <numerical_algos/lin_solvers/bicgstabl.h>
 //#include <numerical_algos/lin_solvers/bicgstab.h>
 #include <common/file_operations.h>
-#include <common/scfd_serial_cpu_vector_operations.h>
-#include <common/cpu_matrix_vector_operations_var_prec.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
+#include <common/legacy/cpu_matrix_vector_operations_var_prec.h>
 #include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 #include "test_matrix_liner_operator.h"
 
@@ -16,7 +17,7 @@ using namespace numerical_algos::lin_solvers;
 using namespace numerical_algos::sherman_morrison_linear_system;
 
 using real              = SCALAR_TYPE;
-using vec_ops_t         = scfd_serial_cpu_vector_operations<real>;
+using vec_ops_t         = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real>;
 using vector_t          = typename vec_ops_t::vector_type;
 using mat_ops_t         = cpu_matrix_vector_operations_var_prec<vec_ops_t>;
 using matrix_t          = typename mat_ops_t::matrix_type;

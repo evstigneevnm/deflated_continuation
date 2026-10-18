@@ -5,7 +5,7 @@
 #include <scfd/backend/cuda.h>
 
 #include <common/cuda_init_scfd.h>
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 
 #include "common/tracked_invariant_subspace_test_suite.h"
 
@@ -33,7 +33,7 @@ int main( int argc, char **argv )
     const int         device          = common::init_cuda_from_scfd_selector( device_selector );
     std::cout << "CUDA device: " << device << '\n';
 
-    using vector_space_type = scfd_vector_operations<scfd::backend::cuda<std::ptrdiff_t>, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<scfd::backend::cuda<std::ptrdiff_t>, double>;
     vector_space_type vector_space( 3 );
     stability_tests::run_tracked_invariant_subspace_test_suite( vector_space, "CUDA", require );
     std::cout << "Tracked invariant-subspace checks: " << checks << ", failures: " << failures << '\n';

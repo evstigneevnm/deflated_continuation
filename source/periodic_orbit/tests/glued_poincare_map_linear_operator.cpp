@@ -1,6 +1,7 @@
 #include <scfd/utils/log_std.h>
 #include <limits>
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 #include "../glued_poincare_map_linear_operator.h"
 #include "rossler_operator.h"
 #include <time_stepper/legacy/explicit_time_step.h>
@@ -16,7 +17,7 @@ int main( int argc, char const *argv[] )
     using log_t        = scfd::utils::log_std;
     using real         = SCALAR_TYPE;
     using T            = real;
-    using vec_ops_t    = scfd_serial_cpu_vector_operations<real>;
+    using vec_ops_t    = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real>;
     using vec_t        = typename vec_ops_t::vector_type;
     using nlin_op_t    = nonlinear_operators::rossler<vec_ops_t>;
     using hyperplane_t = periodic_orbit::hyperplane<vec_ops_t, nlin_op_t>;

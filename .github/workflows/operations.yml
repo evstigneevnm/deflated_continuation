@@ -14,6 +14,16 @@ defaults:
     shell: bash
 
 jobs:
+  operations-dependency-boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify canonical operations dependencies
+        run: |
+          python3 -m unittest discover -s scripts/tests -p test_operations_dependencies.py
+          python3 scripts/check_operations_dependencies.py
+
   nmfd-newton-operations-cpu:
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -7,7 +7,7 @@
 #    include <nlohmann/json.hpp>
 #endif
 #include <common/detail/vector_wrap.h>
-#include <glued_matrix_operator.h>
+#include <nmfd/operations/glued_matrix_operator.h>
 #include "dummy.h"
 #include "schur_bfbt.hpp"
 
@@ -26,7 +26,7 @@ class schur_runtime : public scfd::utils::logged_obj_base<Log>
 public:
     using operations_type   = Operations;
     using scalar_type       = typename Operations::scalar_type;
-    using operator_type     = scfd::linspace::glued_matrix_operator<Operations, 2>;
+    using operator_type     = nmfd::operations::glued_matrix_operator<Operations, 2>;
     using vector_type       = typename operator_type::vector_type;
     using vector_space_type = typename operator_type::vector_space_type;
 

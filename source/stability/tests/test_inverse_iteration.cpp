@@ -7,7 +7,7 @@
 #include <scfd/backend/omp.h>
 #include <scfd/backend/serial_cpu.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <stability/eigensolvers/inverse_iteration.h>
 
 #include "common/analytical_dense_operator.h"
@@ -36,7 +36,7 @@ void run_case(
     double expected
 )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type       = typename vector_space_type::vector_type;
 
     vector_space_type                                                      vector_space( problem.dimension() );
@@ -89,7 +89,7 @@ void run_case(
 
 void run_failure_cases()
 {
-    using vector_space_type = scfd_vector_operations<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, double>;
     using vector_type       = typename vector_space_type::vector_type;
 
     const auto        problem = stability::tests::diagonal_eigenproblem<double>();

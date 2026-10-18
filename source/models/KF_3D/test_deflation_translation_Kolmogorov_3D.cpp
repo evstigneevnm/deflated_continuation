@@ -28,7 +28,7 @@
 #include <numerical_algos/newton_solvers/newton_solver.h>
 #include <numerical_algos/newton_solvers/newton_solver_extended.h>
 
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 #include <common/gpu_file_operations.h>
 #include <models/KF_3D/test_deflation_translation_typedefs_Kolmogorov_3D.h>
 

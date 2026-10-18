@@ -1,10 +1,11 @@
 #include <iostream>
 #include "solutions_container.h"
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 
-typedef SFLOATTYPE                              real;
-typedef scfd_serial_cpu_vector_operations<real> vector_operations;
-typedef typename vector_operations::vector_type vector_t;
+typedef SFLOATTYPE                                                                           real;
+typedef nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real> vector_operations;
+typedef typename vector_operations::vector_type                                              vector_t;
 
 void init_vec( size_t N, vector_t &array, real init )
 {

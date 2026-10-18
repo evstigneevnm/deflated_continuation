@@ -5,8 +5,8 @@
 #include <cstddef>
 #include <stdexcept>
 
-#include <common/scfd_backend_ext/complex.h>
-#include <common/scfd_backend_ext/math.h>
+#include <nmfd/operations/backend/complex.h>
+#include <nmfd/operations/backend/math.h>
 #include <scfd/utils/device_tag.h>
 
 namespace symmetry
@@ -44,8 +44,8 @@ void apply_translation(
 {
     static_assert( WavevectorTable::dimension == Dimension, "translation and wavevector dimensions differ" );
     using complex_type  = typename SpectralField::value_type;
-    using traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
-    using math_type     = ::common::scfd_backend_ext::math<Backend, Real>;
+    using traits        = ::nmfd::operations::backend::complex_value_traits<complex_type>;
+    using math_type     = ::nmfd::operations::backend::math<Backend, Real>;
     using for_each_type = typename Backend::for_each_type;
     if ( source.size() != destination.size() || source.size() != wavevectors.index_space().complex_size() )
     {
@@ -82,7 +82,7 @@ void translation_generator(
 )
 {
     using complex_type  = typename SpectralField::value_type;
-    using traits        = ::common::scfd_backend_ext::complex_value_traits<complex_type>;
+    using traits        = ::nmfd::operations::backend::complex_value_traits<complex_type>;
     using real_type     = typename traits::real_type;
     using for_each_type = typename Backend::for_each_type;
     if ( dimension >= WavevectorTable::dimension || source.size() != destination.size() ||

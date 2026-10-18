@@ -8,7 +8,7 @@
 #include <scfd/backend/omp.h>
 #include <scfd/backend/serial_cpu.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <nmfd/operations/linalg/host_small_dense_backend.h>
 #include <nmfd/solvers/krylov/arnoldi.h>
 #include <nmfd/solvers/krylov/basis_storage.h>
@@ -39,7 +39,7 @@ void run_arnoldi_case(
 )
 {
     using scalar_type        = double;
-    using vector_space_type  = scfd_vector_operations<Backend, scalar_type>;
+    using vector_space_type  = nmfd::operations::scfd_vector_space<Backend, scalar_type>;
     using vector_type        = typename vector_space_type::vector_type;
     using dense_backend_type = nmfd::operations::linalg::host_small_dense_backend<std::ptrdiff_t, scalar_type>;
 
@@ -143,7 +143,7 @@ template <class Backend>
 void run_operator_failure_case( const std::string &label )
 {
     using scalar_type       = double;
-    using vector_space_type = scfd_vector_operations<Backend, scalar_type>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, scalar_type>;
     using vector_type       = typename vector_space_type::vector_type;
     using matrix_type       = nmfd::operations::linalg::host_dense_matrix<scalar_type>;
 

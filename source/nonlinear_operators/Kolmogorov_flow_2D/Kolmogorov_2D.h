@@ -45,8 +45,8 @@
 #include <nonlinear_operators/Kolmogorov_flow_2D/Kolmogorov_2D_ker.h>
 #include <nonlinear_operators/Kolmogorov_flow_2D/plot_solution.h>
 
-#include <common/vector_wrap.h>
-#include <common/vector_pool.h>
+#include <common/legacy/vector_wrap.h>
+#include <common/legacy/vector_pool.h>
 
 
 namespace nonlinear_operators

@@ -2,8 +2,8 @@
 #include <string>
 #include <sstream>
 #include <external_libraries/cublas_wrap.h>
-#include <common/gpu_vector_operations.h>
-#include <common/gpu_matrix_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
+#include <common/legacy/gpu_matrix_vector_operations.h>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown_params.h>
 #include <nonlinear_operators/overscreening_breakdown/overscreening_breakdown.h>
 

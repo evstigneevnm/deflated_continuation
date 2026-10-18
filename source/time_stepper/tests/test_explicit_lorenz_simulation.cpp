@@ -23,7 +23,7 @@ constexpr const char *backend_name = "omp";
 using backend_type                 = scfd::backend::serial_cpu<std::ptrdiff_t>;
 constexpr const char *backend_name = "serial_cpu";
 #endif
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <contrib/json/nlohmann/json.hpp>
 #include <time_stepper/integration/time_integrator.h>
 #include <time_stepper/integration/time_step_adaptation_constant.h>
@@ -31,7 +31,7 @@ constexpr const char *backend_name = "serial_cpu";
 #include <time_stepper/integration/time_step_adaptation_scipy.h>
 #include <time_stepper/runge_kutta/explicit_time_step.h>
 
-using operations_type = scfd_vector_operations<backend_type, double>;
+using operations_type = nmfd::operations::scfd_vector_space<backend_type, double>;
 
 namespace nmfd
 {

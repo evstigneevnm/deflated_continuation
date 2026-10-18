@@ -4,7 +4,8 @@
 #include <string>
 #include <vector>
 
-#include <common/scfd_serial_cpu_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
+#include <scfd/backend/serial_cpu.h>
 #include <continuation/chart_helpers.h>
 #include <symmetry/fourier/real_packed_fourier_slice_1d_adapter.h>
 
@@ -12,7 +13,7 @@ namespace
 {
 
 using real      = double;
-using vec_ops_t = scfd_serial_cpu_vector_operations<real>;
+using vec_ops_t = nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real>;
 using adapter_t = symmetry::fourier::real_packed_fourier_slice_1d_adapter<vec_ops_t>;
 using vector_t  = typename vec_ops_t::vector_type;
 using policy_t  = symmetry::continuation::isotropy_transition_policy<real>;

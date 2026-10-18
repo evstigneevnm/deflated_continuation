@@ -48,8 +48,8 @@
 #include <nonlinear_operators/Kolmogorov_flow_3D/Kolmogorov_3D_ker.h>
 #include <nonlinear_operators/Kolmogorov_flow_3D/plot_solution.h>
 
-#include <common/vector_wrap.h>
-#include <common/vector_pool.h>
+#include <common/legacy/vector_wrap.h>
+#include <common/legacy/vector_pool.h>
 
 #include <tuple>
 #include <limits>

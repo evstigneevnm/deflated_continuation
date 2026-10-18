@@ -10,7 +10,7 @@
 #include <scfd/backend/omp.h>
 #include <scfd/backend/serial_cpu.h>
 
-#include <common/scfd_vector_operations.h>
+#include <nmfd/operations/scfd_vector_space.h>
 #include <stability/eigensolvers/transformations/stability_polynomial_operator.h>
 
 namespace
@@ -65,7 +65,7 @@ private:
 template <class Backend>
 void run_backend( const std::string &label )
 {
-    using vector_space_type = scfd_vector_operations<Backend, double>;
+    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
     using vector_type       = typename vector_space_type::vector_type;
     using operator_type     = diagonal_operator<vector_space_type>;
     using polynomial_type =

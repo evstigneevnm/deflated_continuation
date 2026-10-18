@@ -12,8 +12,8 @@
 #include <nonlinear_operators/abc_flow/abc_flow_ker.h>
 #include <nonlinear_operators/abc_flow/plot_solution.h>
 
-#include <common/vector_wrap.h>
-#include <common/vector_pool.h>
+#include <common/legacy/vector_wrap.h>
+#include <common/legacy/vector_pool.h>
 
 #include <tuple>
 #include <limits>

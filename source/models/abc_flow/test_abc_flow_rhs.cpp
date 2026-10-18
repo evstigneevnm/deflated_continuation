@@ -9,7 +9,7 @@
 #include <nonlinear_operators/abc_flow/abc_flow.h>
 #include <common/macros.h>
 #include <common/gpu_file_operations.h>
-#include <common/gpu_vector_operations.h>
+#include <common/legacy/gpu_vector_operations.h>
 #include <string>
 #include <type_traits>
 #include <scfd/utils/cuda_ownutils.h>
