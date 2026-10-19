@@ -138,7 +138,8 @@ BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/models
 STAR_SHAPED_MODEL_HEADERS = source/models/star_shaped/star_shaped_backend_typedefs.h source/nonlinear_operators/star_shaped/star_shaped.h source/nonlinear_operators/star_shaped/convergence_strategy.h source/nonlinear_operators/star_shaped/linear_operator_star_shaped.h source/nonlinear_operators/star_shaped/preconditioner_star_shaped.h source/nonlinear_operators/star_shaped/system_operator.h
 KS1D_MODEL_HEADERS = source/models/KS_1D/KS1D_backend_typedefs.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/linear_operator_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/preconditioner_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/system_operator.h
 KS1D_FULL_MODEL_HEADERS = $(KS1D_MODEL_HEADERS) source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h $(SYMMETRY_LINEARIZATION_HEADERS) source/nonlinear_operators/projected_system_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/projected_system_operator_continuation.h $(CONTINUATION_CHART_HEADERS) $(DEFLATION_SYMMETRY_HEADERS)
-STABILITY_CONTINUATION_HEADERS = source/main/stability_continuation.hpp source/containers/stability_diagram.h $(STABILITY_ANALYSIS_HEADERS) $(EIGENSOLVER_HEADERS) $(EIGENSOLVER_TRANSFORMATION_HEADERS) $(PRODUCT_VECTOR_SPACE_HEADERS) $(NMFD_GMRES_HEADERS) $(HOST_SMALL_DENSE_HEADERS)
+WORKFLOW_OWNERSHIP_HEADERS = source/main/deflation_continuation.hpp source/main/deflation_continuation/solver_bundle.h source/main/stability_continuation.hpp source/main/stability_continuation/solver_bundle.h
+STABILITY_CONTINUATION_HEADERS = source/main/stability_continuation.hpp source/main/stability_continuation/solver_bundle.h source/containers/stability_diagram.h $(STABILITY_ANALYSIS_HEADERS) $(EIGENSOLVER_HEADERS) $(EIGENSOLVER_TRANSFORMATION_HEADERS) $(PRODUCT_VECTOR_SPACE_HEADERS) $(NMFD_GMRES_HEADERS) $(HOST_SMALL_DENSE_HEADERS)
 KS1D_STABILITY_HEADERS = source/models/KS_1D/KS1D_stability_cli.h $(STABILITY_CONTINUATION_HEADERS)
 KS1D_STABILITY_REPLAY_SCRIPT = scripts/test_ks1d_full_stability_replay.py
 KS1D_STABILITY_REPLAY_MANIFEST = source/models/KS_1D/tests/data/stability_replay/manifest.json
@@ -315,7 +316,7 @@ test_tracked_invariant_subspace_cuda.bin: source/stability/tests/test_tracked_in
 test_matrix_free_stability_configuration.bin: source/stability/tests/test_matrix_free_stability_configuration.cpp source/stability/analysis/matrix_free_stability_config.h source/stability/analysis/matrix_free_stability_configuration.h $(EIGENSOLVER_TRANSFORMATION_HEADERS) $(NMFD_KRYLOV_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) source/stability/tests/test_matrix_free_stability_configuration.cpp -o $(BUILD_DIR)/test_matrix_free_stability_configuration.bin 2>$(RESULTS)
 
-test_stability_continuation_interface_cpu.bin: source/stability/tests/test_stability_continuation_interface.cpp source/main/stability_continuation.hpp source/main/parameters.hpp $(STABILITY_ANALYSIS_HEADERS) $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
+test_stability_continuation_interface_cpu.bin: source/stability/tests/test_stability_continuation_interface.cpp $(WORKFLOW_OWNERSHIP_HEADERS) source/main/parameters.hpp $(STABILITY_ANALYSIS_HEADERS) $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) source/stability/tests/test_stability_continuation_interface.cpp $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/test_stability_continuation_interface_cpu.bin 2>$(RESULTS)
 
 test_shared_arnoldi_cpu_omp.bin: source/stability/tests/test_shared_arnoldi.cpp $(ANALYTICAL_EIGENPROBLEM_HEADERS) $(NMFD_KRYLOV_HEADERS) $(HOST_SMALL_DENSE_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
@@ -441,8 +442,18 @@ test_symmetry_event_persistence.bin: source/containers/tests/test_symmetry_event
 test_parameters_json.bin: source/main/tests/test_parameters_json.cpp source/main/parameters.hpp
 	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_parameters_json.cpp -o $(BUILD_DIR)/test_parameters_json.bin 2>$(RESULTS)
 
-test_solver_bundle.bin: source/main/tests/test_solver_bundle.cpp source/main/deflation_continuation/solver_bundle.h
+test_solver_bundle.bin: source/main/tests/test_solver_bundle.cpp source/main/deflation_continuation/solver_bundle.h source/main/stability_continuation/solver_bundle.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_solver_bundle.cpp -o $(BUILD_DIR)/test_solver_bundle.bin 2>$(RESULTS)
+
+test_workflow_ownership_cpu.bin: source/main/tests/test_workflow_ownership.cpp $(WORKFLOW_OWNERSHIP_HEADERS) $(CIRCLE_MODEL_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) $< $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/$@
+
+test_workflow_ownership_cpu_omp.bin: source/main/tests/test_workflow_ownership.cpp $(WORKFLOW_OWNERSHIP_HEADERS) $(CIRCLE_MODEL_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) -DTEST_WORKFLOW_OMP $< $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/$@
+
+test_workflow_ownership_cuda.bin: source/main/tests/test_workflow_ownership.cpp $(WORKFLOW_OWNERSHIP_HEADERS) $(CIRCLE_MODEL_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(ICUDA) $(IPROJECT) $(IBOOST) -DTEST_WORKFLOW_CUDA -x cu -c $< -o $(BUILD_DIR)/test_workflow_ownership_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_workflow_ownership_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LBOOST) $(LIBBOOST) $(LIBS1) -o $(BUILD_DIR)/$@
 
 test_parameter_application.bin: source/main/tests/test_parameter_application.cpp source/main/deflation_continuation/parameter_application.h source/main/parameters.hpp
 	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_parameter_application.cpp -o $(BUILD_DIR)/test_parameter_application.bin 2>$(RESULTS)

@@ -17,6 +17,7 @@
 #include <vector>
 #include <limits>
 #include <memory>
+#include <stdexcept>
 #include <filesystem>
 #include <sstream>
 #include <type_traits>
@@ -381,13 +382,32 @@ private:
 
 public:
     deflation_continuation(
+        std::shared_ptr<VectorOperations> vector_operations, std::shared_ptr<VectorFileOperations> file_operations,
+        Log *log, Log *linear_solver_log, std::shared_ptr<NonlinearOperations> nonlinear_operations,
+        std::shared_ptr<Parameters> configuration, std::shared_ptr<sol_storage_def_t> solution_storage = nullptr
+    )
+        : deflation_continuation(
+              vector_operations.get(), file_operations.get(), log, linear_solver_log, nonlinear_operations.get(),
+              configuration.get(), solution_storage.get()
+          )
+    {
+        vector_operations_owner    = std::move( vector_operations );
+        file_operations_owner      = std::move( file_operations );
+        nonlinear_operations_owner = std::move( nonlinear_operations );
+        parameters_owner           = std::move( configuration );
+        solution_storage_owner     = std::move( solution_storage );
+    }
+
+    // Borrowed construction remains for callers not migrated yet.
+    deflation_continuation(
         VectorOperations *vec_ops_, VectorFileOperations *file_ops_, Log *log_, Log *log_linsolver_,
         NonlinearOperations *nonlin_op_, Parameters *parameters_, sol_storage_def_t *sol_storage_external_ = nullptr
     )
         : vec_ops( vec_ops_ ), file_ops( file_ops_ ), log( log_ ), nonlin_op( nonlin_op_ ),
           log_linsolver( log_linsolver_ ), parameters( parameters_ )
     {
-
+        if ( !vec_ops || !file_ops || !nonlin_op || !parameters )
+            throw std::invalid_argument( "deflation_continuation: missing computational dependency" );
         //add '/' to the end of the project dir, if needed
 
         project_dir = parameters->path_to_project;
@@ -1385,6 +1405,11 @@ private:
     continuate_analytical_t                        *continuate_analytical;
     deflate_t                                      *deflate;
     sol_storage_def_t                              *sol_storage_def = nullptr;
+    std::shared_ptr<VectorOperations>               vector_operations_owner;
+    std::shared_ptr<VectorFileOperations>           file_operations_owner;
+    std::shared_ptr<NonlinearOperations>            nonlinear_operations_owner;
+    std::shared_ptr<Parameters>                     parameters_owner;
+    std::shared_ptr<sol_storage_def_t>              solution_storage_owner;
     std::unique_ptr<solver_bundle_t>                solver_bundle;
     std::unique_ptr<exact_solution_registry_t>      exact_solutions;
     std::unique_ptr<analytical_branch_executor_t>   analytical_branches;

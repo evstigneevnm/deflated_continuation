@@ -207,6 +207,76 @@ jobs:
             BUILD_DIR="$BUILD_DIR/newton_short_recurrence"
           timeout 60s "$BUILD_DIR/newton_short_recurrence/test_nmfd_newton_short_recurrence_cpu.bin"
 
+  solver-bundle-ownership-cpu:
+    name: Solver bundles / ownership and construction failure
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - run: |
+          make test_solver_bundle.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/bundle_ownership"
+          timeout 30s "$BUILD_DIR/bundle_ownership/test_solver_bundle.bin"
+
+  workflow-ownership-cpu:
+    name: Workflow ownership / ${{ matrix.backend }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [cpu, cpu_omp]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - run: sudo apt-get update && sudo apt-get install -y libboost-serialization-dev
+      - name: Verify shared workflows and workspace failure cleanup
+        run: |
+          make 'test_workflow_ownership_${{ matrix.backend }}.bin' CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/workflow_ownership"
+          OMP_NUM_THREADS=2 timeout 60s "$BUILD_DIR/workflow_ownership/test_workflow_ownership_${{ matrix.backend }}.bin"
+
+  workflow-ownership-sanitizers-cpu:
+    needs: [solver-bundle-ownership-cpu, workflow-ownership-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - run: sudo apt-get update && sudo apt-get install -y libboost-serialization-dev
+      - name: Verify dependency lifetime and cleanup with sanitizers
+        run: |
+          make test_solver_bundle.bin test_workflow_ownership_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/workflow_ownership_sanitizers" TARGET_GCC="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          timeout 60s "$BUILD_DIR/workflow_ownership_sanitizers/test_solver_bundle.bin"
+          timeout 60s "$BUILD_DIR/workflow_ownership_sanitizers/test_workflow_ownership_cpu.bin"
+
+  workflow-ownership-cuda:
+    needs: [workflow-ownership-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify workflow ownership on CUDA when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping CUDA workflow ownership: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA workflow ownership: nvcc unavailable"
+            exit 0
+          fi
+          sudo apt-get update && sudo apt-get install -y libboost-serialization-dev
+          make test_workflow_ownership_cuda.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/workflow_ownership_cuda"
+          timeout 120s "$BUILD_DIR/workflow_ownership_cuda/test_workflow_ownership_cuda.bin"
+
   nmfd-operations-standalone-cpu:
     runs-on: ubuntu-latest
     timeout-minutes: 10

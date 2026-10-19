@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -28,6 +29,8 @@
 #include <numerical_algos/newton_solvers/newton_solver.h>
 
 #include <containers/stability_diagram.h>
+#include <main/stability_continuation/solver_bundle.h>
+#include <nmfd/detail/vector_wrap.h>
 
 #include <stability/stability_analysis.hpp>
 #include <stability/analysis/source_parameter_path.h>
@@ -62,6 +65,27 @@ private:
         VectorOperations, NonlinearOperations, system_operator_t, convergence_newton_t>
         newton_t;
 
+    struct solver_bundle_types
+    {
+        using vector_operations_type    = VectorOperations;
+        using nonlinear_operations_type = NonlinearOperations;
+        using log_type                  = Log;
+        using linear_operator_type      = LinearOperator;
+        using preconditioner_type       = Preconditioner;
+        using linear_solver_type        = lin_slv_t;
+        using convergence_type          = convergence_newton_t;
+        using system_operator_type      = system_operator_t;
+        using newton_type               = newton_t;
+    };
+    using solver_bundle_t = stability_continuation_detail::solver_bundle<solver_bundle_types>;
+    using state_storage_t = nmfd::detail::vector_wrap<VectorOperations, false, false>;
+
+    static VectorOperations *checked_vector_operations( VectorOperations *operations )
+    {
+        if ( !operations )
+            throw std::invalid_argument( "stability_continuation: vector operations are null" );
+        return operations;
+    }
 
     using stability_t = stability::stability_analysis<
         VectorOperations, NonlinearOperations, Log, newton_t, EigensolverAdapter, StabilityLinearizationProvider>;
@@ -137,17 +161,38 @@ private:
 
 public:
     stability_continuation(
+        std::shared_ptr<VectorOperations> vector_operations, std::shared_ptr<VectorFileOperations> file_operations,
+        Log *log, Log *linear_solver_log, std::shared_ptr<NonlinearOperations> nonlinear_operations,
+        std::shared_ptr<Parameters> configuration, std::shared_ptr<EigensolverAdapter> eigensolver,
+        std::shared_ptr<StabilityLinearizationProvider> linearization_provider = nullptr
+    )
+        : stability_continuation(
+              vector_operations.get(), file_operations.get(), log, linear_solver_log, nonlinear_operations.get(),
+              configuration.get(), eigensolver.get(), linearization_provider.get()
+          )
+    {
+        vector_operations_owner      = std::move( vector_operations );
+        file_operations_owner        = std::move( file_operations );
+        nonlinear_operations_owner   = std::move( nonlinear_operations );
+        parameters_owner             = std::move( configuration );
+        eigensolver_owner            = std::move( eigensolver );
+        linearization_provider_owner = std::move( linearization_provider );
+    }
+
+    // Borrowed construction remains for callers not migrated yet.
+    stability_continuation(
         VectorOperations *vec_ops_, VectorFileOperations *file_ops_, Log *log_, Log *log_linsolver_,
         NonlinearOperations *nonlin_op_, Parameters *parameters_, EigensolverAdapter *eigensolver_adapter_,
         StabilityLinearizationProvider *stability_linearization_provider_ = nullptr
     )
-        : vec_ops( vec_ops_ ), file_ops( file_ops_ ), log( log_ ), nonlin_op( nonlin_op_ ),
+        : vec_ops( checked_vector_operations( vec_ops_ ) ), file_ops( file_ops_ ), log( log_ ), nonlin_op( nonlin_op_ ),
           log_linsolver( log_linsolver_ ), parameters( parameters_ ), eigensolver_adapter( eigensolver_adapter_ ),
-          stability_linearization_provider( stability_linearization_provider_ )
+          stability_linearization_provider( stability_linearization_provider_ ), x_p_storage( *vec_ops ),
+          x_transition_upper_storage( *vec_ops ), x_p( *x_p_storage ), x_transition_upper( *x_transition_upper_storage )
 
     {
-        if ( eigensolver_adapter == nullptr )
-            throw std::invalid_argument( "stability_continuation: eigensolver adapter is null" );
+        if ( !file_ops || !nonlin_op || !parameters || !eigensolver_adapter )
+            throw std::invalid_argument( "stability_continuation: missing computational dependency" );
 
         project_dir = parameters->path_to_project;
         skip_files  = parameters->deflation_continuation.skip_files;
@@ -167,7 +212,7 @@ public:
         uncertainty_options.file_name                 = std::move( uncertainty_file );
         uncertainty_options.maximum_diagnostic_length = configured_uncertainty.maximum_diagnostic_length;
         uncertainty_options.retain_resolved           = configured_uncertainty.retain_resolved;
-        uncertainty_registry                          = new uncertainty_registry_t( std::move( uncertainty_options ) );
+        uncertainty_registry = std::make_unique<uncertainty_registry_t>( std::move( uncertainty_options ) );
         if ( uncertainty_registry->unresolved_count() != 0 )
         {
             log->warning_f(
@@ -177,60 +222,31 @@ public:
             );
         }
 
-        lin_op = new LinearOperator( nonlin_op );
-        prec   = new Preconditioner( nonlin_op );
+        solver_bundle      = std::make_unique<solver_bundle_t>( vec_ops, log, log_linsolver, nonlin_op );
+        lin_op             = solver_bundle->linear_operator();
+        prec               = solver_bundle->preconditioner();
+        lin_slv            = solver_bundle->linear_solver();
+        convergence_newton = solver_bundle->convergence();
+        system_operator    = solver_bundle->system_operator();
+        newton             = solver_bundle->newton();
 
-        lin_slv = new lin_slv_t( vec_ops, log_linsolver );
-        lin_slv->set_preconditioner( prec );
+        stab = std::make_unique<stability_t>(
+            vec_ops, log, nonlin_op, newton, eigensolver_adapter, stability_linearization_provider
+        );
+        source_path_marcher = std::make_unique<source_path_marcher_t>( vec_ops );
+        bif_diag = std::make_unique<bif_diag_t>( vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files );
+        stability_diagram    = std::make_unique<stability_diagram_t>( vec_ops, file_ops, log, project_dir );
+        queue_pointer        = std::make_unique<queue_pointer_t>( vec_ops, queue_size );
+        queue_lambda         = std::make_unique<queue_lambda_t>();
+        queue_dims           = std::make_unique<queue_dims_t>();
+        queue_source_indices = std::make_unique<queue_source_indices_t>();
 
-        convergence_newton = new convergence_newton_t( vec_ops, log );
-        system_operator    = new system_operator_t( vec_ops, lin_op, lin_slv );
-        newton             = new newton_t( vec_ops, system_operator, convergence_newton );
-
-        stab =
-            new stability_t( vec_ops, log, nonlin_op, newton, eigensolver_adapter, stability_linearization_provider );
-
-        source_path_marcher = new source_path_marcher_t( vec_ops );
-
-
-        bif_diag = new bif_diag_t( vec_ops, file_ops, log, nonlin_op, newton, project_dir, skip_files );
-
-        stability_diagram = new stability_diagram_t( vec_ops, file_ops, log, project_dir );
-
-        queue_pointer        = new queue_pointer_t( vec_ops, queue_size );
-        queue_lambda         = new queue_lambda_t();
-        queue_dims           = new queue_dims_t();
-        queue_source_indices = new queue_source_indices_t();
-
-        vec_ops->init_vector( x_p );
-        vec_ops->start_use_vector( x_p );
-        vec_ops->init_vector( x_transition_upper );
-        vec_ops->start_use_vector( x_transition_upper );
+        x_p_storage.init();
+        x_p_storage.start_use();
+        x_transition_upper_storage.init();
+        x_transition_upper_storage.start_use();
     }
-    ~stability_continuation()
-    {
-        delete uncertainty_registry;
-        delete queue_source_indices;
-        delete queue_dims;
-        delete queue_lambda;
-        delete queue_pointer;
-        delete stability_diagram;
-        delete bif_diag;
-        delete source_path_marcher;
-        delete stab;
-        delete newton;
-        delete system_operator;
-        delete convergence_newton;
-        delete lin_slv;
-        delete prec;
-        delete lin_op;
-
-
-        vec_ops->stop_use_vector( x_transition_upper );
-        vec_ops->free_vector( x_transition_upper );
-        vec_ops->stop_use_vector( x_p );
-        vec_ops->free_vector( x_p );
-    }
+    ~stability_continuation() = default;
 
 
     void set_parameters()
@@ -1887,6 +1903,14 @@ private:
 
     static constexpr std::size_t queue_size = 2;
 
+    // Keep external owners alive until every borrowed consumer and workspace is gone.
+    std::shared_ptr<VectorOperations>               vector_operations_owner;
+    std::shared_ptr<VectorFileOperations>           file_operations_owner;
+    std::shared_ptr<NonlinearOperations>            nonlinear_operations_owner;
+    std::shared_ptr<Parameters>                     parameters_owner;
+    std::shared_ptr<EigensolverAdapter>             eigensolver_owner;
+    std::shared_ptr<StabilityLinearizationProvider> linearization_provider_owner;
+
     VectorOperations               *vec_ops;
     VectorFileOperations           *file_ops;
     Log                            *log;
@@ -1898,31 +1922,34 @@ private:
     std::string                     project_dir;
     unsigned int                    skip_files;
     //created locally:
-    LinearOperator                           *lin_op               = nullptr;
-    Preconditioner                           *prec                 = nullptr;
-    lin_slv_t                                *lin_slv              = nullptr;
-    monitor_t                                *mon                  = nullptr;
-    newton_t                                 *newton               = nullptr;
-    convergence_newton_t                     *convergence_newton   = nullptr;
-    system_operator_t                        *system_operator      = nullptr;
-    stability_t                              *stab                 = nullptr;
-    source_path_marcher_t                    *source_path_marcher  = nullptr;
-    bif_diag_t                               *bif_diag             = nullptr;
-    queue_pointer_t                          *queue_pointer        = nullptr;
-    queue_lambda_t                           *queue_lambda         = nullptr;
-    queue_dims_t                             *queue_dims           = nullptr;
-    queue_source_indices_t                   *queue_source_indices = nullptr;
-    stability_diagram_t                      *stability_diagram    = nullptr;
-    uncertainty_registry_t                   *uncertainty_registry = nullptr;
+    std::unique_ptr<solver_bundle_t>          solver_bundle;
+    LinearOperator                           *lin_op             = nullptr;
+    Preconditioner                           *prec               = nullptr;
+    lin_slv_t                                *lin_slv            = nullptr;
+    monitor_t                                *mon                = nullptr;
+    newton_t                                 *newton             = nullptr;
+    convergence_newton_t                     *convergence_newton = nullptr;
+    system_operator_t                        *system_operator    = nullptr;
+    std::unique_ptr<stability_t>              stab;
+    std::unique_ptr<source_path_marcher_t>    source_path_marcher;
+    std::unique_ptr<bif_diag_t>               bif_diag;
+    std::unique_ptr<queue_pointer_t>          queue_pointer;
+    std::unique_ptr<queue_lambda_t>           queue_lambda;
+    std::unique_ptr<queue_dims_t>             queue_dims;
+    std::unique_ptr<queue_source_indices_t>   queue_source_indices;
+    std::unique_ptr<stability_diagram_t>      stability_diagram;
+    std::unique_ptr<uncertainty_registry_t>   uncertainty_registry;
     std::vector<pending_topology_uncertainty> pending_topology_uncertainties;
 
     //  to detect curve break during analysis
     T x_p_start_norm;
     T lambda_p_start;
 
-    T_vec x_p;
-    T_vec x_transition_upper;
-    T     lambda_p;
+    state_storage_t x_p_storage;
+    state_storage_t x_transition_upper_storage;
+    T_vec          &x_p;
+    T_vec          &x_transition_upper;
+    T               lambda_p;
 
 
     bool load_diagram_data( const std::string file_name_ = {} )

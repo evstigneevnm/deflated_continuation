@@ -37,6 +37,9 @@ not require changes to unrelated algorithm interfaces.
   Internal workspaces remain values/RAII objects. Borrowed views must not outlive
   their owner. Do not create ownership cycles or wrap stack objects with no-op
   shared-pointer deleters.
+- During ownership migration, unchanged legacy consumers may borrow `.get()`
+  from workflow-owned resources. New workflow assembly uses shared ownership;
+  borrowed compatibility constructors do not extend dependency lifetimes.
 - Reuse allocations, sparse patterns, FFT plans, and preconditioner resources.
   Avoid hidden copies, transfers, and synchronization; measure performance.
 - Use SCFD `operator()` indexing and backend operations for large vector mappings.

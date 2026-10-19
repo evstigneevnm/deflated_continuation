@@ -2,7 +2,9 @@
 #define __MAIN_DEFLATION_CONTINUATION_SOLVER_BUNDLE_H__
 
 #include <memory>
+#include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace main_classes
 {
@@ -32,17 +34,38 @@ public:
     using scalar_type                  = typename vector_operations_type::scalar_type;
 
     solver_bundle(
+        std::shared_ptr<vector_operations_type>      vector_operations,
+        std::shared_ptr<vector_file_operations_type> file_operations, log_type *log, log_type *linear_solver_log,
+        std::shared_ptr<nonlinear_operations_type> nonlinear_operations, const std::string &project_directory,
+        const unsigned int skip_files, std::shared_ptr<solution_storage_type> external_solution_storage = nullptr
+    )
+        : solver_bundle(
+              vector_operations.get(), file_operations.get(), log, linear_solver_log, nonlinear_operations.get(),
+              project_directory, skip_files, external_solution_storage.get()
+          )
+    {
+        vector_operations_owner_         = std::move( vector_operations );
+        file_operations_owner_           = std::move( file_operations );
+        nonlinear_operations_owner_      = std::move( nonlinear_operations );
+        external_solution_storage_owner_ = std::move( external_solution_storage );
+    }
+
+    // Borrowed construction remains for callers not migrated yet.
+    solver_bundle(
         vector_operations_type *vector_operations, vector_file_operations_type *file_operations, log_type *log,
         log_type *linear_solver_log, nonlinear_operations_type *nonlinear_operations,
         const std::string &project_directory, const unsigned int skip_files,
         solution_storage_type *external_solution_storage = nullptr
     )
     {
-        linear_operator_                      = std::make_unique<linear_operator_type>( nonlinear_operations );
+        if ( !vector_operations || !file_operations || !nonlinear_operations )
+            throw std::invalid_argument( "solver_bundle: missing computational dependency" );
+
+        linear_operator_                      = std::make_shared<linear_operator_type>( nonlinear_operations );
         linear_operator_type *linear_operator = linear_operator_.get();
-        preconditioner_                       = std::make_unique<preconditioner_type>( nonlinear_operations );
+        preconditioner_                       = std::make_shared<preconditioner_type>( nonlinear_operations );
         preconditioner_type *preconditioner   = preconditioner_.get();
-        linear_system_ = std::make_unique<linear_system_type>( preconditioner, vector_operations, linear_solver_log );
+        linear_system_ = std::make_shared<linear_system_type>( preconditioner, vector_operations, linear_solver_log );
         linear_system_type *linear_system = linear_system_.get();
         convergence_                      = std::make_unique<convergence_type>( vector_operations, log );
         convergence_type *convergence     = convergence_.get();
@@ -137,9 +160,14 @@ public:
     }
 
 private:
-    std::unique_ptr<linear_operator_type>         linear_operator_;
-    std::unique_ptr<preconditioner_type>          preconditioner_;
-    std::unique_ptr<linear_system_type>           linear_system_;
+    // Declared first so borrowed consumers are destroyed before their dependencies.
+    std::shared_ptr<vector_operations_type>       vector_operations_owner_;
+    std::shared_ptr<vector_file_operations_type>  file_operations_owner_;
+    std::shared_ptr<nonlinear_operations_type>    nonlinear_operations_owner_;
+    std::shared_ptr<solution_storage_type>        external_solution_storage_owner_;
+    std::shared_ptr<linear_operator_type>         linear_operator_;
+    std::shared_ptr<preconditioner_type>          preconditioner_;
+    std::shared_ptr<linear_system_type>           linear_system_;
     std::unique_ptr<convergence_type>             convergence_;
     std::unique_ptr<system_operator_type>         system_operator_;
     std::unique_ptr<newton_type>                  newton_;
