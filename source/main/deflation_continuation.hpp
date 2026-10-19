@@ -187,7 +187,9 @@ template <
     template <class, class, class, class> class SystemOperator, class Parameters,
     class SolutionStorage = deflation::solution_storage<VectorOperations, Log>,
     template <class, class, class, class, class> class ContinuationSystemOperator =
-        continuation::system_operator_continuation>
+        continuation::system_operator_continuation,
+    class LinearSystem = numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
+        LinearOperator, Preconditioner, VectorOperations, Monitor, Log, LinearSolver>>
 class deflation_continuation
 {
 private:
@@ -196,9 +198,7 @@ private:
     typedef Monitor                                monitor_t;
 
     //general linear solver used in continuation and deflation
-    typedef numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
-        LinearOperator, Preconditioner, VectorOperations, monitor_t, Log, LinearSolver>
-        sherman_morrison_linear_system_solve_t;
+    using sherman_morrison_linear_system_solve_t = LinearSystem;
 
     //general system operator for the newton's method
     //TODO: move to nonlinear_operators?
@@ -386,16 +386,17 @@ public:
         Log *log, Log *linear_solver_log, std::shared_ptr<NonlinearOperations> nonlinear_operations,
         std::shared_ptr<Parameters> configuration, std::shared_ptr<sol_storage_def_t> solution_storage = nullptr
     )
-        : deflation_continuation(
-              vector_operations.get(), file_operations.get(), log, linear_solver_log, nonlinear_operations.get(),
-              configuration.get(), solution_storage.get()
-          )
+        : vec_ops( vector_operations.get() ), file_ops( file_operations.get() ), log( log ),
+          nonlin_op( nonlinear_operations.get() ), log_linsolver( linear_solver_log ), parameters( configuration.get() )
     {
         vector_operations_owner    = std::move( vector_operations );
         file_operations_owner      = std::move( file_operations );
         nonlinear_operations_owner = std::move( nonlinear_operations );
         parameters_owner           = std::move( configuration );
         solution_storage_owner     = std::move( solution_storage );
+        initialize(
+            vector_operations_owner, file_operations_owner, nonlinear_operations_owner, solution_storage_owner
+        );
     }
 
     // Borrowed construction remains for callers not migrated yet.
@@ -405,6 +406,16 @@ public:
     )
         : vec_ops( vec_ops_ ), file_ops( file_ops_ ), log( log_ ), nonlin_op( nonlin_op_ ),
           log_linsolver( log_linsolver_ ), parameters( parameters_ )
+    {
+        initialize( vec_ops_, file_ops_, nonlin_op_, sol_storage_external_ );
+    }
+
+private:
+    template <class OperationsHandle, class FilesHandle, class ProblemHandle, class StorageHandle>
+    void initialize(
+        const OperationsHandle &operations, const FilesHandle &files, const ProblemHandle &problem,
+        const StorageHandle &storage
+    )
     {
         if ( !vec_ops || !file_ops || !nonlin_op || !parameters )
             throw std::invalid_argument( "deflation_continuation: missing computational dependency" );
@@ -418,7 +429,7 @@ public:
 
 
         solver_bundle = std::make_unique<solver_bundle_t>(
-            vec_ops, file_ops, log, log_linsolver, nonlin_op, project_dir, skip_files, sol_storage_external_
+            operations, files, log, log_linsolver, problem, project_dir, skip_files, storage
         );
         lin_op                = solver_bundle->linear_operator();
         precond               = solver_bundle->preconditioner();
@@ -445,6 +456,8 @@ public:
             continuate_analytical, sol_storage_def, static_cast<T_vec *>( nullptr )
         );
     }
+
+public:
     ~deflation_continuation() = default;
 
 

@@ -12,6 +12,8 @@
 
 #if defined( TEST_WORKFLOW_CUDA )
 #    include <scfd/backend/cuda.h>
+#elif defined( TEST_WORKFLOW_HIP )
+#    include <scfd/backend/hip.h>
 #elif defined( TEST_WORKFLOW_OMP )
 #    include <scfd/backend/omp.h>
 #else
@@ -25,8 +27,7 @@
 #include <nonlinear_operators/circle/linear_operator_circle.h>
 #include <nonlinear_operators/circle/preconditioner_circle.h>
 #include <nonlinear_operators/circle/system_operator.h>
-#include <numerical_algos/lin_solvers/bicgstabl.h>
-#include <numerical_algos/lin_solvers/default_monitor.h>
+#include <models/circle/circle_linear_solvers.h>
 #include <main/parameters.hpp>
 #include <main/deflation_continuation.hpp>
 #include <main/stability_continuation.hpp>
@@ -38,6 +39,8 @@ namespace
 
 #if defined( TEST_WORKFLOW_CUDA )
 using backend_type = scfd::backend::cuda<std::ptrdiff_t>;
+#elif defined( TEST_WORKFLOW_HIP )
+using backend_type = scfd::backend::hip<std::ptrdiff_t>;
 #elif defined( TEST_WORKFLOW_OMP )
 using backend_type = scfd::backend::omp<std::ptrdiff_t>;
 #else
@@ -96,7 +99,7 @@ using problem_type         = nonlinear_operators::circle<vector_space, 64>;
 using linear_operator_type = nonlinear_operators::linear_operator_circle<vector_space, problem_type>;
 using preconditioner_type =
     nonlinear_operators::preconditioner_circle<vector_space, problem_type, linear_operator_type>;
-using monitor_type    = numerical_algos::lin_solvers::default_monitor<vector_space, log_type>;
+using monitor_type    = nmfd::solvers::default_monitor<vector_space, log_type>;
 using parameters_type = main_classes::parameters<double>;
 using scaled_operator_type =
     stability::eigensolvers::transformations::scaled_real_operator<vector_space, linear_operator_type>;
@@ -137,13 +140,16 @@ struct linearization_provider
 
 using deflation_workflow = main_classes::deflation_continuation<
     vector_space, file_operations_type, log_type, monitor_type, problem_type, linear_operator_type, preconditioner_type,
-    numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator, parameters_type>;
+    circle_model::bicgstabl, nonlinear_operators::system_operator, parameters_type,
+    deflation::solution_storage<vector_space, log_type>, continuation::system_operator_continuation,
+    nmfd::solvers::sherman_morrison<
+        vector_space, monitor_type, log_type, linear_operator_type, preconditioner_type, nmfd::solvers::bicgstabl>>;
 using stability_workflow = main_classes::stability_continuation<
     vector_space, file_operations_type, log_type, monitor_type, problem_type, linear_operator_type, preconditioner_type,
-    numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator, parameters_type, eigensolver>;
+    circle_model::bicgstabl, nonlinear_operators::system_operator, parameters_type, eigensolver>;
 using custom_stability_workflow = main_classes::stability_continuation<
     vector_space, file_operations_type, log_type, monitor_type, problem_type, linear_operator_type, preconditioner_type,
-    numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator, parameters_type, eigensolver,
+    circle_model::bicgstabl, nonlinear_operators::system_operator, parameters_type, eigensolver,
     linearization_provider>;
 
 struct fixture

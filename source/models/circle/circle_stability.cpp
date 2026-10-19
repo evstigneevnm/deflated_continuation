@@ -17,8 +17,7 @@
 #include <main/parameters.hpp>
 #include <main/stability_continuation.hpp>
 
-#include <numerical_algos/lin_solvers/bicgstabl.h>
-#include <numerical_algos/lin_solvers/default_monitor.h>
+#include "circle_linear_solvers.h"
 
 #include <stability/eigensolvers/direct_scalar_eigensolver.h>
 #include <stability/eigensolvers/transformations/scaled_real_operator.h>
@@ -118,11 +117,11 @@ int main( int argc, char **argv )
             stability::eigensolvers::transformations::scaled_real_operator<vec_ops_real, newton_operator_type>;
         using eigensolver_type =
             stability::eigensolvers::direct_scalar_eigensolver<vec_ops_real, stability_operator_type>;
-        using monitor_type = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
+        using monitor_type = nmfd::solvers::default_monitor<vec_ops_real, log_t>;
         using driver_type  = main_classes::stability_continuation<
              vec_ops_real, file_operations_type, log_t, monitor_type, nonlinear_operator_type, newton_operator_type,
-             newton_preconditioner_type, numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator,
-             parameters_type, eigensolver_type>;
+             newton_preconditioner_type, circle_model::bicgstabl, nonlinear_operators::system_operator, parameters_type,
+             eigensolver_type>;
 
         auto vector_space = std::make_shared<vec_ops_real>( 1 );
         if ( parameters->use_high_precision_reduction )

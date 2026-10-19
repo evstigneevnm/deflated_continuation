@@ -1,6 +1,9 @@
 #ifndef __MAIN_DEFLATION_CONTINUATION_PARAMETER_APPLICATION_H__
 #define __MAIN_DEFLATION_CONTINUATION_PARAMETER_APPLICATION_H__
 
+#include <limits>
+#include <stdexcept>
+
 #include <containers/branch_intersection.h>
 #include <continuation/corrector_retry_policy.h>
 #include <continuation/predictor_chart_validation.h>
@@ -14,6 +17,33 @@ namespace deflation_continuation_detail
 
 namespace parameter_application_detail
 {
+
+template <class T, class Monitor, class Parameters>
+auto configure_monitor( Monitor *monitor, const Parameters &parameters, int )
+    -> decltype( monitor->configure( typename Monitor::params() ), void() )
+{
+    typename Monitor::params p;
+    if ( parameters.lin_solver_max_it > static_cast<unsigned int>( std::numeric_limits<int>::max() ) )
+        throw std::invalid_argument( "Linear iteration limit exceeds monitor capacity" );
+    p.rel_tol                      = static_cast<T>( parameters.lin_solver_tol );
+    p.abs_tol                      = T( 0 );
+    p.max_iters_num                = parameters.lin_solver_max_it;
+    p.save_convergence_history     = parameters.save_convergence_history;
+    p.divide_out_norms_by_rel_base = parameters.divide_out_norms_by_rel_base;
+    p.obj_log_lev                  = parameters.verbose ? 0 : 100;
+    p.out_min_resid_norm           = true;
+    monitor->configure( p );
+}
+
+template <class T, class Monitor, class Parameters>
+void configure_monitor( Monitor *monitor, const Parameters &parameters, long )
+{
+    monitor->init( static_cast<T>( parameters.lin_solver_tol ), T( 0 ), parameters.lin_solver_max_it );
+    monitor->set_save_convergence_history( parameters.save_convergence_history );
+    monitor->set_divide_out_norms_by_rel_base( parameters.divide_out_norms_by_rel_base );
+    monitor->set_verbose( parameters.verbose );
+    monitor->out_min_resid_norm();
+}
 
 template <class Solver>
 auto set_use_preconditioned_residual( Solver *solver, int value )
@@ -64,11 +94,7 @@ template <class Scalar, class Solver, class Parameters>
 auto configure_linear_solver( Solver *solver, const Parameters &parameters ) -> decltype( &solver->monitor() )
 {
     auto *monitor = &solver->monitor();
-    monitor->init( static_cast<Scalar>( parameters.lin_solver_tol ), Scalar( 0 ), parameters.lin_solver_max_it );
-    monitor->set_save_convergence_history( parameters.save_convergence_history );
-    monitor->set_divide_out_norms_by_rel_base( parameters.divide_out_norms_by_rel_base );
-    monitor->set_verbose( parameters.verbose );
-    monitor->out_min_resid_norm();
+    parameter_application_detail::configure_monitor<Scalar>( monitor, parameters, 0 );
 
     if ( parameters.use_precond_resid >= 0 )
     {

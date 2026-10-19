@@ -13,8 +13,12 @@
 #include <nonlinear_operators/circle/preconditioner_circle.h>
 #include <nonlinear_operators/circle/system_operator.h>
 // problem dependant ends
-#include <numerical_algos/lin_solvers/cgs.h>
-#include <numerical_algos/lin_solvers/default_monitor.h>
+#if defined( CIRCLE_VECTOR_BACKEND_VAR_PREC )
+#    include <numerical_algos/lin_solvers/cgs.h>
+#    include <numerical_algos/lin_solvers/default_monitor.h>
+#else
+#    include "circle_linear_solvers.h"
+#endif
 
 // problem dependant
 #include <common/gpu_file_operations.h>
@@ -81,8 +85,12 @@ int main( int argc, char const *argv[] )
 {
     size_t Nx = 1; // size of the vector variable. 1 in this case
 
-    typedef gpu_file_operations<vec_ops_real>                                  files_ops_t;
-    typedef numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t> monitor_t;
+    typedef gpu_file_operations<vec_ops_real> files_ops_t;
+#if defined( CIRCLE_VECTOR_BACKEND_VAR_PREC )
+    using monitor_t = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
+#else
+    using monitor_t = nmfd::solvers::default_monitor<vec_ops_real, log_t>;
+#endif
 
     typedef nonlinear_operators::circle<vec_ops_real, Blocks_x_> circle_t;
 
@@ -195,10 +203,19 @@ int main( int argc, char const *argv[] )
     log_linsolver.set_verbosity( quiet ? 0 : 1 );
 
     // test continuaiton process of a single curve
+#if defined( CIRCLE_VECTOR_BACKEND_VAR_PREC )
     typedef main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, circle_t, lin_op_t, prec_t, numerical_algos::lin_solvers::cgs,
         nonlinear_operators::system_operator, parameters_t>
         deflation_continuation_t;
+#else
+    using linear_system_type =
+        nmfd::solvers::sherman_morrison<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t, nmfd::solvers::cgs>;
+    using deflation_continuation_t = main_classes::deflation_continuation<
+        vec_ops_real, files_ops_t, log_t, monitor_t, circle_t, lin_op_t, prec_t, circle_model::cgs,
+        nonlinear_operators::system_operator, parameters_t, deflation::solution_storage<vec_ops_real, log_t>,
+        continuation::system_operator_continuation, linear_system_type>;
+#endif
 
     deflation_continuation_t DC( vec_ops_R, file_ops, &log, &log_linsolver, CIRCLE, parameters );
 

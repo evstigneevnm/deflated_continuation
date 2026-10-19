@@ -30,6 +30,7 @@
 
 #include <containers/stability_diagram.h>
 #include <main/stability_continuation/solver_bundle.h>
+#include <main/deflation_continuation/parameter_application.h>
 #include <nmfd/detail/vector_wrap.h>
 
 #include <stability/stability_analysis.hpp>
@@ -166,10 +167,11 @@ public:
         std::shared_ptr<Parameters> configuration, std::shared_ptr<EigensolverAdapter> eigensolver,
         std::shared_ptr<StabilityLinearizationProvider> linearization_provider = nullptr
     )
-        : stability_continuation(
-              vector_operations.get(), file_operations.get(), log, linear_solver_log, nonlinear_operations.get(),
-              configuration.get(), eigensolver.get(), linearization_provider.get()
-          )
+        : vec_ops( checked_vector_operations( vector_operations.get() ) ), file_ops( file_operations.get() ),
+          log( log ), nonlin_op( nonlinear_operations.get() ), log_linsolver( linear_solver_log ),
+          parameters( configuration.get() ), eigensolver_adapter( eigensolver.get() ),
+          stability_linearization_provider( linearization_provider.get() ), x_p_storage( *vec_ops ),
+          x_transition_upper_storage( *vec_ops ), x_p( *x_p_storage ), x_transition_upper( *x_transition_upper_storage )
     {
         vector_operations_owner      = std::move( vector_operations );
         file_operations_owner        = std::move( file_operations );
@@ -177,6 +179,7 @@ public:
         parameters_owner             = std::move( configuration );
         eigensolver_owner            = std::move( eigensolver );
         linearization_provider_owner = std::move( linearization_provider );
+        initialize( vector_operations_owner, nonlinear_operations_owner );
     }
 
     // Borrowed construction remains for callers not migrated yet.
@@ -190,6 +193,13 @@ public:
           stability_linearization_provider( stability_linearization_provider_ ), x_p_storage( *vec_ops ),
           x_transition_upper_storage( *vec_ops ), x_p( *x_p_storage ), x_transition_upper( *x_transition_upper_storage )
 
+    {
+        initialize( vec_ops_, nonlin_op_ );
+    }
+
+private:
+    template <class OperationsHandle, class ProblemHandle>
+    void initialize( const OperationsHandle &operations, const ProblemHandle &problem )
     {
         if ( !file_ops || !nonlin_op || !parameters || !eigensolver_adapter )
             throw std::invalid_argument( "stability_continuation: missing computational dependency" );
@@ -222,7 +232,7 @@ public:
             );
         }
 
-        solver_bundle      = std::make_unique<solver_bundle_t>( vec_ops, log, log_linsolver, nonlin_op );
+        solver_bundle      = std::make_unique<solver_bundle_t>( operations, log, log_linsolver, problem );
         lin_op             = solver_bundle->linear_operator();
         prec               = solver_bundle->preconditioner();
         lin_slv            = solver_bundle->linear_solver();
@@ -246,6 +256,8 @@ public:
         x_transition_upper_storage.init();
         x_transition_upper_storage.start_use();
     }
+
+public:
     ~stability_continuation() = default;
 
 
@@ -285,31 +297,9 @@ public:
     void set_linsolver()
     /*T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true*/
     {
-        //setup linear system:
-        mon = &lin_slv->monitor();
-
-        T            lin_solver_tol    = parameters->stability_continuation.linear_solver.lin_solver_tol;
-        unsigned int lin_solver_max_it = parameters->stability_continuation.linear_solver.lin_solver_max_it;
-        bool save_convergence_history_ = parameters->stability_continuation.linear_solver.save_convergence_history;
-        bool divide_out_norms_by_rel_base_ =
-            parameters->stability_continuation.linear_solver.divide_out_norms_by_rel_base;
-        bool verbose_          = parameters->stability_continuation.linear_solver.verbose;
-        int  use_precond_resid = parameters->stability_continuation.linear_solver.use_precond_resid;
-        int  resid_recalc_freq = parameters->stability_continuation.linear_solver.resid_recalc_freq;
-        int  basis_sz          = parameters->stability_continuation.linear_solver.basis_size;
-
-        mon->init( lin_solver_tol, T( 0.0 ), lin_solver_max_it );
-        mon->set_save_convergence_history( save_convergence_history_ );
-        mon->set_divide_out_norms_by_rel_base( divide_out_norms_by_rel_base_ );
-        mon->set_verbose( verbose_ );
-        mon->out_min_resid_norm();
-        //
-        if ( use_precond_resid >= 0 )
-            lin_slv->set_use_precond_resid( use_precond_resid );
-        if ( resid_recalc_freq >= 0 )
-            lin_slv->set_resid_recalc_freq( resid_recalc_freq );
-        if ( basis_sz > 0 )
-            lin_slv->set_basis_size( basis_sz );
+        mon = deflation_continuation_detail::configure_linear_solver<T>(
+            lin_slv, parameters->stability_continuation.linear_solver
+        );
     }
 
     void set_newton()

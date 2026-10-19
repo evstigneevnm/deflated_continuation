@@ -81,6 +81,26 @@ jobs:
             CONFIG_FILE=build_configs/config_github_ubuntu_gcc.inc \
             BUILD_DIR=build/operations_integration TEST_OMP_NUM_THREADS=2
 
+  nmfd-sherman-morrison-cpu:
+    name: Sherman-Morrison / ordinary, rank-one and scalar-border
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify analytical solves, failure reporting and ownership
+        run: |
+          make -C source/contrib/nmfd-linsolvers check_sherman_morrison_cpu \
+            CONFIG_FILE=build_configs/config_github_ubuntu_gcc.inc \
+            BUILD_DIR=build/sherman_morrison TEST_OMP_NUM_THREADS=2
+      - name: Verify project recovery with migrated ordinary and extended solves
+        run: |
+          make test_linear_solve_recovery.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
+            BUILD_DIR=build/sherman_morrison_recovery
+          timeout 30s build/sherman_morrison_recovery/test_linear_solve_recovery.bin
+
   nmfd-cahn-hilliard-original:
     name: Original Cahn-Hilliard / restored operations
     runs-on: ubuntu-latest

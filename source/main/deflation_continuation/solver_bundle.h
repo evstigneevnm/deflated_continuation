@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <main/solver_construction.h>
 
 namespace main_classes
 {
@@ -39,15 +40,22 @@ public:
         std::shared_ptr<nonlinear_operations_type> nonlinear_operations, const std::string &project_directory,
         const unsigned int skip_files, std::shared_ptr<solution_storage_type> external_solution_storage = nullptr
     )
-        : solver_bundle(
-              vector_operations.get(), file_operations.get(), log, linear_solver_log, nonlinear_operations.get(),
-              project_directory, skip_files, external_solution_storage.get()
-          )
+        : vector_operations_owner_( std::move( vector_operations ) ),
+          file_operations_owner_( std::move( file_operations ) ),
+          nonlinear_operations_owner_( std::move( nonlinear_operations ) ),
+          external_solution_storage_owner_( std::move( external_solution_storage ) )
     {
-        vector_operations_owner_         = std::move( vector_operations );
-        file_operations_owner_           = std::move( file_operations );
-        nonlinear_operations_owner_      = std::move( nonlinear_operations );
-        external_solution_storage_owner_ = std::move( external_solution_storage );
+        if ( !vector_operations_owner_ || !file_operations_owner_ || !nonlinear_operations_owner_ )
+            throw std::invalid_argument( "solver_bundle: missing computational dependency" );
+        linear_operator_ = detail::make_problem_component<linear_operator_type>( nonlinear_operations_owner_ );
+        preconditioner_  = detail::make_problem_component<preconditioner_type>( nonlinear_operations_owner_ );
+        linear_system_   = detail::make_linear_system<linear_system_type>(
+            vector_operations_owner_, linear_operator_, preconditioner_, linear_solver_log
+        );
+        initialize(
+            vector_operations_owner_.get(), file_operations_owner_.get(), log, nonlinear_operations_owner_.get(),
+            project_directory, skip_files, external_solution_storage_owner_.get()
+        );
     }
 
     // Borrowed construction remains for callers not migrated yet.
@@ -61,14 +69,27 @@ public:
         if ( !vector_operations || !file_operations || !nonlinear_operations )
             throw std::invalid_argument( "solver_bundle: missing computational dependency" );
 
-        linear_operator_                      = std::make_shared<linear_operator_type>( nonlinear_operations );
-        linear_operator_type *linear_operator = linear_operator_.get();
-        preconditioner_                       = std::make_shared<preconditioner_type>( nonlinear_operations );
-        preconditioner_type *preconditioner   = preconditioner_.get();
+        linear_operator_                    = std::make_shared<linear_operator_type>( nonlinear_operations );
+        preconditioner_                     = std::make_shared<preconditioner_type>( nonlinear_operations );
+        preconditioner_type *preconditioner = preconditioner_.get();
         linear_system_ = std::make_shared<linear_system_type>( preconditioner, vector_operations, linear_solver_log );
-        linear_system_type *linear_system = linear_system_.get();
-        convergence_                      = std::make_unique<convergence_type>( vector_operations, log );
-        convergence_type *convergence     = convergence_.get();
+        initialize(
+            vector_operations, file_operations, log, nonlinear_operations, project_directory, skip_files,
+            external_solution_storage
+        );
+    }
+
+private:
+    void initialize(
+        vector_operations_type *vector_operations, vector_file_operations_type *file_operations, log_type *log,
+        nonlinear_operations_type *nonlinear_operations, const std::string &project_directory, unsigned int skip_files,
+        solution_storage_type *external_solution_storage
+    )
+    {
+        linear_operator_type *linear_operator = linear_operator_.get();
+        linear_system_type   *linear_system   = linear_system_.get();
+        convergence_                          = std::make_unique<convergence_type>( vector_operations, log );
+        convergence_type *convergence         = convergence_.get();
         system_operator_ = std::make_unique<system_operator_type>( vector_operations, linear_operator, linear_system );
         system_operator_type *system_operator = system_operator_.get();
         newton_             = std::make_unique<newton_type>( vector_operations, system_operator, convergence );
@@ -103,6 +124,7 @@ public:
         );
     }
 
+public:
     solver_bundle( const solver_bundle & )            = delete;
     solver_bundle &operator=( const solver_bundle & ) = delete;
 

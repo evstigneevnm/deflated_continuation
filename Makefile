@@ -133,13 +133,13 @@ ADJOINT_JACOBIAN_TEST_HEADERS = source/nonlinear_operators/adjoint_jacobian_capa
 FOURIER_DISCRETIZATION_HEADERS = source/discretization/common/structured_extent.h source/discretization/common/component_field.h source/discretization/fourier/periodic_grid.h source/discretization/fourier/r2c_index_space.h source/discretization/fourier/spectral_field.h source/discretization/fourier/normalized_fft.h source/discretization/fourier/wavevector_table.h source/discretization/fourier/diagonal_symbols.h source/discretization/fourier/dealiasing_policy.h source/discretization/fourier/initialization/low_mode_odd_field.h source/discretization/fourier/codecs/codec_descriptor_2d.h source/discretization/fourier/codecs/full_real_field.h source/discretization/fourier/codecs/translation_equivariant_real_field.h source/discretization/fourier/codecs/inversion_odd_field.h source/discretization/fourier/codecs/component_product.h source/discretization/fourier/operations/derivative.h source/discretization/fourier/operations/laplacian.h source/discretization/fourier/operations/inverse_laplacian.h source/discretization/fourier/operations/pseudospectral_product.h source/discretization/fourier/operations/vector_advection.h
 KS2D_REFACTORED_HEADERS = source/models/KS_2D/KS2D_backend_typedefs.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/kuramoto_sivashinskiy_2d.h source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/linear_operator_KS_2D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/preconditioner_KS_2D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/system_operator.h source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/convergence_strategy.h source/symmetry/generated_finite_group.h source/symmetry/finite_group_manifest.h source/symmetry/fourier/periodic_affine_element_2d.h source/symmetry/fourier/periodic_affine_action_2d.h source/symmetry/fourier/residual_translation_group_2d.h source/symmetry/fourier/residual_translation_orbit_aligner_2d.h source/symmetry/finite_action_registry.h source/symmetry/finite_quotient_adapter.h source/containers/bifurcation_diagram/symmetry_archive_audit.h source/deflation/symmetry_solution_storage.h $(FOURIER_DISCRETIZATION_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
 VISUALIZATION_HEADERS = source/visualization/bd_curve_file_reader.h source/visualization/physical_solution_writer.h source/visualization/structured_physical_solution_writer.h source/visualization/io/numpy_array_writer.h source/visualization/bd_prepare_visualization.hpp
-CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/nonlinear_operators/circle/circle.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/linear_operator_circle.h source/nonlinear_operators/circle/preconditioner_circle.h source/nonlinear_operators/circle/system_operator.h $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
+CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/models/circle/circle_linear_solvers.h $(wildcard source/contrib/nmfd-linsolvers/include/nmfd/solvers/*.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/detail/*.h) source/nonlinear_operators/circle/circle.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/linear_operator_circle.h source/nonlinear_operators/circle/preconditioner_circle.h source/nonlinear_operators/circle/system_operator.h $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 CIRCLE_STABILITY_HEADERS = $(CIRCLE_MODEL_HEADERS) source/stability/eigensolvers/direct_scalar_eigensolver.h source/stability/eigensolvers/transformations/scaled_real_operator.h
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/models/bratu/bratu_model_config.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h
 STAR_SHAPED_MODEL_HEADERS = source/models/star_shaped/star_shaped_backend_typedefs.h source/nonlinear_operators/star_shaped/star_shaped.h source/nonlinear_operators/star_shaped/convergence_strategy.h source/nonlinear_operators/star_shaped/linear_operator_star_shaped.h source/nonlinear_operators/star_shaped/preconditioner_star_shaped.h source/nonlinear_operators/star_shaped/system_operator.h
 KS1D_MODEL_HEADERS = source/models/KS_1D/KS1D_backend_typedefs.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/linear_operator_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/preconditioner_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/system_operator.h
 KS1D_FULL_MODEL_HEADERS = $(KS1D_MODEL_HEADERS) source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h $(SYMMETRY_LINEARIZATION_HEADERS) source/nonlinear_operators/projected_system_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/projected_system_operator_continuation.h $(CONTINUATION_CHART_HEADERS) $(DEFLATION_SYMMETRY_HEADERS)
-WORKFLOW_OWNERSHIP_HEADERS = source/main/deflation_continuation.hpp source/main/deflation_continuation/solver_bundle.h source/main/stability_continuation.hpp source/main/stability_continuation/solver_bundle.h
+WORKFLOW_OWNERSHIP_HEADERS = source/main/deflation_continuation.hpp source/main/deflation_continuation/solver_bundle.h source/main/stability_continuation.hpp source/main/stability_continuation/solver_bundle.h source/main/solver_construction.h source/main/deflation_continuation/parameter_application.h
 STABILITY_CONTINUATION_HEADERS = source/main/stability_continuation.hpp source/main/stability_continuation/solver_bundle.h source/containers/stability_diagram.h $(STABILITY_ANALYSIS_HEADERS) $(EIGENSOLVER_HEADERS) $(EIGENSOLVER_TRANSFORMATION_HEADERS) $(PRODUCT_VECTOR_SPACE_HEADERS) $(NMFD_GMRES_HEADERS) $(HOST_SMALL_DENSE_HEADERS)
 KS1D_STABILITY_HEADERS = source/models/KS_1D/KS1D_stability_cli.h $(STABILITY_CONTINUATION_HEADERS)
 KS1D_STABILITY_REPLAY_SCRIPT = scripts/test_ks1d_full_stability_replay.py
@@ -151,6 +151,7 @@ LIBS1 = $(LCUDA) -lcublas -lcurand
 LIBS2 = $(LCUDA) -lcufft $(LIBS1)
 LIBS3 = $(LCUDA) -lcusolver $(LIBS2)
 LIBSAll = $(LCUDA) -lcublas -lcurand -lcufft -lcusolver
+HIPLIBS = -L$(HIP_PATH)/lib -lhipblas -lhipsolver $(if $(filter 1,$(HIP_NVIDIA_BACKEND)),$(LIBS1),-lhiprand)
 LIBBOOST = -lboost_serialization
 LLAPACK = -L$(OPENBLAS_ROOT_PATH)/lib -lopenblas
 LFFTW = -lfftw3 -lfftw3f
@@ -443,18 +444,21 @@ test_symmetry_event_persistence.bin: source/containers/tests/test_symmetry_event
 test_parameters_json.bin: source/main/tests/test_parameters_json.cpp source/main/parameters.hpp
 	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_parameters_json.cpp -o $(BUILD_DIR)/test_parameters_json.bin 2>$(RESULTS)
 
-test_solver_bundle.bin: source/main/tests/test_solver_bundle.cpp source/main/deflation_continuation/solver_bundle.h source/main/stability_continuation/solver_bundle.h
+test_solver_bundle.bin: source/main/tests/test_solver_bundle.cpp source/main/deflation_continuation/solver_bundle.h source/main/stability_continuation/solver_bundle.h $(WORKFLOW_OWNERSHIP_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_solver_bundle.cpp -o $(BUILD_DIR)/test_solver_bundle.bin 2>$(RESULTS)
 
 test_workflow_ownership_cpu.bin: source/main/tests/test_workflow_ownership.cpp $(WORKFLOW_OWNERSHIP_HEADERS) $(CIRCLE_STABILITY_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
-	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) $< $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/$@
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) $< $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/$@
 
 test_workflow_ownership_cpu_omp.bin: source/main/tests/test_workflow_ownership.cpp $(WORKFLOW_OWNERSHIP_HEADERS) $(CIRCLE_STABILITY_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
-	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) -DTEST_WORKFLOW_OMP $< $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/$@
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -DTEST_WORKFLOW_OMP $< $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/$@
 
 test_workflow_ownership_cuda.bin: source/main/tests/test_workflow_ownership.cpp $(WORKFLOW_OWNERSHIP_HEADERS) $(CIRCLE_STABILITY_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
-	$(NVCC) $(NVCCFLAGS) --extended-lambda $(ICUDA) $(IPROJECT) $(IBOOST) -DTEST_WORKFLOW_CUDA -x cu -c $< -o $(BUILD_DIR)/test_workflow_ownership_cuda.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -DTEST_WORKFLOW_CUDA -x cu -c $< -o $(BUILD_DIR)/test_workflow_ownership_cuda.o
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_workflow_ownership_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LBOOST) $(LIBBOOST) $(LIBS1) -o $(BUILD_DIR)/$@
+
+test_workflow_ownership_hip.bin: source/main/tests/test_workflow_ownership.cpp $(WORKFLOW_OWNERSHIP_HEADERS) $(CIRCLE_STABILITY_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
+	$(HIPCC) $(HIPFLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -DTEST_WORKFLOW_HIP $< $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(LBOOST) $(LIBBOOST) $(HIPLIBS) -o $(BUILD_DIR)/$@
 
 test_parameter_application.bin: source/main/tests/test_parameter_application.cpp source/main/deflation_continuation/parameter_application.h source/main/parameters.hpp
 	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_parameter_application.cpp -o $(BUILD_DIR)/test_parameter_application.bin 2>$(RESULTS)
@@ -486,8 +490,8 @@ test_knot_executor.bin: source/main/tests/test_knot_executor.cpp source/main/def
 test_deflation_seed_registry.bin: source/containers/tests/test_deflation_seed_registry.cpp source/containers/deflation_seed_registry.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_deflation_seed_registry.cpp -o $(BUILD_DIR)/test_deflation_seed_registry.bin 2>$(RESULTS)
 
-test_linear_solve_recovery.bin: source/numerical_algos/lin_solvers/tests/test_linear_solve_recovery.cpp source/numerical_algos/lin_solvers/linear_solve_recovery.h source/numerical_algos/lin_solvers/iter_solver_base.h source/numerical_algos/lin_solvers/default_monitor.h source/numerical_algos/lin_solvers/tests/nmfd_cpu_reference_vector_space.h
-	$(G++) $(G++FLAGS) $(IPROJECT) source/numerical_algos/lin_solvers/tests/test_linear_solve_recovery.cpp -o $(BUILD_DIR)/test_linear_solve_recovery.bin 2>$(RESULTS)
+test_linear_solve_recovery.bin: source/numerical_algos/lin_solvers/tests/test_linear_solve_recovery.cpp source/numerical_algos/lin_solvers/linear_solve_recovery.h source/numerical_algos/lin_solvers/iter_solver_base.h source/numerical_algos/lin_solvers/default_monitor.h source/numerical_algos/lin_solvers/tests/nmfd_cpu_reference_vector_space.h $(CIRCLE_MODEL_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) source/numerical_algos/lin_solvers/tests/test_linear_solve_recovery.cpp -o $(BUILD_DIR)/test_linear_solve_recovery.bin 2>$(RESULTS)
 
 test_curve_metadata_io.bin: source/containers/tests/test_curve_metadata_io.cpp source/containers/bifurcation_diagram/curve_point.h source/containers/bifurcation_diagram/curve_metadata_io.h source/containers/curve_endpoint_reason.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_curve_metadata_io.cpp -o $(BUILD_DIR)/test_curve_metadata_io.bin 2>$(RESULTS)
@@ -686,24 +690,27 @@ circle_curve_container_cuda: source/models/circle/circle_test_curve_container.cp
 
 circle_bd: circle_bd_cuda
 
-circle_bd_cuda: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
-	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/circle/circle_bd.cpp -c -o $(BUILD_DIR)/circle_bd_cuda_main.o 2>$(RESULTS)
+circle_bd_cuda: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(WORKFLOW_OWNERSHIP_HEADERS)
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -x cu source/models/circle/circle_bd.cpp -c -o $(BUILD_DIR)/circle_bd_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/circle_bd_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd_cuda.bin 2>$(RESULTS)
 
-circle_bd_cpu_omp: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
-	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) source/models/circle/circle_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd_cpu_omp.bin 2>$(RESULTS)
+circle_bd_cpu_omp: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS)
+	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/circle/circle_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd_cpu_omp.bin 2>$(RESULTS)
 
-circle_bd_hip: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
-	$(HIPCC) $(HIPFLAGS) -DCIRCLE_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) source/models/circle/circle_bd.cpp $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd_hip.bin 2>$(RESULTS)
+circle_bd_hip: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
+	$(HIPCC) $(HIPFLAGS) -DCIRCLE_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/circle/circle_bd.cpp $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(LBOOST) $(LIBBOOST) $(HIPLIBS) -o $(BUILD_DIR)/circle_bd_hip.bin 2>$(RESULTS)
 
-circle_bd_var_prec: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
-	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(IBOOST) source/models/circle/circle_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd_var_prec.bin 2>$(RESULTS)
+circle_stability_hip: source/models/circle/circle_stability.cpp $(CIRCLE_STABILITY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(STABILITY_ANALYSIS_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
+	$(HIPCC) $(HIPFLAGS) -DCIRCLE_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) $< $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(LBOOST) $(LIBBOOST) $(HIPLIBS) -o $(BUILD_DIR)/circle_stability_hip.bin 2>$(RESULTS)
+
+circle_bd_var_prec: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(CPU_VECTOR_OPS_VAR_PREC_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS)
+	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/circle/circle_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd_var_prec.bin 2>$(RESULTS)
 
 circle_stability_cpu_omp: source/models/circle/circle_stability.cpp $(CIRCLE_STABILITY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(STABILITY_ANALYSIS_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS)
-	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) source/models/circle/circle_stability.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_stability_cpu_omp.bin 2>$(RESULTS)
+	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/circle/circle_stability.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_stability_cpu_omp.bin 2>$(RESULTS)
 
 circle_stability_cuda: source/models/circle/circle_stability.cpp $(CIRCLE_STABILITY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(STABILITY_ANALYSIS_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
-	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/circle/circle_stability.cpp -c -o $(BUILD_DIR)/circle_stability_cuda_main.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -x cu source/models/circle/circle_stability.cpp -c -o $(BUILD_DIR)/circle_stability_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/circle_stability_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_stability_cuda.bin 2>$(RESULTS)
 
 circle_prepare_visualization_cpu_omp: source/models/circle/circle_prepare_visualization.cpp $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(VISUALIZATION_HEADERS)

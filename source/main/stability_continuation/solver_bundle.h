@@ -4,6 +4,7 @@
 #include <memory>
 #include <stdexcept>
 #include <utility>
+#include <main/solver_construction.h>
 
 namespace main_classes
 {
@@ -28,10 +29,16 @@ public:
         std::shared_ptr<vector_operations_type> operations, log_type *log, log_type *linear_solver_log,
         std::shared_ptr<nonlinear_operations_type> problem
     )
-        : solver_bundle( operations.get(), log, linear_solver_log, problem.get() )
+        : operations_owner_( std::move( operations ) ), problem_owner_( std::move( problem ) )
     {
-        operations_owner_ = std::move( operations );
-        problem_owner_    = std::move( problem );
+        if ( !operations_owner_ || !problem_owner_ )
+            throw std::invalid_argument( "stability solver_bundle: missing computational dependency" );
+        linear_operator_ = detail::make_problem_component<linear_operator_type>( problem_owner_ );
+        preconditioner_  = detail::make_problem_component<preconditioner_type>( problem_owner_ );
+        linear_solver_   = detail::make_linear_solver<linear_solver_type>(
+            operations_owner_, linear_operator_, preconditioner_, linear_solver_log
+        );
+        initialize( operations_owner_.get(), log );
     }
 
     // Borrowed construction remains for callers not migrated yet.
@@ -47,6 +54,12 @@ public:
         preconditioner_  = std::make_shared<preconditioner_type>( problem );
         linear_solver_   = std::make_shared<linear_solver_type>( operations, linear_solver_log );
         linear_solver_->set_preconditioner( preconditioner_.get() );
+        initialize( operations, log );
+    }
+
+private:
+    void initialize( vector_operations_type *operations, log_type *log )
+    {
         auto *linear_operator = linear_operator_.get();
         auto *linear_solver   = linear_solver_.get();
         convergence_          = std::make_unique<convergence_type>( operations, log );
@@ -56,6 +69,7 @@ public:
         newton_               = std::make_unique<newton_type>( operations, system_operator, convergence );
     }
 
+public:
     solver_bundle( const solver_bundle & )            = delete;
     solver_bundle &operator=( const solver_bundle & ) = delete;
 

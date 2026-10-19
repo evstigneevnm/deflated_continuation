@@ -250,6 +250,17 @@ public:
         }
     }
 
+    void add_lin_comb(
+        scalar_type a, const vector_type &x, scalar_type b, const vector_type &y, scalar_type c, vector_type &out
+    ) const
+    {
+        check_vector_size( x );
+        check_vector_size( y );
+        check_vector_size( out );
+        for ( std::size_t i = 0; i < x.size(); ++i )
+            out[i] = a * x[i] + b * y[i] + c * out[i];
+    }
+
 private:
     static std::size_t as_size( ordinal_type value )
     {
