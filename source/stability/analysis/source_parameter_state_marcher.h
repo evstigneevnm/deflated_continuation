@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -77,6 +78,12 @@ public:
     void set_state_aligner( Aligner *aligner )
     {
         alignment_.set( aligner );
+    }
+
+    template <class Aligner>
+    void set_state_aligner( std::shared_ptr<Aligner> aligner )
+    {
+        alignment_.set( std::move( aligner ) );
     }
 
     void reset_state_aligner()

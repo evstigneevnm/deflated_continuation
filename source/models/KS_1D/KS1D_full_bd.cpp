@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -22,10 +23,8 @@
 #include <main/deflation_continuation.hpp>
 #include <main/parameters.hpp>
 
-#include <numerical_algos/lin_solvers/bicgstabl.h>
-#include <numerical_algos/lin_solvers/default_monitor.h>
-
 #include "KS1D_backend_typedefs.h"
+#include "KS1D_linear_solvers.h"
 
 #if defined( KS1D_VECTOR_BACKEND_CUDA )
 #    include <common/cuda_init_scfd.h>
@@ -96,8 +95,7 @@ void print_symmetry_stabilizer_policy( const char *label, const Policy &policy )
 int main( int argc, char const *argv[] )
 {
     using files_ops_t  = gpu_file_operations<vec_ops_real>;
-    using monitor_t    = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
-    using real_vec     = typename vec_ops_real::vector_type;
+    using monitor_t    = nmfd::solvers::default_monitor<vec_ops_real, log_t>;
     using ks1d_t       = nonlinear_operators::kuramoto_sivashinskiy_1d_full<vec_ops_real, fft_backend_t, Blocks_x_>;
     using lin_op_t     = symmetry::linearization::projected_linear_operator<vec_ops_real, ks1d_t>;
     using prec_t       = symmetry::linearization::projected_preconditioner<vec_ops_real, ks1d_t, lin_op_t>;
@@ -197,7 +195,9 @@ int main( int argc, char const *argv[] )
     std::cout << "Using full Fourier KS1D backend: " << KS1D_BACKEND_NAME << std::endl;
     std::cout << "Reading config file: " << path_to_config_file << std::endl;
 
-    parameters_t parameters = main_classes::read_parameters_json<real>( path_to_config_file );
+    auto configuration =
+        std::make_shared<parameters_t>( main_classes::read_parameters_json<real>( path_to_config_file ) );
+    auto &parameters = *configuration;
     if ( !quiet )
     {
         parameters.plot_all();
@@ -244,17 +244,17 @@ int main( int argc, char const *argv[] )
     std::cout << "Full Fourier KS1D parameters: N=" << physical_size << ", positive modes=" << positive_modes
               << ", state size=" << state_size << ", a=" << a_val << ", b=" << b_val << std::endl;
 
-    vec_ops_real vec_ops_R( state_size );
+    auto vec_ops_R = std::make_shared<vec_ops_real>( state_size );
     if ( parameters.use_high_precision_reduction )
     {
-        vec_ops_R.use_high_precision();
+        vec_ops_R->use_high_precision();
     }
 
-    files_ops_t        file_ops( &vec_ops_R );
-    ks1d_t             KS1D( a_val, b_val, physical_size, &vec_ops_R );
-    symmetry_adapter_t symmetry_adapter( &vec_ops_R, positive_modes );
-    const auto         config_json             = main_classes::read_json( path_to_config_file );
-    auto               storage_symmetry_policy = symmetry::fourier::read_real_packed_fourier_slice_1d_policy<real>(
+    auto       file_ops                = std::make_shared<files_ops_t>( vec_ops_R.get() );
+    auto       KS1D                    = std::make_shared<ks1d_t>( a_val, b_val, physical_size, vec_ops_R );
+    auto       symmetry_adapter        = std::make_shared<symmetry_adapter_t>( vec_ops_R, positive_modes );
+    const auto config_json             = main_classes::read_json( path_to_config_file );
+    auto       storage_symmetry_policy = symmetry::fourier::read_real_packed_fourier_slice_1d_policy<real>(
         config_json, "symmetry_stabilizer", ks1d_t::default_continuation_symmetry_policy()
     );
     auto continuation_symmetry_policy = symmetry::fourier::read_real_packed_fourier_slice_1d_policy<real>(
@@ -267,33 +267,33 @@ int main( int argc, char const *argv[] )
             "LSQ continuation is disabled until its frozen-chart Jacobian and corrector tests pass"
         );
     }
-    symmetry_adapter.configure( storage_symmetry_policy );
-    KS1D.configure_continuation_symmetry( continuation_symmetry_policy );
+    symmetry_adapter->configure( storage_symmetry_policy );
+    KS1D->configure_continuation_symmetry( continuation_symmetry_policy );
     if ( !quiet )
     {
         print_symmetry_stabilizer_policy( "symmetry_stabilizer", storage_symmetry_policy );
         print_symmetry_stabilizer_policy( "continuation_symmetry_stabilizer", continuation_symmetry_policy );
     }
-    finite_actions_t finite_actions( &vec_ops_R );
-    KS1D.configure_finite_symmetry_actions( finite_actions );
-    quotient_adapter_t quotient_adapter( &vec_ops_R, &symmetry_adapter, &finite_actions );
+    auto finite_actions = std::make_shared<finite_actions_t>( vec_ops_R );
+    KS1D->configure_finite_symmetry_actions( *finite_actions );
+    auto quotient_adapter = std::make_shared<quotient_adapter_t>( vec_ops_R, symmetry_adapter, finite_actions );
 
     log_t log;
     log_t log_linsolver;
     log.set_verbosity( quiet ? 0 : 1 );
     log_linsolver.set_verbosity( quiet ? 0 : 1 );
-    sol_storage_t sol_storage_with_log(
-        &vec_ops_R, 50, vec_ops_R.get_l2_size(), real( 2 ), &quotient_adapter, 1e-10, &log
+    auto sol_storage_with_log = std::make_shared<sol_storage_t>(
+        vec_ops_R, 50, vec_ops_R->get_l2_size(), real( 2 ), quotient_adapter, 1e-10, &log
     );
 
+    using linear_system_t =
+        nmfd::solvers::sherman_morrison<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t, nmfd::solvers::bicgstabl>;
     using deflation_continuation_t = main_classes::deflation_continuation<
-        vec_ops_real, files_ops_t, log_t, monitor_t, ks1d_t, lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl,
+        vec_ops_real, files_ops_t, log_t, monitor_t, ks1d_t, lin_op_t, prec_t, ks1d_model::bicgstabl,
         nonlinear_operators::projected_system_operator, parameters_t, sol_storage_t,
-        continuation::projected_system_operator_continuation>;
+        continuation::projected_system_operator_continuation, linear_system_t>;
 
-    deflation_continuation_t DC(
-        &vec_ops_R, &file_ops, &log, &log_linsolver, &KS1D, &parameters, &sol_storage_with_log
-    );
+    deflation_continuation_t DC( vec_ops_R, file_ops, &log, &log_linsolver, KS1D, configuration, sol_storage_with_log );
 
     DC.set_parameters();
 
@@ -304,27 +304,23 @@ int main( int argc, char const *argv[] )
 
     if ( seed_zero )
     {
-        real_vec x_seed;
-        vec_ops_R.init_vector( x_seed );
-        vec_ops_R.start_use_vector( x_seed );
-        KS1D.exact_solution( seed_lambda, x_seed );
+        nmfd::detail::vector_wrap<vec_ops_real, false, false> x_seed( *vec_ops_R );
+        x_seed.init();
+        x_seed.start_use();
+        KS1D->exact_solution( seed_lambda, *x_seed );
         std::cout << "Exact full Fourier KS1D zero-branch seed: lambda=" << seed_lambda << std::endl;
-        DC.add_solution_curve( x_seed, seed_lambda );
-        vec_ops_R.stop_use_vector( x_seed );
-        vec_ops_R.free_vector( x_seed );
+        DC.add_solution_curve( *x_seed, seed_lambda );
     }
 
     if ( seed_file )
     {
-        real_vec x_seed;
-        vec_ops_R.init_vector( x_seed );
-        vec_ops_R.start_use_vector( x_seed );
-        file_ops.read_vector( seed_file_path, x_seed );
+        nmfd::detail::vector_wrap<vec_ops_real, false, false> x_seed( *vec_ops_R );
+        x_seed.init();
+        x_seed.start_use();
+        file_ops->read_vector( seed_file_path, *x_seed );
         std::cout << "Loaded full Fourier KS1D seed: lambda=" << seed_lambda << ", file=" << seed_file_path
                   << std::endl;
-        DC.add_solution_curve( x_seed, seed_lambda );
-        vec_ops_R.stop_use_vector( x_seed );
-        vec_ops_R.free_vector( x_seed );
+        DC.add_solution_curve( *x_seed, seed_lambda );
     }
 
     if ( !continue_seed_only || ( !seed_zero && !seed_file ) )

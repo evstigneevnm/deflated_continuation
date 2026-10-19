@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -34,6 +35,12 @@ public:
             throw std::invalid_argument( "finite_action_registry got null vector operations" );
         }
         reset_to_identity();
+    }
+
+    explicit finite_action_registry( std::shared_ptr<VectorOperations> operations )
+        : finite_action_registry( operations.get() )
+    {
+        operations_owner_ = std::move( operations );
     }
 
     VectorOperations *vector_operations() const
@@ -149,10 +156,11 @@ private:
     }
 
 private:
-    VectorOperations         *vec_ops;
-    std::vector<action_entry> actions;
-    std::string               definition_fingerprint_          = "identity";
-    bool                      definition_fingerprint_explicit_ = false;
+    std::shared_ptr<VectorOperations> operations_owner_;
+    VectorOperations                 *vec_ops;
+    std::vector<action_entry>         actions;
+    std::string                       definition_fingerprint_          = "identity";
+    bool                              definition_fingerprint_explicit_ = false;
 };
 
 } // namespace symmetry

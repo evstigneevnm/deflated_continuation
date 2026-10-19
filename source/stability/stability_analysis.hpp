@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <functional>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -263,6 +264,12 @@ public:
     void set_transition_state_aligner( Aligner *aligner )
     {
         transition_refiner_.set_transition_state_aligner( aligner );
+    }
+
+    template <class Aligner>
+    void set_transition_state_aligner( std::shared_ptr<Aligner> aligner )
+    {
+        transition_refiner_.set_transition_state_aligner( std::move( aligner ) );
     }
 
     void reset_transition_state_aligner()

@@ -5,10 +5,13 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
+#include <nmfd/detail/vector_wrap.h>
 
 #include <symmetry/finite_action_registry.h>
 
@@ -83,13 +86,14 @@ public:
         VectorOperations *vec_ops_, ContinuousAdapter *continuous_adapter_,
         finite_action_registry_type *finite_actions_, orbit_aligner_type *orbit_aligner_
     )
-        : vec_ops( vec_ops_ ), continuous_adapter( continuous_adapter_ ), finite_actions( finite_actions_ ),
-          orbit_aligner( orbit_aligner_ )
+        : vec_ops(
+              vec_ops_ ? vec_ops_ : throw std::invalid_argument( "finite_quotient_adapter got null vector operations" )
+          ),
+          continuous_adapter( continuous_adapter_ ), finite_actions( finite_actions_ ), orbit_aligner( orbit_aligner_ ),
+          action_source_storage_( *vec_ops ), candidate_storage_( *vec_ops ), best_storage_( *vec_ops ),
+          gradient_storage_( *vec_ops ), action_tangent_storage_( *vec_ops ), candidate_tangent_storage_( *vec_ops ),
+          best_tangent_storage_( *vec_ops ), distance_storage_( *vec_ops )
     {
-        if ( vec_ops == nullptr )
-        {
-            throw std::invalid_argument( "finite_quotient_adapter got null vector operations" );
-        }
         if ( continuous_adapter == nullptr )
         {
             throw std::invalid_argument( "finite_quotient_adapter got null continuous adapter" );
@@ -107,43 +111,40 @@ public:
             throw std::invalid_argument( "finite_quotient_adapter needs at least one finite action" );
         }
 
-        vec_ops->init_vector( action_source );
-        vec_ops->init_vector( candidate );
-        vec_ops->init_vector( best );
-        vec_ops->init_vector( action_gradient );
-        vec_ops->init_vector( action_tangent );
-        vec_ops->init_vector( candidate_tangent );
-        vec_ops->init_vector( best_tangent );
-        vec_ops->init_vector( distance );
-        vec_ops->start_use_vector( action_source );
-        vec_ops->start_use_vector( candidate );
-        vec_ops->start_use_vector( best );
-        vec_ops->start_use_vector( action_gradient );
-        vec_ops->start_use_vector( action_tangent );
-        vec_ops->start_use_vector( candidate_tangent );
-        vec_ops->start_use_vector( best_tangent );
-        vec_ops->start_use_vector( distance );
+        for ( auto *storage :
+              { &action_source_storage_, &candidate_storage_, &best_storage_, &gradient_storage_,
+                &action_tangent_storage_, &candidate_tangent_storage_, &best_tangent_storage_, &distance_storage_ } )
+        {
+            storage->init();
+            storage->start_use();
+        }
     }
 
-    ~finite_quotient_adapter()
+    template <
+        class Aligner                                                                = orbit_aligner_type,
+        std::enable_if_t<std::is_same<Aligner, continuous_adapter_type>::value, int> = 0>
+    finite_quotient_adapter(
+        std::shared_ptr<VectorOperations> operations, std::shared_ptr<ContinuousAdapter> continuous,
+        std::shared_ptr<finite_action_registry_type> actions
+    )
+        : finite_quotient_adapter( operations, continuous, std::move( actions ), continuous )
     {
-        vec_ops->stop_use_vector( best_tangent );
-        vec_ops->free_vector( best_tangent );
-        vec_ops->stop_use_vector( candidate_tangent );
-        vec_ops->free_vector( candidate_tangent );
-        vec_ops->stop_use_vector( action_tangent );
-        vec_ops->free_vector( action_tangent );
-        vec_ops->stop_use_vector( distance );
-        vec_ops->free_vector( distance );
-        vec_ops->stop_use_vector( action_gradient );
-        vec_ops->free_vector( action_gradient );
-        vec_ops->stop_use_vector( best );
-        vec_ops->free_vector( best );
-        vec_ops->stop_use_vector( candidate );
-        vec_ops->free_vector( candidate );
-        vec_ops->stop_use_vector( action_source );
-        vec_ops->free_vector( action_source );
     }
+
+    finite_quotient_adapter(
+        std::shared_ptr<VectorOperations> operations, std::shared_ptr<ContinuousAdapter> continuous,
+        std::shared_ptr<finite_action_registry_type> actions, std::shared_ptr<orbit_aligner_type> aligner
+    )
+        : finite_quotient_adapter( operations.get(), continuous.get(), actions.get(), aligner.get() )
+    {
+        operations_owner_ = std::move( operations );
+        continuous_owner_ = std::move( continuous );
+        actions_owner_    = std::move( actions );
+        aligner_owner_    = std::move( aligner );
+    }
+
+    finite_quotient_adapter( const finite_quotient_adapter & )            = delete;
+    finite_quotient_adapter &operator=( const finite_quotient_adapter & ) = delete;
 
     ContinuousAdapter *continuous() const
     {
@@ -294,6 +295,10 @@ public:
     }
 
 private:
+    std::shared_ptr<VectorOperations>            operations_owner_;
+    std::shared_ptr<ContinuousAdapter>           continuous_owner_;
+    std::shared_ptr<finite_action_registry_type> actions_owner_;
+    std::shared_ptr<orbit_aligner_type>          aligner_owner_;
     std::size_t select_canonical_action( const vector_type &source, vector_type &destination )
     {
         bool                     have_best = false;
@@ -372,19 +377,22 @@ private:
     }
 
 private:
-    VectorOperations            *vec_ops;
-    ContinuousAdapter           *continuous_adapter;
-    finite_action_registry_type *finite_actions;
-    orbit_aligner_type          *orbit_aligner;
-    vector_type                  action_source;
-    vector_type                  candidate;
-    vector_type                  best;
-    vector_type                  action_gradient;
-    vector_type                  action_tangent;
-    vector_type                  candidate_tangent;
-    vector_type                  best_tangent;
-    vector_type                  distance;
-    std::size_t                  last_action_index_ = 0;
+    VectorOperations                                         *vec_ops;
+    ContinuousAdapter                                        *continuous_adapter;
+    finite_action_registry_type                              *finite_actions;
+    orbit_aligner_type                                       *orbit_aligner;
+    nmfd::detail::vector_wrap<VectorOperations, false, false> action_source_storage_, candidate_storage_, best_storage_,
+        gradient_storage_, action_tangent_storage_, candidate_tangent_storage_, best_tangent_storage_,
+        distance_storage_;
+    vector_type &action_source      = *action_source_storage_;
+    vector_type &candidate          = *candidate_storage_;
+    vector_type &best               = *best_storage_;
+    vector_type &action_gradient    = *gradient_storage_;
+    vector_type &action_tangent     = *action_tangent_storage_;
+    vector_type &candidate_tangent  = *candidate_tangent_storage_;
+    vector_type &best_tangent       = *best_tangent_storage_;
+    vector_type &distance           = *distance_storage_;
+    std::size_t  last_action_index_ = 0;
 };
 
 } // namespace symmetry

@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <functional>
 #include <iomanip>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -150,6 +151,12 @@ public:
     void set_transition_state_aligner( Aligner *aligner )
     {
         state_alignment_.set( aligner );
+    }
+
+    template <class Aligner>
+    void set_transition_state_aligner( std::shared_ptr<Aligner> aligner )
+    {
+        state_alignment_.set( std::move( aligner ) );
     }
 
     void reset_transition_state_aligner()

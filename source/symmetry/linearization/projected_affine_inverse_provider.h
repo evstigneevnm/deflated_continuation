@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include <nmfd/detail/vector_wrap.h>
+
 #include <stability/eigensolvers/transformations/affine_inverse_health.h>
 
 namespace symmetry
@@ -35,24 +37,35 @@ public:
         std::shared_ptr<const provider_type> provider, scalar_type gauge_completion = scalar_type( 1 )
     )
         : vector_operations_( vector_operations ), nonlinear_operator_( nonlinear_operator ),
-          provider_( std::move( provider ) ), gauge_completion_( gauge_completion )
+          provider_( std::move( provider ) ), gauge_completion_( gauge_completion ),
+          projected_storage_( vector_operations ), gauge_storage_( vector_operations ),
+          tangent_storage_( vector_operations )
     {
         if ( !provider_ )
             throw std::invalid_argument( "projected affine inverse requires a provider" );
-        initialize( projected_rhs_ );
-        initialize( gauge_rhs_ );
-        initialize( tangent_solution_ );
+        for ( auto *storage : { &projected_storage_, &gauge_storage_, &tangent_storage_ } )
+        {
+            storage->init();
+            storage->start_use();
+        }
+    }
+
+    projected_affine_inverse_provider(
+        std::shared_ptr<vector_operations_type> operations, std::shared_ptr<nonlinear_operator_type> problem,
+        std::shared_ptr<const provider_type> provider, scalar_type gauge_completion = scalar_type( 1 )
+    )
+        : projected_affine_inverse_provider(
+              operations ? *operations : throw std::invalid_argument( "projected affine inverse requires a space" ),
+              problem ? *problem : throw std::invalid_argument( "projected affine inverse requires a problem" ),
+              std::move( provider ), gauge_completion
+          )
+    {
+        operations_owner_ = std::move( operations );
+        problem_owner_    = std::move( problem );
     }
 
     projected_affine_inverse_provider( const projected_affine_inverse_provider & )            = delete;
     projected_affine_inverse_provider &operator=( const projected_affine_inverse_provider & ) = delete;
-
-    ~projected_affine_inverse_provider()
-    {
-        release( tangent_solution_ );
-        release( gauge_rhs_ );
-        release( projected_rhs_ );
-    }
 
     bool apply(
         scalar_type jacobian_scale, scalar_type identity_shift, const vector_type &right_hand_side,
@@ -132,27 +145,19 @@ public:
     }
 
 private:
-    void initialize( vector_type &vector )
-    {
-        vector_operations_.init_vector( vector );
-        vector_operations_.start_use_vector( vector );
-    }
-
-    void release( vector_type &vector )
-    {
-        vector_operations_.stop_use_vector( vector );
-        vector_operations_.free_vector( vector );
-    }
-
-    vector_operations_type              &vector_operations_;
-    nonlinear_operator_type             &nonlinear_operator_;
-    std::shared_ptr<const provider_type> provider_;
-    scalar_type                          gauge_completion_;
-    mutable vector_type                  projected_rhs_;
-    mutable vector_type                  gauge_rhs_;
-    mutable vector_type                  tangent_solution_;
-    mutable std::size_t                  apply_calls_         = 0;
-    mutable std::size_t                  failed_applications_ = 0;
+    std::shared_ptr<vector_operations_type>                                 operations_owner_;
+    std::shared_ptr<nonlinear_operator_type>                                problem_owner_;
+    vector_operations_type                                                 &vector_operations_;
+    nonlinear_operator_type                                                &nonlinear_operator_;
+    std::shared_ptr<const provider_type>                                    provider_;
+    scalar_type                                                             gauge_completion_;
+    mutable nmfd::detail::vector_wrap<vector_operations_type, false, false> projected_storage_, gauge_storage_,
+        tangent_storage_;
+    vector_type        &projected_rhs_       = *projected_storage_;
+    vector_type        &gauge_rhs_           = *gauge_storage_;
+    vector_type        &tangent_solution_    = *tangent_storage_;
+    mutable std::size_t apply_calls_         = 0;
+    mutable std::size_t failed_applications_ = 0;
 };
 
 } // namespace linearization

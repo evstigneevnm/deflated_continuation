@@ -1,6 +1,11 @@
 #ifndef __SYMMETRY_LINEARIZATION_PROJECTED_STABILITY_LINEAR_OPERATOR_H__
 #define __SYMMETRY_LINEARIZATION_PROJECTED_STABILITY_LINEAR_OPERATOR_H__
 
+#include <memory>
+#include <stdexcept>
+#include <utility>
+#include <nmfd/detail/vector_wrap.h>
+
 namespace symmetry
 {
 namespace linearization
@@ -23,21 +28,29 @@ public:
     explicit projected_stability_linear_operator(
         NonlinearOperator *nonlinear_operator, scalar_type gauge_completion = scalar_type( 1 )
     )
-        : nonlinear_operator_( nonlinear_operator ), vector_operations_( nonlinear_operator_->get_vec_ops_ref() ),
-          gauge_completion_( gauge_completion )
+        : nonlinear_operator_(
+              nonlinear_operator ? nonlinear_operator
+                                 : throw std::invalid_argument( "projected stability requires a problem" )
+          ),
+          vector_operations_( nonlinear_operator_->get_vec_ops_ref() ), gauge_completion_( gauge_completion ),
+          projected_storage_( *vector_operations_ ), gauge_storage_( *vector_operations_ )
     {
-        vector_operations_->init_vectors( projected_source_, gauge_component_ );
-        vector_operations_->start_use_vectors( projected_source_, gauge_component_ );
+        projected_storage_.init();
+        projected_storage_.start_use();
+        gauge_storage_.init();
+        gauge_storage_.start_use();
+    }
+
+    explicit projected_stability_linear_operator(
+        std::shared_ptr<NonlinearOperator> problem, scalar_type gauge_completion = scalar_type( 1 )
+    )
+        : projected_stability_linear_operator( problem.get(), gauge_completion )
+    {
+        problem_owner_ = std::move( problem );
     }
 
     projected_stability_linear_operator( const projected_stability_linear_operator & )            = delete;
     projected_stability_linear_operator &operator=( const projected_stability_linear_operator & ) = delete;
-
-    ~projected_stability_linear_operator()
-    {
-        vector_operations_->stop_use_vectors( projected_source_, gauge_component_ );
-        vector_operations_->free_vectors( projected_source_, gauge_component_ );
-    }
 
     void apply( const vector_type &source, vector_type &destination ) const
     {
@@ -60,11 +73,13 @@ public:
     }
 
 private:
-    NonlinearOperator  *nonlinear_operator_;
-    VectorOperations   *vector_operations_;
-    scalar_type         gauge_completion_;
-    mutable vector_type projected_source_;
-    mutable vector_type gauge_component_;
+    std::shared_ptr<NonlinearOperator>                                problem_owner_;
+    NonlinearOperator                                                *nonlinear_operator_;
+    VectorOperations                                                 *vector_operations_;
+    scalar_type                                                       gauge_completion_;
+    mutable nmfd::detail::vector_wrap<VectorOperations, false, false> projected_storage_, gauge_storage_;
+    vector_type                                                      &projected_source_ = *projected_storage_;
+    vector_type                                                      &gauge_component_  = *gauge_storage_;
 };
 
 } // namespace linearization

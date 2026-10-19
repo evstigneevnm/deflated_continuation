@@ -6,8 +6,10 @@
 #include <complex>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <numeric>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include <symmetry/fourier/fourier_slice_differential_1d.h>
@@ -77,6 +79,16 @@ public:
         {
             throw std::invalid_argument( "real_packed_fourier_slice_1d_adapter needs at least one positive mode" );
         }
+    }
+
+    real_packed_fourier_slice_1d_adapter(
+        std::shared_ptr<VectorOperations> operations, const std::size_t positive_modes,
+        const real_packed_fourier_1d_layout layout = real_packed_fourier_1d_layout::interleaved_real_imag,
+        const scalar_type                   active_mode_tolerance = slice_type::default_active_mode_tolerance()
+    )
+        : real_packed_fourier_slice_1d_adapter( operations.get(), positive_modes, layout, active_mode_tolerance )
+    {
+        operations_owner_ = std::move( operations );
     }
 
     std::size_t positive_modes() const
@@ -1203,6 +1215,7 @@ private:
     }
 
 private:
+    std::shared_ptr<VectorOperations>                                operations_owner_;
     VectorOperations                                                *vec_ops;
     std::size_t                                                      positive_modes_;
     codec_type                                                       codec;

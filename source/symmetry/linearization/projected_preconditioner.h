@@ -1,6 +1,11 @@
 #ifndef __SYMMETRY_LINEARIZATION_PROJECTED_PRECONDITIONER_H__
 #define __SYMMETRY_LINEARIZATION_PROJECTED_PRECONDITIONER_H__
 
+#include <memory>
+#include <stdexcept>
+#include <utility>
+#include <nmfd/detail/vector_wrap.h>
+
 namespace symmetry
 {
 namespace linearization
@@ -14,20 +19,21 @@ public:
     using vector_type = typename VectorOperations::vector_type;
 
     explicit projected_preconditioner( NonlinearOperator *nonlin_op_ )
-        : nonlin_op( nonlin_op_ ), vec_ops( nonlin_op_->get_vec_ops_ref() )
+        : nonlin_op(
+              nonlin_op_ ? nonlin_op_ : throw std::invalid_argument( "projected preconditioner requires a problem" )
+          ),
+          vec_ops( nonlin_op->get_vec_ops_ref() ), projected_storage_( *vec_ops ), gauge_storage_( *vec_ops )
     {
-        vec_ops->init_vector( projected_x );
-        vec_ops->start_use_vector( projected_x );
-        vec_ops->init_vector( gauge_component );
-        vec_ops->start_use_vector( gauge_component );
+        projected_storage_.init();
+        projected_storage_.start_use();
+        gauge_storage_.init();
+        gauge_storage_.start_use();
     }
 
-    ~projected_preconditioner()
+    explicit projected_preconditioner( std::shared_ptr<NonlinearOperator> problem )
+        : projected_preconditioner( problem.get() )
     {
-        vec_ops->stop_use_vector( gauge_component );
-        vec_ops->free_vector( gauge_component );
-        vec_ops->stop_use_vector( projected_x );
-        vec_ops->free_vector( projected_x );
+        problem_owner_ = std::move( problem );
     }
 
     projected_preconditioner( const projected_preconditioner & )            = delete;
@@ -35,7 +41,15 @@ public:
 
     void set_operator( const LinearOperator *op_ ) const
     {
+        if ( op_ != operator_owner_.get() )
+            operator_owner_.reset();
         lin_op = op_;
+    }
+
+    void set_operator( std::shared_ptr<const LinearOperator> op ) const
+    {
+        operator_owner_ = std::move( op );
+        lin_op          = operator_owner_.get();
     }
 
     void apply( vector_type &x ) const
@@ -49,11 +63,14 @@ public:
     }
 
 private:
-    NonlinearOperator            *nonlin_op;
-    VectorOperations             *vec_ops;
-    mutable vector_type           projected_x;
-    mutable vector_type           gauge_component;
-    mutable const LinearOperator *lin_op = nullptr;
+    std::shared_ptr<NonlinearOperator>                                problem_owner_;
+    mutable std::shared_ptr<const LinearOperator>                     operator_owner_;
+    NonlinearOperator                                                *nonlin_op;
+    VectorOperations                                                 *vec_ops;
+    mutable nmfd::detail::vector_wrap<VectorOperations, false, false> projected_storage_, gauge_storage_;
+    vector_type                                                      &projected_x     = *projected_storage_;
+    vector_type                                                      &gauge_component = *gauge_storage_;
+    mutable const LinearOperator                                     *lin_op          = nullptr;
 };
 
 } // namespace linearization

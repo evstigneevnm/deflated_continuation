@@ -277,6 +277,13 @@ public:
         source_path_marcher->set_state_aligner( aligner );
     }
 
+    template <class Aligner>
+    void set_transition_state_aligner( std::shared_ptr<Aligner> aligner )
+    {
+        stab->set_transition_state_aligner( aligner );
+        source_path_marcher->set_state_aligner( std::move( aligner ) );
+    }
+
     void reset_transition_state_aligner()
     {
         stab->reset_transition_state_aligner();

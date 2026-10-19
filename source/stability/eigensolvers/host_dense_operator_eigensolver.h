@@ -6,9 +6,11 @@
 #include <complex>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include <stability/analysis/detail/vector_workspace.h>
@@ -61,6 +63,21 @@ public:
         {
             throw std::invalid_argument( "host dense eigensolver residual tolerances are invalid" );
         }
+    }
+
+    host_dense_operator_eigensolver(
+        std::shared_ptr<vector_space_type> space, std::shared_ptr<const operator_type> op,
+        std::shared_ptr<dense_lapack_type> lapack, options_type options = {}
+    )
+        : host_dense_operator_eigensolver(
+              space ? *space : throw std::invalid_argument( "dense eigensolver requires a space" ),
+              op ? *op : throw std::invalid_argument( "dense eigensolver requires an operator" ),
+              lapack ? *lapack : throw std::invalid_argument( "dense eigensolver requires dense operations" ), options
+          )
+    {
+        space_owner_    = std::move( space );
+        operator_owner_ = std::move( op );
+        lapack_owner_   = std::move( lapack );
     }
 
     result_type execute( const vector_type & ) const
@@ -135,6 +152,9 @@ public:
     }
 
 private:
+    std::shared_ptr<vector_space_type>                            space_owner_;
+    std::shared_ptr<const operator_type>                          operator_owner_;
+    std::shared_ptr<dense_lapack_type>                            lapack_owner_;
     vector_space_type                                            &vector_space_;
     const operator_type                                          &linear_operator_;
     dense_lapack_type                                            &dense_lapack_;

@@ -1,4 +1,6 @@
-# Symmetric KS1D Linear-Solver Regression
+# KS1D Linear-Solver Regressions
+
+## Symmetric KS1D
 
 `symmetric_lambda6.dat` is the unchanged state `KS1D_test_sym/1/1` from
 `KS1D/N128/stability_20260824/symmetric/project.tar.xz`, published under
@@ -13,3 +15,17 @@ The complete archive remains under `data/reference`; CI needs only this state.
 from the first seven rows of the same archive's `1/debug_curve.dat`.
 The workflow replay compares both fields after nontrivial continuation,
 then checks stability and byte-identical stability restart.
+
+## Full KS1D
+
+`full_nmfd_continuation_reference.dat` records the parameter and normalized
+reduced L2 norm of ten points generated with the pre-migration full-KS1D
+binary built from parent commit `ec75b2c` (legacy BiCGStab(L)). It starts
+from `stability_replay/curve03_state058.dat` at lambda=16.14704430336377.
+The configuration is `KS1D_test_full.json` with N=128, knots [16, 16.2],
+four steps per semicurve, initial step 0.02, maximum step 0.03, and no
+deflation attempts. Existing symmetry policies and tolerances are unchanged.
+
+The full replay compares this curve, checks its (1, 0) unstable signature,
+verifies byte-identical stability restart, and exercises nonzero deflation.
+The original state/transition fixtures and their manifest remain unchanged.

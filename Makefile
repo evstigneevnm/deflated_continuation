@@ -764,6 +764,13 @@ test_KS1D_linear_solvers_cuda.bin: source/models/KS_1D/test_KS1D_linear_solvers.
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) -x cu $< -c -o $(BUILD_DIR)/test_KS1D_linear_solvers_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS1D_linear_solvers_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
+test_KS1D_full_linear_solvers_cpu_omp.bin: source/models/KS_1D/test_KS1D_full_linear_solvers.cpp $(KS1D_FULL_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(KS1D_STABILITY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
+	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $< $(OPENMP) $(LFFTW) $(LLAPACK) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_KS1D_full_linear_solvers_cuda.bin: source/models/KS_1D/test_KS1D_full_linear_solvers.cpp $(KS1D_FULL_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(KS1D_STABILITY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) -x cu $< -c -o $(BUILD_DIR)/test_KS1D_full_linear_solvers_cuda_main.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS1D_full_linear_solvers_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) $(LLAPACK) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
 KS1D_operator_cuda.bin: source/models/KS_1D/test_KS1D_operator.cpp $(KS1D_MODEL_HEADERS) $(RESIDUAL_DECOMPOSITION_TEST_HEADER) $(ADJOINT_JACOBIAN_TEST_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/KS_1D/test_KS1D_operator.cpp -c -o $(BUILD_DIR)/test_KS1D_operator_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS1D_operator_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/test_KS1D_operator_cuda.bin 2>$(RESULTS)
@@ -785,8 +792,8 @@ KS1D_stability_scan_cuda.bin: source/models/KS_1D/test_KS1D_stability_scan.cpp $
 KS1D_bd_cpu_omp: source/models/KS_1D/KS1D_bd.cpp $(KS1D_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
 	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/KS_1D/KS1D_bd.cpp $(OPENMP) $(LFFTW) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_bd_cpu_omp.bin 2>$(RESULTS)
 
-KS1D_full_bd_cpu_omp: source/models/KS_1D/KS1D_full_bd.cpp $(KS1D_FULL_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
-	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) source/models/KS_1D/KS1D_full_bd.cpp $(OPENMP) $(LFFTW) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_full_bd_cpu_omp.bin 2>$(RESULTS)
+KS1D_full_bd_cpu_omp: source/models/KS_1D/KS1D_full_bd.cpp $(KS1D_FULL_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
+	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/KS_1D/KS1D_full_bd.cpp $(OPENMP) $(LFFTW) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_full_bd_cpu_omp.bin 2>$(RESULTS)
 
 KS1D_bd: KS1D_bd_cuda
 
@@ -794,14 +801,14 @@ KS1D_bd_cuda: source/models/KS_1D/KS1D_bd.cpp $(KS1D_MODEL_HEADERS) $(KS1D_LINEA
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -x cu source/models/KS_1D/KS1D_bd.cpp -c -o $(BUILD_DIR)/KS1D_bd_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/KS1D_bd_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_bd_cuda.bin 2>$(RESULTS)
 
-KS1D_full_bd_cuda: source/models/KS_1D/KS1D_full_bd.cpp $(KS1D_FULL_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
-	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/KS_1D/KS1D_full_bd.cpp -c -o $(BUILD_DIR)/KS1D_full_bd_cuda_main.o 2>$(RESULTS)
+KS1D_full_bd_cuda: source/models/KS_1D/KS1D_full_bd.cpp $(KS1D_FULL_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -x cu source/models/KS_1D/KS1D_full_bd.cpp -c -o $(BUILD_DIR)/KS1D_full_bd_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/KS1D_full_bd_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBSAll) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_full_bd_cuda.bin 2>$(RESULTS)
 
 KS1D_stability_cpu_omp: source/models/KS_1D/KS1D_stability.cpp $(KS1D_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(KS1D_STABILITY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
 	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/KS_1D/KS1D_stability.cpp $(OPENMP) $(LFFTW) $(LLAPACK) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_stability_cpu_omp.bin 2>$(RESULTS)
 
-KS1D_full_stability_cpu_omp: source/models/KS_1D/KS1D_full_stability.cpp $(KS1D_FULL_MODEL_HEADERS) $(KS1D_STABILITY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
+KS1D_full_stability_cpu_omp: source/models/KS_1D/KS1D_full_stability.cpp $(KS1D_FULL_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(KS1D_STABILITY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
 	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/KS_1D/KS1D_full_stability.cpp $(OPENMP) $(LFFTW) $(LLAPACK) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_full_stability_cpu_omp.bin 2>$(RESULTS)
 
 test_KS1D_full_stability_replay_cpu_omp: KS1D_full_stability_cpu_omp $(KS1D_STABILITY_REPLAY_SCRIPT) $(KS1D_STABILITY_REPLAY_MANIFEST)
@@ -811,7 +818,7 @@ KS1D_stability_cuda: source/models/KS_1D/KS1D_stability.cpp $(KS1D_MODEL_HEADERS
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -x cu source/models/KS_1D/KS1D_stability.cpp -c -o $(BUILD_DIR)/KS1D_stability_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/KS1D_stability_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBSAll) $(LLAPACK) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_stability_cuda.bin 2>$(RESULTS)
 
-KS1D_full_stability_cuda: source/models/KS_1D/KS1D_full_stability.cpp $(KS1D_FULL_MODEL_HEADERS) $(KS1D_STABILITY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+KS1D_full_stability_cuda: source/models/KS_1D/KS1D_full_stability.cpp $(KS1D_FULL_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(KS1D_STABILITY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -x cu source/models/KS_1D/KS1D_full_stability.cpp -c -o $(BUILD_DIR)/KS1D_full_stability_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/KS1D_full_stability_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBSAll) $(LLAPACK) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_full_stability_cuda.bin 2>$(RESULTS)
 

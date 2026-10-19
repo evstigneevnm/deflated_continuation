@@ -2,7 +2,9 @@
 #define __STABILITY_ANALYSIS_TRANSITION_STATE_ALIGNMENT_H__
 
 #include <functional>
+#include <memory>
 #include <stdexcept>
+#include <utility>
 
 namespace stability
 {
@@ -31,6 +33,17 @@ public:
         align_ = [aligner]( const vector_type &reference, const vector_type &source, vector_type &destination ) {
             aligner->stabilize_closest_to_reference( reference, source, destination );
         };
+        identity_ = false;
+    }
+
+    template <class Aligner>
+    void set( std::shared_ptr<Aligner> aligner )
+    {
+        if ( !aligner )
+            throw std::invalid_argument( "transition_state_alignment: aligner is null" );
+        align_ = [aligner = std::move( aligner )](
+                     const vector_type &reference, const vector_type &source, vector_type &destination
+                 ) { aligner->stabilize_closest_to_reference( reference, source, destination ); };
         identity_ = false;
     }
 

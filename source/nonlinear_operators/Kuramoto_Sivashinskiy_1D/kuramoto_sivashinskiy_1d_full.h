@@ -4,9 +4,11 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h>
 #include <nonlinear_operators/detail/linear_nonlinear_terms.h>
@@ -42,9 +44,15 @@ public:
     kuramoto_sivashinskiy_1d_full(
         const T &a_val_, const T &b_val_, std::size_t physical_size_, VectorOperations *vec_ops_
     )
-        : vec_ops( vec_ops_ ), physical_size_( physical_size_ ), complex_size_( physical_size_ / 2 + 1 ),
+        : vec_ops( vec_ops_ ? vec_ops_ : throw std::invalid_argument( "full KS1D requires vector operations" ) ),
+          physical_size_( physical_size_ ), complex_size_( physical_size_ / 2 + 1 ),
           mode_count_( complex_size_ > 1 ? complex_size_ - 2 : 0 ), state_size_( 2 * mode_count_ ),
-          fft_plan( physical_size_ ), symmetry_adapter( vec_ops_, mode_count_ ), a_val( a_val_ ), b_val( b_val_ )
+          fft_plan( physical_size_ ), symmetry_adapter( vec_ops_, mode_count_ ), a_val( a_val_ ), b_val( b_val_ ),
+          physical_space_{ *vec_ops, physical_size_ }, u0_storage_( *vec_ops ), state_storage_( *vec_ops ),
+          vector_storage_( *vec_ops ), residual_storage_( *vec_ops ), field_storage_( *vec_ops ),
+          physical_u_storage_( physical_space_ ), physical_ux_storage_( physical_space_ ),
+          physical_du_storage_( physical_space_ ), physical_dux_storage_( physical_space_ ),
+          physical_nonlin_storage_( physical_space_ ), physical_out_storage_( physical_space_ )
     {
         if ( physical_size_ < 4 || physical_size_ % 2 != 0 )
         {
@@ -60,39 +68,16 @@ public:
         common_constructor_operation();
     }
 
-    ~kuramoto_sivashinskiy_1d_full()
+    kuramoto_sivashinskiy_1d_full(
+        const T &a, const T &b, std::size_t physical_size, std::shared_ptr<VectorOperations> operations
+    )
+        : kuramoto_sivashinskiy_1d_full( a, b, physical_size, operations.get() )
     {
-        vec_ops->stop_use_vector( u_0 );
-        vec_ops->free_vector( u_0 );
-        vec_ops->stop_use_vector( projected_state );
-        vec_ops->free_vector( projected_state );
-        vec_ops->stop_use_vector( projected_vector );
-        vec_ops->free_vector( projected_vector );
-        vec_ops->stop_use_vector( projected_residual );
-        vec_ops->free_vector( projected_residual );
-        vec_ops->stop_use_vector( projected_field );
-        vec_ops->free_vector( projected_field );
-        vec_ops->stop_use_vector( physical_u );
-        vec_ops->free_vector( physical_u );
-        vec_ops->stop_use_vector( physical_ux );
-        vec_ops->free_vector( physical_ux );
-        vec_ops->stop_use_vector( physical_du );
-        vec_ops->free_vector( physical_du );
-        vec_ops->stop_use_vector( physical_dux );
-        vec_ops->free_vector( physical_dux );
-        vec_ops->stop_use_vector( physical_nonlin );
-        vec_ops->free_vector( physical_nonlin );
-        vec_ops->stop_use_vector( physical_out );
-        vec_ops->free_vector( physical_out );
-        free_complex( u_hat );
-        free_complex( ux_hat );
-        free_complex( du_hat );
-        free_complex( dux_hat );
-        free_complex( nonlin_hat );
-        free_complex( u0_hat );
-        free_complex( nonlin0_hat );
-        free_complex( ifft_work_hat );
+        operations_owner_ = std::move( operations );
     }
+
+    kuramoto_sivashinskiy_1d_full( const kuramoto_sivashinskiy_1d_full & )            = delete;
+    kuramoto_sivashinskiy_1d_full &operator=( const kuramoto_sivashinskiy_1d_full & ) = delete;
 
     std::size_t size() const
     {
@@ -609,29 +594,36 @@ private:
         }
         vec_ops->set( host_values.data(), u_out, state_size_ );
     }
-    VectorOperations     *vec_ops;
-    std::size_t           physical_size_;
-    std::size_t           complex_size_;
-    std::size_t           mode_count_;
-    std::size_t           state_size_;
-    fft_type              fft_plan;
-    symmetry_adapter_type symmetry_adapter;
-    T                     a_val;
-    T                     b_val;
-    T                     lambda_0               = T( 0 );
-    unsigned int          random_profile_counter = 0;
+    std::shared_ptr<VectorOperations> operations_owner_;
+    VectorOperations                 *vec_ops;
+    std::size_t                       physical_size_;
+    std::size_t                       complex_size_;
+    std::size_t                       mode_count_;
+    std::size_t                       state_size_;
+    fft_type                          fft_plan;
+    symmetry_adapter_type             symmetry_adapter;
+    T                                 a_val;
+    T                                 b_val;
+    T                                 lambda_0               = T( 0 );
+    unsigned int                      random_profile_counter = 0;
 
-    T_vec u_0;
-    T_vec projected_state;
-    T_vec projected_vector;
-    T_vec projected_residual;
-    T_vec projected_field;
-    T_vec physical_u;
-    T_vec physical_ux;
-    T_vec physical_du;
-    T_vec physical_dux;
-    T_vec physical_nonlin;
-    T_vec physical_out;
+    using physical_space_type = ks1d_detail::physical_vector_space<VectorOperations>;
+    physical_space_type                                       physical_space_;
+    nmfd::detail::vector_wrap<VectorOperations, false, false> u0_storage_, state_storage_, vector_storage_,
+        residual_storage_, field_storage_;
+    nmfd::detail::vector_wrap<physical_space_type, false, false> physical_u_storage_, physical_ux_storage_,
+        physical_du_storage_, physical_dux_storage_, physical_nonlin_storage_, physical_out_storage_;
+    T_vec &u_0                = *u0_storage_;
+    T_vec &projected_state    = *state_storage_;
+    T_vec &projected_vector   = *vector_storage_;
+    T_vec &projected_residual = *residual_storage_;
+    T_vec &projected_field    = *field_storage_;
+    T_vec &physical_u         = *physical_u_storage_;
+    T_vec &physical_ux        = *physical_ux_storage_;
+    T_vec &physical_du        = *physical_du_storage_;
+    T_vec &physical_dux       = *physical_dux_storage_;
+    T_vec &physical_nonlin    = *physical_nonlin_storage_;
+    T_vec &physical_out       = *physical_out_storage_;
 
     complex_vector_type u_hat;
     complex_vector_type ux_hat;
@@ -641,14 +633,6 @@ private:
     complex_vector_type u0_hat;
     complex_vector_type nonlin0_hat;
     complex_vector_type ifft_work_hat;
-
-    static void free_complex( complex_vector_type &x )
-    {
-        if ( !x.is_free() )
-        {
-            x.free();
-        }
-    }
 
     void init_complex( complex_vector_type &x )
     {
@@ -661,34 +645,19 @@ private:
 public:
     void common_constructor_operation()
     {
-        vec_ops->init_vector( u_0 );
-        vec_ops->start_use_vector( u_0 );
-        vec_ops->assign_scalar( T( 0 ), u_0 );
-        vec_ops->init_vector( projected_state );
-        vec_ops->start_use_vector( projected_state );
-        vec_ops->assign_scalar( T( 0 ), projected_state );
-        vec_ops->init_vector( projected_vector );
-        vec_ops->start_use_vector( projected_vector );
-        vec_ops->assign_scalar( T( 0 ), projected_vector );
-        vec_ops->init_vector( projected_residual );
-        vec_ops->start_use_vector( projected_residual );
-        vec_ops->assign_scalar( T( 0 ), projected_residual );
-        vec_ops->init_vector( projected_field );
-        vec_ops->start_use_vector( projected_field );
-        vec_ops->assign_scalar( T( 0 ), projected_field );
-
-        vec_ops->init_vector( physical_u );
-        vec_ops->start_use_vector( physical_u, physical_size_ );
-        vec_ops->init_vector( physical_ux );
-        vec_ops->start_use_vector( physical_ux, physical_size_ );
-        vec_ops->init_vector( physical_du );
-        vec_ops->start_use_vector( physical_du, physical_size_ );
-        vec_ops->init_vector( physical_dux );
-        vec_ops->start_use_vector( physical_dux, physical_size_ );
-        vec_ops->init_vector( physical_nonlin );
-        vec_ops->start_use_vector( physical_nonlin, physical_size_ );
-        vec_ops->init_vector( physical_out );
-        vec_ops->start_use_vector( physical_out, physical_size_ );
+        for ( auto *storage : { &u0_storage_, &state_storage_, &vector_storage_, &residual_storage_, &field_storage_ } )
+        {
+            storage->init();
+            storage->start_use();
+            vec_ops->assign_scalar( T( 0 ), **storage );
+        }
+        for ( auto *storage :
+              { &physical_u_storage_, &physical_ux_storage_, &physical_du_storage_, &physical_dux_storage_,
+                &physical_nonlin_storage_, &physical_out_storage_ } )
+        {
+            storage->init();
+            storage->start_use();
+        }
 
         init_complex( u_hat );
         init_complex( ux_hat );

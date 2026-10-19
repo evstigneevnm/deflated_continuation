@@ -5,10 +5,12 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
+#include <nmfd/detail/vector_wrap.h>
 
 namespace deflation
 {
@@ -238,43 +240,49 @@ public:
         SymmetryAdapter *symmetry_adapter_, const double duplicate_tolerance_ = default_duplicate_tolerance(),
         Log *log_ = nullptr
     )
-        : vec_ops( vec_ops_ ), symmetry_adapter( symmetry_adapter_ ), log( log_ ),
-          duplicate_tolerance_( duplicate_tolerance_ ), norm_weight( norm_weight_ ), P( P_ ),
-          number_of_solutions_( number_of_solutions )
+        : vec_ops(
+              vec_ops_ ? vec_ops_
+                       : throw std::invalid_argument( "symmetry_solution_storage got null vector operations" )
+          ),
+          symmetry_adapter( symmetry_adapter_ ), log( log_ ), duplicate_tolerance_( duplicate_tolerance_ ),
+          norm_weight( norm_weight_ ), P( P_ ), number_of_solutions_( number_of_solutions ),
+          distance_storage_( *vec_ops ), gradient_storage_( *vec_ops ), state_storage_( *vec_ops ),
+          zero_storage_( *vec_ops )
     {
-        if ( vec_ops == nullptr )
-        {
-            throw std::invalid_argument( "symmetry_solution_storage got null vector operations" );
-        }
         if ( norm_weight == T( 0 ) )
         {
             throw std::invalid_argument( "symmetry_solution_storage got zero norm weight" );
         }
 
         container.reserve( number_of_solutions );
-        vec_ops->init_vector( distance_help );
-        vec_ops->start_use_vector( distance_help );
-        vec_ops->init_vector( slice_gradient );
-        vec_ops->start_use_vector( slice_gradient );
-        vec_ops->init_vector( x_hat );
-        vec_ops->start_use_vector( x_hat );
-        vec_ops->init_vector( x0_hat );
-        vec_ops->start_use_vector( x0_hat );
+        for ( auto *storage : { &distance_storage_, &gradient_storage_, &state_storage_, &zero_storage_ } )
+        {
+            storage->init();
+            storage->start_use();
+        }
         vec_ops->assign_scalar( T( 0 ), x0_hat );
     }
 
     ~symmetry_solution_storage()
     {
         clear();
-        vec_ops->stop_use_vector( x0_hat );
-        vec_ops->free_vector( x0_hat );
-        vec_ops->stop_use_vector( x_hat );
-        vec_ops->free_vector( x_hat );
-        vec_ops->stop_use_vector( slice_gradient );
-        vec_ops->free_vector( slice_gradient );
-        vec_ops->stop_use_vector( distance_help );
-        vec_ops->free_vector( distance_help );
     }
+
+    symmetry_solution_storage(
+        std::shared_ptr<VectorOperations> operations, unsigned int number_of_solutions, T norm_weight, T power,
+        std::shared_ptr<SymmetryAdapter> adapter, double duplicate_tolerance = default_duplicate_tolerance(),
+        Log *log = nullptr
+    )
+        : symmetry_solution_storage(
+              operations.get(), number_of_solutions, norm_weight, power, adapter.get(), duplicate_tolerance, log
+          )
+    {
+        operations_owner_ = std::move( operations );
+        adapter_owner_    = std::move( adapter );
+    }
+
+    symmetry_solution_storage( const symmetry_solution_storage & )            = delete;
+    symmetry_solution_storage &operator=( const symmetry_solution_storage & ) = delete;
 
     static double default_duplicate_tolerance()
     {
@@ -283,7 +291,15 @@ public:
 
     void set_symmetry_adapter( SymmetryAdapter *symmetry_adapter_ )
     {
+        if ( symmetry_adapter_ != adapter_owner_.get() )
+            adapter_owner_.reset();
         symmetry_adapter = symmetry_adapter_;
+    }
+
+    void set_symmetry_adapter( std::shared_ptr<SymmetryAdapter> adapter )
+    {
+        adapter_owner_   = std::move( adapter );
+        symmetry_adapter = adapter_owner_.get();
     }
 
     SymmetryAdapter *get_symmetry_adapter() const
@@ -426,86 +442,43 @@ private:
     {
     public:
         internal_container( VectorOperations *vec_ops_, const T_vec &vec_, Log *log_ = nullptr )
-            : vec_ops( vec_ops_ ), log( log_ )
+            : log( log_ ), storage_( *vec_ops_ )
         {
-            vec_ops->init_vector( array_ );
-            vec_ops->start_use_vector( array_ );
-            vec_ops->assign( vec_, array_ );
-            allocated = true;
-            owned     = true;
+            storage_.init();
+            storage_.start_use();
+            vec_ops_->assign( vec_, *storage_ );
         }
 
-        internal_container( const internal_container &that ) : vec_ops( that.vec_ops ), log( that.log )
-        {
-            vec_ops->init_vector( array_ );
-            vec_ops->start_use_vector( array_ );
-            vec_ops->assign( that.array_, array_ );
-            allocated = true;
-            owned     = true;
-        }
-
-        internal_container( internal_container &&that )
-            : vec_ops( that.vec_ops ), log( that.log ), array_( that.array_ ), allocated( that.allocated ),
-              owned( that.owned )
-        {
-            that.owned     = false;
-            that.allocated = false;
-        }
-
+        internal_container( const internal_container & )            = delete;
+        internal_container( internal_container && )                 = default;
         internal_container &operator=( const internal_container & ) = delete;
-
-        internal_container &operator=( internal_container &&that )
-        {
-            if ( this == &that )
-            {
-                return *this;
-            }
-            release();
-            vec_ops        = that.vec_ops;
-            log            = that.log;
-            array_         = that.array_;
-            allocated      = that.allocated;
-            owned          = that.owned;
-            that.owned     = false;
-            that.allocated = false;
-            return *this;
-        }
+        internal_container &operator=( internal_container && )      = delete;
 
         ~internal_container()
         {
-            release();
-        }
-
-        T_vec &get_ref()
-        {
-            return array_;
-        }
-
-        const T_vec &get_ref() const
-        {
-            return array_;
-        }
-
-    private:
-        void release()
-        {
-            if ( allocated && owned )
+            if ( storage_.is_inited_ )
             {
-                vec_ops->stop_use_vector( array_ );
-                vec_ops->free_vector( array_ );
+                storage_.stop_use();
+                storage_.free();
                 detail::log_symmetry_solution_storage_message(
                     log, "deflation::symmetry_solution_storage: removed solution from container"
                 );
             }
-            allocated = false;
-            owned     = false;
         }
 
-        VectorOperations *vec_ops = nullptr;
-        Log              *log     = nullptr;
-        T_vec             array_;
-        bool              allocated = false;
-        bool              owned     = false;
+        T_vec &get_ref()
+        {
+            return *storage_;
+        }
+
+        const T_vec &get_ref() const
+        {
+            return *storage_;
+        }
+
+    private:
+        Log                                                      *log = nullptr;
+        nmfd::detail::vector_wrap<VectorOperations, false, false> storage_;
     };
 
     void require_symmetry_adapter() const
@@ -578,21 +551,25 @@ private:
     }
 
 private:
-    VectorOperations               *vec_ops;
-    SymmetryAdapter                *symmetry_adapter;
-    Log                            *log;
-    double                          duplicate_tolerance_;
-    T                               norm_weight;
-    T                               P;
-    bool                            ignore_zero_ = false;
-    unsigned int                    number_of_solutions_;
-    unsigned int                    elements_number                 = 0;
-    std::size_t                     duplicates_skipped_since_clear_ = 0;
-    T                               distance                        = T( 1 );
-    T_vec                           distance_help;
-    T_vec                           slice_gradient;
-    T_vec                           x_hat;
-    T_vec                           x0_hat;
+    std::shared_ptr<VectorOperations>                         operations_owner_;
+    std::shared_ptr<SymmetryAdapter>                          adapter_owner_;
+    VectorOperations                                         *vec_ops;
+    SymmetryAdapter                                          *symmetry_adapter;
+    Log                                                      *log;
+    double                                                    duplicate_tolerance_;
+    T                                                         norm_weight;
+    T                                                         P;
+    bool                                                      ignore_zero_ = false;
+    unsigned int                                              number_of_solutions_;
+    unsigned int                                              elements_number                 = 0;
+    std::size_t                                               duplicates_skipped_since_clear_ = 0;
+    T                                                         distance                        = T( 1 );
+    nmfd::detail::vector_wrap<VectorOperations, false, false> distance_storage_, gradient_storage_, state_storage_,
+        zero_storage_;
+    T_vec                          &distance_help  = *distance_storage_;
+    T_vec                          &slice_gradient = *gradient_storage_;
+    T_vec                          &x_hat          = *state_storage_;
+    T_vec                          &x0_hat         = *zero_storage_;
     std::vector<internal_container> container;
 };
 

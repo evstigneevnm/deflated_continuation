@@ -170,6 +170,32 @@ T sqrt( const T &value )
     return common::scalar_math::sqrt( value );
 }
 
+// FFT buffers have a different extent from the reduced state space.
+template <class VectorOperations>
+struct physical_vector_space
+{
+    using vector_type = typename VectorOperations::vector_type;
+    const VectorOperations &operations;
+    std::size_t             size;
+
+    void init_vector( vector_type &v ) const
+    {
+        operations.init_vector( v );
+    }
+    void start_use_vector( vector_type &v ) const
+    {
+        operations.start_use_vector( v, size );
+    }
+    void stop_use_vector( vector_type &v ) const
+    {
+        operations.stop_use_vector( v );
+    }
+    void free_vector( vector_type &v ) const
+    {
+        operations.free_vector( v );
+    }
+};
+
 template <class T>
 __DEVICE_TAG__ T linear_multiplier( const std::size_t mode, const T lambda, const T biharmonic_scale )
 {
@@ -494,30 +520,7 @@ public:
     }
 
 private:
-    // Physical FFT buffers have a different extent from the reduced state space.
-    struct physical_space_type
-    {
-        using vector_type = T_vec;
-        const VectorOperations &operations;
-        std::size_t             size;
-
-        void init_vector( vector_type &v ) const
-        {
-            operations.init_vector( v );
-        }
-        void start_use_vector( vector_type &v ) const
-        {
-            operations.start_use_vector( v, size );
-        }
-        void stop_use_vector( vector_type &v ) const
-        {
-            operations.stop_use_vector( v );
-        }
-        void free_vector( vector_type &v ) const
-        {
-            operations.free_vector( v );
-        }
-    };
+    using physical_space_type = ks1d_detail::physical_vector_space<VectorOperations>;
 
     static VectorOperations *checked_space( VectorOperations *operations )
     {

@@ -2,6 +2,7 @@
 #define __STABILITY_ANALYSIS_DIMENSION_GUARDED_EIGENSOLVER_H__
 
 #include <cstddef>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -124,6 +125,21 @@ public:
                 "dimension"
             );
         }
+    }
+
+    dimension_guarded_eigensolver(
+        std::shared_ptr<primary_type> primary, std::shared_ptr<const small_system_type> small_system,
+        std::size_t dimension, std::size_t maximum_small_dimension, bool prefer_small_system
+    )
+        : dimension_guarded_eigensolver(
+              primary ? *primary : throw std::invalid_argument( "guarded eigensolver requires a primary solver" ),
+              small_system ? *small_system
+                           : throw std::invalid_argument( "guarded eigensolver requires a small-system solver" ),
+              dimension, maximum_small_dimension, prefer_small_system
+          )
+    {
+        primary_owner_      = std::move( primary );
+        small_system_owner_ = std::move( small_system );
     }
 
     result_type execute( const vector_type &initial_vector ) const
@@ -283,11 +299,13 @@ private:
         result.diagnostic = result.diagnostic.empty() ? prefix : prefix + ": " + result.diagnostic;
     }
 
-    primary_type            &primary_;
-    const small_system_type &small_system_;
-    std::size_t              dimension_;
-    std::size_t              maximum_small_dimension_;
-    bool                     prefer_small_system_;
+    std::shared_ptr<primary_type>            primary_owner_;
+    std::shared_ptr<const small_system_type> small_system_owner_;
+    primary_type                            &primary_;
+    const small_system_type                 &small_system_;
+    std::size_t                              dimension_;
+    std::size_t                              maximum_small_dimension_;
+    bool                                     prefer_small_system_;
 };
 
 } // namespace analysis

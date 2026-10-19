@@ -1,6 +1,10 @@
 #ifndef __SYMMETRY_LINEARIZATION_PROJECTED_LINEARIZATION_PROVIDER_H__
 #define __SYMMETRY_LINEARIZATION_PROJECTED_LINEARIZATION_PROVIDER_H__
 
+#include <memory>
+#include <stdexcept>
+#include <utility>
+
 namespace symmetry
 {
 namespace linearization
@@ -41,6 +45,15 @@ public:
     {
     }
 
+    explicit projected_linearization_provider( std::shared_ptr<nonlinear_operator_type> problem )
+        : problem_owner_( std::move( problem ) ),
+          nonlinear_operator_(
+              problem_owner_ ? *problem_owner_
+                             : throw std::invalid_argument( "projected linearization requires a problem" )
+          )
+    {
+    }
+
     void set_linearization_point( const vector_type &state, scalar_type parameter )
     {
         detail::set_stateless_projected_linearization_point( nonlinear_operator_, state, parameter, 0 );
@@ -57,7 +70,8 @@ public:
     }
 
 private:
-    nonlinear_operator_type &nonlinear_operator_;
+    std::shared_ptr<nonlinear_operator_type> problem_owner_;
+    nonlinear_operator_type                 &nonlinear_operator_;
 };
 
 } // namespace linearization
