@@ -4,9 +4,11 @@
 #include <cmath>
 #include <complex>
 #include <cstddef>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 
 #include <stability/analysis/detail/vector_workspace.h>
 
@@ -34,6 +36,20 @@ public:
     using real_type         = typename vector_space_type::norm_type;
     using vector_type       = typename vector_space_type::vector_type;
     using result_type       = eigensolver_result<real_type>;
+
+    direct_scalar_eigensolver(
+        std::shared_ptr<vector_space_type> vector_space, std::shared_ptr<const operator_type> linear_operator
+    )
+        : direct_scalar_eigensolver(
+              vector_space ? *vector_space
+                           : throw std::invalid_argument( "direct scalar eigensolver requires a vector space" ),
+              linear_operator ? *linear_operator
+                              : throw std::invalid_argument( "direct scalar eigensolver requires an operator" )
+          )
+    {
+        vector_space_owner_    = std::move( vector_space );
+        linear_operator_owner_ = std::move( linear_operator );
+    }
 
     direct_scalar_eigensolver( vector_space_type &vector_space, const operator_type &linear_operator )
         : vector_space_( vector_space ), linear_operator_( linear_operator ), basis_( &vector_space_ ),
@@ -87,6 +103,8 @@ public:
     }
 
 private:
+    std::shared_ptr<vector_space_type>                            vector_space_owner_;
+    std::shared_ptr<const operator_type>                          linear_operator_owner_;
     vector_space_type                                            &vector_space_;
     const operator_type                                          &linear_operator_;
     mutable analysis::detail::vector_workspace<vector_space_type> basis_;

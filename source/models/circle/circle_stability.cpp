@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -77,12 +78,11 @@ void initialize_device( int pci_id )
 
 void validate_direct_configuration( const stability::analysis::matrix_free_stability_config<real> &config )
 {
-    using std::isfinite;
     if ( !config.enabled )
     {
         throw std::invalid_argument( "circle stability eigensolver is disabled" );
     }
-    if ( !isfinite( config.linearization_scale ) || config.linearization_scale == real{} )
+    if ( !std::isfinite( config.linearization_scale ) || config.linearization_scale == real{} )
     {
         throw std::invalid_argument(
             "circle stability linearization scale must be finite "
@@ -97,16 +97,17 @@ int main( int argc, char **argv )
 {
     try
     {
-        const auto command_line    = parse_command_line( argc, argv );
-        using parameters_type      = main_classes::parameters<real>;
-        parameters_type parameters = main_classes::read_parameters_json<real>( command_line.config_file );
-        const auto     &config     = parameters.stability_continuation.matrix_free_eigensolver;
+        const auto command_line = parse_command_line( argc, argv );
+        using parameters_type   = main_classes::parameters<real>;
+        auto parameters =
+            std::make_shared<parameters_type>( main_classes::read_parameters_json<real>( command_line.config_file ) );
+        const auto &config = parameters->stability_continuation.matrix_free_eigensolver;
         validate_direct_configuration( config );
-        if ( parameters.nonlinear_operator.N_size.size() != 1 || parameters.nonlinear_operator.N_size.front() != 1 )
+        if ( parameters->nonlinear_operator.N_size.size() != 1 || parameters->nonlinear_operator.N_size.front() != 1 )
         {
             throw std::invalid_argument( "circle stability requires vector dimension one" );
         }
-        initialize_device( parameters.nvidia_pci_id );
+        initialize_device( parameters->nvidia_pci_id );
 
         using file_operations_type    = gpu_file_operations<vec_ops_real>;
         using nonlinear_operator_type = nonlinear_operators::circle<vec_ops_real, Blocks_x_>;
@@ -123,28 +124,28 @@ int main( int argc, char **argv )
              newton_preconditioner_type, numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator,
              parameters_type, eigensolver_type>;
 
-        vec_ops_real vector_space( 1 );
-        if ( parameters.use_high_precision_reduction )
-            vector_space.use_high_precision();
-        file_operations_type     file_operations( &vector_space );
-        nonlinear_operator_type  nonlinear_operator( real( 1 ), 1, &vector_space );
-        nonlinear_operator_type *nonlinear_operator_pointer = &nonlinear_operator;
-        newton_operator_type     newton_operator( nonlinear_operator_pointer );
-        stability_operator_type  stability_operator( vector_space, newton_operator, config.linearization_scale );
-        eigensolver_type         eigensolver( vector_space, stability_operator );
-        log_t                    log;
-        log_t                    linear_solver_log;
+        auto vector_space = std::make_shared<vec_ops_real>( 1 );
+        if ( parameters->use_high_precision_reduction )
+            vector_space->use_high_precision();
+        auto file_operations    = std::make_shared<file_operations_type>( vector_space.get() );
+        auto nonlinear_operator = std::make_shared<nonlinear_operator_type>( real( 1 ), 1, vector_space );
+        auto newton_operator    = std::make_shared<newton_operator_type>( nonlinear_operator );
+        auto stability_operator =
+            std::make_shared<stability_operator_type>( vector_space, newton_operator, config.linearization_scale );
+        auto  eigensolver = std::make_shared<eigensolver_type>( vector_space, stability_operator );
+        log_t log;
+        log_t linear_solver_log;
         log.set_verbosity( command_line.quiet ? 0 : 1 );
         linear_solver_log.set_verbosity( command_line.quiet ? 0 : 1 );
 
         if ( !command_line.quiet )
         {
             std::cout << "Using circle stability backend: " << CIRCLE_BACKEND_NAME << '\n';
-            parameters.plot_all();
+            parameters->plot_all();
         }
 
         driver_type driver(
-            &vector_space, &file_operations, &log, &linear_solver_log, &nonlinear_operator, &parameters, &eigensolver
+            vector_space, file_operations, &log, &linear_solver_log, nonlinear_operator, parameters, eigensolver
         );
         driver.set_parameters();
         if ( command_line.edit )

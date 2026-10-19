@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -2100,8 +2101,9 @@ void test_fold_secant_refinement( const std::string &label )
     using refiner_type =
         stability::analysis::stability_transition_refiner<vector_space_type, problem_type, newton_type, evaluator_type>;
 
-    vector_space_type    vector_space( 1 );
-    problem_type         problem( 1.0, 1, &vector_space );
+    auto                 vector_space_owner = std::make_shared<vector_space_type>( 1 );
+    auto                &vector_space       = *vector_space_owner;
+    problem_type         problem( 1.0, 1, vector_space_owner );
     problem_type        *problem_pointer = &problem;
     operator_type        linear_operator( problem_pointer );
     scaled_operator_type stability_operator( vector_space, linear_operator, -1.0 );

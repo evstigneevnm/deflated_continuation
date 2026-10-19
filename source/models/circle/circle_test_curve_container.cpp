@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <exception>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -94,12 +95,13 @@ int main( int argc, char const *argv[] )
     real         newton_interp_tol  = std::max( real( 1.0e-9 ), real( 10 ) * std::numeric_limits<real>::epsilon() );
 
 
-    vec_ops_real *vec_ops_R = new vec_ops_real( Nx );
-
-    circle_t  *CIRCLE = new circle_t( Rad, Nx, vec_ops_R );
-    log_t     *log    = new log_t();
-    lin_op_t  *Ax     = new lin_op_t( CIRCLE );
-    prec_t    *prec   = new prec_t( CIRCLE );
+    auto       operations_owner = std::make_shared<vec_ops_real>( Nx );
+    auto       circle_owner     = std::make_shared<circle_t>( Rad, Nx, operations_owner );
+    auto      *vec_ops_R        = operations_owner.get();
+    auto      *CIRCLE           = circle_owner.get();
+    log_t     *log              = new log_t();
+    lin_op_t  *Ax               = new lin_op_t( CIRCLE );
+    prec_t    *prec             = new prec_t( CIRCLE );
     monitor_t *mon;
     monitor_t *mon_orig;
     //setup deflation system
@@ -117,7 +119,7 @@ int main( int argc, char const *argv[] )
     convergence_newton_def_t *conv_newton_def =
         new convergence_newton_def_t( vec_ops_R, log, newton_def_tol, newton_def_max_it, real( 1 ), true );
     sol_storage_def_t     *sol_storage_def     = new sol_storage_def_t( vec_ops_R, 50, norm_wight );
-    system_operator_def_t *system_operator_def = new system_operator_def_t( vec_ops_R, Ax, SM, sol_storage_def );
+    system_operator_def_t *system_operator_def = new system_operator_def_t( vec_ops_R, Ax, SM, sol_storage_def, log );
     newton_def_t          *newton_def          = new newton_def_t( vec_ops_R, system_operator_def, conv_newton_def );
 
     //setup linear system:
@@ -294,7 +296,6 @@ int main( int argc, char const *argv[] )
     delete system_operator_cont;
     delete predict;
     delete deflation_op;
-    delete CIRCLE;
     delete prec;
     delete SM;
     delete log;
@@ -308,8 +309,6 @@ int main( int argc, char const *argv[] )
     delete system_operator;
     delete newton;
     delete curve_storage;
-
-    delete vec_ops_R;
 
     return 0;
 }

@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -204,10 +205,11 @@ void verify_bratu_adjoint(
 template <class Backend>
 void run_backend( const std::string &label )
 {
-    using vector_space_type = nmfd::operations::scfd_vector_space<Backend, double>;
-    vector_space_type vector_space( 1 );
+    using vector_space_type  = nmfd::operations::scfd_vector_space<Backend, double>;
+    auto  vector_space_owner = std::make_shared<vector_space_type>( 1 );
+    auto &vector_space       = *vector_space_owner;
 
-    nonlinear_operators::circle<vector_space_type> circle( 1.0, 1, &vector_space );
+    nonlinear_operators::circle<vector_space_type> circle( 1.0, 1, vector_space_owner );
     verify_affine_inverse( label + " circle", vector_space, circle, 0.6, 0.8, -1.75, 0.45 );
     verify_adjoint( label + " circle", vector_space, circle, 0.6, 0.8 );
 

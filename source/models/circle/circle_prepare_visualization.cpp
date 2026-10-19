@@ -1,11 +1,11 @@
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 
 #include <common/gpu_file_operations.h>
 #include <main/parameters.hpp>
-#include <nonlinear_operators/circle/circle.h>
 #include <visualization/bd_prepare_visualization.hpp>
 
 #include "circle_backend_typedefs.h"
@@ -13,7 +13,6 @@
 int main( int argc, char const *argv[] )
 {
     using files_ops_t = gpu_file_operations<vec_ops_real>;
-    using circle_t    = nonlinear_operators::circle<vec_ops_real, Blocks_x_>;
 
 #if defined( CIRCLE_VECTOR_BACKEND_VAR_PREC )
     using parameters_real = double;
@@ -58,12 +57,11 @@ int main( int argc, char const *argv[] )
             options.project_dir = parameters.path_to_project;
         }
 
-        vec_ops_real                                     vec_ops( 1 );
-        files_ops_t                                      file_ops( &vec_ops );
-        circle_t                                         circle( real( 1 ), 1, &vec_ops );
-        visualization::state_vector_writer<vec_ops_real> writer( &vec_ops, "state_scalar" );
+        auto                                             vec_ops  = std::make_shared<vec_ops_real>( 1 );
+        auto                                             file_ops = std::make_shared<files_ops_t>( vec_ops.get() );
+        visualization::state_vector_writer<vec_ops_real> writer( vec_ops.get(), "state_scalar" );
         visualization::bd_visualization_preparer<vec_ops_real, files_ops_t, decltype( writer )> preparer(
-            &vec_ops, &file_ops
+            vec_ops.get(), file_ops.get()
         );
         preparer.prepare( options, writer );
     }

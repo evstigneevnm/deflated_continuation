@@ -1886,6 +1886,15 @@ jobs:
           cmp "$CIRCLE_BUILD/stability_diagram.before_restart.dat" "$CIRCLE_BUILD/project/stability_diagram.dat"
           cmp "$CIRCLE_BUILD/stability_curve.before_restart.dat" "$CIRCLE_BUILD/project/0/debug_curve_stability.dat"
 
+      - name: Validate circle visualization against archived states
+        run: |
+          export OMP_NUM_THREADS=8
+          python3 scripts/tests/test_validate_circle_visualization.py
+          CIRCLE_BUILD="$BUILD_DIR/circle_bd_full_cpu_omp"
+          make circle_prepare_visualization_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double
+          timeout 60s ./"$CIRCLE_BUILD"/circle_prepare_visualization_cpu_omp.bin "$CIRCLE_BUILD/circle_full_ci.json" --output-dir "$CIRCLE_BUILD/visualization" --branch 0 --max-points 3 --quiet
+          python3 scripts/validate_circle_visualization.py "$CIRCLE_BUILD/visualization/manifest.jsonl" --expected-points 3
+
   circle-bd-var-prec:
     needs: [cpu-vector-operations-var-prec, fftw-operations-cpu, lapack-wrap-cpu]
     runs-on: ubuntu-latest

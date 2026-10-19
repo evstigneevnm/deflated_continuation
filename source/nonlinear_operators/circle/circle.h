@@ -12,12 +12,15 @@
 
 #include <cmath>
 #include <cstddef>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include <common/scalar_math.h>
+#include <nmfd/detail/vector_wrap.h>
 #include <scfd/utils/device_tag.h>
 
 namespace nonlinear_operators
@@ -97,16 +100,21 @@ public:
     using ordinal_type           = typename VectorOperations_R::ordinal_type;
     using access_type            = circle_detail::vector_access<VectorOperations_R>;
 
-    circle( T R_, std::size_t Nx_, vector_operations_real *vec_ops_R_ ) : R( R_ ), vec_ops_R( vec_ops_R_ ), Nx( Nx_ )
+    circle( T R_, std::size_t Nx_, std::shared_ptr<vector_operations_real> operations )
+        : operations_owner_( std::move( operations ) ), R( R_ ), vec_ops_R( operations_owner_.get() ), Nx( Nx_ ),
+          linearization_storage_(
+              vec_ops_R ? *vec_ops_R : throw std::invalid_argument( "circle requires vector operations" )
+          ),
+          u_0( *linearization_storage_ )
     {
-        common_constructor_operation();
+        if ( Nx != 1 )
+            throw std::runtime_error( "nonlinear_operators::circle expects vector size 1." );
+        linearization_storage_.init();
+        linearization_storage_.start_use();
     }
 
-    ~circle()
-    {
-        vec_ops_R->stop_use_vector( u_0 );
-        vec_ops_R->free_vector( u_0 );
-    }
+    circle( const circle & )            = delete;
+    circle &operator=( const circle & ) = delete;
 
     void F( const T_vec &u, const T alpha, T_vec &v )
     {
@@ -218,21 +226,13 @@ public:
     }
 
 private:
-    T                       R;
-    vector_operations_real *vec_ops_R;
-    std::size_t             Nx;
-    T_vec                   u_0;
-    T                       alpha_0 = T( 0 );
-
-    void common_constructor_operation()
-    {
-        if ( Nx != 1 )
-        {
-            throw std::runtime_error( "nonlinear_operators::circle expects vector size 1." );
-        }
-        vec_ops_R->init_vector( u_0 );
-        vec_ops_R->start_use_vector( u_0 );
-    }
+    std::shared_ptr<vector_operations_real>                         operations_owner_;
+    T                                                               R;
+    vector_operations_real                                         *vec_ops_R;
+    std::size_t                                                     Nx;
+    nmfd::detail::vector_wrap<vector_operations_real, false, false> linearization_storage_;
+    T_vec                                                          &u_0;
+    T                                                               alpha_0 = T( 0 );
 };
 
 }

@@ -21,7 +21,7 @@ typedef deflation::newton_method_extended::convergence_strategy<vec_ops_real, ci
 typedef deflation::solution_storage<vec_ops_real> sol_storage_def_t;
 
 typedef deflation::system_operator_deflation<
-    vec_ops_real, circle_t, lin_op_t, sherman_morrison_linear_system_solve_t, sol_storage_def_t>
+    vec_ops_real, circle_t, lin_op_t, sherman_morrison_linear_system_solve_t, sol_storage_def_t, log_t>
     system_operator_def_t;
 
 typedef numerical_algos::newton_method_extended::newton_solver_extended<

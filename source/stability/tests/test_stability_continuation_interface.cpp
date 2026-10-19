@@ -7,6 +7,7 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -177,9 +178,10 @@ int main()
         linear_operator_type, preconditioner_type, numerical_algos::lin_solvers::bicgstabl,
         nonlinear_operators::system_operator, parameters_type, adapter_type, provider_type>;
 
-    vector_operations_type  vector_operations( 1 );
+    auto                    vector_operations_owner = std::make_shared<vector_operations_type>( 1 );
+    auto                   &vector_operations       = *vector_operations_owner;
     file_operations_type    file_operations( &vector_operations );
-    nonlinear_operator_type nonlinear_operator( real_type( 1 ), 1, &vector_operations );
+    nonlinear_operator_type nonlinear_operator( real_type( 1 ), 1, vector_operations_owner );
     parameters_type         parameters;
     parameters.set_default();
     const auto                  unique_id = std::chrono::high_resolution_clock::now().time_since_epoch().count();

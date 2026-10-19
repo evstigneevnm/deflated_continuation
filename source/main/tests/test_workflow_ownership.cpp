@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cmath>
 #include <complex>
 #include <cstddef>
 #include <filesystem>
@@ -6,6 +7,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #if defined( TEST_WORKFLOW_CUDA )
@@ -28,6 +30,8 @@
 #include <main/parameters.hpp>
 #include <main/deflation_continuation.hpp>
 #include <main/stability_continuation.hpp>
+#include <stability/eigensolvers/direct_scalar_eigensolver.h>
+#include <stability/eigensolvers/transformations/scaled_real_operator.h>
 
 namespace
 {
@@ -94,6 +98,18 @@ using preconditioner_type =
     nonlinear_operators::preconditioner_circle<vector_space, problem_type, linear_operator_type>;
 using monitor_type    = numerical_algos::lin_solvers::default_monitor<vector_space, log_type>;
 using parameters_type = main_classes::parameters<double>;
+using scaled_operator_type =
+    stability::eigensolvers::transformations::scaled_real_operator<vector_space, linear_operator_type>;
+using scalar_eigensolver_type = stability::eigensolvers::direct_scalar_eigensolver<vector_space, scaled_operator_type>;
+
+static_assert(
+    std::is_constructible<problem_type, double, std::size_t, std::shared_ptr<vector_space>>::value,
+    "circle construction must retain shared vector operations"
+);
+static_assert(
+    !std::is_constructible<problem_type, double, std::size_t, vector_space *>::value,
+    "circle construction must not accept borrowed vector operations"
+);
 
 struct eigensolver
 {
@@ -135,7 +151,7 @@ struct fixture
     log_type                              log;
     std::shared_ptr<vector_space>         operations = std::make_shared<vector_space>();
     std::shared_ptr<file_operations_type> files      = std::make_shared<file_operations_type>( operations.get() );
-    std::shared_ptr<problem_type>         problem    = std::make_shared<problem_type>( 1.0, 1, operations.get() );
+    std::shared_ptr<problem_type>         problem    = std::make_shared<problem_type>( 1.0, 1, operations );
     std::shared_ptr<parameters_type>      parameters = std::make_shared<parameters_type>();
     std::shared_ptr<eigensolver>          adapter    = std::make_shared<eigensolver>();
 
@@ -230,6 +246,110 @@ void test_workspace_failure()
     }
 }
 
+void test_circle_stability_chain()
+{
+    auto                        operations          = std::make_shared<vector_space>();
+    auto                        problem             = std::make_shared<problem_type>( 1.0, 1, operations );
+    std::weak_ptr<vector_space> observed_operations = operations;
+    operations.reset();
+    require( !observed_operations.expired(), "circle retains its vector space independently of the eigensolver" );
+    operations                                  = observed_operations.lock();
+    auto                                linear  = std::make_shared<linear_operator_type>( problem );
+    auto                                scaled  = std::make_shared<scaled_operator_type>( operations, linear, -1.0 );
+    auto                                adapter = std::make_shared<scalar_eigensolver_type>( operations, scaled );
+    std::weak_ptr<problem_type>         observed_problem = problem;
+    std::weak_ptr<linear_operator_type> observed_linear  = linear;
+    std::weak_ptr<scaled_operator_type> observed_scaled  = scaled;
+    auto                               *space            = operations.get();
+    auto                               *model            = problem.get();
+
+    operations.reset();
+    problem.reset();
+    linear.reset();
+    scaled.reset();
+    require( !observed_operations.expired() && !observed_problem.expired(), "eigensolver retains circle resources" );
+    require( !observed_linear.expired() && !observed_scaled.expired(), "eigensolver retains its operator chain" );
+    {
+        nmfd::detail::vector_wrap<vector_space, false, false> state( *space );
+        nmfd::detail::vector_wrap<vector_space, false, false> residual( *space );
+        state.init();
+        state.start_use();
+        residual.init();
+        residual.start_use();
+        space->assign_scalar( 0.6, *state );
+        model->F( *state, 0.8, *residual );
+        require( space->norm_l2( *residual ) < 1e-14, "retained circle residual remains usable" );
+        model->set_linearization_point( *state, 0.8 );
+        for ( int iteration = 0; iteration < 3; ++iteration )
+        {
+            const auto result = adapter->execute( *state );
+            require(
+                result.coverage_complete && result.eigenpairs.size() == 1 && result.eigenpairs.front().converged &&
+                    std::abs( result.eigenpairs.front().value.real() + 1.2 ) < 1e-14,
+                "retained eigensolver computes the analytical circle eigenvalue"
+            );
+        }
+    }
+    adapter.reset();
+    require(
+        observed_operations.expired() && observed_problem.expired() && observed_linear.expired() &&
+            observed_scaled.expired(),
+        "circle stability chain released without ownership cycles"
+    );
+}
+
+void test_circle_construction_failure()
+{
+    // The problem owns one workspace; the scalar eigensolver owns three.
+    for ( int activation = 1; activation <= 4; ++activation )
+    {
+        auto operations             = std::make_shared<vector_space>();
+        operations->fail_activation = activation;
+        bool failed                 = false;
+        try
+        {
+            auto problem = std::make_shared<problem_type>( 1.0, 1, operations );
+            auto linear  = std::make_shared<linear_operator_type>( problem );
+            auto scaled  = std::make_shared<scaled_operator_type>( operations, linear, -1.0 );
+            auto adapter = std::make_shared<scalar_eigensolver_type>( operations, scaled );
+        }
+        catch ( const std::runtime_error & )
+        {
+            failed = true;
+        }
+        require( failed, "circle stability construction failure propagated" );
+        require( operations->allocations == operations->frees, "circle stability construction releases all storage" );
+    }
+}
+
+void test_circle_invalid_construction()
+{
+    bool failed = false;
+    try
+    {
+        problem_type problem( 1.0, 1, std::shared_ptr<vector_space>{} );
+    }
+    catch ( const std::invalid_argument & )
+    {
+        failed = true;
+    }
+    require( failed, "null circle vector operations rejected" );
+
+    auto operations = std::make_shared<vector_space>();
+    failed          = false;
+    try
+    {
+        problem_type problem( 1.0, 2, operations );
+    }
+    catch ( const std::runtime_error & )
+    {
+        failed = true;
+    }
+    require( failed, "invalid circle dimension rejected" );
+    require( operations->allocations == 0, "invalid circle construction does not allocate scratch" );
+    require( operations.use_count() == 1, "invalid circle construction releases its shared dependency" );
+}
+
 } // namespace
 
 int main()
@@ -240,6 +360,9 @@ int main()
         test_shared_workflows();
         test_custom_provider();
         test_workspace_failure();
+        test_circle_stability_chain();
+        test_circle_construction_failure();
+        test_circle_invalid_construction();
         require( !vector_space::invalid_cleanup, "all vector allocations released before their space" );
     }
     catch ( const std::exception &error )
