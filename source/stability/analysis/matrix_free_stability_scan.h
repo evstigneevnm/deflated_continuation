@@ -116,6 +116,22 @@ public:
         update_confirmation_union_options();
     }
 
+    matrix_free_stability_scan(
+        std::shared_ptr<real_space_type> real_space, std::shared_ptr<complex_space_type> complex_space,
+        std::shared_ptr<const real_operator_type> real_operator, std::shared_ptr<const provider_type> provider,
+        std::vector<scan_definition_type> scans, inner_parameters_type inner_parameters,
+        aggregation_options_type aggregation_options = {}, log_type *log = nullptr,
+        probe_generator_type probe_generator = {}
+    )
+        : matrix_free_stability_scan(
+              std::move( real_space ), std::move( complex_space ), *checked( real_operator, "real operator" ),
+              std::move( provider ), std::move( scans ), std::move( inner_parameters ),
+              std::move( aggregation_options ), log, std::move( probe_generator )
+          )
+    {
+        real_operator_owner_ = std::move( real_operator );
+    }
+
     result_type execute( const vector_type &initial_vector ) const
     {
         const auto       &tracking            = tracked_subspace_.options();
@@ -559,6 +575,7 @@ private:
 
     std::shared_ptr<real_space_type>            real_space_;
     std::shared_ptr<complex_space_type>         complex_space_;
+    std::shared_ptr<const real_operator_type>   real_operator_owner_;
     const real_operator_type                   &real_operator_;
     std::shared_ptr<const provider_type>        provider_;
     std::vector<scan_definition_type>           scans_;

@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cmath>
 #include <limits>
+#include <memory>
+#include <stdexcept>
 #include <type_traits>
 #include <utility>
 
@@ -30,6 +32,14 @@ public:
         vector_operations_type &vector_operations, nonlinear_operator_type &nonlinear_operator
     )
         : vector_operations_( vector_operations ), nonlinear_operator_( nonlinear_operator )
+    {
+    }
+
+    nonlinear_operator_real_affine_inverse_provider(
+        std::shared_ptr<vector_operations_type> operations, std::shared_ptr<nonlinear_operator_type> problem
+    )
+        : operations_owner_( std::move( operations ) ), problem_owner_( std::move( problem ) ),
+          vector_operations_( checked( operations_owner_ ) ), nonlinear_operator_( checked( problem_owner_ ) )
     {
     }
 
@@ -81,6 +91,14 @@ public:
     }
 
 private:
+    template <class Value>
+    static Value &checked( const std::shared_ptr<Value> &value )
+    {
+        if ( !value )
+            throw std::invalid_argument( "affine inverse provider requires nonnull dependencies" );
+        return *value;
+    }
+
     template <class Operator>
     static auto query_health(
         const Operator &nonlinear_operator, scalar_type jacobian_scale, scalar_type identity_shift, int
@@ -119,10 +137,12 @@ private:
     {
     }
 
-    vector_operations_type  &vector_operations_;
-    nonlinear_operator_type &nonlinear_operator_;
-    mutable std::size_t      apply_calls_         = 0;
-    mutable std::size_t      failed_applications_ = 0;
+    std::shared_ptr<vector_operations_type>  operations_owner_;
+    std::shared_ptr<nonlinear_operator_type> problem_owner_;
+    vector_operations_type                  &vector_operations_;
+    nonlinear_operator_type                 &nonlinear_operator_;
+    mutable std::size_t                      apply_calls_         = 0;
+    mutable std::size_t                      failed_applications_ = 0;
 };
 
 } // namespace transformations

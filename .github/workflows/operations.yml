@@ -1762,6 +1762,27 @@ jobs:
           timeout 120s ./"$KS2D_BUILD"/KS2D_bd_cuda.bin "$KS2D_BUILD/ks2d_nontrivial_ci.json" --quiet auto
           python3 scripts/validate_ks2d_nontrivial_branch.py "$KS2D_BUILD/project_nontrivial" --seed-parameter 4.333 --minimum-norm 1e-3
 
+  ks1d-nmfd-linear-solvers-cpu-omp:
+    needs: [fftw-operations-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make libfftw3-dev
+          fi
+      - name: Verify nonzero Jacobian solves, Newton corrections, recovery, and ownership
+        run: |
+          export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
+          KS1D_BUILD="$BUILD_DIR/ks1d_nmfd_cpu_omp"
+          make test_KS1D_linear_solvers_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          ./"$KS1D_BUILD"/test_KS1D_linear_solvers_cpu_omp.bin
+
   ks1d-sym-cpu-omp:
     needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
     runs-on: ubuntu-latest
@@ -1807,6 +1828,12 @@ jobs:
           cmp "$KS1D_BUILD/stability_diagram.before_restart.dat" "$KS1D_BUILD/project/stability_diagram.dat"
           cmp "$KS1D_BUILD/stability_curve.before_restart.dat" "$KS1D_BUILD/project/0/debug_curve_stability.dat"
           cmp "$KS1D_BUILD/stability_plot.before_restart.dat" "$KS1D_BUILD/project/0/debug_curve_stability_plot.dat"
+
+      - name: Replay nonzero symmetric KS1D against archived continuation and stability
+        run: |
+          export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
+          KS1D_BUILD="$BUILD_DIR/ks1d_sym_cpu_omp"
+          python3 scripts/test_ks1d_symmetric_nmfd.py --bd-executable "$KS1D_BUILD/KS1D_bd_cpu_omp.bin" --stability-executable "$KS1D_BUILD/KS1D_stability_cpu_omp.bin" --work-dir "$KS1D_BUILD/nonzero_replay"
 
   ks1d-full-cpu-omp:
     needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
@@ -2165,6 +2192,8 @@ jobs:
           KS1D_BUILD="$BUILD_DIR/ks1d_sym_cuda"
           make KS1D_operator_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_operator_cuda.bin auto
+          make test_KS1D_linear_solvers_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          ./"$KS1D_BUILD"/test_KS1D_linear_solvers_cuda.bin
           make KS1D_full_operator_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_full_operator_cuda.bin auto
           make KS1D_stability_scan_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
@@ -2176,6 +2205,7 @@ jobs:
           make KS1D_stability_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           timeout 120s ./"$KS1D_BUILD"/KS1D_stability_cuda.bin "$KS1D_BUILD/ks1d_ci.json" --quiet auto
           python3 scripts/validate_stability_diagram.py "$KS1D_BUILD/project" --expected-curves 1 --min-points 10 --require-complete --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
+          python3 scripts/test_ks1d_symmetric_nmfd.py --bd-executable "$KS1D_BUILD/KS1D_bd_cuda.bin" --stability-executable "$KS1D_BUILD/KS1D_stability_cuda.bin" --work-dir "$KS1D_BUILD/nonzero_replay" --device auto
           make KS1D_full_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --base-config json_project_files/KS1D_test_full.json --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
           timeout 120s ./"$KS1D_BUILD"/KS1D_full_bd_cuda.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet auto

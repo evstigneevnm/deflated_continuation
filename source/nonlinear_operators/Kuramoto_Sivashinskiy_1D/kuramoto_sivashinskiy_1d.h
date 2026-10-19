@@ -5,6 +5,7 @@
 #include <complex>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -17,6 +18,7 @@
 
 #include <common/scalar_math.h>
 #include <external_libraries/fft_facade.h>
+#include <nmfd/detail/vector_wrap.h>
 #include <nonlinear_operators/detail/linear_nonlinear_terms.h>
 #include <scfd/arrays/array.h>
 #include <scfd/utils/device_tag.h>
@@ -202,7 +204,10 @@ public:
     kuramoto_sivashinskiy_1d( const T &a_val_, const T &b_val_, std::size_t physical_size_, VectorOperations *vec_ops_ )
         : vec_ops( vec_ops_ ), physical_size_( physical_size_ ), complex_size_( physical_size_ / 2 + 1 ),
           mode_count_( complex_size_ > 1 ? complex_size_ - 2 : 0 ), fft_plan( physical_size_ ), a_val( a_val_ ),
-          b_val( b_val_ )
+          b_val( b_val_ ), physical_space_{ *checked_space( vec_ops_ ), physical_size_ }, u0_storage_( *vec_ops_ ),
+          physical_u_storage_( physical_space_ ), physical_ux_storage_( physical_space_ ),
+          physical_du_storage_( physical_space_ ), physical_dux_storage_( physical_space_ ),
+          physical_nonlin_storage_( physical_space_ ), physical_out_storage_( physical_space_ )
     {
         if ( physical_size_ < 4 || physical_size_ % 2 != 0 )
         {
@@ -217,31 +222,16 @@ public:
         common_constructor_operation();
     }
 
-    ~kuramoto_sivashinskiy_1d()
+    kuramoto_sivashinskiy_1d(
+        const T &a, const T &b, std::size_t physical_size, std::shared_ptr<VectorOperations> operations
+    )
+        : kuramoto_sivashinskiy_1d( a, b, physical_size, operations.get() )
     {
-        vec_ops->stop_use_vector( u_0 );
-        vec_ops->free_vector( u_0 );
-        vec_ops->stop_use_vector( physical_u );
-        vec_ops->free_vector( physical_u );
-        vec_ops->stop_use_vector( physical_ux );
-        vec_ops->free_vector( physical_ux );
-        vec_ops->stop_use_vector( physical_du );
-        vec_ops->free_vector( physical_du );
-        vec_ops->stop_use_vector( physical_dux );
-        vec_ops->free_vector( physical_dux );
-        vec_ops->stop_use_vector( physical_nonlin );
-        vec_ops->free_vector( physical_nonlin );
-        vec_ops->stop_use_vector( physical_out );
-        vec_ops->free_vector( physical_out );
-        free_complex( u_hat );
-        free_complex( ux_hat );
-        free_complex( du_hat );
-        free_complex( dux_hat );
-        free_complex( nonlin_hat );
-        free_complex( u0_hat );
-        free_complex( nonlin0_hat );
-        free_complex( ifft_work_hat );
+        operations_owner_ = std::move( operations );
     }
+
+    kuramoto_sivashinskiy_1d( const kuramoto_sivashinskiy_1d & )            = delete;
+    kuramoto_sivashinskiy_1d &operator=( const kuramoto_sivashinskiy_1d & ) = delete;
 
     std::size_t size() const
     {
@@ -504,23 +494,61 @@ public:
     }
 
 private:
-    VectorOperations *vec_ops;
-    std::size_t       physical_size_;
-    std::size_t       complex_size_;
-    std::size_t       mode_count_;
-    fft_type          fft_plan;
-    T                 a_val;
-    T                 b_val;
-    T                 lambda_0               = T( 0 );
-    unsigned int      random_profile_counter = 0;
+    // Physical FFT buffers have a different extent from the reduced state space.
+    struct physical_space_type
+    {
+        using vector_type = T_vec;
+        const VectorOperations &operations;
+        std::size_t             size;
 
-    T_vec u_0;
-    T_vec physical_u;
-    T_vec physical_ux;
-    T_vec physical_du;
-    T_vec physical_dux;
-    T_vec physical_nonlin;
-    T_vec physical_out;
+        void init_vector( vector_type &v ) const
+        {
+            operations.init_vector( v );
+        }
+        void start_use_vector( vector_type &v ) const
+        {
+            operations.start_use_vector( v, size );
+        }
+        void stop_use_vector( vector_type &v ) const
+        {
+            operations.stop_use_vector( v );
+        }
+        void free_vector( vector_type &v ) const
+        {
+            operations.free_vector( v );
+        }
+    };
+
+    static VectorOperations *checked_space( VectorOperations *operations )
+    {
+        if ( !operations )
+            throw std::invalid_argument( "KS1D requires vector operations" );
+        return operations;
+    }
+
+    std::shared_ptr<VectorOperations> operations_owner_;
+    VectorOperations                 *vec_ops;
+    std::size_t                       physical_size_;
+    std::size_t                       complex_size_;
+    std::size_t                       mode_count_;
+    fft_type                          fft_plan;
+    T                                 a_val;
+    T                                 b_val;
+    T                                 lambda_0               = T( 0 );
+    unsigned int                      random_profile_counter = 0;
+
+    physical_space_type                                          physical_space_;
+    nmfd::detail::vector_wrap<VectorOperations, false, false>    u0_storage_;
+    nmfd::detail::vector_wrap<physical_space_type, false, false> physical_u_storage_, physical_ux_storage_,
+        physical_du_storage_, physical_dux_storage_, physical_nonlin_storage_, physical_out_storage_;
+
+    T_vec &u_0             = *u0_storage_;
+    T_vec &physical_u      = *physical_u_storage_;
+    T_vec &physical_ux     = *physical_ux_storage_;
+    T_vec &physical_du     = *physical_du_storage_;
+    T_vec &physical_dux    = *physical_dux_storage_;
+    T_vec &physical_nonlin = *physical_nonlin_storage_;
+    T_vec &physical_out    = *physical_out_storage_;
 
     complex_vector_type u_hat;
     complex_vector_type ux_hat;
@@ -530,14 +558,6 @@ private:
     complex_vector_type u0_hat;
     complex_vector_type nonlin0_hat;
     complex_vector_type ifft_work_hat;
-
-    static void free_complex( complex_vector_type &x )
-    {
-        if ( !x.is_free() )
-        {
-            x.free();
-        }
-    }
 
     void init_complex( complex_vector_type &x )
     {
@@ -550,22 +570,17 @@ private:
 public:
     void common_constructor_operation()
     {
-        vec_ops->init_vector( u_0 );
-        vec_ops->start_use_vector( u_0 );
+        u0_storage_.init();
+        u0_storage_.start_use();
         vec_ops->assign_scalar( T( 0 ), u_0 );
 
-        vec_ops->init_vector( physical_u );
-        vec_ops->start_use_vector( physical_u, physical_size_ );
-        vec_ops->init_vector( physical_ux );
-        vec_ops->start_use_vector( physical_ux, physical_size_ );
-        vec_ops->init_vector( physical_du );
-        vec_ops->start_use_vector( physical_du, physical_size_ );
-        vec_ops->init_vector( physical_dux );
-        vec_ops->start_use_vector( physical_dux, physical_size_ );
-        vec_ops->init_vector( physical_nonlin );
-        vec_ops->start_use_vector( physical_nonlin, physical_size_ );
-        vec_ops->init_vector( physical_out );
-        vec_ops->start_use_vector( physical_out, physical_size_ );
+        for ( auto *storage :
+              { &physical_u_storage_, &physical_ux_storage_, &physical_du_storage_, &physical_dux_storage_,
+                &physical_nonlin_storage_, &physical_out_storage_ } )
+        {
+            storage->init();
+            storage->start_use();
+        }
 
         init_complex( u_hat );
         init_complex( ux_hat );

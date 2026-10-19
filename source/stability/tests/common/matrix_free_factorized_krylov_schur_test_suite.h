@@ -332,7 +332,19 @@ void test_complex_pair_recovery( const std::string &label )
             real_space->assign( source, destination );
         }
     );
-    const auto scanned = scan_driver.execute( *initial );
+    const auto                        scanned        = scan_driver.execute( *initial );
+    auto                              owned_operator = std::make_shared<real_operator_type>( *real_space, problem );
+    std::weak_ptr<real_operator_type> weak_operator  = owned_operator;
+    {
+        scan_type owned_scan(
+            real_space, complex_space, owned_operator, provider, scans, scan_inner_parameters,
+            stability::analysis::make_spectrum_scan_aggregation_options( scan_config )
+        );
+        owned_operator.reset();
+        require( !weak_operator.expired(), label + " scan retains its shared operator" );
+        require( owned_scan.execute( *initial ).succeeded(), label + " scan executes after caller releases operator" );
+    }
+    require( weak_operator.expired(), label + " scan operator ownership has no cycle" );
     require(
         scanned.succeeded() && scanned.coverage_complete && scanned.scans_requested == 2 &&
             scanned.scans_succeeded == 2,
