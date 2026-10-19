@@ -81,6 +81,38 @@ jobs:
             CONFIG_FILE=build_configs/config_github_ubuntu_gcc.inc \
             BUILD_DIR=build/operations_integration TEST_OMP_NUM_THREADS=2
 
+  nmfd-cahn-hilliard-original:
+    name: Original Cahn-Hilliard / restored operations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - run: make -C source/contrib/nmfd-newton -j2 check_ch_original CONFIG_FILE=build_configs/config_cpu.inc BUILD_DIR=build/ch_original
+
+  nmfd-cahn-hilliard-mpi:
+    name: Original Cahn-Hilliard / MPI / ${{ matrix.ranks }} ranks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        ranks: [1, 2, 4]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - run: sudo apt-get update && sudo apt-get install -y openmpi-bin libopenmpi-dev
+      - name: Verify distributed spaces, halo exchange, GMRES and multigrid
+        run: |
+          make -C source/contrib/nmfd-operations -j2 test-rect-mpi \
+            CONFIG_FILE=build_configs/config_cpu.inc BUILD_DIR=build/mpi \
+            MPI_NP=${{ matrix.ranks }} MPIEXEC_FLAGS=--oversubscribe OMP_NUM_THREADS=2
+          make -C source/contrib/nmfd-newton -j2 check_ch_mpi \
+            CONFIG_FILE=build_configs/config_cpu.inc BUILD_DIR=build/ch_mpi \
+            MPI_NP=${{ matrix.ranks }} MPIEXEC_FLAGS=--oversubscribe
+
   nmfd-short-recurrence-cpu:
     name: NMFD linear solvers / ${{ matrix.solver }}
     runs-on: ubuntu-latest
@@ -115,6 +147,50 @@ jobs:
             CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
             BUILD_DIR="$BUILD_DIR/short_recurrence_baseline"
           OMP_NUM_THREADS=2 timeout 60s "$BUILD_DIR/short_recurrence_baseline/test_nmfd_short_recurrence_baseline_cpu.bin"
+
+  nmfd-jacobi-cpu:
+    name: Jacobi / ${{ matrix.compiler }} / CPU and OMP
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install Clang OpenMP runtime
+        if: matrix.compiler == 'clang'
+        run: sudo apt-get update && sudo apt-get install -y clang libomp-dev
+      - name: Verify Jacobi, ownership, and JSON configuration
+        run: |
+          make -C source/contrib/nmfd-linsolvers -j2 check_jacobi_cpu check_jacobi_json_cpu \
+            CONFIG_FILE='build_configs/config_github_ubuntu_${{ matrix.compiler }}.inc' \
+            JSON_INCLUDE="$GITHUB_WORKSPACE/source/contrib/nmfd-newton/contrib/json" \
+            BUILD_DIR=build/jacobi/${{ matrix.compiler }} TEST_OMP_NUM_THREADS=2
+
+  nmfd-jacobi-cahn-hilliard-cpu:
+    name: Jacobi / Cahn-Hilliard / ${{ matrix.backend }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [serial, omp]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify unchanged Newton and Cahn-Hilliard regressions
+        run: |
+          make -C source/contrib/nmfd-newton -j2 check_linsolvers 'check_ch_${{ matrix.backend }}' \
+            CONFIG_FILE=build_configs/config_cpu.inc BUILD_DIR=build/jacobi_ch
+      - name: Verify Jacobi CH convergence, rebinding, and Newton rollback
+        run: |
+          make 'test_nmfd_jacobi_ch_${{ matrix.backend }}.bin' \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/jacobi_ch"
+          OMP_NUM_THREADS=2 timeout 120s "$BUILD_DIR/jacobi_ch/test_nmfd_jacobi_ch_${{ matrix.backend }}.bin"
 
   nmfd-newton-short-recurrence-cpu:
     name: Newton / migrated short-recurrence solvers

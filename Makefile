@@ -930,6 +930,18 @@ NEWTON_TEST_HEADERS = $(CONTRIB_NMFD_NEWTON)/test/solvers/newton_test_fixture.h 
 NEWTON_TEST_INCLUDES = -I$(COMMON_NMFD_OPERATIONS) $(INMFD_NEWTON) -I$(CONTRIB_SCFD)/include -I$(CONTRIB_NMFD_NEWTON)/contrib/json
 NEWTON_TEST_FLAGS ?=
 
+NMFD_JACOBI_CH_SOURCE = source/common/tests/test_nmfd_jacobi_ch.cpp
+NMFD_JACOBI_CH_HEADERS = $(wildcard $(CONTRIB_NMFD_NEWTON)/test/cahn_hilliard/*.h $(CONTRIB_NMFD_NEWTON)/test/cahn_hilliard/kernels/*.h $(CONTRIB_NMFD_NEWTON)/test/cahn_hilliard/include/*.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/*.h)
+
+test_nmfd_jacobi_ch_serial.bin: $(NMFD_JACOBI_CH_SOURCE) $(NEWTON_TEST_HEADERS) $(NMFD_JACOBI_CH_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_NEWTON) -DPLATFORM_SERIAL_CPU $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_nmfd_jacobi_ch_omp.bin: $(NMFD_JACOBI_CH_SOURCE) $(NEWTON_TEST_HEADERS) $(NMFD_JACOBI_CH_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_NEWTON) -DPLATFORM_OMP $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_nmfd_jacobi_ch_cuda.bin: $(NMFD_JACOBI_CH_SOURCE) $(NEWTON_TEST_HEADERS) $(NMFD_JACOBI_CH_HEADERS)
+	$(NVCC) $(NVCCFLAGS) $(IPROJECT) $(INMFD_NEWTON) -DPLATFORM_CUDA -x cu $< -o $(BUILD_DIR)/$@
+
 test_nmfd_newton_short_recurrence_cpu.bin: source/common/tests/test_nmfd_newton_short_recurrence.cpp $(NEWTON_TEST_HEADERS) $(wildcard $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/detail/*.h)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@
 
