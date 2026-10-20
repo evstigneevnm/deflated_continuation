@@ -57,6 +57,21 @@ public:
         initialize( operations, log );
     }
 
+    // Retain an already configured solver, e.g. the transition GMRES fallback.
+    solver_bundle(
+        std::shared_ptr<vector_operations_type> operations, log_type *log,
+        std::shared_ptr<nonlinear_operations_type> problem, std::shared_ptr<linear_operator_type> op,
+        std::shared_ptr<preconditioner_type> prec, std::shared_ptr<linear_solver_type> solver
+    )
+        : operations_owner_( std::move( operations ) ), problem_owner_( std::move( problem ) ),
+          linear_operator_( std::move( op ) ), preconditioner_( std::move( prec ) ),
+          linear_solver_( std::move( solver ) )
+    {
+        if ( !operations_owner_ || !problem_owner_ || !linear_operator_ || !preconditioner_ || !linear_solver_ )
+            throw std::invalid_argument( "stability solver_bundle: missing computational dependency" );
+        initialize( operations_owner_.get(), log );
+    }
+
 private:
     void initialize( vector_operations_type *operations, log_type *log )
     {

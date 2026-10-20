@@ -172,6 +172,12 @@ public:
         }
     }
 
+    explicit identity_symmetry_adapter( std::shared_ptr<VectorOperations> operations )
+        : identity_symmetry_adapter( operations.get() )
+    {
+        operations_owner_ = std::move( operations );
+    }
+
     void stabilize( const vector_type &source, vector_type &destination ) const
     {
         vec_ops->assign( source, destination );
@@ -213,7 +219,8 @@ public:
     }
 
 private:
-    VectorOperations *vec_ops;
+    std::shared_ptr<VectorOperations> operations_owner_;
+    VectorOperations                 *vec_ops;
 };
 
 template <class VectorOperations, class SymmetryAdapter = identity_symmetry_adapter<VectorOperations>, class Log = void>

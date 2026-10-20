@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -16,13 +17,12 @@
 #include <main/deflation_continuation.hpp>
 #include <main/parameters.hpp>
 
-#include <numerical_algos/lin_solvers/bicgstabl.h>
-#include <numerical_algos/lin_solvers/default_monitor.h>
 #include <symmetry/finite_action_registry.h>
 #include <symmetry/finite_quotient_adapter.h>
 #include <symmetry/fourier/residual_translation_orbit_aligner_2d.h>
 
 #include "KS2D_backend_typedefs.h"
+#include "KS2D_linear_solvers.h"
 
 #if defined( KS2D_VECTOR_BACKEND_CUDA )
 #    include <common/cuda_init_scfd.h>
@@ -75,8 +75,7 @@ int initialize_device( const std::string &selector )
 int main( int argc, char **argv )
 {
     using file_operations_type    = gpu_file_operations<vec_ops_real>;
-    using monitor_type            = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
-    using vector_type             = typename vec_ops_real::vector_type;
+    using monitor_type            = nmfd::solvers::default_monitor<vec_ops_real, log_t>;
     using nonlinear_operator_type = nonlinear_operators::kuramoto_sivashinskiy_2d<vec_ops_real, fft_backend_t>;
     using linear_operator_type    = nonlinear_operators::linear_operator_KS_2D<vec_ops_real, nonlinear_operator_type>;
     using preconditioner_type =
@@ -158,7 +157,9 @@ int main( int argc, char **argv )
         {
             throw std::invalid_argument( "--seed-zero and --replay-seed-file are mutually exclusive" );
         }
-        parameters_type parameters = main_classes::read_parameters_json<real>( config_file );
+        auto configuration =
+            std::make_shared<parameters_type>( main_classes::read_parameters_json<real>( config_file ) );
+        auto &parameters = *configuration;
         if ( parameters.nonlinear_operator.N_size.size() != 2 )
         {
             throw std::invalid_argument( "KS2D requires nonlinear_operator.discrete_problem_dimensions=[Nx, Ny]" );
@@ -193,70 +194,68 @@ int main( int argc, char **argv )
             parameters.plot_all();
         }
 
-        vec_ops_real vector_operations( state_size );
+        auto vector_operations = std::make_shared<vec_ops_real>( state_size );
         if ( parameters.use_high_precision_reduction )
         {
-            vector_operations.use_high_precision();
+            vector_operations->use_high_precision();
         }
-        file_operations_type    file_operations( &vector_operations );
-        nonlinear_operator_type nonlinear_operator( a, b, nx, ny, &vector_operations );
-        log_t                   log;
-        log_t                   linear_solver_log;
+        auto  file_operations    = std::make_shared<file_operations_type>( vector_operations.get() );
+        auto  nonlinear_operator = std::make_shared<nonlinear_operator_type>( a, b, nx, ny, vector_operations );
+        log_t log;
+        log_t linear_solver_log;
         log.set_verbosity( quiet ? 0 : 1 );
         linear_solver_log.set_verbosity( quiet ? 0 : 1 );
-        finite_actions_type finite_actions( &vector_operations );
-        const auto          finite_symmetry_group = nonlinear_operator.finite_symmetry_group();
-        const auto          finite_action_workspace =
-            nonlinear_operator.configure_finite_symmetry_actions( finite_actions, finite_symmetry_group );
+        auto       finite_actions          = std::make_shared<finite_actions_type>( vector_operations );
+        const auto finite_symmetry_group   = nonlinear_operator->finite_symmetry_group();
+        const auto finite_action_workspace = nonlinear_operator_type::configure_finite_symmetry_actions(
+            *finite_actions, finite_symmetry_group, nonlinear_operator
+        );
         if ( !quiet )
         {
             std::cout << "KS2D finite symmetry group: order=" << finite_symmetry_group.size()
                       << ", fingerprint=" << finite_symmetry_group.fingerprint() << '\n';
         }
-        identity_adapter_type             identity_adapter( &vector_operations );
-        residual_translation_aligner_type residual_translation_aligner(
-            &vector_operations, nonlinear_operator.state_modes()
+        auto identity_adapter = std::make_shared<identity_adapter_type>( vector_operations );
+        auto residual_translation_aligner =
+            std::make_shared<residual_translation_aligner_type>( vector_operations, nonlinear_operator->state_modes() );
+        auto quotient_adapter = std::make_shared<quotient_adapter_type>(
+            vector_operations, identity_adapter, finite_actions, residual_translation_aligner
         );
-        quotient_adapter_type quotient_adapter(
-            &vector_operations, &identity_adapter, &finite_actions, &residual_translation_aligner
-        );
-        solution_storage_type solution_storage(
-            &vector_operations, 50, vector_operations.get_l2_size(), real( 2 ), &quotient_adapter,
+        auto solution_storage = std::make_shared<solution_storage_type>(
+            vector_operations, 50, vector_operations->get_l2_size(), real( 2 ), quotient_adapter,
             static_cast<double>( parameters.deflation_continuation.restart_policy.duplicate_after_deflation_tolerance ),
             &log
         );
 
+        using linear_system_type = nmfd::solvers::sherman_morrison<
+            vec_ops_real, monitor_type, log_t, linear_operator_type, preconditioner_type, nmfd::solvers::bicgstabl>;
         using driver_type = main_classes::deflation_continuation<
             vec_ops_real, file_operations_type, log_t, monitor_type, nonlinear_operator_type, linear_operator_type,
-            preconditioner_type, numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator,
-            parameters_type, solution_storage_type>;
+            preconditioner_type, ks2d_model::bicgstabl, nonlinear_operators::system_operator, parameters_type,
+            solution_storage_type, continuation::system_operator_continuation, linear_system_type>;
         driver_type driver(
-            &vector_operations, &file_operations, &log, &linear_solver_log, &nonlinear_operator, &parameters,
-            &solution_storage
+            vector_operations, file_operations, &log, &linear_solver_log, nonlinear_operator, configuration,
+            solution_storage
         );
         (void)finite_action_workspace;
         driver.set_parameters();
         if ( replay_seed_file )
         {
             driver.execute();
-            vector_type seed;
-            vector_operations.init_vector( seed );
-            vector_operations.start_use_vector( seed );
-            file_operations.read_vector( seed_file, seed );
-            driver.add_solution_curve( seed, seed_parameter );
-            vector_operations.stop_use_vector( seed );
-            vector_operations.free_vector( seed );
+            nmfd::detail::vector_wrap<vec_ops_real, false, false> seed( *vector_operations );
+            seed.init();
+            seed.start_use();
+            file_operations->read_vector( seed_file, *seed );
+            driver.add_solution_curve( *seed, seed_parameter );
             return EXIT_SUCCESS;
         }
         if ( seed_zero )
         {
-            vector_type seed;
-            vector_operations.init_vector( seed );
-            vector_operations.start_use_vector( seed );
-            nonlinear_operator.exact_solution( seed_parameter, seed );
-            driver.add_solution_curve( seed, seed_parameter );
-            vector_operations.stop_use_vector( seed );
-            vector_operations.free_vector( seed );
+            nmfd::detail::vector_wrap<vec_ops_real, false, false> seed( *vector_operations );
+            seed.init();
+            seed.start_use();
+            nonlinear_operator->exact_solution( seed_parameter, *seed );
+            driver.add_solution_curve( *seed, seed_parameter );
         }
         if ( !continue_seed_only || !seed_zero )
         {

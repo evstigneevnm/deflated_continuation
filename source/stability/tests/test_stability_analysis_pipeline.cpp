@@ -1843,6 +1843,17 @@ void test_transition_fallback_newton( const std::string &label )
         label + " disabled fallback preserves primary failure"
     );
 
+    auto                                owned_fallback    = std::make_shared<fallback_newton_type>( &vector_space );
+    std::weak_ptr<fallback_newton_type> observed_fallback = owned_fallback;
+    refiner.set_fallback_newton( owned_fallback );
+    owned_fallback.reset();
+    require( !observed_fallback.expired(), label + " refiner retains shared fallback" );
+    vector_space.assign_scalar( 1.0, refined );
+    const auto owned_result = refiner.correct_fixed_parameter_state( refined, 0.5 );
+    require( owned_result.succeeded && owned_result.used_fallback, label + " owned fallback recovers the state" );
+    refiner.set_fallback_newton( std::shared_ptr<fallback_newton_type>{} );
+    require( observed_fallback.expired(), label + " resetting shared fallback releases its owner" );
+
     vector_space.stop_use_vector( refined );
     vector_space.stop_use_vector( upper );
     vector_space.stop_use_vector( lower );

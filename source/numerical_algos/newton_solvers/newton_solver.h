@@ -7,6 +7,7 @@
 
 #include <string>
 #include <stdexcept>
+#include <nmfd/detail/vector_wrap.h>
 #include "../detail/str_source_helper.h"
 
 namespace numerical_algos
@@ -22,17 +23,14 @@ public:
     typedef typename vector_operations::vector_type T_vec;
 
     newton_solver( vector_operations *vec_ops_, system_operator *system_op_, convergence_strategy *conv_strat_ )
-        : vec_ops( vec_ops_ ), system_op( system_op_ ), conv_strat( conv_strat_ )
+        : vec_ops( vec_ops_ ), system_op( system_op_ ), conv_strat( conv_strat_ ), correction_storage_( *vec_ops_ )
     {
-        vec_ops->init_vector( delta_x );
-        vec_ops->start_use_vector( delta_x );
+        correction_storage_.init();
+        correction_storage_.start_use();
     }
 
-    ~newton_solver()
-    {
-        vec_ops->stop_use_vector( delta_x );
-        vec_ops->free_vector( delta_x );
-    }
+    newton_solver( const newton_solver & )            = delete;
+    newton_solver &operator=( const newton_solver & ) = delete;
 
     //solve inplace
     bool solve( nonlinear_operator *nonlin_op, T_vec &x, const T &lambda )
@@ -86,10 +84,11 @@ public:
     }
 
 private:
-    vector_operations    *vec_ops;
-    system_operator      *system_op;
-    convergence_strategy *conv_strat;
-    T_vec                 delta_x;
+    vector_operations                                         *vec_ops;
+    system_operator                                           *system_op;
+    convergence_strategy                                      *conv_strat;
+    nmfd::detail::vector_wrap<vector_operations, false, false> correction_storage_;
+    T_vec                                                     &delta_x = *correction_storage_;
 };
 
 

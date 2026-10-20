@@ -10,6 +10,7 @@
 */
 
 #include <numerical_algos/lin_solvers/linear_solve_recovery.h>
+#include <nmfd/detail/vector_wrap.h>
 
 
 namespace nonlinear_operators
@@ -25,16 +26,14 @@ public:
 
 
     system_operator( vector_operations *&vec_ops_, linear_operator *&lin_op_, linear_solver *&lin_solver_ )
-        : vec_ops( vec_ops_ ), lin_op( lin_op_ ), lin_solver( lin_solver_ )
+        : vec_ops( vec_ops_ ), lin_op( lin_op_ ), lin_solver( lin_solver_ ), rhs_storage_( *vec_ops_ )
     {
-        vec_ops->init_vector( b );
-        vec_ops->start_use_vector( b );
+        rhs_storage_.init();
+        rhs_storage_.start_use();
     }
-    ~system_operator()
-    {
-        vec_ops->stop_use_vector( b );
-        vec_ops->free_vector( b );
-    }
+
+    system_operator( const system_operator & )            = delete;
+    system_operator &operator=( const system_operator & ) = delete;
 
     bool solve( nonlinear_operator *nonlin_op, const T_vec &x, const T lambda, T_vec &d_x )
     {
@@ -51,13 +50,11 @@ public:
     }
 
 private:
-    vector_operations *vec_ops;
-    linear_operator   *lin_op;
-    linear_solver     *lin_solver;
-    T_vec              b;
-    T_vec              f;
-    T_vec              c;
-    T                  beta;
+    vector_operations                                         *vec_ops;
+    linear_operator                                           *lin_op;
+    linear_solver                                             *lin_solver;
+    nmfd::detail::vector_wrap<vector_operations, false, false> rhs_storage_;
+    T_vec                                                     &b = *rhs_storage_;
 };
 
 }

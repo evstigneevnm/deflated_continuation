@@ -293,6 +293,12 @@ public:
         transition_refiner_.reset_fallback_newton();
     }
 
+    template <class FallbackNewton>
+    void set_transition_fallback_newton( std::shared_ptr<FallbackNewton> fallback_newton )
+    {
+        transition_refiner_.set_fallback_newton( std::move( fallback_newton ) );
+    }
+
     fixed_parameter_correction_result_type correct_fixed_parameter_state( T_vec &state, T parameter )
     {
         return transition_refiner_.correct_fixed_parameter_state( state, parameter );

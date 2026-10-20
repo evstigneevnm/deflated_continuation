@@ -1373,6 +1373,27 @@ jobs:
           make test_finite_group_manifest.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$FOURIER_BUILD" REAL_TYPE=double
           ./"$FOURIER_BUILD"/test_finite_group_manifest.bin
 
+  ks2d-nmfd-linear-solvers-cpu-omp:
+    needs: [fftw-operations-cpu, nmfd-sherman-morrison-cpu, nmfd-short-recurrence-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make libfftw3-dev
+          fi
+      - name: Verify KS2D residuals, solver recovery, symmetry ownership, and construction cleanup
+        run: |
+          export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
+          KS2D_BUILD="$BUILD_DIR/ks2d_nmfd_cpu_omp"
+          make test_KS2D_linear_solvers_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          timeout 60s ./"$KS2D_BUILD"/test_KS2D_linear_solvers_cpu_omp.bin
+
   ks2d-cpu-omp:
     needs: [fourier-discretization-cpu, eigensolver-foundation-cpu]
     runs-on: ubuntu-latest
@@ -1436,6 +1457,12 @@ jobs:
           python3 scripts/write_ks2d_ci_config.py "$KS2D_BUILD/ks2d_nontrivial_ci.json" "$KS2D_BUILD/project_nontrivial" --clean-project --nx 12 --ny 16 --steps 20 --step-size 2 --max-step-size 5 --skip-file-output 5 --seed-parameter 4.333 --parameter-min 3.99 --parameter-max 4.4 --deflation-attempts 1 --newton-deflation-iterations 80 --newton-deflation-weight 0.5 --newton-deflation-tolerance 1e-8 --linear-solver-iterations 150 --linear-solver-tolerance 1e-3 --add-analytical-solution --enable-branch-intersections --enable-seed-schedule --max-failed-continuations-per-knot 1
           timeout 120s ./"$KS2D_BUILD"/KS2D_bd_cpu_omp.bin "$KS2D_BUILD/ks2d_nontrivial_ci.json" --quiet
           python3 scripts/validate_ks2d_nontrivial_branch.py "$KS2D_BUILD/project_nontrivial" --seed-parameter 4.333 --minimum-norm 1e-3
+
+      - name: Replay KS2D NMFD reference curve, stability restart, and Newton fallback
+        run: |
+          export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
+          KS2D_BUILD="$BUILD_DIR/ks2d_cpu_omp"
+          python3 scripts/test_ks2d_nmfd.py --bd-executable "$KS2D_BUILD/KS2D_bd_cpu_omp.bin" --stability-executable "$KS2D_BUILD/KS2D_stability_cpu_omp.bin" --work-dir "$KS2D_BUILD/nonzero_nmfd"
 
   lapack-wrap-cpu:
     needs: [scfd-vector-operations-cpu]
@@ -1742,6 +1769,8 @@ jobs:
           ./"$KS2D_BUILD"/test_fourier_translation_cuda.bin
           make test_KS2D_operator_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
           ./"$KS2D_BUILD"/test_KS2D_operator_cuda.bin
+          make test_KS2D_linear_solvers_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_KS2D_linear_solvers_cuda.bin
           make test_numpy_array_writer.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
           ./"$KS2D_BUILD"/test_numpy_array_writer.bin
           make KS2D_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
@@ -1761,6 +1790,7 @@ jobs:
           python3 scripts/write_ks2d_ci_config.py "$KS2D_BUILD/ks2d_nontrivial_ci.json" "$KS2D_BUILD/project_nontrivial" --clean-project --nx 12 --ny 16 --steps 20 --step-size 2 --max-step-size 5 --skip-file-output 5 --seed-parameter 4.333 --parameter-min 3.99 --parameter-max 4.4 --deflation-attempts 1 --newton-deflation-iterations 80 --newton-deflation-weight 0.5 --newton-deflation-tolerance 1e-8 --linear-solver-iterations 150 --linear-solver-tolerance 1e-3 --add-analytical-solution --enable-branch-intersections --enable-seed-schedule --max-failed-continuations-per-knot 1
           timeout 120s ./"$KS2D_BUILD"/KS2D_bd_cuda.bin "$KS2D_BUILD/ks2d_nontrivial_ci.json" --quiet auto
           python3 scripts/validate_ks2d_nontrivial_branch.py "$KS2D_BUILD/project_nontrivial" --seed-parameter 4.333 --minimum-norm 1e-3
+          python3 scripts/test_ks2d_nmfd.py --bd-executable "$KS2D_BUILD/KS2D_bd_cuda.bin" --stability-executable "$KS2D_BUILD/KS2D_stability_cuda.bin" --work-dir "$KS2D_BUILD/nonzero_nmfd" --device auto
 
   ks1d-nmfd-linear-solvers-cpu-omp:
     needs: [fftw-operations-cpu]

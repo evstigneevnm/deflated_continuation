@@ -187,6 +187,20 @@ public:
         fallback_newton_ = {};
     }
 
+    template <class FallbackNewton>
+    void set_fallback_newton( std::shared_ptr<FallbackNewton> fallback_newton )
+    {
+        if ( !fallback_newton )
+        {
+            reset_fallback_newton();
+            return;
+        }
+        fallback_newton_ = [this, fallback_newton =
+                                      std::move( fallback_newton )]( vector_type &state, scalar_type parameter ) {
+            return fallback_newton->solve( nonlinear_operations_, state, parameter );
+        };
+    }
+
     fixed_parameter_correction_result correct_fixed_parameter_state( vector_type &state, scalar_type parameter )
     {
         fixed_parameter_correction_result result;

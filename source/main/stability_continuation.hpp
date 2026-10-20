@@ -301,6 +301,12 @@ public:
         stab->reset_transition_fallback_newton();
     }
 
+    template <class FallbackNewton>
+    void set_transition_fallback_newton( std::shared_ptr<FallbackNewton> fallback_newton )
+    {
+        stab->set_transition_fallback_newton( std::move( fallback_newton ) );
+    }
+
     void set_linsolver()
     /*T lin_solver_tol, unsigned int lin_solver_max_it, int use_precond_resid = 1, int resid_recalc_freq = 1, int basis_sz = 4, bool save_convergence_history_  = true, bool divide_out_norms_by_rel_base_ = true*/
     {

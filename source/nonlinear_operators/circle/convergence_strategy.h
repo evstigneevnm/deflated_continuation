@@ -16,6 +16,7 @@
 #include <cmath>
 #include <vector>
 #include <common/scalar_math.h>
+#include <nmfd/detail/vector_wrap.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
 #include <scfd/utils/logged_obj_base.h>
 
@@ -41,24 +42,21 @@ public:
     )
         : vec_ops( vec_ops_ ), log( log_ ), iterations( 0 ), tolerance( tolerance_ ),
           maximum_iterations( maximum_iterations_ ), newton_wight( newton_wight_ ),
-          newton_wight_initial( newton_wight_ ), verbose( verbose_ ), store_norms_history( store_norms_history_ )
+          newton_wight_initial( newton_wight_ ), verbose( verbose_ ), store_norms_history( store_norms_history_ ),
+          trial_storage_( *vec_ops_ ), residual_storage_( *vec_ops_ )
     {
-        vec_ops->init_vector( x1 );
-        vec_ops->start_use_vector( x1 );
-        vec_ops->init_vector( Fx );
-        vec_ops->start_use_vector( Fx );
+        trial_storage_.init();
+        trial_storage_.start_use();
+        residual_storage_.init();
+        residual_storage_.start_use();
         if ( store_norms_history )
         {
             norms_evolution.reserve( maximum_iterations );
         }
     }
-    ~convergence_strategy()
-    {
-        vec_ops->stop_use_vector( x1 );
-        vec_ops->free_vector( x1 );
-        vec_ops->stop_use_vector( Fx );
-        vec_ops->free_vector( Fx );
-    }
+
+    convergence_strategy( const convergence_strategy & )            = delete;
+    convergence_strategy &operator=( const convergence_strategy & ) = delete;
 
     void set_convergence_constants(
         T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T( 1 ), bool store_norms_history_ = false,
@@ -190,15 +188,17 @@ public:
     }
 
 private:
-    vector_operations *vec_ops;
-    logging           *log;
-    unsigned int       maximum_iterations;
-    unsigned int       iterations;
-    T                  tolerance;
-    T_vec              x1, Fx;
-    T                  newton_wight, newton_wight_initial;
-    bool               verbose, store_norms_history;
-    std::vector<T>     norms_evolution;
+    vector_operations                                         *vec_ops;
+    logging                                                   *log;
+    unsigned int                                               maximum_iterations;
+    unsigned int                                               iterations;
+    T                                                          tolerance;
+    T                                                          newton_wight, newton_wight_initial;
+    bool                                                       verbose, store_norms_history;
+    std::vector<T>                                             norms_evolution;
+    nmfd::detail::vector_wrap<vector_operations, false, false> trial_storage_, residual_storage_;
+    T_vec                                                     &x1 = *trial_storage_;
+    T_vec                                                     &Fx = *residual_storage_;
 };
 
 

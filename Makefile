@@ -140,7 +140,7 @@ STAR_SHAPED_MODEL_HEADERS = source/models/star_shaped/star_shaped_backend_typede
 KS1D_MODEL_HEADERS = source/models/KS_1D/KS1D_backend_typedefs.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/linear_operator_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/preconditioner_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/system_operator.h
 KS1D_LINEAR_SOLVER_HEADERS = source/models/KS_1D/KS1D_linear_solvers.h $(wildcard source/contrib/nmfd-linsolvers/include/nmfd/solvers/*.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/detail/*.h) $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 KS1D_FULL_MODEL_HEADERS = $(KS1D_MODEL_HEADERS) source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h $(SYMMETRY_LINEARIZATION_HEADERS) source/nonlinear_operators/projected_system_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/projected_system_operator_continuation.h $(CONTINUATION_CHART_HEADERS) $(DEFLATION_SYMMETRY_HEADERS)
-WORKFLOW_OWNERSHIP_HEADERS = source/main/deflation_continuation.hpp source/main/deflation_continuation/solver_bundle.h source/main/stability_continuation.hpp source/main/stability_continuation/solver_bundle.h source/main/solver_construction.h source/main/deflation_continuation/parameter_application.h
+WORKFLOW_OWNERSHIP_HEADERS = source/main/deflation_continuation.hpp source/main/deflation_continuation/solver_bundle.h source/main/stability_continuation.hpp source/main/stability_continuation/solver_bundle.h source/main/solver_construction.h source/main/deflation_continuation/parameter_application.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/system_operator.h source/numerical_algos/newton_solvers/newton_solver.h
 STABILITY_CONTINUATION_HEADERS = source/main/stability_continuation.hpp source/main/stability_continuation/solver_bundle.h source/containers/stability_diagram.h $(STABILITY_ANALYSIS_HEADERS) $(EIGENSOLVER_HEADERS) $(EIGENSOLVER_TRANSFORMATION_HEADERS) $(PRODUCT_VECTOR_SPACE_HEADERS) $(NMFD_GMRES_HEADERS) $(HOST_SMALL_DENSE_HEADERS)
 KS1D_STABILITY_HEADERS = source/models/KS_1D/KS1D_stability_cli.h $(STABILITY_CONTINUATION_HEADERS)
 KS1D_STABILITY_REPLAY_SCRIPT = scripts/test_ks1d_full_stability_replay.py
@@ -231,11 +231,20 @@ test_KS2D_stability_cli.bin: source/models/KS_2D/tests/test_KS2D_stability_cli.c
 test_numpy_array_writer.bin: source/visualization/tests/test_numpy_array_writer.cpp source/visualization/io/numpy_array_writer.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/visualization/tests/test_numpy_array_writer.cpp -o $(BUILD_DIR)/test_numpy_array_writer.bin 2>$(RESULTS)
 
-KS2D_bd_cpu_omp: source/models/KS_2D/KS2D_bd.cpp $(KS2D_REFACTORED_HEADERS) $(COMMON_FILE_OPS_HEADERS)
-	$(G++) $(G++FLAGS) -DKS2D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) source/models/KS_2D/KS2D_bd.cpp $(OPENMP) $(LFFTW) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS2D_bd_cpu_omp.bin 2>$(RESULTS)
+KS2D_LINEAR_SOLVER_HEADERS = source/models/KS_2D/KS2D_linear_solvers.h $(wildcard source/contrib/nmfd-linsolvers/include/nmfd/solvers/*.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/detail/*.h) source/nonlinear_operators/circle/system_operator.h source/nonlinear_operators/circle/convergence_strategy.h source/numerical_algos/newton_solvers/newton_solver.h $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 
-KS2D_bd_cuda: source/models/KS_2D/KS2D_bd.cpp $(KS2D_REFACTORED_HEADERS) $(COMMON_FILE_OPS_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
-	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS2D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(IBOOST) -x cu source/models/KS_2D/KS2D_bd.cpp -c -o $(BUILD_DIR)/KS2D_bd_cuda_main.o 2>$(RESULTS)
+test_KS2D_linear_solvers_cpu_omp.bin: source/models/KS_2D/test_KS2D_linear_solvers.cpp $(KS2D_REFACTORED_HEADERS) $(KS2D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS)
+	$(G++) $(G++FLAGS) -DKS2D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $< $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_KS2D_linear_solvers_cuda.bin: source/models/KS_2D/test_KS2D_linear_solvers.cpp $(KS2D_REFACTORED_HEADERS) $(KS2D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS2D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) -x cu $< -c -o $(BUILD_DIR)/test_KS2D_linear_solvers_cuda_main.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS2D_linear_solvers_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+KS2D_bd_cpu_omp: source/models/KS_2D/KS2D_bd.cpp $(KS2D_REFACTORED_HEADERS) $(KS2D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS)
+	$(G++) $(G++FLAGS) -DKS2D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/KS_2D/KS2D_bd.cpp $(OPENMP) $(LFFTW) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS2D_bd_cpu_omp.bin 2>$(RESULTS)
+
+KS2D_bd_cuda: source/models/KS_2D/KS2D_bd.cpp $(KS2D_REFACTORED_HEADERS) $(KS2D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS2D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -x cu source/models/KS_2D/KS2D_bd.cpp -c -o $(BUILD_DIR)/KS2D_bd_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/KS2D_bd_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS2D_bd_cuda.bin 2>$(RESULTS)
 
 KS2D_prepare_visualization_cpu_omp: source/models/KS_2D/KS2D_prepare_visualization.cpp $(KS2D_REFACTORED_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(VISUALIZATION_HEADERS)
@@ -245,10 +254,10 @@ KS2D_prepare_visualization_cuda: source/models/KS_2D/KS2D_prepare_visualization.
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS2D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/KS_2D/KS2D_prepare_visualization.cpp -c -o $(BUILD_DIR)/KS2D_prepare_visualization_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/KS2D_prepare_visualization_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/KS2D_prepare_visualization_cuda.bin 2>$(RESULTS)
 
-KS2D_stability_cpu_omp: source/models/KS_2D/KS2D_stability.cpp source/models/KS_2D/KS2D_stability_cli.h $(KS2D_REFACTORED_HEADERS) $(STABILITY_CONTINUATION_HEADERS) $(COMMON_FILE_OPS_HEADERS)
+KS2D_stability_cpu_omp: source/models/KS_2D/KS2D_stability.cpp source/models/KS_2D/KS2D_stability_cli.h $(KS2D_REFACTORED_HEADERS) $(KS2D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(STABILITY_CONTINUATION_HEADERS) $(COMMON_FILE_OPS_HEADERS)
 	$(G++) $(G++FLAGS) -DKS2D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/KS_2D/KS2D_stability.cpp $(OPENMP) $(LFFTW) $(LLAPACK) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS2D_stability_cpu_omp.bin 2>$(RESULTS)
 
-KS2D_stability_cuda: source/models/KS_2D/KS2D_stability.cpp source/models/KS_2D/KS2D_stability_cli.h $(KS2D_REFACTORED_HEADERS) $(STABILITY_CONTINUATION_HEADERS) $(COMMON_FILE_OPS_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+KS2D_stability_cuda: source/models/KS_2D/KS2D_stability.cpp source/models/KS_2D/KS2D_stability_cli.h $(KS2D_REFACTORED_HEADERS) $(KS2D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(STABILITY_CONTINUATION_HEADERS) $(COMMON_FILE_OPS_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS2D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -x cu source/models/KS_2D/KS2D_stability.cpp -c -o $(BUILD_DIR)/KS2D_stability_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/KS2D_stability_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBSAll) $(LLAPACK) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS2D_stability_cuda.bin 2>$(RESULTS)
 

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -41,6 +42,14 @@ public:
         {
             throw std::invalid_argument( "residual translation mode layout has the wrong size" );
         }
+    }
+
+    residual_translation_orbit_aligner_2d(
+        std::shared_ptr<vector_operations_type> operations, std::vector<mode_type> modes, policy_type policy = {}
+    )
+        : residual_translation_orbit_aligner_2d( operations.get(), std::move( modes ), policy )
+    {
+        operations_owner_ = std::move( operations );
     }
 
     void align_orbit_closest_to_reference(
@@ -130,15 +139,16 @@ private:
         vec_ops->get( source, destination.data(), destination.size() );
     }
 
-    vector_operations_type           *vec_ops;
-    std::vector<mode_type>            modes;
-    policy_type                       policy;
-    std::vector<scalar_type>          reference_host;
-    std::vector<scalar_type>          source_host;
-    std::vector<scalar_type>          candidate_host;
-    std::vector<scalar_type>          best_host;
-    residual_translation_character_2d last_character;
-    bool                              last_character_valid = false;
+    std::shared_ptr<vector_operations_type> operations_owner_;
+    vector_operations_type                 *vec_ops;
+    std::vector<mode_type>                  modes;
+    policy_type                             policy;
+    std::vector<scalar_type>                reference_host;
+    std::vector<scalar_type>                source_host;
+    std::vector<scalar_type>                candidate_host;
+    std::vector<scalar_type>                best_host;
+    residual_translation_character_2d       last_character;
+    bool                                    last_character_valid = false;
 };
 
 } // namespace fourier

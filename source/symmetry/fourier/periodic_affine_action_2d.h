@@ -8,6 +8,7 @@
 #include <limits>
 #include <memory>
 #include <stdexcept>
+#include <utility>
 
 #include <nmfd/operations/backend/complex.h>
 #include <nmfd/operations/backend/math.h>
@@ -61,6 +62,16 @@ public:
 
     periodic_affine_action_2d( const periodic_affine_action_2d & )            = delete;
     periodic_affine_action_2d &operator=( const periodic_affine_action_2d & ) = delete;
+
+    periodic_affine_action_2d(
+        std::shared_ptr<vector_operations_type> operations, std::shared_ptr<const codec_type> codec,
+        const discretization::fourier::r2c_index_space_2d &index_space, const std::array<scalar_type, 2> &lengths
+    )
+        : periodic_affine_action_2d( operations.get(), codec.get(), index_space, lengths )
+    {
+        operations_owner_ = std::move( operations );
+        codec_owner_      = std::move( codec );
+    }
 
     void apply( const element_type &element, const vector_type &source, vector_type &destination )
     {
@@ -164,6 +175,8 @@ private:
         }
     }
 
+    std::shared_ptr<vector_operations_type>     operations_owner_;
+    std::shared_ptr<const codec_type>           codec_owner_;
     vector_operations_type                     *vector_operations_;
     const codec_type                           *codec_;
     discretization::fourier::r2c_index_space_2d index_space_;
@@ -172,16 +185,9 @@ private:
     spectral_field_type                         destination_spectrum_;
 };
 
-template <class Registry, class Group, class Codec, class Complex>
-auto register_periodic_affine_group_2d(
-    Registry &registry, const Group &group, const Codec *codec,
-    const discretization::fourier::r2c_index_space_2d   &index_space,
-    const std::array<typename Registry::scalar_type, 2> &lengths
-)
+template <class Registry, class Group, class Action>
+auto register_periodic_affine_group_2d( Registry &registry, const Group &group, std::shared_ptr<Action> action )
 {
-    using action_type = periodic_affine_action_2d<typename Registry::vector_operations_type, Codec, Complex>;
-    auto action       = std::make_shared<action_type>( registry.vector_operations(), codec, index_space, lengths );
-
     registry.clear();
     for ( const auto &entry : group.entries() )
     {
@@ -199,6 +205,35 @@ auto register_periodic_affine_group_2d(
     }
     registry.set_definition_fingerprint( group.fingerprint() );
     return action;
+}
+
+template <class Registry, class Group, class Codec, class Complex>
+auto register_periodic_affine_group_2d(
+    Registry &registry, const Group &group, const Codec *codec,
+    const discretization::fourier::r2c_index_space_2d   &index_space,
+    const std::array<typename Registry::scalar_type, 2> &lengths
+)
+{
+    using action_type = periodic_affine_action_2d<typename Registry::vector_operations_type, Codec, Complex>;
+    return register_periodic_affine_group_2d(
+        registry, group, std::make_shared<action_type>( registry.vector_operations(), codec, index_space, lengths )
+    );
+}
+
+template <class Registry, class Group, class Codec, class Complex>
+auto register_periodic_affine_group_2d(
+    Registry &registry, const Group &group, std::shared_ptr<typename Registry::vector_operations_type> operations,
+    std::shared_ptr<const Codec> codec, const discretization::fourier::r2c_index_space_2d &index_space,
+    const std::array<typename Registry::scalar_type, 2> &lengths
+)
+{
+    using action_type = periodic_affine_action_2d<typename Registry::vector_operations_type, Codec, Complex>;
+    if ( !operations || operations.get() != registry.vector_operations() )
+        throw std::invalid_argument( "periodic affine registry and owned space differ" );
+    return register_periodic_affine_group_2d(
+        registry, group,
+        std::make_shared<action_type>( std::move( operations ), std::move( codec ), index_space, lengths )
+    );
 }
 
 } // namespace fourier

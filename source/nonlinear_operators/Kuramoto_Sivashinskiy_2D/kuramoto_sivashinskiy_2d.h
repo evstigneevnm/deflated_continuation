@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -14,6 +15,7 @@
 #include <vector>
 
 #include <nmfd/operations/backend/complex.h>
+#include <nmfd/detail/vector_wrap.h>
 #include <discretization/fourier/codecs/inversion_odd_field.h>
 #include <discretization/fourier/dealiasing_policy.h>
 #include <discretization/fourier/initialization/low_mode_odd_field.h>
@@ -80,27 +82,33 @@ public:
           index_space_( physical_extent_ ), lengths_( lengths ), grid_( physical_extent_, lengths_ ),
           transform_( physical_extent_ ), wavevectors_( grid_, index_space_ ),
           codec_( vector_operations_, index_space_ ), product_( &transform_, dealiasing_type( index_space_ ) ), a_( a ),
-          b_( b ), u_hat_( index_space_.spectral_extent() ), u_gradient_x_( index_space_.spectral_extent() ),
-          u_gradient_y_( index_space_.spectral_extent() ), u_gradient_sum_( index_space_.spectral_extent() ),
-          nonlinear_hat_( index_space_.spectral_extent() ), output_hat_( index_space_.spectral_extent() ),
-          u0_hat_( index_space_.spectral_extent() ), u0_gradient_sum_( index_space_.spectral_extent() ),
-          du_hat_( index_space_.spectral_extent() ), du_gradient_sum_( index_space_.spectral_extent() ),
-          jacobian_product_1_( index_space_.spectral_extent() ), jacobian_product_2_( index_space_.spectral_extent() ),
-          preconditioner_hat_( index_space_.spectral_extent() ), physical_output_( physical_extent_ )
+          b_( b ), u0_storage_( *vector_operations_ ), u_hat_( index_space_.spectral_extent() ),
+          u_gradient_x_( index_space_.spectral_extent() ), u_gradient_y_( index_space_.spectral_extent() ),
+          u_gradient_sum_( index_space_.spectral_extent() ), nonlinear_hat_( index_space_.spectral_extent() ),
+          output_hat_( index_space_.spectral_extent() ), u0_hat_( index_space_.spectral_extent() ),
+          u0_gradient_sum_( index_space_.spectral_extent() ), du_hat_( index_space_.spectral_extent() ),
+          du_gradient_sum_( index_space_.spectral_extent() ), jacobian_product_1_( index_space_.spectral_extent() ),
+          jacobian_product_2_( index_space_.spectral_extent() ), preconditioner_hat_( index_space_.spectral_extent() ),
+          physical_output_( physical_extent_ )
     {
-        vector_operations_->init_vector( u0_state_ );
-        vector_operations_->start_use_vector( u0_state_ );
+        u0_storage_.init();
+        u0_storage_.start_use();
         vector_operations_->assign_scalar( scalar_type( 0 ), u0_state_ );
+    }
+
+    kuramoto_sivashinskiy_2d(
+        const scalar_type a, const scalar_type b, const std::size_t nx, const std::size_t ny,
+        std::shared_ptr<vector_operations_type> operations,
+        const std::array<scalar_type, 2>       &lengths =
+            { scalar_type( 2 ) * std::acos( scalar_type( -1 ) ), scalar_type( 2 ) * std::acos( scalar_type( -1 ) ) }
+    )
+        : kuramoto_sivashinskiy_2d( a, b, nx, ny, operations.get(), lengths )
+    {
+        operations_owner_ = std::move( operations );
     }
 
     kuramoto_sivashinskiy_2d( const kuramoto_sivashinskiy_2d & )            = delete;
     kuramoto_sivashinskiy_2d &operator=( const kuramoto_sivashinskiy_2d & ) = delete;
-
-    ~kuramoto_sivashinskiy_2d()
-    {
-        vector_operations_->stop_use_vector( u0_state_ );
-        vector_operations_->free_vector( u0_state_ );
-    }
 
     std::size_t size() const
     {
@@ -171,6 +179,22 @@ public:
     {
         const auto group = finite_symmetry_group();
         return configure_finite_symmetry_actions( registry, group );
+    }
+
+    template <class FiniteActionRegistry>
+    static auto configure_finite_symmetry_actions(
+        FiniteActionRegistry &registry, const finite_symmetry_group_type &group,
+        const std::shared_ptr<kuramoto_sivashinskiy_2d> &problem
+    )
+    {
+        if ( !problem )
+            throw std::invalid_argument( "KS2D finite actions require a problem" );
+        // The alias keeps the model and its codec alive without copying either.
+        auto codec = std::shared_ptr<const state_codec_type>( problem, &problem->codec_ );
+        return symmetry::fourier::register_periodic_affine_group_2d<
+            FiniteActionRegistry, finite_symmetry_group_type, state_codec_type, complex_type>(
+            registry, group, problem->operations_owner_, std::move( codec ), problem->index_space_, problem->lengths_
+        );
     }
 
     scalar_type linear_multiplier( const std::size_t ix, const std::size_t iy, const scalar_type lambda ) const
@@ -591,35 +615,37 @@ private:
         }
     }
 
-    vector_operations_type    *vector_operations_;
-    extent_type                physical_extent_;
-    index_space_type           index_space_;
-    std::array<scalar_type, 2> lengths_;
-    grid_type                  grid_;
-    mutable transform_type     transform_;
-    wavevector_table_type      wavevectors_;
-    mutable state_codec_type   codec_;
-    mutable product_type       product_;
-    scalar_type                a_;
-    scalar_type                b_;
-    scalar_type                lambda0_                = scalar_type( 0 );
-    unsigned int               random_profile_counter_ = 0;
+    std::shared_ptr<vector_operations_type> operations_owner_;
+    vector_operations_type                 *vector_operations_;
+    extent_type                             physical_extent_;
+    index_space_type                        index_space_;
+    std::array<scalar_type, 2>              lengths_;
+    grid_type                               grid_;
+    mutable transform_type                  transform_;
+    wavevector_table_type                   wavevectors_;
+    mutable state_codec_type                codec_;
+    mutable product_type                    product_;
+    scalar_type                             a_;
+    scalar_type                             b_;
+    scalar_type                             lambda0_                = scalar_type( 0 );
+    unsigned int                            random_profile_counter_ = 0;
 
-    vector_type                 u0_state_;
-    spectral_field_type         u_hat_;
-    spectral_field_type         u_gradient_x_;
-    spectral_field_type         u_gradient_y_;
-    spectral_field_type         u_gradient_sum_;
-    spectral_field_type         nonlinear_hat_;
-    spectral_field_type         output_hat_;
-    spectral_field_type         u0_hat_;
-    spectral_field_type         u0_gradient_sum_;
-    spectral_field_type         du_hat_;
-    spectral_field_type         du_gradient_sum_;
-    spectral_field_type         jacobian_product_1_;
-    spectral_field_type         jacobian_product_2_;
-    mutable spectral_field_type preconditioner_hat_;
-    physical_field_type         physical_output_;
+    nmfd::detail::vector_wrap<vector_operations_type, false, false> u0_storage_;
+    vector_type                                                    &u0_state_ = *u0_storage_;
+    spectral_field_type                                             u_hat_;
+    spectral_field_type                                             u_gradient_x_;
+    spectral_field_type                                             u_gradient_y_;
+    spectral_field_type                                             u_gradient_sum_;
+    spectral_field_type                                             nonlinear_hat_;
+    spectral_field_type                                             output_hat_;
+    spectral_field_type                                             u0_hat_;
+    spectral_field_type                                             u0_gradient_sum_;
+    spectral_field_type                                             du_hat_;
+    spectral_field_type                                             du_gradient_sum_;
+    spectral_field_type                                             jacobian_product_1_;
+    spectral_field_type                                             jacobian_product_2_;
+    mutable spectral_field_type                                     preconditioner_hat_;
+    physical_field_type                                             physical_output_;
 };
 
 } // namespace nonlinear_operators
