@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -14,6 +15,8 @@
 #include <common/scalar_math.h>
 #include <nonlinear_operators/detail/linear_nonlinear_terms.h>
 #include <scfd/utils/device_tag.h>
+#include <scfd/backend/serial_cpu.h>
+#include <nmfd/operations/dense_operations_base.h>
 
 namespace nonlinear_operators
 {
@@ -326,6 +329,18 @@ public:
     {
     }
 
+    bratu(
+        std::size_t interior_size_, std::shared_ptr<VectorOperations> operations,
+        spatial_discretization discretization_ = spatial_discretization::chebyshev
+    )
+        : bratu(
+              interior_size_, operations ? operations.get() : throw std::invalid_argument( "Bratu: null vector space" ),
+              discretization_
+          )
+    {
+        operations_owner_ = std::move( operations );
+    }
+
     ~bratu()
     {
         vec_ops->stop_use_vector( u_0 );
@@ -409,20 +424,28 @@ public:
 
     void solve_jacobian_system( T_vec &rhs_to_solution ) const
     {
-        solve_affine_jacobian_system( rhs_to_solution, T( 1 ), T( 0 ), false );
+        if ( !try_solve_jacobian_system( rhs_to_solution ) )
+            throw std::runtime_error( "Bratu: singular or nonfinite Jacobian solve" );
+    }
+
+    bool try_solve_jacobian_system( T_vec &rhs_to_solution ) const
+    {
+        return solve_affine_jacobian_system( rhs_to_solution, T( 1 ), T( 0 ), false );
     }
 
     void
     preconditioner_jacobian_affine_u( T_vec &rhs_to_solution, const T jacobian_scale, const T identity_shift ) const
     {
-        solve_affine_jacobian_system( rhs_to_solution, jacobian_scale, identity_shift, false );
+        if ( !solve_affine_jacobian_system( rhs_to_solution, jacobian_scale, identity_shift, false ) )
+            throw std::runtime_error( "Bratu: singular or nonfinite affine Jacobian solve" );
     }
 
     void preconditioner_jacobian_affine_u_adjoint(
         T_vec &rhs_to_solution, const T jacobian_scale, const T identity_shift
     ) const
     {
-        solve_affine_jacobian_system( rhs_to_solution, jacobian_scale, identity_shift, true );
+        if ( !solve_affine_jacobian_system( rhs_to_solution, jacobian_scale, identity_shift, true ) )
+            throw std::runtime_error( "Bratu: singular or nonfinite adjoint affine Jacobian solve" );
     }
 
     void physical_solution( T_vec &, T_vec & )
@@ -581,13 +604,14 @@ public:
     }
 
 private:
-    VectorOperations      *vec_ops;
-    std::size_t            interior_size;
-    std::size_t            total_nodes;
-    spatial_discretization discretization;
-    T_vec                  u_0;
-    T_vec                  d2_matrix;
-    T_vec                  jacobian_matrix;
+    std::shared_ptr<VectorOperations> operations_owner_;
+    VectorOperations                 *vec_ops;
+    std::size_t                       interior_size;
+    std::size_t                       total_nodes;
+    spatial_discretization            discretization;
+    T_vec                             u_0;
+    T_vec                             d2_matrix;
+    T_vec                             jacobian_matrix;
 
     __DEVICE_TAG__ static T scaled_exponential( const T value, const T lambda )
     {
@@ -898,7 +922,7 @@ private:
         );
     }
 
-    void solve_affine_jacobian_system(
+    bool solve_affine_jacobian_system(
         T_vec &rhs_to_solution, const T jacobian_scale, const T identity_shift, const bool transpose
     ) const
     {
@@ -926,8 +950,10 @@ private:
             host_matrix_work[index( row, row, interior_size )] += identity_shift;
         }
         vec_ops->get( rhs_to_solution, host_rhs_work.data(), interior_size );
-        solve_dense_system( host_matrix_work, host_rhs_work );
+        if ( !solve_dense_system( host_matrix_work, host_rhs_work ) )
+            return false;
         vec_ops->set( host_rhs_work.data(), rhs_to_solution, interior_size );
+        return true;
     }
 
     void ensure_host_work() const
@@ -941,54 +967,69 @@ private:
         return row * rows + col;
     }
 
-    static void solve_dense_system( std::vector<T> &matrix, std::vector<T> &rhs )
+    static bool solve_dense_system( std::vector<T> &matrix, std::vector<T> &rhs )
     {
         const std::size_t n = rhs.size();
-        for ( std::size_t k = 0; k < n; ++k )
+        if constexpr ( std::is_floating_point<T>::value )
         {
-            std::size_t pivot     = k;
-            T           pivot_abs = bratu_detail::abs( matrix[index( k, k, n )] );
-            for ( std::size_t row = k + 1; row < n; ++row )
-            {
-                const T value_abs = bratu_detail::abs( matrix[index( row, k, n )] );
-                if ( value_abs > pivot_abs )
-                {
-                    pivot     = row;
-                    pivot_abs = value_abs;
-                }
-            }
-            if ( pivot_abs <= T( 0 ) )
-            {
-                throw std::runtime_error( "nonlinear_operators::bratu: singular Jacobian matrix." );
-            }
-            if ( pivot != k )
-            {
-                for ( std::size_t col = 0; col < n; ++col )
-                {
-                    std::swap( matrix[index( k, col, n )], matrix[index( pivot, col, n )] );
-                }
-                std::swap( rhs[k], rhs[pivot] );
-            }
-            for ( std::size_t row = k + 1; row < n; ++row )
-            {
-                const T factor             = matrix[index( row, k, n )] / matrix[index( k, k, n )];
-                matrix[index( row, k, n )] = T( 0 );
-                for ( std::size_t col = k + 1; col < n; ++col )
-                {
-                    matrix[index( row, col, n )] -= factor * matrix[index( k, col, n )];
-                }
-                rhs[row] -= factor * rhs[k];
-            }
+            // Match the existing row-major storage without copying or transposing it.
+            using dense_type = nmfd::operations::dense_operations<T, scfd::backend::serial_cpu<ordinal_type>>;
+            scfd::arrays::array_nd<T, 2, scfd::memory::host, scfd::arrays::last_index_fast_arranger> matrix_view;
+            scfd::arrays::array<T, scfd::memory::host>                                               rhs_view;
+            matrix_view.init_by_raw_data( matrix.data(), n, n );
+            rhs_view.init_by_raw_data( rhs.data(), n );
+            return dense_type::solve_in_place( matrix_view, rhs_view, n );
         }
-
-        for ( std::size_t rr = n; rr-- > 0; )
+        else
         {
-            T sum = rhs[rr];
-            for ( std::size_t col = rr + 1; col < n; ++col )
+            // Preserve the existing multiprecision path until generic scalar support is migrated.
+            for ( std::size_t k = 0; k < n; ++k )
             {
-                sum -= matrix[index( rr, col, n )] * rhs[col];
+                std::size_t pivot     = k;
+                T           pivot_abs = bratu_detail::abs( matrix[index( k, k, n )] );
+                for ( std::size_t row = k + 1; row < n; ++row )
+                {
+                    const T value_abs = bratu_detail::abs( matrix[index( row, k, n )] );
+                    if ( value_abs > pivot_abs )
+                    {
+                        pivot     = row;
+                        pivot_abs = value_abs;
+                    }
+                }
+                if ( pivot_abs <= T( 0 ) )
+                {
+                    throw std::runtime_error( "nonlinear_operators::bratu: singular Jacobian matrix." );
+                }
+                if ( pivot != k )
+                {
+                    for ( std::size_t col = 0; col < n; ++col )
+                    {
+                        std::swap( matrix[index( k, col, n )], matrix[index( pivot, col, n )] );
+                    }
+                    std::swap( rhs[k], rhs[pivot] );
+                }
+                for ( std::size_t row = k + 1; row < n; ++row )
+                {
+                    const T factor             = matrix[index( row, k, n )] / matrix[index( k, k, n )];
+                    matrix[index( row, k, n )] = T( 0 );
+                    for ( std::size_t col = k + 1; col < n; ++col )
+                    {
+                        matrix[index( row, col, n )] -= factor * matrix[index( k, col, n )];
+                    }
+                    rhs[row] -= factor * rhs[k];
+                }
             }
-            rhs[rr] = sum / matrix[index( rr, rr, n )];
+
+            for ( std::size_t rr = n; rr-- > 0; )
+            {
+                T sum = rhs[rr];
+                for ( std::size_t col = rr + 1; col < n; ++col )
+                {
+                    sum -= matrix[index( rr, col, n )] * rhs[col];
+                }
+                rhs[rr] = sum / matrix[index( rr, rr, n )];
+            }
+            return true;
         }
     }
 };

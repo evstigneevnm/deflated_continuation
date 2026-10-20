@@ -15,9 +15,11 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <utility>
 #include <vector>
 
@@ -131,6 +133,15 @@ public:
         : vec_ops_R( vec_ops_R_ ), Nx( Nx_ ), curvature( curvature_ )
     {
         common_constructor_operation();
+    }
+
+    star_shaped( std::size_t size, std::shared_ptr<vector_operations_real> operations, const T &curvature_ = T( 0.2 ) )
+        : star_shaped(
+              size, operations ? operations.get() : throw std::invalid_argument( "Star-shaped: null vector space" ),
+              curvature_
+          )
+    {
+        operations_owner_ = std::move( operations );
     }
 
     ~star_shaped()
@@ -289,11 +300,12 @@ public:
     }
 
 private:
-    vector_operations_real *vec_ops_R;
-    std::size_t             Nx;
-    T_vec                   u_0;
-    T                       lambda_0  = T( 0 );
-    T                       curvature = T( 0.2 );
+    std::shared_ptr<vector_operations_real> operations_owner_;
+    vector_operations_real                 *vec_ops_R;
+    std::size_t                             Nx;
+    T_vec                                   u_0;
+    T                                       lambda_0  = T( 0 );
+    T                                       curvature = T( 0.2 );
 
     void common_constructor_operation()
     {

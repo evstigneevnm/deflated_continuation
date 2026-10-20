@@ -101,6 +101,64 @@ jobs:
             BUILD_DIR=build/sherman_morrison_recovery
           timeout 30s build/sherman_morrison_recovery/test_linear_solve_recovery.bin
 
+  nmfd-dense-solve-cpu:
+    name: Dense operations / direct solve and numerical failures
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify CPU and OMP dense solves
+        run: make -C source/contrib/nmfd-operations test-dense BUILD_DIR=build/dense_solve OMP_NUM_THREADS=2
+
+  nmfd-direct-solver-cpu:
+    name: Direct solver / ordinary, rank-one and scalar-border
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify residuals, failure rollback and ownership
+        run: |
+          make -C source/contrib/nmfd-linsolvers check_direct_solver_cpu \
+            CONFIG_FILE=build_configs/config_github_ubuntu_gcc.inc \
+            BUILD_DIR=build/direct_solver TEST_OMP_NUM_THREADS=2
+
+  nmfd-newton-direct-solver-cpu:
+    name: Newton / canonical direct solver
+    needs: nmfd-direct-solver-cpu
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify nonlinear convergence, linear failure and recovery
+        run: |
+          make test_nmfd_newton_direct_solver_cpu.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_direct
+          timeout 30s build/newton_direct/test_nmfd_newton_direct_solver_cpu.bin
+
+  nmfd-direct-solver-cuda:
+    name: Direct solver and dense operations / CUDA
+    needs: [nmfd-dense-solve-cpu, nmfd-direct-solver-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Verify device dense, rank-one and bordered solves when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1 || ! command -v nvcc >/dev/null 2>&1; then
+            echo "Skipping CUDA direct solves: no usable CUDA runner"
+            exit 0
+          fi
+          make -C source/contrib/nmfd-operations test-dense-cuda BUILD_DIR=build/direct_cuda
+          make -C source/contrib/nmfd-linsolvers check_direct_solver_cuda BUILD_DIR=build/direct_cuda
+
   nmfd-cahn-hilliard-original:
     name: Original Cahn-Hilliard / restored operations
     runs-on: ubuntu-latest

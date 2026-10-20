@@ -1,6 +1,9 @@
 #ifndef __PRECONDITIONER_BRATU_H__
 #define __PRECONDITIONER_BRATU_H__
 
+#include <memory>
+#include <utility>
+
 namespace nonlinear_operators
 {
 
@@ -15,20 +18,33 @@ public:
     {
     }
 
+    explicit preconditioner_bratu( std::shared_ptr<NonlinearOperator> problem )
+        : owner_( std::move( problem ) ), nonlin_op( owner_.get() )
+    {
+    }
+
+    void set_operator( std::shared_ptr<const LinearOperator> op )
+    {
+        operator_owner_ = std::move( op );
+        lin_op          = operator_owner_.get();
+    }
+
     void set_operator( const LinearOperator *op_ ) const
     {
         lin_op = op_;
         (void)lin_op;
     }
 
-    void apply( T_vec &x ) const
+    bool apply( T_vec &x ) const
     {
-        nonlin_op->solve_jacobian_system( x );
+        return nonlin_op->try_solve_jacobian_system( x );
     }
 
 private:
-    NonlinearOperator            *nonlin_op;
-    mutable const LinearOperator *lin_op = nullptr;
+    std::shared_ptr<NonlinearOperator>    owner_;
+    std::shared_ptr<const LinearOperator> operator_owner_;
+    NonlinearOperator                    *nonlin_op;
+    mutable const LinearOperator         *lin_op = nullptr;
 };
 
 } // namespace nonlinear_operators

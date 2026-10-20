@@ -1,6 +1,9 @@
 #ifndef __LINEAR_OPERATOR_STAR_SHAPED_H__
 #define __LINEAR_OPERATOR_STAR_SHAPED_H__
 
+#include <memory>
+#include <utility>
+
 namespace nonlinear_operators
 {
 
@@ -15,13 +18,19 @@ public:
     {
     }
 
+    explicit linear_operator_star_shaped( std::shared_ptr<NonlinearOperator> problem )
+        : owner_( std::move( problem ) ), nonlin_op( owner_.get() )
+    {
+    }
+
     void apply( const T_vec &x, T_vec &f ) const
     {
         nonlin_op->jacobian_u( x, f );
     }
 
 private:
-    NonlinearOperator *nonlin_op;
+    std::shared_ptr<NonlinearOperator> owner_;
+    NonlinearOperator                 *nonlin_op;
 };
 
 } // namespace nonlinear_operators

@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <sstream>
 #include <string>
@@ -16,10 +17,8 @@
 #include <main/deflation_continuation.hpp>
 #include <main/parameters.hpp>
 
-#include <numerical_algos/lin_solvers/default_monitor.h>
-#include <numerical_algos/lin_solvers/exact_wrapper.h>
-
 #include "bratu_backend_typedefs.h"
+#include "bratu_linear_solvers.h"
 #include "bratu_model_config.h"
 
 namespace
@@ -49,7 +48,7 @@ T parse_scalar( const std::string &value, const char *label )
 int main( int argc, char const *argv[] )
 {
     using files_ops_t = gpu_file_operations<vec_ops_real>;
-    using monitor_t   = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
+    using monitor_t   = bratu_model::monitor<vec_ops_real, log_t>;
     using real_vec    = typename vec_ops_real::vector_type;
     using bratu_t     = nonlinear_operators::bratu<vec_ops_real, Blocks_x_>;
     using lin_op_t    = nonlinear_operators::linear_operator_bratu<vec_ops_real, bratu_t>;
@@ -112,7 +111,9 @@ int main( int argc, char const *argv[] )
     std::cout << "Using Bratu backend: " << BRATU_BACKEND_NAME << std::endl;
     std::cout << "Reading config file: " << path_to_config_file << std::endl;
 
-    parameters_t parameters = main_classes::read_parameters_json<parameters_real>( path_to_config_file );
+    auto configuration =
+        std::make_shared<parameters_t>( main_classes::read_parameters_json<parameters_real>( path_to_config_file ) );
+    auto &parameters = *configuration;
     if ( !quiet )
     {
         parameters.plot_all();
@@ -128,7 +129,8 @@ int main( int argc, char const *argv[] )
     const auto        spatial_discretization =
         bratu_model::spatial_discretization_from_parameters<bratu_t>( parameters, path_to_config_file );
 
-    vec_ops_real vec_ops_R( interior_size );
+    auto  vector_operations = std::make_shared<vec_ops_real>( interior_size );
+    auto &vec_ops_R         = *vector_operations;
     if ( use_high_precision_reduction )
     {
 #if defined( BRATU_VECTOR_BACKEND_VAR_PREC )
@@ -138,8 +140,9 @@ int main( int argc, char const *argv[] )
 #endif
     }
 
-    files_ops_t file_ops( &vec_ops_R );
-    bratu_t     BRATU( interior_size, &vec_ops_R, spatial_discretization );
+    auto  file_operations    = std::make_shared<files_ops_t>( vector_operations.get() );
+    auto  nonlinear_operator = std::make_shared<bratu_t>( interior_size, vector_operations, spatial_discretization );
+    auto &BRATU              = *nonlinear_operator;
     std::cout << "Bratu spatial discretization: " << bratu_t::discretization_name( spatial_discretization )
               << std::endl;
     log_t log;
@@ -147,11 +150,15 @@ int main( int argc, char const *argv[] )
     log.set_verbosity( quiet ? 0 : 1 );
     log_linsolver.set_verbosity( quiet ? 0 : 1 );
 
+    using linear_system_type       = bratu_model::linear_system<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t>;
     using deflation_continuation_t = main_classes::deflation_continuation<
-        vec_ops_real, files_ops_t, log_t, monitor_t, bratu_t, lin_op_t, prec_t,
-        numerical_algos::lin_solvers::exact_wrapper, nonlinear_operators::system_operator, parameters_t>;
+        vec_ops_real, files_ops_t, log_t, monitor_t, bratu_t, lin_op_t, prec_t, bratu_model::direct_solver,
+        nonlinear_operators::system_operator, parameters_t, deflation::solution_storage<vec_ops_real, log_t>,
+        continuation::system_operator_continuation, linear_system_type>;
 
-    deflation_continuation_t DC( &vec_ops_R, &file_ops, &log, &log_linsolver, &BRATU, &parameters );
+    deflation_continuation_t DC(
+        vector_operations, file_operations, &log, &log_linsolver, nonlinear_operator, configuration
+    );
 
     DC.set_parameters();
 

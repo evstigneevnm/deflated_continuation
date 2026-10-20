@@ -273,6 +273,22 @@ void test_branch_morse_index()
     require( positive == 1, "Bratu upper branch has Morse index one" );
 }
 
+void test_direct_failure_and_recovery()
+{
+    vector_space_type space( 1 );
+    problem_type      problem( 1, &space, problem_type::spatial_discretization::fd3 );
+    vector_workspace  state( space ), rhs( space );
+    space.assign_scalar( 0.0, state.get() );
+    space.assign_scalar( 3.0, rhs.get() );
+    // For one FD3 interior node, J(0, lambda) = -8 + lambda.
+    problem.set_linearization_point( state.get(), 8.0 );
+    require( !problem.try_solve_jacobian_system( rhs.get() ), "singular Bratu Jacobian returns failure" );
+    require( rhs.get()( 0 ) == 3.0, "failed Bratu solve preserves RHS" );
+    problem.set_linearization_point( state.get(), 7.0 );
+    require( problem.try_solve_jacobian_system( rhs.get() ), "Bratu inverse recovers after values update" );
+    require( rhs.get()( 0 ) == -3.0, "recovered Bratu inverse has the correct sign" );
+}
+
 } // namespace
 
 int main()
@@ -282,6 +298,7 @@ int main()
     test_fd3_affine_inverse_and_eigenvectors();
     test_fd3_dense_spectrum();
     test_branch_morse_index();
+    test_direct_failure_and_recovery();
     std::cout << "Bratu stability operator checks: " << checks << ", failures: " << failures << '\n';
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

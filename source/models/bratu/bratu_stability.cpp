@@ -21,9 +21,6 @@
 #include <nmfd/solvers/gmres.h>
 #include <nmfd/solvers/monitor_krylov.h>
 
-#include <numerical_algos/lin_solvers/default_monitor.h>
-#include <numerical_algos/lin_solvers/exact_wrapper.h>
-
 #include <stability/analysis/matrix_free_stability_configuration.h>
 #include <stability/analysis/matrix_free_stability_scan.h>
 #include <stability/eigensolvers/transformations/matrix_free_complex_factor_solver_bundle.h>
@@ -32,6 +29,7 @@
 #include <stability/eigensolvers/transformations/scaled_real_operator.h>
 
 #include "bratu_backend_typedefs.h"
+#include "bratu_linear_solvers.h"
 #include "bratu_model_config.h"
 
 namespace
@@ -74,10 +72,12 @@ int main( int argc, char **argv )
 {
     try
     {
-        const auto command_line    = parse_command_line( argc, argv );
-        using parameters_type      = main_classes::parameters<real>;
-        parameters_type parameters = main_classes::read_parameters_json<real>( command_line.config_file );
-        const auto     &config     = parameters.stability_continuation.matrix_free_eigensolver;
+        const auto command_line = parse_command_line( argc, argv );
+        using parameters_type   = main_classes::parameters<real>;
+        auto configuration =
+            std::make_shared<parameters_type>( main_classes::read_parameters_json<real>( command_line.config_file ) );
+        auto       &parameters = *configuration;
+        const auto &config     = parameters.stability_continuation.matrix_free_eigensolver;
         stability::analysis::validate_matrix_free_stability_config( config );
         if ( parameters.nonlinear_operator.N_size.empty() )
         {
@@ -110,22 +110,23 @@ int main( int argc, char **argv )
         using dense_lapack_type = nmfd::operations::linalg::host_small_dense_lapack<real>;
         using eigensolver_type =
             stability::analysis::matrix_free_stability_scan<factorization_types, inner_solver_type, dense_lapack_type>;
-        using newton_monitor_type = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
+        using newton_monitor_type = bratu_model::monitor<vec_ops_real, log_t>;
         using driver_type         = main_classes::stability_continuation<
                     vec_ops_real, file_operations_type, log_t, newton_monitor_type, nonlinear_operator_type,
-                    newton_operator_type, newton_preconditioner_type, numerical_algos::lin_solvers::exact_wrapper,
+                    newton_operator_type, newton_preconditioner_type, bratu_model::direct_solver,
                     nonlinear_operators::system_operator, parameters_type, eigensolver_type>;
 
         auto real_space    = std::make_shared<vec_ops_real>( state_size );
         auto complex_space = std::make_shared<complex_space_type>( state_size );
         if ( parameters.use_high_precision_reduction )
             real_space->use_high_precision();
-        file_operations_type file_operations( real_space.get() );
-        const auto discretization = bratu_model::spatial_discretization_from_parameters<nonlinear_operator_type>(
+        auto       file_operations = std::make_shared<file_operations_type>( real_space.get() );
+        const auto discretization  = bratu_model::spatial_discretization_from_parameters<nonlinear_operator_type>(
             parameters, command_line.config_file
         );
-        nonlinear_operator_type nonlinear_operator( state_size, real_space.get(), discretization );
-        newton_operator_type    newton_operator( &nonlinear_operator );
+        auto  nonlinear_owner    = std::make_shared<nonlinear_operator_type>( state_size, real_space, discretization );
+        auto &nonlinear_operator = *nonlinear_owner;
+        newton_operator_type    newton_operator( nonlinear_owner );
         stability_operator_type stability_operator( *real_space, newton_operator, config.linearization_scale );
         auto                    base_provider = std::make_shared<base_provider_type>( *real_space, nonlinear_operator );
         auto                    stability_provider =
@@ -135,7 +136,7 @@ int main( int argc, char **argv )
         log_t linear_solver_log;
         log.set_verbosity( command_line.quiet ? 0 : 1 );
         linear_solver_log.set_verbosity( command_line.quiet ? 0 : 1 );
-        eigensolver_type eigensolver(
+        auto eigensolver_owner = std::make_shared<eigensolver_type>(
             real_space, complex_space, stability_operator, stability_provider,
             stability::analysis::make_matrix_free_stability_scans<eigensolver_type>( config ),
             stability::analysis::make_matrix_free_inner_solver_parameters<
@@ -143,6 +144,7 @@ int main( int argc, char **argv )
             stability::analysis::make_spectrum_scan_aggregation_options( config ),
             !command_line.quiet && config.inner_solver.verbose ? &linear_solver_log : nullptr
         );
+        auto &eigensolver = *eigensolver_owner;
         stability::analysis::configure_matrix_free_stability_reuse( eigensolver, config );
 
         if ( !command_line.quiet )
@@ -154,7 +156,7 @@ int main( int argc, char **argv )
         }
 
         driver_type driver(
-            real_space.get(), &file_operations, &log, &linear_solver_log, &nonlinear_operator, &parameters, &eigensolver
+            real_space, file_operations, &log, &linear_solver_log, nonlinear_owner, configuration, eigensolver_owner
         );
         driver.set_parameters();
         if ( command_line.edit )
