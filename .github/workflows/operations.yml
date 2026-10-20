@@ -117,7 +117,10 @@ jobs:
         with:
           submodules: true
       - name: Verify CPU and OMP dense solves
-        run: make -C source/contrib/nmfd-operations test-dense BUILD_DIR=build/dense_solve OMP_NUM_THREADS=2
+        run: |
+          make -C source/contrib/nmfd-operations test-dense \
+            CONFIG_FILE=build_configs/config_cpu.inc \
+            BUILD_DIR=build/dense_solve OMP_NUM_THREADS=2
 
   nmfd-direct-solver-cpu:
     name: Direct solver / ordinary, rank-one and scalar-border
@@ -163,8 +166,10 @@ jobs:
             echo "Skipping CUDA direct solves: no usable CUDA runner"
             exit 0
           fi
-          make -C source/contrib/nmfd-operations test-dense-cuda BUILD_DIR=build/direct_cuda
-          make -C source/contrib/nmfd-linsolvers check_direct_solver_cuda BUILD_DIR=build/direct_cuda
+          make -C source/contrib/nmfd-operations test-dense-cuda \
+            CONFIG_FILE=build_configs/config_cuda.inc BUILD_DIR=build/direct_cuda
+          make -C source/contrib/nmfd-linsolvers check_direct_solver_cuda \
+            CONFIG_FILE=build_configs/config_github_ubuntu_gcc.inc BUILD_DIR=build/direct_cuda
 
   nmfd-cahn-hilliard-original:
     name: Original Cahn-Hilliard / restored operations

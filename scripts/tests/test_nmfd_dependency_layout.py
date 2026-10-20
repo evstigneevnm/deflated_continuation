@@ -1,6 +1,7 @@
 import configparser
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import unittest
@@ -66,6 +67,21 @@ class NmfdDependencyLayoutTest(unittest.TestCase):
                 if step.get("uses", "").startswith("actions/checkout@"):
                     setting = step.get("with", {}).get("submodules")
                     self.assertIn(setting, (None, True))
+
+    def test_dense_solver_jobs_select_module_local_configs(self):
+        workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
+        for name in ("nmfd-dense-solve-cpu", "nmfd-direct-solver-cuda"):
+            for step in workflow["jobs"][name]["steps"]:
+                commands = step.get("run", "").replace("\\\n", " ")
+                for command in commands.splitlines():
+                    words = shlex.split(command)
+                    if words[:2] != ["make", "-C"]:
+                        continue
+                    with self.subTest(job=name, command=command):
+                        configs = [word.split("=", 1)[1] for word in words
+                                   if word.startswith("CONFIG_FILE=")]
+                        self.assertEqual(len(configs), 1, "module builds must override the parent config")
+                        self.assertTrue((ROOT / words[2] / configs[0]).is_file())
 
     def test_local_runner_expands_workflow_and_step_environment(self):
         workflow = {"env": {name: "${{ github.workspace }}/source/contrib/" + Path(path).name
