@@ -8,6 +8,9 @@ on:
 env:
   CONFIG_FILE: build_configs/config_omen_home_release.inc
   BUILD_DIR: build/local_ci_operations
+  SCFD_ROOT: ${{ github.workspace }}/source/contrib/scfd
+  NMFD_OPERATIONS_ROOT: ${{ github.workspace }}/source/contrib/nmfd-operations
+  NMFD_LINSOLVERS_ROOT: ${{ github.workspace }}/source/contrib/nmfd-linsolvers
 
 defaults:
   run:
@@ -19,10 +22,14 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: true
       - name: Verify canonical operations dependencies
         run: |
           python3 -m unittest discover -s scripts/tests -p test_operations_dependencies.py
+          python3 -m unittest discover -s scripts/tests -p test_nmfd_dependency_layout.py
           python3 scripts/check_operations_dependencies.py
+          git submodule status
 
   nmfd-newton-operations-cpu:
     runs-on: ubuntu-latest
@@ -30,8 +37,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
-      - name: Verify standalone Newton with canonical operations
+          submodules: true
+      - name: Verify Newton with canonical parent dependencies
         run: |
           make -C source/contrib/nmfd-newton -j2 test_cpu check_headers_cpu \
             CONFIG_FILE=build_configs/config_cpu.inc \
@@ -43,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify Newton linear-solver API and include-order independence
         run: |
           make -C source/contrib/nmfd-newton -j2 check_linsolvers \
@@ -61,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify coupled Cahn-Hilliard Newton solves
         run: |
           make -C source/contrib/nmfd-newton -j2 'check_ch_${{ matrix.backend }}' \
@@ -74,8 +81,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
-      - name: Verify standalone linear solvers with canonical operations
+          submodules: true
+      - name: Verify linear solvers with canonical parent dependencies
         run: |
           make -C source/contrib/nmfd-linsolvers -j2 check_operations_cpu check_public_headers_cpu \
             CONFIG_FILE=build_configs/config_github_ubuntu_gcc.inc \
@@ -88,7 +95,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify analytical solves, failure reporting and ownership
         run: |
           make -C source/contrib/nmfd-linsolvers check_sherman_morrison_cpu \
@@ -108,7 +115,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify CPU and OMP dense solves
         run: make -C source/contrib/nmfd-operations test-dense BUILD_DIR=build/dense_solve OMP_NUM_THREADS=2
 
@@ -119,7 +126,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify residuals, failure rollback and ownership
         run: |
           make -C source/contrib/nmfd-linsolvers check_direct_solver_cpu \
@@ -134,7 +141,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify nonlinear convergence, linear failure and recovery
         run: |
           make test_nmfd_newton_direct_solver_cpu.bin \
@@ -149,7 +156,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify device dense, rank-one and bordered solves when available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1 || ! command -v nvcc >/dev/null 2>&1; then
@@ -166,7 +173,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - run: make -C source/contrib/nmfd-newton -j2 check_ch_original CONFIG_FILE=build_configs/config_cpu.inc BUILD_DIR=build/ch_original
 
   nmfd-cahn-hilliard-mpi:
@@ -180,7 +187,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - run: sudo apt-get update && sudo apt-get install -y openmpi-bin libopenmpi-dev
       - name: Verify distributed spaces, halo exchange, GMRES and multigrid
         run: |
@@ -202,7 +209,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify solver, canonical CPU/OMP backends, and JSON
         run: |
           make -C source/contrib/nmfd-linsolvers -j2 \
@@ -218,7 +225,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Compare against existing production solver implementations
         run: |
           make test_nmfd_short_recurrence_baseline_cpu.bin \
@@ -237,7 +244,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Install Clang OpenMP runtime
         if: matrix.compiler == 'clang'
         run: sudo apt-get update && sudo apt-get install -y clang libomp-dev
@@ -259,7 +266,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify unchanged Newton and Cahn-Hilliard regressions
         run: |
           make -C source/contrib/nmfd-newton -j2 check_linsolvers 'check_ch_${{ matrix.backend }}' \
@@ -277,7 +284,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify Newton convergence, hierarchy construction, and linear failure rollback
         run: |
           make test_nmfd_newton_short_recurrence_cpu.bin \
@@ -292,7 +299,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - run: |
           make test_solver_bundle.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/bundle_ownership"
           timeout 30s "$BUILD_DIR/bundle_ownership/test_solver_bundle.bin"
@@ -308,7 +315,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - run: sudo apt-get update && sudo apt-get install -y libboost-serialization-dev
       - name: Verify shared workflows and workspace failure cleanup
         run: |
@@ -325,7 +332,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - run: sudo apt-get update && sudo apt-get install -y libboost-serialization-dev
       - name: Verify dependency lifetime and cleanup with sanitizers
         run: |
@@ -340,7 +347,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify workflow ownership on CUDA when available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -361,10 +368,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Install standalone test dependencies
         run: sudo apt-get update && sudo apt-get install -y libboost-dev
-      - name: Verify the operations submodule without parent include paths
+      - name: Verify operations with canonical parent dependencies
         run: make -C source/contrib/nmfd-operations -j2 test-cpu test-multiprecision check-headers CONFIG_FILE=build_configs/config_cpu.inc
 
   nmfd-newton-failure-reporting-cpu:
@@ -373,7 +380,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify increment failures, vector validation, and projection recovery
         run: |
           make test_newton_failure_reporting_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_failure"
@@ -385,7 +392,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify bounded backtracking, overflow recovery, logging, and JSON configuration
         run: |
           make test_newton_backtracking_cpu.bin test_newton_backtracking_json_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_backtracking"
@@ -398,7 +405,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify tolerance, stagnation, iteration limits, restart, and rollback
         run: |
           make test_newton_convergence_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_convergence"
@@ -410,7 +417,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify parameter validation and atomic updates with and without JSON
         run: |
           make test_newton_configuration_cpu.bin test_newton_configuration_json_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_configuration"
@@ -423,7 +430,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify scratch cleanup and reuse across injected failures
         run: |
           make test_newton_vector_ownership_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_ownership"
@@ -435,7 +442,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify bound operators, optional hooks, rebinding, and rollback
         run: |
           make test_newton_operator_binding_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_operator_binding"
@@ -447,7 +454,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify shared dependency lifetimes, borrowed loggers, and null guards
         run: |
           make test_newton_dependency_ownership_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_dependencies"
@@ -462,7 +469,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Run Newton regressions with address and undefined-behavior sanitizers
         run: |
           make test_newton_failure_reporting_cpu.bin test_newton_backtracking_cpu.bin test_newton_convergence_cpu.bin test_newton_vector_ownership_cpu.bin test_newton_backtracking_json_cpu.bin test_newton_configuration_cpu.bin test_newton_configuration_json_cpu.bin test_newton_operator_binding_cpu.bin test_newton_dependency_ownership_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_sanitizers" NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
@@ -477,7 +484,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify Newton validation, projection recovery, restart, and rollback with SCFD OMP storage
         run: |
           make test_nmfd_newton_backend_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_backend_omp"
@@ -490,7 +497,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify Newton validation, projection recovery, restart, and rollback when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -510,7 +517,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify updated SCFD adapters, vector operations, and dense solvers
         run: |
           make -j2 test_nmfd_scfd_backend_cpu.bin test_nmfd_dense_gmres_cpu.bin test_nmfd_dense_nonlinear_solver_cpu.bin test_nmfd_dense_direct_solver_cpu.bin test_nmfd_dense_newton_direct_solver_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/scfd_dense_float"
@@ -539,7 +546,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify updated SCFD dense solvers when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -593,7 +600,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -612,7 +619,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify retained timestepper dependencies on serial CPU and OMP
         run: |
           make test_explicit_ownership_cpu.bin test_explicit_ownership_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/timestepper_ownership"
@@ -626,7 +633,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify retained timestepper dependencies when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -646,7 +653,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -664,7 +671,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify FSAL lifecycle and memory when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -684,7 +691,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -702,7 +709,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -720,7 +727,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify transformed sums and SciPy adaptation when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -741,7 +748,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -759,7 +766,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify fixed DOP853 when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -779,7 +786,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -798,7 +805,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU and Python dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -830,7 +837,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify native DOP853 dense output when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -850,7 +857,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -868,7 +875,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify adaptive DOP853 and Lorenz simulation when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -889,7 +896,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -908,7 +915,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU and Python dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -959,7 +966,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU and Python dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1006,7 +1013,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1024,7 +1031,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1042,7 +1049,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Test explicit RK when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -1064,7 +1071,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1082,7 +1089,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1100,7 +1107,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1118,7 +1125,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted CPU compiler
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1136,7 +1143,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify dense output when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -1166,7 +1173,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1184,7 +1191,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1208,7 +1215,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify operations, space factories, and workspace reuse
         run: |
           make test_nmfd_vector_space_hierarchy_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/vector_hierarchy"
@@ -1236,7 +1243,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Verify common operations and solvers when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -1265,7 +1272,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1346,7 +1353,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1387,7 +1394,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1408,7 +1415,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1437,7 +1444,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1458,7 +1465,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1528,7 +1535,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1547,7 +1554,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1640,7 +1647,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Build and test CUDA eigensolver and affine-preconditioner foundations when available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1; then
@@ -1683,7 +1690,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Build and test when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1; then
@@ -1711,7 +1718,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Build and test when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1; then
@@ -1742,7 +1749,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Build and test when HIP is available
         run: |
           HIPCC_BIN="${HIPCC:-hipcc}"
@@ -1781,7 +1788,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Build and test when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1; then
@@ -1805,7 +1812,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Build and validate CUDA Fourier and KS2D adjoint operators when available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1; then
@@ -1856,7 +1863,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1877,7 +1884,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1929,7 +1936,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -1950,7 +1957,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -2001,7 +2008,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -2024,7 +2031,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -2063,7 +2070,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -2085,7 +2092,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -2115,7 +2122,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -2137,7 +2144,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -2169,7 +2176,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -2199,7 +2206,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Prepare hosted Ubuntu CPU dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -2221,7 +2228,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Build and validate when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1; then
@@ -2255,7 +2262,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Build and validate when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1; then
@@ -2289,7 +2296,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Build and validate CUDA KS1D Jacobian/preconditioner adjoints when available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1; then
@@ -2339,7 +2346,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Build and validate when HIP is available
         run: |
           HIPCC_BIN="${HIPCC:-hipcc}"
@@ -2379,7 +2386,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          submodules: true
       - name: Build and validate when HIP is available
         run: |
           HIPCC_BIN="${HIPCC:-hipcc}"

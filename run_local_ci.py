@@ -301,6 +301,7 @@ def run_job(
     job_env = job.get("env", {}) if isinstance(job.get("env", {}), dict) else {}
     env = os.environ.copy()
     env.update(merge_env(workflow_env, job_env, extra_env))
+    env = {key: expand_expressions(value, env, project_root) for key, value in env.items()}
 
     if not eval_condition(job.get("if"), env):
         return JobResult(name=name, status="SKIP", duration=time.monotonic() - start)
@@ -321,6 +322,7 @@ def run_job(
         step_env = step.get("env", {}) if isinstance(step.get("env", {}), dict) else {}
         run_env = env.copy()
         run_env.update(as_str_env(step_env))
+        run_env = {key: expand_expressions(value, run_env, project_root) for key, value in run_env.items()}
 
         if not eval_condition(step.get("if"), run_env):
             print(f"  - skip: {step_name}", flush=True)
