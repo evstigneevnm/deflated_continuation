@@ -4,6 +4,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -115,7 +116,7 @@ class NmfdDependencyLayoutTest(unittest.TestCase):
                 self.assertIn("schedule", events)
                 latest = workflow["jobs"]["latest-dependencies"]
                 commands = "\n".join(step.get("run", "") for step in latest["steps"])
-                self.assertIn("git submodule update --init --remote --checkout", commands)
+                self.assertIn("git submodule update --init --remote --no-fetch --checkout", commands)
                 self.assertIn("git submodule status", commands)
                 for forbidden in ("--recursive", "git add", "git commit", "git push"):
                     self.assertNotIn(forbidden, commands)
@@ -125,6 +126,73 @@ class NmfdDependencyLayoutTest(unittest.TestCase):
                             self.assertIs(step["with"]["submodules"], True)
                         if name != "latest-dependencies":
                             self.assertNotIn("--remote", step.get("run", ""))
+
+    def test_latest_dependency_selection_from_shallow_clones(self):
+        env = dict(os.environ, GIT_ALLOW_PROTOCOL="file", GIT_TERMINAL_PROMPT="0")
+        with tempfile.TemporaryDirectory(prefix="nmfd-latest-") as directory:
+            root = Path(directory)
+
+            def git(cwd, *args):
+                return subprocess.run(
+                    ["git", "-c", "user.name=NMFD CI Test", "-c", "user.email=ci@example.invalid",
+                     "-c", "commit.gpgsign=false", *args],
+                    cwd=cwd, env=env, check=True, text=True, capture_output=True, timeout=30,
+                ).stdout.strip()
+
+            dependencies = {}
+            for i, branch in enumerate(("master", "nevstigneev", "nevstigneev/sync_with_bifurcator")):
+                remote = root / f"remote-{i}"
+                git(root, "init", "-q", "-b", "master", str(remote))
+                git(remote, "commit", "-qm", "Pinned dependency", "--allow-empty")
+                pinned = git(remote, "rev-parse", "HEAD")
+                if branch != "master":
+                    git(remote, "checkout", "-qb", branch, pinned)
+                git(remote, "commit", "-qm", "Latest " + branch, "--allow-empty")
+                dependencies[branch] = (remote, pinned, git(remote, "rev-parse", "HEAD"))
+                git(remote, "checkout", "-q", "master")
+
+            for library, (filename, _) in LIBRARIES.items():
+                with self.subTest(library=library):
+                    parent = root / library
+                    git(root, "init", "-q", "-b", "master", str(parent))
+                    config = configparser.ConfigParser(interpolation=None)
+                    config.read(CONTRIB / library / ".gitmodules")
+                    for section in config.sections():
+                        name = shlex.split(section)[1]
+                        path = config[section]["path"]
+                        remote, pinned, _ = dependencies[config[section]["branch"]]
+                        git(parent, "submodule", "add", "-q", "--name", name, remote.as_uri(), path)
+                        git(parent / path, "checkout", "--detach", "-q", pinned)
+                        git(parent, "config", "-f", ".gitmodules", f"submodule.{name}.branch",
+                            config[section]["branch"])
+                    git(parent, "add", ".")
+                    git(parent, "commit", "-qm", "Pinned direct dependencies")
+                    checkout = root / (library + "-shallow")
+                    git(root, "clone", "-q", "--depth=1", parent.as_uri(), str(checkout))
+                    git(checkout, "submodule", "update", "--init", "--depth=1")
+                    for section in config.sections():
+                        path = checkout / config[section]["path"]
+                        self.assertEqual(git(path, "rev-parse", "--is-shallow-repository"), "true")
+                        self.assertEqual(
+                            git(path, "for-each-ref", "--format=%(refname)", "refs/remotes/origin").splitlines(),
+                            ["refs/remotes/origin/HEAD", "refs/remotes/origin/master"],
+                        )
+                    head = git(checkout, "rev-parse", "HEAD")
+                    index = git(checkout, "ls-files", "--stage")
+                    workflow = ci.load_workflow(CONTRIB / library / ".github/workflows" / filename)
+                    steps = workflow["jobs"]["latest-dependencies"]["steps"]
+                    command = next(step["run"] for step in steps
+                                   if step.get("name") == "Select designated dependency branch tips")
+                    result = subprocess.run(
+                        ["bash", "-eo", "pipefail", "-c", command], cwd=checkout, env=env,
+                        check=True, text=True, capture_output=True, timeout=30,
+                    )
+                    for section in config.sections():
+                        expected = dependencies[config[section]["branch"]][2]
+                        self.assertEqual(git(checkout / config[section]["path"], "rev-parse", "HEAD"), expected)
+                        self.assertIn(expected, result.stdout)
+                    self.assertEqual(git(checkout, "rev-parse", "HEAD"), head)
+                    self.assertEqual(git(checkout, "ls-files", "--stage"), index)
 
     def test_all_direct_dependencies_have_explicit_tracking_branches(self):
         branches = {"scfd": "nevstigneev", "SCFD": "nevstigneev", "nmfd-operations": "master",
