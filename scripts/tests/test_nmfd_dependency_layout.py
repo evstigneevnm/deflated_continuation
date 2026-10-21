@@ -84,6 +84,18 @@ class NmfdDependencyLayoutTest(unittest.TestCase):
                         self.assertEqual(len(configs), 1, "module builds must override the parent config")
                         self.assertTrue((ROOT / words[2] / configs[0]).is_file())
 
+    def test_bratu_jobs_bound_nested_parallelism(self):
+        workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
+        for name in ("bratu-bd-cpu-omp", "bratu-bd-fd3-cpu-omp"):
+            with self.subTest(job=name):
+                job = workflow["jobs"][name]
+                env = ci.merge_env(workflow.get("env"), job.get("env"))
+                self.assertEqual(env["OMP_NUM_THREADS"], "2")
+                self.assertEqual(env["OPENBLAS_NUM_THREADS"], "1")
+                for step in job["steps"]:
+                    self.assertNotRegex(step.get("run", ""),
+                                        r"(?m)^\s*(?:export\s+)?(?:OMP_NUM_THREADS|OPENBLAS_NUM_THREADS)\s*=")
+
     def test_local_runner_expands_workflow_and_step_environment(self):
         workflow = {"env": {name: "${{ github.workspace }}/source/contrib/" + Path(path).name
                             for name, path in ROOTS.items()}}

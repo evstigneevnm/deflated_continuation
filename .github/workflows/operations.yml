@@ -2146,6 +2146,9 @@ jobs:
   bratu-bd-cpu-omp:
     needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
     runs-on: ubuntu-latest
+    env:
+      OMP_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "1"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -2159,7 +2162,6 @@ jobs:
           fi
       - name: Build and validate seeded fold continuation
         run: |
-          export OMP_NUM_THREADS=8
           BRATU_BUILD="$BUILD_DIR/bratu_bd_cpu_omp"
           make bratu_bd_cpu_omp bratu_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BRATU_BUILD" REAL_TYPE=double
           python3 scripts/write_bratu_ci_config.py "$BRATU_BUILD/bratu_ci.json" "$BRATU_BUILD/project" --clean-project --steps 150
@@ -2178,6 +2180,9 @@ jobs:
   bratu-bd-fd3-cpu-omp:
     needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
     runs-on: ubuntu-latest
+    env:
+      OMP_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "1"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -2191,7 +2196,6 @@ jobs:
           fi
       - name: Build and validate FD3 seeded fold continuation
         run: |
-          export OMP_NUM_THREADS=8
           BRATU_BUILD="$BUILD_DIR/bratu_bd_fd3_cpu_omp"
           make bratu_bd_cpu_omp bratu_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BRATU_BUILD" REAL_TYPE=double
           python3 scripts/write_bratu_ci_config.py "$BRATU_BUILD/bratu_ci.json" "$BRATU_BUILD/project" --clean-project --spatial-discretization fd3
