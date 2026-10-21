@@ -117,6 +117,16 @@ class NmfdDependencyLayoutTest(unittest.TestCase):
                              workflow["jobs"]["nmfd-dense1-extended-cpu"]["steps"])
         self.assertIn("check_dense1_extended_solver_cpu", commands)
 
+    def test_multiprecision_workflows_use_canonical_solvers(self):
+        for filename in ("source/models/circle/circle_bd.cpp",
+                         "source/models/bratu/bratu_linear_solvers.h",
+                         "source/models/star_shaped/star_shaped_linear_solvers.h"):
+            with self.subTest(filename=filename):
+                self.assertNotIn("numerical_algos/lin_solvers/", (ROOT / filename).read_text())
+        workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
+        for job in ("circle-bd-var-prec", "bratu-bd-var-prec", "star-shaped-bd-var-prec"):
+            self.assertIn("nmfd-multiprecision-cpu", workflow["jobs"][job]["needs"])
+
     def test_local_runner_expands_workflow_and_step_environment(self):
         workflow = {"env": {name: "${{ github.workspace }}/source/contrib/" + Path(path).name
                             for name, path in ROOTS.items()}}

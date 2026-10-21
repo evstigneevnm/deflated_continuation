@@ -731,7 +731,7 @@ bratu_bd_cpu_omp: source/models/bratu/bratu_bd.cpp $(BRATU_MODEL_HEADERS) $(COMM
 	$(G++) $(G++FLAGS) -DBRATU_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/bratu/bratu_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/bratu_bd_cpu_omp.bin 2>$(RESULTS)
 
 bratu_bd_var_prec: source/models/bratu/bratu_bd.cpp $(BRATU_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
-	$(G++) $(G++FLAGS) -DBRATU_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(IBOOST) source/models/bratu/bratu_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/bratu_bd_var_prec.bin 2>$(RESULTS)
+	$(G++) $(G++FLAGS) -DBRATU_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/bratu/bratu_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/bratu_bd_var_prec.bin 2>$(RESULTS)
 
 bratu_prepare_visualization_cpu_omp: source/models/bratu/bratu_prepare_visualization.cpp $(BRATU_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(VISUALIZATION_HEADERS)
 	$(G++) $(G++FLAGS) -DBRATU_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) source/models/bratu/bratu_prepare_visualization.cpp $(OPENMP) -o $(BUILD_DIR)/bratu_prepare_visualization_cpu_omp.bin 2>$(RESULTS)
@@ -752,7 +752,7 @@ star_shaped_bd_hip: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_M
 	$(HIPCC) $(HIPFLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/star_shaped/star_shaped_bd.cpp $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd_hip.bin 2>$(RESULTS)
 
 star_shaped_bd_var_prec: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
-	$(G++) $(G++FLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(IBOOST) source/models/star_shaped/star_shaped_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd_var_prec.bin 2>$(RESULTS)
+	$(G++) $(G++FLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/star_shaped/star_shaped_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd_var_prec.bin 2>$(RESULTS)
 
 star_shaped_stability_cpu_omp: source/models/star_shaped/star_shaped_stability.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(STABILITY_ANALYSIS_HEADERS) source/stability/eigensolvers/direct_scalar_eigensolver.h
 	$(G++) $(G++FLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/star_shaped/star_shaped_stability.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_stability_cpu_omp.bin 2>$(RESULTS)

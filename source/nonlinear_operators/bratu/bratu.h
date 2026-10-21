@@ -970,67 +970,13 @@ private:
     static bool solve_dense_system( std::vector<T> &matrix, std::vector<T> &rhs )
     {
         const std::size_t n = rhs.size();
-        if constexpr ( std::is_floating_point<T>::value )
-        {
-            // Match the existing row-major storage without copying or transposing it.
-            using dense_type = nmfd::operations::dense_operations<T, scfd::backend::serial_cpu<ordinal_type>>;
-            scfd::arrays::array_nd<T, 2, scfd::memory::host, scfd::arrays::last_index_fast_arranger> matrix_view;
-            scfd::arrays::array<T, scfd::memory::host>                                               rhs_view;
-            matrix_view.init_by_raw_data( matrix.data(), n, n );
-            rhs_view.init_by_raw_data( rhs.data(), n );
-            return dense_type::solve_in_place( matrix_view, rhs_view, n );
-        }
-        else
-        {
-            // Preserve the existing multiprecision path until generic scalar support is migrated.
-            for ( std::size_t k = 0; k < n; ++k )
-            {
-                std::size_t pivot     = k;
-                T           pivot_abs = bratu_detail::abs( matrix[index( k, k, n )] );
-                for ( std::size_t row = k + 1; row < n; ++row )
-                {
-                    const T value_abs = bratu_detail::abs( matrix[index( row, k, n )] );
-                    if ( value_abs > pivot_abs )
-                    {
-                        pivot     = row;
-                        pivot_abs = value_abs;
-                    }
-                }
-                if ( pivot_abs <= T( 0 ) )
-                {
-                    throw std::runtime_error( "nonlinear_operators::bratu: singular Jacobian matrix." );
-                }
-                if ( pivot != k )
-                {
-                    for ( std::size_t col = 0; col < n; ++col )
-                    {
-                        std::swap( matrix[index( k, col, n )], matrix[index( pivot, col, n )] );
-                    }
-                    std::swap( rhs[k], rhs[pivot] );
-                }
-                for ( std::size_t row = k + 1; row < n; ++row )
-                {
-                    const T factor             = matrix[index( row, k, n )] / matrix[index( k, k, n )];
-                    matrix[index( row, k, n )] = T( 0 );
-                    for ( std::size_t col = k + 1; col < n; ++col )
-                    {
-                        matrix[index( row, col, n )] -= factor * matrix[index( k, col, n )];
-                    }
-                    rhs[row] -= factor * rhs[k];
-                }
-            }
-
-            for ( std::size_t rr = n; rr-- > 0; )
-            {
-                T sum = rhs[rr];
-                for ( std::size_t col = rr + 1; col < n; ++col )
-                {
-                    sum -= matrix[index( rr, col, n )] * rhs[col];
-                }
-                rhs[rr] = sum / matrix[index( rr, rr, n )];
-            }
-            return true;
-        }
+        // Borrow the existing row-major workspace; all precisions use the canonical elimination.
+        using dense_type = nmfd::operations::dense_operations<T, scfd::backend::serial_cpu<ordinal_type>>;
+        scfd::arrays::array_nd<T, 2, scfd::memory::host, scfd::arrays::last_index_fast_arranger> matrix_view;
+        scfd::arrays::array<T, scfd::memory::host>                                               rhs_view;
+        matrix_view.init_by_raw_data( matrix.data(), n, n );
+        rhs_view.init_by_raw_data( rhs.data(), n );
+        return dense_type::solve_in_place( matrix_view, rhs_view, n );
     }
 };
 

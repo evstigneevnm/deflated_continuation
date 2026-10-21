@@ -108,6 +108,28 @@ jobs:
             BUILD_DIR=build/sherman_morrison_recovery
           timeout 30s build/sherman_morrison_recovery/test_linear_solve_recovery.bin
 
+  nmfd-multiprecision-cpu:
+    name: Multiprecision / dense and bordered linear solves
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare optional Boost headers
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make libboost-dev
+          fi
+      - name: Verify precision, true residuals, failure reporting and ownership
+        run: |
+          make -C source/contrib/nmfd-operations test-multiprecision \
+            CONFIG_FILE=build_configs/config_cpu.inc BUILD_DIR=build/multiprecision
+          make -C source/contrib/nmfd-linsolvers check_multiprecision_cpu \
+            CONFIG_FILE=build_configs/config_github_ubuntu_gcc.inc \
+            BUILD_DIR=build/multiprecision TEST_OMP_NUM_THREADS=2
+
   nmfd-dense1-extended-cpu:
     name: Extended solver / assembled reference and rebinding
     runs-on: ubuntu-latest
@@ -2084,7 +2106,7 @@ jobs:
           python3 scripts/validate_circle_visualization.py "$CIRCLE_BUILD/visualization/manifest.jsonl" --expected-points 3
 
   circle-bd-var-prec:
-    needs: [cpu-vector-operations-var-prec, fftw-operations-cpu, lapack-wrap-cpu]
+    needs: [cpu-vector-operations-var-prec, nmfd-multiprecision-cpu, fftw-operations-cpu, lapack-wrap-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -2136,7 +2158,7 @@ jobs:
           cmp "$STAR_BUILD/stability_curve.before_restart.dat" "$STAR_BUILD/project/0/debug_curve_stability.dat"
 
   star-shaped-bd-var-prec:
-    needs: [cpu-vector-operations-var-prec, fftw-operations-cpu, lapack-wrap-cpu]
+    needs: [cpu-vector-operations-var-prec, nmfd-multiprecision-cpu, fftw-operations-cpu, lapack-wrap-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -2224,7 +2246,7 @@ jobs:
           cmp "$BRATU_BUILD/stability_curve.before_restart.dat" "$BRATU_BUILD/project/0/debug_curve_stability.dat"
 
   bratu-bd-var-prec:
-    needs: [cpu-vector-operations-var-prec, fftw-operations-cpu, lapack-wrap-cpu]
+    needs: [cpu-vector-operations-var-prec, nmfd-multiprecision-cpu, fftw-operations-cpu, lapack-wrap-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
