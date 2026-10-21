@@ -29,9 +29,135 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p test_operations_dependencies.py
           python3 -m unittest discover -s scripts/tests -p test_nmfd_dependency_layout.py
           python3 -m unittest discover -s scripts/tests -p test_linear_solver_dependencies.py
+          python3 -m unittest discover -s scripts/tests -p test_nmfd_standalone.py
           python3 scripts/check_operations_dependencies.py
           python3 scripts/check_linear_solver_dependencies.py
           git submodule status
+
+  nmfd-standalone-cpu:
+    name: Pinned standalone / ${{ matrix.library }} / ${{ matrix.compiler }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        library: [nmfd-operations, nmfd-linsolvers, nmfd-newton]
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted compiler and optional test dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make libboost-dev nlohmann-json3-dev
+            if [ '${{ matrix.compiler }}' = clang ]; then
+              sudo apt-get install -y --no-install-recommends clang libomp-dev
+            fi
+          fi
+      - name: Verify exact committed pins without parent build overrides
+        run: |
+          python3 scripts/validate_nmfd_standalone.py \
+            --library '${{ matrix.library }}' --compiler '${{ matrix.compiler }}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: standalone-${{ matrix.library }}-${{ matrix.compiler }}
+          path: build/nmfd_standalone/*/report.json
+          if-no-files-found: error
+
+  nmfd-standalone-mpi:
+    name: Pinned MPI / ${{ matrix.library }} / ${{ matrix.ranks }} ranks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        library: [nmfd-operations, nmfd-newton]
+        ranks: [1, 2, 4]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted MPI runtime
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make openmpi-bin libopenmpi-dev
+          fi
+      - name: Verify standalone distributed spaces and original CH programs
+        env:
+          MPIEXEC_FLAGS: --oversubscribe
+        run: |
+          python3 scripts/validate_nmfd_standalone.py \
+            --library '${{ matrix.library }}' --suite mpi --mpi-ranks '${{ matrix.ranks }}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: standalone-mpi-${{ matrix.library }}-${{ matrix.ranks }}
+          path: build/nmfd_standalone/*/report.json
+          if-no-files-found: error
+
+  nmfd-migration-foundation-cpu:
+    name: Linear-solver migration / foundation gates
+    runs-on: ubuntu-latest
+    needs:
+      - operations-dependency-boundaries
+      - nmfd-standalone-cpu
+      - nmfd-standalone-mpi
+      - nmfd-newton-operations-cpu
+      - nmfd-linsolvers-operations-cpu
+      - nmfd-multiprecision-cpu
+      - nmfd-sherman-morrison-cpu
+      - nmfd-dense1-extended-cpu
+      - nmfd-direct-solver-cpu
+      - nmfd-newton-direct-solver-cpu
+      - nmfd-short-recurrence-cpu
+      - nmfd-short-recurrence-baseline-cpu
+      - nmfd-legacy-linear-solve-recovery-cpu
+      - nmfd-jacobi-cahn-hilliard-cpu
+      - workflow-ownership-sanitizers-cpu
+      - nmfd-newton-sanitizers-cpu
+      - nmfd-cahn-hilliard-original
+      - nmfd-cahn-hilliard-mpi
+    steps:
+      - run: echo "Required pinned, integration, solver, ownership and MPI gates passed."
+
+  nmfd-migration-applications-cpu:
+    name: Linear-solver migration / application gates
+    runs-on: ubuntu-latest
+    needs:
+      - ks1d-nmfd-linear-solvers-cpu-omp
+      - ks1d-full-nmfd-linear-solvers-cpu-omp
+      - ks2d-nmfd-linear-solvers-cpu-omp
+      - ks1d-sym-cpu-omp
+      - ks1d-full-cpu-omp
+      - ks2d-cpu-omp
+      - circle-bd-cpu-omp
+      - circle-bd-full-cpu-omp
+      - circle-bd-var-prec
+      - bratu-bd-fd3-cpu-omp
+      - bratu-bd-var-prec
+      - star-shaped-bd-cpu-omp
+      - star-shaped-bd-var-prec
+    steps:
+      - run: echo "Required continuation, stability, restart and multiprecision application gates passed."
+
+  nmfd-migration-validation-cpu:
+    name: Linear-solver migration / required CPU and MPI gates
+    if: always()
+    runs-on: ubuntu-latest
+    needs: [nmfd-migration-foundation-cpu, nmfd-migration-applications-cpu]
+    steps:
+      - env:
+          FOUNDATION_RESULT: ${{ needs.nmfd-migration-foundation-cpu.result }}
+          APPLICATION_RESULT: ${{ needs.nmfd-migration-applications-cpu.result }}
+        run: |
+          test "$FOUNDATION_RESULT" = success
+          test "$APPLICATION_RESULT" = success
+          echo "All required pinned, integration, reference, sanitizer and MPI gates passed."
+          echo "GPU runtime validation is recorded separately on available hardware."
 
   nmfd-newton-operations-cpu:
     runs-on: ubuntu-latest
@@ -2437,10 +2563,17 @@ jobs:
             fi
           fi
           CIRCLE_BUILD="$BUILD_DIR/circle_bd_hip"
-          make circle_bd_hip CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double HIPCC="$HIPCC_BIN"
-          python3 scripts/write_circle_ci_config.py "$CIRCLE_BUILD/circle_ci.json" "$CIRCLE_BUILD/project" --clean-project
-          timeout 120s ./"$CIRCLE_BUILD"/circle_bd_hip.bin "$CIRCLE_BUILD/circle_ci.json" --analytical-solution --quiet
-          python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
+          make circle_bd_hip circle_stability_hip CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double HIPCC="$HIPCC_BIN"
+          python3 scripts/write_circle_ci_config.py "$CIRCLE_BUILD/circle_ci.json" "$CIRCLE_BUILD/project" --clean-project --steps 340 --step-size 0.02 --max-step-size 0.04 --deflation-attempts 1 --continuation-fail-attempts 8 --knots -1.05 0.5 1.05
+          timeout 120s ./"$CIRCLE_BUILD"/circle_bd_hip.bin "$CIRCLE_BUILD/circle_ci.json" --seed-exact-curve 0.5 -1 --quiet
+          python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 100 --expected-curves 1 --require-closed-circle --min-angle-coverage 6.0 --max-closure-distance 1e-10
+          timeout 120s ./"$CIRCLE_BUILD"/circle_stability_hip.bin "$CIRCLE_BUILD/circle_ci.json" --quiet
+          python3 scripts/validate_stability_diagram.py "$CIRCLE_BUILD/project" --expected-curves 1 --min-points 100 --require-complete --expected-bifurcations 2 --min-stable-points 20 --min-unstable-points 20 --expected-bifurcation-parameter=-1 --expected-bifurcation-parameter=1 --bifurcation-parameter-tolerance 2e-3
+          cp "$CIRCLE_BUILD/project/stability_diagram.dat" "$CIRCLE_BUILD/stability_diagram.before_restart.dat"
+          cp "$CIRCLE_BUILD/project/0/debug_curve_stability.dat" "$CIRCLE_BUILD/stability_curve.before_restart.dat"
+          timeout 120s ./"$CIRCLE_BUILD"/circle_stability_hip.bin "$CIRCLE_BUILD/circle_ci.json" --quiet
+          cmp "$CIRCLE_BUILD/stability_diagram.before_restart.dat" "$CIRCLE_BUILD/project/stability_diagram.dat"
+          cmp "$CIRCLE_BUILD/stability_curve.before_restart.dat" "$CIRCLE_BUILD/project/0/debug_curve_stability.dat"
 
   star-shaped-bd-hip:
     needs: [scfd-vector-operations-hip]

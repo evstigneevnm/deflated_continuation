@@ -735,10 +735,12 @@ circle_bd_cpu_omp: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(
 	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/circle/circle_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd_cpu_omp.bin 2>$(RESULTS)
 
 circle_bd_hip: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
-	$(HIPCC) $(HIPFLAGS) -DCIRCLE_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/circle/circle_bd.cpp $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(LBOOST) $(LIBBOOST) $(HIPLIBS) -o $(BUILD_DIR)/circle_bd_hip.bin 2>$(RESULTS)
+	$(HIPCC) $(HIPFLAGS) -DCIRCLE_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -c $< -o $(BUILD_DIR)/circle_bd_hip_main.o 2>$(RESULTS)
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/circle_bd_hip_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(LBOOST) $(LIBBOOST) $(HIPLIBS) -o $(BUILD_DIR)/circle_bd_hip.bin 2>$(RESULTS)
 
 circle_stability_hip: source/models/circle/circle_stability.cpp $(CIRCLE_STABILITY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(STABILITY_ANALYSIS_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
-	$(HIPCC) $(HIPFLAGS) -DCIRCLE_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) $< $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(LBOOST) $(LIBBOOST) $(HIPLIBS) -o $(BUILD_DIR)/circle_stability_hip.bin 2>$(RESULTS)
+	$(HIPCC) $(HIPFLAGS) -DCIRCLE_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -c $< -o $(BUILD_DIR)/circle_stability_hip_main.o 2>$(RESULTS)
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/circle_stability_hip_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(LBOOST) $(LIBBOOST) $(HIPLIBS) -o $(BUILD_DIR)/circle_stability_hip.bin 2>$(RESULTS)
 
 circle_bd_var_prec: source/models/circle/circle_bd.cpp $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(CPU_VECTOR_OPS_VAR_PREC_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS)
 	$(G++) $(G++FLAGS) -DCIRCLE_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/circle/circle_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/circle_bd_var_prec.bin 2>$(RESULTS)
@@ -774,8 +776,9 @@ star_shaped_bd_cuda: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_
 star_shaped_bd_cpu_omp: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/star_shaped/star_shaped_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd_cpu_omp.bin 2>$(RESULTS)
 
-star_shaped_bd_hip: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
-	$(HIPCC) $(HIPFLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/star_shaped/star_shaped_bd.cpp $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd_hip.bin 2>$(RESULTS)
+star_shaped_bd_hip: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
+	$(HIPCC) $(HIPFLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -c $< -o $(BUILD_DIR)/star_shaped_bd_hip_main.o 2>$(RESULTS)
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/star_shaped_bd_hip_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(LBOOST) $(LIBBOOST) $(HIPLIBS) -o $(BUILD_DIR)/star_shaped_bd_hip.bin 2>$(RESULTS)
 
 star_shaped_bd_var_prec: source/models/star_shaped/star_shaped_bd.cpp $(STAR_SHAPED_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
 	$(G++) $(G++FLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/star_shaped/star_shaped_bd.cpp $(OPENMP) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/star_shaped_bd_var_prec.bin 2>$(RESULTS)
