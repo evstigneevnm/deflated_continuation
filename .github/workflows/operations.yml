@@ -28,7 +28,9 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/tests -p test_operations_dependencies.py
           python3 -m unittest discover -s scripts/tests -p test_nmfd_dependency_layout.py
+          python3 -m unittest discover -s scripts/tests -p test_linear_solver_dependencies.py
           python3 scripts/check_operations_dependencies.py
+          python3 scripts/check_linear_solver_dependencies.py
           git submodule status
 
   nmfd-newton-operations-cpu:
@@ -107,6 +109,21 @@ jobs:
             CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
             BUILD_DIR=build/sherman_morrison_recovery
           timeout 30s build/sherman_morrison_recovery/test_linear_solve_recovery.bin
+
+  nmfd-legacy-linear-solve-recovery-cpu:
+    name: Archived solver / recovery compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify legacy preconditioner bypass and restoration
+        run: |
+          make test_legacy_linear_solve_recovery.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
+            BUILD_DIR=build/legacy_solver_recovery
+          timeout 30s build/legacy_solver_recovery/test_legacy_linear_solve_recovery.bin
 
   nmfd-multiprecision-cpu:
     name: Multiprecision / dense and bordered linear solves

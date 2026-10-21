@@ -6,7 +6,7 @@
 #include <string>
 #include <stdexcept>
 
-#include <numerical_algos/lin_solvers/linear_solve_recovery.h>
+#include <numerical_algos/linear_solve_recovery.h>
 #include <continuation/tangent_normalization.h>
 
 namespace continuation

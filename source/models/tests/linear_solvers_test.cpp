@@ -1,1 +1,1 @@
-#include "../../numerical_algos/lin_solvers/tests/iterative_solvers_test.cpp"
+#include <numerical_algos/legacy/tests/lin_solvers/iterative_solvers_test.cpp>

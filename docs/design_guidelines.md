@@ -16,7 +16,8 @@ not require changes to unrelated algorithm interfaces.
 - Follow the root SCFD-derived `.clang-format` for C/C++ and CUDA code. Use
   clang-format 21 (`make format`, `make format-check`) for reproducible formatting;
   use LF line endings and format touched files before committing. Never format
-  vendor/submodule code, generated data, or frozen `source/time_stepper/legacy/` files.
+  vendor/submodule code, generated data, frozen `source/time_stepper/legacy/` files,
+  or the `source/numerical_algos/legacy/` archive.
 - Use C++17 templates and static polymorphism. Check capabilities with SFINAE,
   `std::void_t`, `if constexpr`, and clear `static_assert` diagnostics.
 - Name real-number template parameters `T`, not `Scalar`. Keep established
@@ -164,6 +165,11 @@ workspaces. Preconditioners consume the complete prepared operator.
 
 - `nmfd-linsolvers`: GMRES/FGMRES, BiCGStab/BiCGStab(L), LSQR/LSMR, shared Arnoldi
   and orthogonalization, monitors, and optional validated subspace recycling.
+- Refactored workflows use canonical NMFD solver headers only. Original project
+  solvers live in `source/numerical_algos/legacy`, with their include root enabled
+  only for historical builds and explicit parity tests. Active recovery support
+  and NMFD integration tests stay outside the archive. Do not modify archived
+  algorithms or frozen timestepper files during refactoring.
 - Use flexible solvers for changing preconditioners. Validate the original-system
   residual. LSQR/LSMR require forward and adjoint actions; do not form normal
   equations. Preconditioned operators need mathematically consistent adjoints.

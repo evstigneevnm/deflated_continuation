@@ -7,7 +7,7 @@
 #include <continuation/chart_helpers.h>
 #include <continuation/tangent_normalization.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
-#include <numerical_algos/lin_solvers/linear_solve_recovery.h>
+#include <numerical_algos/linear_solve_recovery.h>
 
 namespace continuation
 {

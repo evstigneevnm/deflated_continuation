@@ -96,6 +96,26 @@ ICUDA = -I$(CUDA_ROOT_PATH)/include
 IPROJECT = -I $(COMMON_NMFD_OPERATIONS) -I source/ -I $(CONTRIB_SCFD)/include
 INMFD_LINSOLVERS = -I $(CONTRIB_NMFD_LINSOLVERS)/include
 INMFD_NEWTON = -I $(CONTRIB_NMFD_NEWTON)/include $(INMFD_LINSOLVERS)
+LINEAR_SOLVE_RECOVERY_HEADER = source/numerical_algos/linear_solve_recovery.h
+LEGACY_LINSOLVERS = source/numerical_algos/legacy/include/numerical_algos/lin_solvers
+ILEGACY_LINSOLVERS = -I source/numerical_algos/legacy/include
+# Only historical applications and explicit parity tests may resolve the old include names.
+LEGACY_LINEAR_SOLVER_TARGETS = cpu_1st_call_alloc_test.bin sm_test.bin iterative_solvers_test.bin \
+  iterative_solvers_test_different_operators.bin exact_linsolver_test.bin lin_solvers_test.bin \
+  test_nmfd_short_recurrence_baseline_cpu.bin test_legacy_linear_solve_recovery.bin \
+  test_Kuramoto_Sivashinskiy_2D_Newton.bin cont_def_KS_2D KS_bd \
+  cont_def_circle_cuda cont_def_circle_cpu_omp cont_def_circle_hip cont_def_circle_var_prec circle_curve_container_cuda \
+  newton_Kolmogorov_3D stability_newton_Kolmogorov_3D file_stability_newton_Kolmogorov_3D \
+  deflation_Kolmogorov_3D deflation_translation_Kolmogorov_3D KF3D_bd KF3D_1_bd \
+  newton_Kolmogorov_2D deflation_Kolmogorov_2D KF2D_bd test_Kolmogorov_3D_continuation_file \
+  Kolmogorov_3D_time_stepping Kolmogorov_3D_perodic_orbit_stabilization test_Kolmogorov_3D_stiff_solve \
+  Kolmogorov_3D_lyapunov_exponents abc_flow_newton abc_flow_deflation abc_bd_deb abc_bd_rel abc_bd \
+  abc_flow_time_stepping abc_flow_perodic_orbit_stabilization abc_flow_lyapunov_exponents \
+  ob_view test_ob_newton test_ob_newton_deflation test_ob_newton_var_prec test_ob_newton_deflation_var_prec ob_json \
+  test_vdp_time_stepping test_rossler_periodic_orbit_cpu test_lorentz_periodic_orbit_cpu \
+  test_rossler_periodic_continuate_cpu test_rossler_periodic_orbit_gpu
+$(LEGACY_LINEAR_SOLVER_TARGETS): private IPROJECT += $(ILEGACY_LINSOLVERS)
+$(LEGACY_LINEAR_SOLVER_TARGETS): $(wildcard $(LEGACY_LINSOLVERS)/*.h $(LEGACY_LINSOLVERS)/detail/*.h)
 IBOOST = -I$(BOOST_ROOT_PATH)/include
 HIGH_PRECISION_BLAS1_CUDA_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_type.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl.cuh $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_functions.cuh $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_shmem.cuh
 HIGH_PRECISION_BLAS1_HIP_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita.h
@@ -119,7 +139,7 @@ AFFINE_PRECONDITIONER_HEADERS = source/stability/eigensolvers/transformations/af
 EIGENSOLVER_TRANSFORMATION_HEADERS = source/stability/eigensolvers/transformations/identity_operator.h source/stability/eigensolvers/transformations/affine_pencil_operator.h source/stability/eigensolvers/transformations/inverse_composed_operator.h source/stability/eigensolvers/transformations/inexact_exponential_operator.h source/stability/eigensolvers/transformations/stability_polynomial_operator.h source/stability/eigensolvers/transformations/complex_affine_factor.h source/stability/eigensolvers/transformations/complex_affine_block_operator.h source/stability/eigensolvers/transformations/complex_shift_block_operator.h source/stability/eigensolvers/transformations/pointwise_diagonal_preconditioner.h $(AFFINE_PRECONDITIONER_HEADERS) source/stability/eigensolvers/transformations/complex_solver_product_adapter.h source/stability/eigensolvers/transformations/tracked_linear_solver.h source/stability/eigensolvers/transformations/factor_solver_statistics.h source/stability/eigensolvers/transformations/iterative_factor_solver_bundle.h source/stability/eigensolvers/transformations/spectral_mapping.h source/stability/eigensolvers/transformations/polynomial_denominator_factorization.h source/stability/eigensolvers/transformations/stability_polynomial_factorization.h source/stability/eigensolvers/transformations/euler_polynomial_factorization.h source/stability/eigensolvers/transformations/factorized_inverse_solver.h source/stability/eigensolvers/projected_spectrum_recovery.h source/stability/eigensolvers/rotated_projected_spectrum_recovery.h
 PRODUCT_VECTOR_SPACE_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/product_vector_space.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/scfd_complex_vector_bridge.h
 NMFD_GMRES_HEADERS = source/contrib/nmfd-linsolvers/include/nmfd/solvers/gmres.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/iter_solver_base.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/default_monitor.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/monitor_krylov.h $(NMFD_KRYLOV_HEADERS) $(HOST_SMALL_DENSE_HEADERS)
-NMFD_GMRES_BASELINE_HEADERS = source/numerical_algos/lin_solvers/tests/nmfd_cpu_reference_vector_space.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_advection.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_diffusion.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_elliptic.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_advection.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_diffusion.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_elliptic.h source/contrib/nmfd-linsolvers/test/solvers/residual_regularization_test.h
+NMFD_GMRES_BASELINE_HEADERS = source/numerical_algos/tests/nmfd_cpu_reference_vector_space.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_advection.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_diffusion.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_elliptic.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_advection.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_diffusion.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_elliptic.h source/contrib/nmfd-linsolvers/test/solvers/residual_regularization_test.h
 COMPLEX_TRAITS_HEADERS = $(NMFD_BACKEND_HEADERS)
 CONTINUATION_SYMMETRY_HEADERS = source/symmetry/translation/orbit_type.h source/symmetry/continuation/continuation_chart_state.h source/symmetry/continuation/geometry_traits.h source/symmetry/continuation/identity_continuation_chart.h source/symmetry/continuation/isotropy_transition.h source/symmetry/continuation/local_representative_policy.h
 CONTINUATION_CHART_HEADERS = source/continuation/chart_helpers.h source/continuation/predictor_chart_validation.h source/continuation/predictor_chart_probe.h source/continuation/predictor_chart_diagnostics.h source/continuation/corrector_retry_policy.h source/continuation/progress_monitor.h source/continuation/continuation_step_state.h source/continuation/continuation_endpoint_state.h source/continuation/observational_knot_sample.h source/continuation/pending_branch_event.h source/continuation/initial_tangent_candidates.h source/continuation/initial_tangent_chart_validator.h source/continuation/initial_tangent_secant_builder.h source/continuation/semicurve_tangent_cache.h source/continuation/tangent_normalization.h $(CONTINUATION_SYMMETRY_HEADERS)
@@ -146,6 +166,9 @@ STABILITY_CONTINUATION_HEADERS = source/main/stability_continuation.hpp source/m
 KS1D_STABILITY_HEADERS = source/models/KS_1D/KS1D_stability_cli.h $(STABILITY_CONTINUATION_HEADERS)
 KS1D_STABILITY_REPLAY_SCRIPT = scripts/test_ks1d_full_stability_replay.py
 KS1D_STABILITY_REPLAY_MANIFEST = source/models/KS_1D/tests/data/stability_replay/manifest.json
+CIRCLE_MODEL_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
+KS1D_FULL_MODEL_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
+WORKFLOW_OWNERSHIP_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
 
 LCUDA = -L$(CUDA_ROOT_PATH)/lib64
 LBOOST = -L$(BOOST_ROOT_PATH)/lib
@@ -413,11 +436,11 @@ test_stability_polynomial_operator_cpu_omp.bin: source/stability/tests/test_stab
 test_complex_solver_product_adapter_cpu_omp.bin: source/stability/tests/test_complex_solver_product_adapter.cpp $(EIGENSOLVER_TRANSFORMATION_HEADERS) $(PRODUCT_VECTOR_SPACE_HEADERS) $(NMFD_KRYLOV_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) source/stability/tests/test_complex_solver_product_adapter.cpp $(OPENMP) -o $(BUILD_DIR)/test_complex_solver_product_adapter_cpu_omp.bin 2>$(RESULTS)
 
-test_nmfd_gmres_shared_krylov_cpu_omp.bin: source/numerical_algos/lin_solvers/tests/test_nmfd_gmres_shared_krylov.cpp $(ANALYTICAL_EIGENPROBLEM_HEADERS) $(NMFD_GMRES_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
-	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) source/numerical_algos/lin_solvers/tests/test_nmfd_gmres_shared_krylov.cpp $(OPENMP) -o $(BUILD_DIR)/test_nmfd_gmres_shared_krylov_cpu_omp.bin 2>$(RESULTS)
+test_nmfd_gmres_shared_krylov_cpu_omp.bin: source/numerical_algos/tests/test_nmfd_gmres_shared_krylov.cpp $(ANALYTICAL_EIGENPROBLEM_HEADERS) $(NMFD_GMRES_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) source/numerical_algos/tests/test_nmfd_gmres_shared_krylov.cpp $(OPENMP) -o $(BUILD_DIR)/test_nmfd_gmres_shared_krylov_cpu_omp.bin 2>$(RESULTS)
 
-test_nmfd_gmres_baseline_cpu.bin: source/numerical_algos/lin_solvers/tests/test_nmfd_gmres_baseline.cpp $(NMFD_GMRES_HEADERS) $(NMFD_GMRES_BASELINE_HEADERS)
-	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) source/numerical_algos/lin_solvers/tests/test_nmfd_gmres_baseline.cpp -o $(BUILD_DIR)/test_nmfd_gmres_baseline_cpu.bin 2>$(RESULTS)
+test_nmfd_gmres_baseline_cpu.bin: source/numerical_algos/tests/test_nmfd_gmres_baseline.cpp $(NMFD_GMRES_HEADERS) $(NMFD_GMRES_BASELINE_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) source/numerical_algos/tests/test_nmfd_gmres_baseline.cpp -o $(BUILD_DIR)/test_nmfd_gmres_baseline_cpu.bin 2>$(RESULTS)
 
 test_complex_traits.bin: source/common/tests/test_complex_traits.cpp $(COMPLEX_TRAITS_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/common/tests/test_complex_traits.cpp -o $(BUILD_DIR)/test_complex_traits.bin 2>$(RESULTS)
@@ -501,8 +524,11 @@ test_knot_executor.bin: source/main/tests/test_knot_executor.cpp source/main/def
 test_deflation_seed_registry.bin: source/containers/tests/test_deflation_seed_registry.cpp source/containers/deflation_seed_registry.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_deflation_seed_registry.cpp -o $(BUILD_DIR)/test_deflation_seed_registry.bin 2>$(RESULTS)
 
-test_linear_solve_recovery.bin: source/numerical_algos/lin_solvers/tests/test_linear_solve_recovery.cpp source/numerical_algos/lin_solvers/linear_solve_recovery.h source/numerical_algos/lin_solvers/iter_solver_base.h source/numerical_algos/lin_solvers/default_monitor.h source/numerical_algos/lin_solvers/tests/nmfd_cpu_reference_vector_space.h $(CIRCLE_MODEL_HEADERS)
-	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) source/numerical_algos/lin_solvers/tests/test_linear_solve_recovery.cpp -o $(BUILD_DIR)/test_linear_solve_recovery.bin 2>$(RESULTS)
+test_linear_solve_recovery.bin: source/numerical_algos/tests/test_linear_solve_recovery.cpp source/numerical_algos/linear_solve_recovery.h source/numerical_algos/tests/nmfd_cpu_reference_vector_space.h $(CIRCLE_MODEL_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) source/numerical_algos/tests/test_linear_solve_recovery.cpp -o $(BUILD_DIR)/test_linear_solve_recovery.bin 2>$(RESULTS)
+
+test_legacy_linear_solve_recovery.bin: source/numerical_algos/tests/test_legacy_linear_solve_recovery.cpp source/numerical_algos/linear_solve_recovery.h source/numerical_algos/tests/nmfd_cpu_reference_vector_space.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/numerical_algos/tests/test_legacy_linear_solve_recovery.cpp -o $(BUILD_DIR)/test_legacy_linear_solve_recovery.bin 2>$(RESULTS)
 
 test_curve_metadata_io.bin: source/containers/tests/test_curve_metadata_io.cpp source/containers/bifurcation_diagram/curve_point.h source/containers/bifurcation_diagram/curve_metadata_io.h source/containers/curve_endpoint_reason.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_curve_metadata_io.cpp -o $(BUILD_DIR)/test_curve_metadata_io.bin 2>$(RESULTS)
@@ -580,21 +606,21 @@ arnoldi_iters.bin:
 	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) source/test_inst/Arnoldi_Iterations/arnoldi_iteraitons_test.cpp $(LIBS1) $(LLAPACK) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o -o $(BUILD_DIR)/test_ArIter.bin
 
 
-cpu_1st_call_alloc_test.bin: source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp
-	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/numerical_algos/lin_solvers/tests/cpu_1st_call_alloc_test.cpp -o $(BUILD_DIR)/cpu_1st_call_alloc_test_float.bin
+cpu_1st_call_alloc_test.bin: source/numerical_algos/legacy/tests/lin_solvers/cpu_1st_call_alloc_test.cpp
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/numerical_algos/legacy/tests/lin_solvers/cpu_1st_call_alloc_test.cpp -o $(BUILD_DIR)/cpu_1st_call_alloc_test_float.bin
 
-sm_test.bin: source/numerical_algos/lin_solvers/tests/sm_test.cpp
-	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/numerical_algos/lin_solvers/tests/sm_test.cpp -o $(BUILD_DIR)/sm_test.bin 2>$(RESULTS) $(OPENMP)
+sm_test.bin: source/numerical_algos/legacy/tests/lin_solvers/sm_test.cpp
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/numerical_algos/legacy/tests/lin_solvers/sm_test.cpp -o $(BUILD_DIR)/sm_test.bin 2>$(RESULTS) $(OPENMP)
 
-iterative_solvers_test.bin: source/numerical_algos/lin_solvers/tests/iterative_solvers_test.cpp
-	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/numerical_algos/lin_solvers/tests/iterative_solvers_test.cpp -o $(BUILD_DIR)/iterative_solvers_test.bin 2>$(RESULTS) $(OPENMP)
+iterative_solvers_test.bin: source/numerical_algos/legacy/tests/lin_solvers/iterative_solvers_test.cpp
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/numerical_algos/legacy/tests/lin_solvers/iterative_solvers_test.cpp -o $(BUILD_DIR)/iterative_solvers_test.bin 2>$(RESULTS) $(OPENMP)
 
-iterative_solvers_test_different_operators.bin: source/numerical_algos/lin_solvers/tests/iterative_solvers_test_different_operators.cpp
-	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/numerical_algos/lin_solvers/tests/iterative_solvers_test_different_operators.cpp -o $(BUILD_DIR)/iterative_solvers_test_different_operators.bin 2>$(RESULTS) $(OPENMP)
+iterative_solvers_test_different_operators.bin: source/numerical_algos/legacy/tests/lin_solvers/iterative_solvers_test_different_operators.cpp
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/numerical_algos/legacy/tests/lin_solvers/iterative_solvers_test_different_operators.cpp -o $(BUILD_DIR)/iterative_solvers_test_different_operators.bin 2>$(RESULTS) $(OPENMP)
 
 
-exact_linsolver_test.bin: source/numerical_algos/lin_solvers/tests/exact_solver_test.cpp
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/numerical_algos/lin_solvers/tests/exact_solver_test.cpp $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o $(BUILD_DIR)/exact_solver_test.bin 2>$(RESULTS)
+exact_linsolver_test.bin: source/numerical_algos/legacy/tests/lin_solvers/exact_solver_test.cpp
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/numerical_algos/legacy/tests/lin_solvers/exact_solver_test.cpp $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o $(LCUDA) $(LIBS3) -o $(BUILD_DIR)/exact_solver_test.bin 2>$(RESULTS)
 
 lin_solvers_test.bin: source/models/tests/linear_solvers_test.cpp
 	$(NVCC) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) source/models/tests/linear_solvers_test.cpp -o $(BUILD_DIR)/linear_solvers_test.bin 2>$(RESULTS)
@@ -767,10 +793,10 @@ star_shaped_prepare_visualization_cpu_omp: source/models/star_shaped/star_shaped
 KS1D_operator_cpu_omp.bin: source/models/KS_1D/test_KS1D_operator.cpp $(KS1D_MODEL_HEADERS) $(RESIDUAL_DECOMPOSITION_TEST_HEADER) $(ADJOINT_JACOBIAN_TEST_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
 	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) source/models/KS_1D/test_KS1D_operator.cpp $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/test_KS1D_operator_cpu_omp.bin 2>$(RESULTS)
 
-test_KS1D_linear_solvers_cpu_omp.bin: source/models/KS_1D/test_KS1D_linear_solvers.cpp $(KS1D_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/numerical_algos/lin_solvers/linear_solve_recovery.h
+test_KS1D_linear_solvers_cpu_omp.bin: source/models/KS_1D/test_KS1D_linear_solvers.cpp $(KS1D_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/numerical_algos/linear_solve_recovery.h
 	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $< $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
-test_KS1D_linear_solvers_cuda.bin: source/models/KS_1D/test_KS1D_linear_solvers.cpp $(KS1D_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/numerical_algos/lin_solvers/linear_solve_recovery.h source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+test_KS1D_linear_solvers_cuda.bin: source/models/KS_1D/test_KS1D_linear_solvers.cpp $(KS1D_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/numerical_algos/linear_solve_recovery.h source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) -x cu $< -c -o $(BUILD_DIR)/test_KS1D_linear_solvers_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS1D_linear_solvers_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
@@ -992,7 +1018,7 @@ test_nmfd_newton_short_recurrence_cpu.bin: source/common/tests/test_nmfd_newton_
 test_nmfd_newton_direct_solver_cpu.bin: source/common/tests/test_nmfd_newton_direct_solver.cpp $(NEWTON_TEST_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@
 
-test_nmfd_short_recurrence_baseline_cpu.bin: source/numerical_algos/lin_solvers/tests/test_nmfd_short_recurrence.cpp $(NEWTON_TEST_HEADERS) $(wildcard $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/detail/*.h source/numerical_algos/lin_solvers/*.h)
+test_nmfd_short_recurrence_baseline_cpu.bin: source/numerical_algos/tests/test_nmfd_short_recurrence.cpp $(NEWTON_TEST_HEADERS) $(wildcard $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/detail/*.h $(LEGACY_LINSOLVERS)/*.h)
 	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) $< $(OPENMP) -o $(BUILD_DIR)/$@
 
 test_newton_%_cpu.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_newton_%.cpp $(NEWTON_TEST_HEADERS)

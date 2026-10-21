@@ -24,7 +24,7 @@ fi
 files=()
 while IFS= read -r -d '' path; do
     case "$path" in
-        source/contrib/*|source/time_stepper/legacy/*|build/*|data/*|dat_files/*) continue ;;
+        source/contrib/*|source/time_stepper/legacy/*|source/numerical_algos/legacy/*|build/*|data/*|dat_files/*) continue ;;
     esac
     if [[ ! -f "$path" || -L "$path" ]]; then
         continue
