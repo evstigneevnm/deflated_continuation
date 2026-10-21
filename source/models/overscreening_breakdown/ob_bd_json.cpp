@@ -29,6 +29,7 @@
 
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/exact_wrapper.h>
+#include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 
 #include <main/deflation_continuation.hpp>
 #include <main/plot_diagram_to_pos.hpp>
@@ -128,9 +129,14 @@ int main( int argc, char const *argv[] )
         //     lin_op_t, prec_t, numerical_algos::lin_solvers::bicgstabl,
         //     nonlinear_operators::system_operator, parameters_t> deflation_continuation_t;
 
+        using linear_system_type =
+            numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
+                lin_op_t, prec_t, vec_ops_t, monitor_t, log_t, numerical_algos::lin_solvers::exact_wrapper>;
         using deflation_continuation_t = main_classes::deflation_continuation<
             vec_ops_t, files_t, log_t, monitor_t, ob_prob_t, lin_op_t, prec_t,
-            numerical_algos::lin_solvers::exact_wrapper, nonlinear_operators::system_operator, parameters_t>;
+            numerical_algos::lin_solvers::exact_wrapper, nonlinear_operators::system_operator, parameters_t,
+            deflation::solution_storage<vec_ops_t, log_t>, continuation::system_operator_continuation,
+            linear_system_type>;
 
         deflation_continuation_t DC(
             (vec_ops_t *)&vec_ops, (files_t *)&vec_file_ops, (log_t *)&log, (log_t *)&log_linsolver,

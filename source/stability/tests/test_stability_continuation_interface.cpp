@@ -28,8 +28,7 @@
 #include <nonlinear_operators/circle/linear_operator_circle.h>
 #include <nonlinear_operators/circle/preconditioner_circle.h>
 #include <nonlinear_operators/circle/system_operator.h>
-#include <numerical_algos/lin_solvers/bicgstabl.h>
-#include <numerical_algos/lin_solvers/default_monitor.h>
+#include <models/circle/circle_linear_solvers.h>
 #include <main/parameters.hpp>
 #include <main/stability_continuation.hpp>
 #include <stability/eigensolvers/eigensolver_result.h>
@@ -143,13 +142,13 @@ int main()
         nmfd::operations::scfd_vector_space<scfd::backend::serial_cpu<std::ptrdiff_t>, real_type>;
     using file_operations_type    = gpu_file_operations<vector_operations_type>;
     using log_type                = scfd::utils::log_std;
-    using monitor_type            = numerical_algos::lin_solvers::default_monitor<vector_operations_type, log_type>;
+    using monitor_type            = nmfd::solvers::default_monitor<vector_operations_type, log_type>;
     using nonlinear_operator_type = nonlinear_operators::circle<vector_operations_type, 64>;
     using linear_operator_type =
         nonlinear_operators::linear_operator_circle<vector_operations_type, nonlinear_operator_type>;
     using preconditioner_type = nonlinear_operators::preconditioner_circle<
         vector_operations_type, nonlinear_operator_type, linear_operator_type>;
-    using linear_solver_type = numerical_algos::lin_solvers::bicgstabl<
+    using linear_solver_type = circle_model::bicgstabl<
         linear_operator_type, preconditioner_type, vector_operations_type, monitor_type, log_type>;
     using convergence_type = nonlinear_operators::newton_method::convergence_strategy<
         vector_operations_type, nonlinear_operator_type, log_type>;
@@ -171,18 +170,21 @@ int main()
     using provider_type          = forwarding_linearization_provider<nonlinear_operator_type>;
     using driver_type            = main_classes::stability_continuation<
                    vector_operations_type, file_operations_type, log_type, monitor_type, nonlinear_operator_type,
-                   linear_operator_type, preconditioner_type, numerical_algos::lin_solvers::bicgstabl,
-                   nonlinear_operators::system_operator, parameters_type, adapter_type>;
+                   linear_operator_type, preconditioner_type, circle_model::bicgstabl, nonlinear_operators::system_operator,
+                   parameters_type, adapter_type>;
     using custom_driver_type = main_classes::stability_continuation<
         vector_operations_type, file_operations_type, log_type, monitor_type, nonlinear_operator_type,
-        linear_operator_type, preconditioner_type, numerical_algos::lin_solvers::bicgstabl,
-        nonlinear_operators::system_operator, parameters_type, adapter_type, provider_type>;
+        linear_operator_type, preconditioner_type, circle_model::bicgstabl, nonlinear_operators::system_operator,
+        parameters_type, adapter_type, provider_type>;
 
-    auto                    vector_operations_owner = std::make_shared<vector_operations_type>( 1 );
-    auto                   &vector_operations       = *vector_operations_owner;
-    file_operations_type    file_operations( &vector_operations );
-    nonlinear_operator_type nonlinear_operator( real_type( 1 ), 1, vector_operations_owner );
-    parameters_type         parameters;
+    auto  vector_operations_owner = std::make_shared<vector_operations_type>( 1 );
+    auto &vector_operations       = *vector_operations_owner;
+    auto  file_operations_owner   = std::make_shared<file_operations_type>( &vector_operations );
+    auto &file_operations         = *file_operations_owner;
+    auto  problem_owner      = std::make_shared<nonlinear_operator_type>( real_type( 1 ), 1, vector_operations_owner );
+    auto &nonlinear_operator = *problem_owner;
+    auto  parameters_owner   = std::make_shared<parameters_type>();
+    auto &parameters         = *parameters_owner;
     parameters.set_default();
     const auto                  unique_id = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     const std::filesystem::path fixture_directory =
@@ -211,31 +213,32 @@ int main()
 
     try
     {
-        adapter_type  construction_adapter;
-        provider_type provider( &nonlinear_operator );
+        auto construction_adapter = std::make_shared<adapter_type>();
+        auto provider             = std::make_shared<provider_type>( &nonlinear_operator );
         {
             driver_type driver(
-                &vector_operations, &file_operations, &log, &linear_solver_log, &nonlinear_operator, &parameters,
-                &construction_adapter
+                vector_operations_owner, file_operations_owner, &log, &linear_solver_log, problem_owner,
+                parameters_owner, construction_adapter
             );
             driver.set_parameters();
         }
         {
             custom_driver_type driver(
-                &vector_operations, &file_operations, &log, &linear_solver_log, &nonlinear_operator, &parameters,
-                &construction_adapter, &provider
+                vector_operations_owner, file_operations_owner, &log, &linear_solver_log, problem_owner,
+                parameters_owner, construction_adapter, provider
             );
             driver.set_parameters();
         }
 
-        auto                *vector_operations_ptr  = &vector_operations;
-        auto                *nonlinear_operator_ptr = &nonlinear_operator;
-        auto                *log_ptr                = &log;
-        linear_operator_type fixture_linear_operator( nonlinear_operator_ptr );
-        auto                *fixture_linear_operator_ptr = &fixture_linear_operator;
-        preconditioner_type  fixture_preconditioner( nonlinear_operator_ptr );
-        linear_solver_type   fixture_linear_solver( &vector_operations, &linear_solver_log );
-        fixture_linear_solver.set_preconditioner( &fixture_preconditioner );
+        auto              *vector_operations_ptr       = &vector_operations;
+        auto              *log_ptr                     = &log;
+        auto               fixture_linear_operator     = std::make_shared<linear_operator_type>( problem_owner );
+        auto              *fixture_linear_operator_ptr = fixture_linear_operator.get();
+        auto               fixture_preconditioner      = std::make_shared<preconditioner_type>( problem_owner );
+        linear_solver_type fixture_linear_solver(
+            vector_operations_owner, &linear_solver_log, {}, fixture_preconditioner
+        );
+        fixture_linear_solver.set_operator( fixture_linear_operator );
         auto                *fixture_linear_solver_ptr = &fixture_linear_solver;
         convergence_type     fixture_convergence( vector_operations_ptr, log_ptr );
         system_operator_type fixture_system_operator(
@@ -329,12 +332,12 @@ int main()
         std::filesystem::remove_all( relocated_fixture_directory, filesystem_error );
         require( !filesystem_error, "failed to remove the archive relocation fixture" );
 
-        adapter_type failing_adapter( 2 );
-        bool         injected_failure_observed = false;
+        auto failing_adapter           = std::make_shared<adapter_type>( 2 );
+        bool injected_failure_observed = false;
         {
             driver_type driver(
-                &vector_operations, &file_operations, &log, &linear_solver_log, &nonlinear_operator, &parameters,
-                &failing_adapter
+                vector_operations_owner, file_operations_owner, &log, &linear_solver_log, problem_owner,
+                parameters_owner, failing_adapter
             );
             driver.set_parameters();
             try
@@ -348,7 +351,7 @@ int main()
             }
         }
         require( injected_failure_observed, "injected curve-1 classification failure was not propagated" );
-        require( failing_adapter.call_count() == 3, "interrupted traversal did not fail on curve 1's first point" );
+        require( failing_adapter->call_count() == 3, "interrupted traversal did not fail on curve 1's first point" );
 
         const std::filesystem::path stability_archive = fixture_directory / parameters.stability_diagram_file_name;
         stability_diagram_type      interrupted_diagram(
@@ -386,16 +389,16 @@ int main()
             "interrupted traversal did not persist the failed source point"
         );
 
-        adapter_type restart_adapter;
+        auto restart_adapter = std::make_shared<adapter_type>();
         {
             driver_type driver(
-                &vector_operations, &file_operations, &log, &linear_solver_log, &nonlinear_operator, &parameters,
-                &restart_adapter
+                vector_operations_owner, file_operations_owner, &log, &linear_solver_log, problem_owner,
+                parameters_owner, restart_adapter
             );
             driver.set_parameters();
             driver.execute();
         }
-        require( restart_adapter.call_count() == 2, "restart did not resume at curve 1" );
+        require( restart_adapter->call_count() == 2, "restart did not resume at curve 1" );
         uncertainty_registry_type recovered_uncertainties( uncertainty_options );
         require(
             recovered_uncertainties.unresolved_count() == 0 && recovered_uncertainties.all().size() == 1 &&
@@ -424,16 +427,16 @@ int main()
         const std::string completed_curve1_legacy = read_file( fixture_directory / "1" / "debug_curve_stability.dat" );
         const std::string completed_curve1_plot =
             read_file( fixture_directory / "1" / "debug_curve_stability_plot.dat" );
-        adapter_type no_op_adapter;
+        auto no_op_adapter = std::make_shared<adapter_type>();
         {
             driver_type driver(
-                &vector_operations, &file_operations, &log, &linear_solver_log, &nonlinear_operator, &parameters,
-                &no_op_adapter
+                vector_operations_owner, file_operations_owner, &log, &linear_solver_log, problem_owner,
+                parameters_owner, no_op_adapter
             );
             driver.set_parameters();
             driver.execute();
         }
-        require( no_op_adapter.call_count() == 0, "completed stability restart reprocessed existing curves" );
+        require( no_op_adapter->call_count() == 0, "completed stability restart reprocessed existing curves" );
         require(
             read_file( stability_archive ) == completed_archive &&
                 read_file( fixture_directory / "1" / "debug_curve_stability.dat" ) == completed_curve1_legacy &&
@@ -471,15 +474,15 @@ int main()
         );
         require( boundary_archive_save.succeeded(), "terminal-boundary replay fixture was not saved" );
 
-        adapter_type barrier_adapter( 0 );
-        driver_type  barrier_driver(
-            &vector_operations, &file_operations, &log, &linear_solver_log, &nonlinear_operator, &parameters,
-            &barrier_adapter
+        auto        barrier_adapter = std::make_shared<adapter_type>( 0 );
+        driver_type barrier_driver(
+            vector_operations_owner, file_operations_owner, &log, &linear_solver_log, problem_owner, parameters_owner,
+            barrier_adapter
         );
         barrier_driver.set_parameters();
         const auto barrier_transitions = barrier_driver.execute_curve_transition_sequence( 0, 0, 3 );
         require( barrier_transitions.empty(), "discontinuous boundary replay invented a transition" );
-        require( barrier_adapter.call_count() == 0, "discontinuous boundary replay invoked the eigensolver" );
+        require( barrier_adapter->call_count() == 0, "discontinuous boundary replay invoked the eigensolver" );
     }
     catch ( const std::exception &error )
     {

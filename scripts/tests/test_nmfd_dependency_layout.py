@@ -96,6 +96,27 @@ class NmfdDependencyLayoutTest(unittest.TestCase):
                     self.assertNotRegex(step.get("run", ""),
                                         r"(?m)^\s*(?:export\s+)?(?:OMP_NUM_THREADS|OPENBLAS_NUM_THREADS)\s*=")
 
+    def test_linear_solver_headers_have_one_canonical_owner(self):
+        header = Path("include/nmfd/solvers/dense1_extended_solver.h")
+        self.assertTrue((CONTRIB / "nmfd-linsolvers" / header).is_file())
+        self.assertFalse((CONTRIB / "nmfd-newton" / header).exists())
+        newton_headers = {path.relative_to(CONTRIB / "nmfd-newton/include")
+                          for path in (CONTRIB / "nmfd-newton/include").rglob("*.h")}
+        linear_headers = {path.relative_to(CONTRIB / "nmfd-linsolvers/include")
+                          for path in (CONTRIB / "nmfd-linsolvers/include").rglob("*.h")}
+        self.assertFalse(newton_headers & linear_headers)
+
+    def test_migrated_regressions_do_not_bind_legacy_solvers(self):
+        for filename in ("source/models/KS_1D/test_KS1D_full_operator.cpp",
+                         "source/stability/tests/test_stability_continuation_interface.cpp",
+                         "source/main/deflation_continuation.hpp"):
+            with self.subTest(filename=filename):
+                self.assertNotIn("numerical_algos/lin_solvers/", (ROOT / filename).read_text())
+        workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
+        commands = "\n".join(step.get("run", "") for step in
+                             workflow["jobs"]["nmfd-dense1-extended-cpu"]["steps"])
+        self.assertIn("check_dense1_extended_solver_cpu", commands)
+
     def test_local_runner_expands_workflow_and_step_environment(self):
         workflow = {"env": {name: "${{ github.workspace }}/source/contrib/" + Path(path).name
                             for name, path in ROOTS.items()}}

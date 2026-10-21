@@ -330,7 +330,7 @@ test_matrix_free_stability_configuration.bin: source/stability/tests/test_matrix
 	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) source/stability/tests/test_matrix_free_stability_configuration.cpp -o $(BUILD_DIR)/test_matrix_free_stability_configuration.bin 2>$(RESULTS)
 
 test_stability_continuation_interface_cpu.bin: source/stability/tests/test_stability_continuation_interface.cpp $(WORKFLOW_OWNERSHIP_HEADERS) source/main/parameters.hpp $(STABILITY_ANALYSIS_HEADERS) $(CIRCLE_MODEL_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
-	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) source/stability/tests/test_stability_continuation_interface.cpp $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/test_stability_continuation_interface_cpu.bin 2>$(RESULTS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/stability/tests/test_stability_continuation_interface.cpp $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/test_stability_continuation_interface_cpu.bin 2>$(RESULTS)
 
 test_shared_arnoldi_cpu_omp.bin: source/stability/tests/test_shared_arnoldi.cpp $(ANALYTICAL_EIGENPROBLEM_HEADERS) $(NMFD_KRYLOV_HEADERS) $(HOST_SMALL_DENSE_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) source/stability/tests/test_shared_arnoldi.cpp $(OPENMP) -o $(BUILD_DIR)/test_shared_arnoldi_cpu_omp.bin 2>$(RESULTS)
@@ -785,11 +785,11 @@ KS1D_operator_cuda.bin: source/models/KS_1D/test_KS1D_operator.cpp $(KS1D_MODEL_
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/KS_1D/test_KS1D_operator.cpp -c -o $(BUILD_DIR)/test_KS1D_operator_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS1D_operator_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/test_KS1D_operator_cuda.bin 2>$(RESULTS)
 
-KS1D_full_operator_cpu_omp.bin: source/models/KS_1D/test_KS1D_full_operator.cpp $(KS1D_FULL_MODEL_HEADERS) $(RESIDUAL_DECOMPOSITION_TEST_HEADER) $(ADJOINT_JACOBIAN_TEST_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
-	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) source/models/KS_1D/test_KS1D_full_operator.cpp $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/test_KS1D_full_operator_cpu_omp.bin 2>$(RESULTS)
+KS1D_full_operator_cpu_omp.bin: source/models/KS_1D/test_KS1D_full_operator.cpp $(KS1D_FULL_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(RESIDUAL_DECOMPOSITION_TEST_HEADER) $(ADJOINT_JACOBIAN_TEST_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
+	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) source/models/KS_1D/test_KS1D_full_operator.cpp $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/test_KS1D_full_operator_cpu_omp.bin 2>$(RESULTS)
 
-KS1D_full_operator_cuda.bin: source/models/KS_1D/test_KS1D_full_operator.cpp $(KS1D_FULL_MODEL_HEADERS) $(RESIDUAL_DECOMPOSITION_TEST_HEADER) $(ADJOINT_JACOBIAN_TEST_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
-	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) -x cu source/models/KS_1D/test_KS1D_full_operator.cpp -c -o $(BUILD_DIR)/test_KS1D_full_operator_cuda_main.o 2>$(RESULTS)
+KS1D_full_operator_cuda.bin: source/models/KS_1D/test_KS1D_full_operator.cpp $(KS1D_FULL_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(RESIDUAL_DECOMPOSITION_TEST_HEADER) $(ADJOINT_JACOBIAN_TEST_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) -x cu source/models/KS_1D/test_KS1D_full_operator.cpp -c -o $(BUILD_DIR)/test_KS1D_full_operator_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS1D_full_operator_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/test_KS1D_full_operator_cuda.bin 2>$(RESULTS)
 
 KS1D_stability_scan_cpu_omp.bin: source/models/KS_1D/test_KS1D_stability_scan.cpp $(KS1D_FULL_MODEL_HEADERS) $(KS1D_STABILITY_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)

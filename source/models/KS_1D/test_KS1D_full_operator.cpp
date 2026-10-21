@@ -30,9 +30,9 @@
 #include <symmetry/linearization/projected_linearization_provider.h>
 #include <symmetry/linearization/projected_stability_gauge.h>
 #include <nonlinear_operators/projected_system_operator.h>
-#include <numerical_algos/lin_solvers/bicgstabl.h>
-#include <numerical_algos/lin_solvers/default_monitor.h>
-#include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
+#include <nmfd/solvers/bicgstabl.h>
+#include <nmfd/solvers/default_monitor.h>
+#include <nmfd/solvers/sherman_morrison.h>
 #include <numerical_algos/newton_solvers/newton_solver.h>
 #include <symmetry/finite_action_registry.h>
 #include <symmetry/fourier/real_packed_fourier_slice_1d_adapter.h>
@@ -50,9 +50,9 @@ using finite_actions_t   = symmetry::finite_action_registry<vec_ops_real>;
 using lin_op_t           = symmetry::linearization::projected_linear_operator<vec_ops_real, ks1d_t>;
 using stability_lin_op_t = symmetry::linearization::projected_stability_linear_operator<vec_ops_real, ks1d_t>;
 using prec_t             = symmetry::linearization::projected_preconditioner<vec_ops_real, ks1d_t, lin_op_t>;
-using monitor_t          = numerical_algos::lin_solvers::default_monitor<vec_ops_real, log_t>;
-using sm_solver_t        = numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
-           lin_op_t, prec_t, vec_ops_real, monitor_t, log_t, numerical_algos::lin_solvers::bicgstabl>;
+using monitor_t          = nmfd::solvers::default_monitor<vec_ops_real, log_t>;
+using sm_solver_t =
+    nmfd::solvers::sherman_morrison<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t, nmfd::solvers::bicgstabl>;
 using projected_newton_system_t =
     nonlinear_operators::projected_system_operator<vec_ops_real, ks1d_t, lin_op_t, sm_solver_t>;
 using convergence_strategy_t = nonlinear_operators::newton_method::convergence_strategy<vec_ops_real, ks1d_t, log_t>;
@@ -64,6 +64,15 @@ using projected_continuation_system_t =
 
 int checks   = 0;
 int failures = 0;
+
+monitor_t::params linear_monitor_parameters( int max_iterations )
+{
+    monitor_t::params parameters;
+    parameters.rel_tol       = std::is_same<real, float>::value ? real( 1.0e-5 ) : real( 1.0e-10 );
+    parameters.abs_tol       = real( 1.0e-14 );
+    parameters.max_iters_num = max_iterations;
+    return parameters;
+}
 
 template <class T>
 T tolerance()
@@ -1196,8 +1205,12 @@ void test_frozen_lsq_projected_operator_hooks( vec_ops_real &vec_ops, ks1d_t &ks
     );
 }
 
-void test_projected_bordered_continuation_correction( vec_ops_real &vec_ops, ks1d_t &ks )
+void test_projected_bordered_continuation_correction(
+    const std::shared_ptr<vec_ops_real> &operations, const std::shared_ptr<ks1d_t> &problem
+)
 {
+    auto    &vec_ops = *operations;
+    auto    &ks      = *problem;
     real_vec x0;
     real_vec x0_chart;
     real_vec tangent;
@@ -1255,13 +1268,11 @@ void test_projected_bordered_continuation_correction( vec_ops_real &vec_ops, ks1
 
     log_t log;
     log.set_verbosity( 0 );
-    lin_op_t    lin_op( &ks );
-    prec_t      prec( &ks );
-    sm_solver_t sm_solver( &prec, &vec_ops, &log );
-    sm_solver.get_linsolver_handle()->monitor().init(
-        std::is_same<real, float>::value ? real( 1.0e-5 ) : real( 1.0e-10 ), real( 1.0e-14 ), 2000, 0, false, false,
-        true
-    );
+    auto        linear_operator = std::make_shared<lin_op_t>( problem );
+    auto        preconditioner  = std::make_shared<prec_t>( problem );
+    auto       &lin_op          = *linear_operator;
+    sm_solver_t sm_solver( operations, linear_operator, preconditioner, &log );
+    sm_solver.get_linsolver_handle()->monitor().configure( linear_monitor_parameters( 2000 ) );
     sm_solver.get_linsolver_handle()->set_basis_size( 16 );
     sm_solver.get_linsolver_handle()->set_use_precond_resid( true );
     sm_solver.get_linsolver_handle()->set_resid_recalc_freq( 1 );
@@ -1331,8 +1342,12 @@ void test_projected_bordered_continuation_correction( vec_ops_real &vec_ops, ks1
     );
 }
 
-void test_projected_bordered_initial_tangent_equation( vec_ops_real &vec_ops, ks1d_t &ks )
+void test_projected_bordered_initial_tangent_equation(
+    const std::shared_ptr<vec_ops_real> &operations, const std::shared_ptr<ks1d_t> &problem
+)
 {
+    auto    &vec_ops = *operations;
+    auto    &ks      = *problem;
     real_vec x0;
     real_vec row;
     real_vec row_projected;
@@ -1357,13 +1372,11 @@ void test_projected_bordered_initial_tangent_equation( vec_ops_real &vec_ops, ks
 
     log_t log;
     log.set_verbosity( 0 );
-    lin_op_t    lin_op( &ks );
-    prec_t      prec( &ks );
-    sm_solver_t sm_solver( &prec, &vec_ops, &log );
-    sm_solver.get_linsolver_handle()->monitor().init(
-        std::is_same<real, float>::value ? real( 1.0e-5 ) : real( 1.0e-10 ), real( 1.0e-14 ), 2000, 0, false, false,
-        true
-    );
+    auto        linear_operator = std::make_shared<lin_op_t>( problem );
+    auto        preconditioner  = std::make_shared<prec_t>( problem );
+    auto       &lin_op          = *linear_operator;
+    sm_solver_t sm_solver( operations, linear_operator, preconditioner, &log );
+    sm_solver.get_linsolver_handle()->monitor().configure( linear_monitor_parameters( 2000 ) );
     sm_solver.get_linsolver_handle()->set_basis_size( 16 );
     sm_solver.get_linsolver_handle()->set_use_precond_resid( true );
     sm_solver.get_linsolver_handle()->set_resid_recalc_freq( 1 );
@@ -1411,8 +1424,12 @@ void test_projected_bordered_initial_tangent_equation( vec_ops_real &vec_ops, ks
     vec_ops.free_vectors( x0, row, row_projected, jlambda, rhs_zero, tangent, tangent_projected, lhs );
 }
 
-void test_initial_tangent_projected_path_smoke( vec_ops_real &vec_ops, ks1d_t &ks )
+void test_initial_tangent_projected_path_smoke(
+    const std::shared_ptr<vec_ops_real> &operations, const std::shared_ptr<ks1d_t> &problem
+)
 {
+    auto    &vec_ops = *operations;
+    auto    &ks      = *problem;
     real_vec x0;
     real_vec tangent;
     vec_ops.init_vectors( x0, tangent );
@@ -1421,20 +1438,15 @@ void test_initial_tangent_projected_path_smoke( vec_ops_real &vec_ops, ks1d_t &k
 
     log_t log;
     log.set_verbosity( 0 );
-    lin_op_t    lin_op( &ks );
-    prec_t      prec( &ks );
-    sm_solver_t sm_solver( &prec, &vec_ops, &log );
-    sm_solver.get_linsolver_handle()->monitor().init(
-        std::is_same<real, float>::value ? real( 1.0e-5 ) : real( 1.0e-10 ), real( 1.0e-14 ), 1000, 0, false, false,
-        true
-    );
+    auto        linear_operator = std::make_shared<lin_op_t>( problem );
+    auto        preconditioner  = std::make_shared<prec_t>( problem );
+    auto       &lin_op          = *linear_operator;
+    sm_solver_t sm_solver( operations, linear_operator, preconditioner, &log );
+    sm_solver.get_linsolver_handle()->monitor().configure( linear_monitor_parameters( 1000 ) );
     sm_solver.get_linsolver_handle()->set_basis_size( 16 );
     sm_solver.get_linsolver_handle()->set_use_precond_resid( true );
     sm_solver.get_linsolver_handle()->set_resid_recalc_freq( 1 );
-    sm_solver.get_linsolver_handle_original()->monitor().init(
-        std::is_same<real, float>::value ? real( 1.0e-5 ) : real( 1.0e-10 ), real( 1.0e-14 ), 1000, 0, false, false,
-        true
-    );
+    sm_solver.get_linsolver_handle_original()->monitor().configure( linear_monitor_parameters( 1000 ) );
     sm_solver.get_linsolver_handle_original()->set_basis_size( 16 );
     sm_solver.get_linsolver_handle_original()->set_use_precond_resid( true );
     sm_solver.get_linsolver_handle_original()->set_resid_recalc_freq( 1 );
@@ -1496,11 +1508,13 @@ int main( int argc, char **argv )
     const std::size_t physical_size  = 32;
     const std::size_t positive_modes = physical_size / 2 - 1;
     const std::size_t state_size     = 2 * positive_modes;
-    vec_ops_real      vec_ops( state_size );
+    auto              operations     = std::make_shared<vec_ops_real>( state_size );
+    auto             &vec_ops        = *operations;
     vec_ops_real      reduced_vec_ops( positive_modes );
     vec_ops.use_high_precision();
     reduced_vec_ops.use_high_precision();
-    ks1d_t             ks( real( 2 ), real( 4 ), physical_size, &vec_ops );
+    auto               problem = std::make_shared<ks1d_t>( real( 2 ), real( 4 ), physical_size, operations );
+    auto              &ks      = *problem;
     ks1d_t             lsq_ks( real( 2 ), real( 4 ), physical_size, &vec_ops );
     ks1d_reduced_t     reduced_ks( real( 2 ), real( 4 ), physical_size, &reduced_vec_ops );
     symmetry_adapter_t symmetry( &vec_ops, positive_modes );
@@ -1536,10 +1550,10 @@ int main( int argc, char **argv )
     test_continuation_chart_bridge( vec_ops, ks, symmetry );
     test_reduced_continuation_chart_fallback( reduced_vec_ops, reduced_ks );
     test_projected_operator_hooks( vec_ops, ks, symmetry );
-    test_projected_bordered_continuation_correction( vec_ops, ks );
+    test_projected_bordered_continuation_correction( operations, problem );
     test_frozen_lsq_projected_operator_hooks( vec_ops, lsq_ks );
-    test_projected_bordered_initial_tangent_equation( vec_ops, ks );
-    test_initial_tangent_projected_path_smoke( vec_ops, ks );
+    test_projected_bordered_initial_tangent_equation( operations, problem );
+    test_initial_tangent_projected_path_smoke( operations, problem );
 
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;
     if ( failures != 0 )

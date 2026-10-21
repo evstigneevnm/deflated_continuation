@@ -16,6 +16,7 @@
 #if defined( CIRCLE_VECTOR_BACKEND_VAR_PREC )
 #    include <numerical_algos/lin_solvers/cgs.h>
 #    include <numerical_algos/lin_solvers/default_monitor.h>
+#    include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 #else
 #    include "circle_linear_solvers.h"
 #endif
@@ -204,9 +205,12 @@ int main( int argc, char const *argv[] )
 
     // test continuaiton process of a single curve
 #if defined( CIRCLE_VECTOR_BACKEND_VAR_PREC )
+    using linear_system_type = numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
+        lin_op_t, prec_t, vec_ops_real, monitor_t, log_t, numerical_algos::lin_solvers::cgs>;
     typedef main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, circle_t, lin_op_t, prec_t, numerical_algos::lin_solvers::cgs,
-        nonlinear_operators::system_operator, parameters_t>
+        nonlinear_operators::system_operator, parameters_t, deflation::solution_storage<vec_ops_real, log_t>,
+        continuation::system_operator_continuation, linear_system_type>
         deflation_continuation_t;
 #else
     using linear_system_type =

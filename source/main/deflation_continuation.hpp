@@ -21,7 +21,6 @@
 #include <filesystem>
 #include <sstream>
 #include <type_traits>
-#include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 #include <numerical_algos/newton_solvers/newton_solver.h>
 
 #include <common/scalar_math.h>
@@ -188,10 +187,11 @@ template <
     class SolutionStorage = deflation::solution_storage<VectorOperations, Log>,
     template <class, class, class, class, class> class ContinuationSystemOperator =
         continuation::system_operator_continuation,
-    class LinearSystem = numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
-        LinearOperator, Preconditioner, VectorOperations, Monitor, Log, LinearSolver>>
+    class LinearSystem = void>
 class deflation_continuation
 {
+    static_assert( !std::is_void<LinearSystem>::value, "Select the workflow LinearSystem explicitly" );
+
 private:
     typedef typename VectorOperations::scalar_type T;
     typedef typename VectorOperations::vector_type T_vec;

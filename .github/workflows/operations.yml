@@ -108,6 +108,20 @@ jobs:
             BUILD_DIR=build/sherman_morrison_recovery
           timeout 30s build/sherman_morrison_recovery/test_linear_solve_recovery.bin
 
+  nmfd-dense1-extended-cpu:
+    name: Extended solver / assembled reference and rebinding
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify the canonical extended solver
+        run: |
+          make -C source/contrib/nmfd-linsolvers check_dense1_extended_solver_cpu \
+            CONFIG_FILE=build_configs/config_github_ubuntu_gcc.inc \
+            BUILD_DIR=build/dense1_extended TEST_OMP_NUM_THREADS=2
+
   nmfd-dense-solve-cpu:
     name: Dense operations / direct solve and numerical failures
     runs-on: ubuntu-latest

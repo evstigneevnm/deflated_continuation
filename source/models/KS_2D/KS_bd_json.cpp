@@ -24,6 +24,7 @@
 
 #include <numerical_algos/lin_solvers/default_monitor.h>
 #include <numerical_algos/lin_solvers/bicgstabl.h>
+#include <numerical_algos/lin_solvers/sherman_morrison_linear_system_solve.h>
 
 #include <main/deflation_continuation.hpp>
 #include <main/stability_continuation.hpp>
@@ -145,9 +146,14 @@ int main( int argc, char const *argv[] )
     if ( ( what_to_execute == 'D' ) || ( what_to_execute == 'E' ) )
     {
 
+        using linear_system_type =
+            numerical_algos::sherman_morrison_linear_system::sherman_morrison_linear_system_solve<
+                lin_op_t, prec_t, vec_ops_real_im, monitor_t, log_t, numerical_algos::lin_solvers::bicgstabl>;
         typedef main_classes::deflation_continuation<
             vec_ops_real_im, files_real_im_t, log_t, monitor_t, KS_2D_t, lin_op_t, prec_t,
-            numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator, parameters_t>
+            numerical_algos::lin_solvers::bicgstabl, nonlinear_operators::system_operator, parameters_t,
+            deflation::solution_storage<vec_ops_real_im, log_t>, continuation::system_operator_continuation,
+            linear_system_type>
             deflation_continuation_t;
 
         deflation_continuation_t DC(
