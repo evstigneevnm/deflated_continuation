@@ -752,6 +752,315 @@ jobs:
             done
           done
 
+
+  timestepper-implicit-dirk-cpu:
+    needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify analytical order and generic DIRK tables on serial CPU and OMP
+        run: |
+          make -j2 test_implicit_dirk_cpu.bin test_implicit_dirk_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_dirk"
+          for backend in cpu cpu_omp; do
+            OMP_NUM_THREADS=2 timeout 120s ./"$BUILD_DIR"/implicit_dirk/"test_implicit_dirk_${backend}.bin"
+          done
+
+  timestepper-implicit-dirk-cuda:
+    needs: [timestepper-implicit-dirk-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify analytical order and generic DIRK tables when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping implicit CUDA test: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping implicit CUDA test: nvcc unavailable"
+            exit 0
+          fi
+          make test_implicit_dirk_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_dirk_cuda"
+          timeout 300s ./"$BUILD_DIR"/implicit_dirk_cuda/test_implicit_dirk_cuda.bin
+
+  timestepper-implicit-mass-dae-cpu:
+    needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify nontrivial mass and coupled DAEs on serial CPU and OMP
+        run: |
+          make -j2 test_implicit_mass_dae_cpu.bin test_implicit_mass_dae_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_mass_dae"
+          for backend in cpu cpu_omp; do
+            OMP_NUM_THREADS=2 timeout 120s ./"$BUILD_DIR"/implicit_mass_dae/"test_implicit_mass_dae_${backend}.bin"
+          done
+
+  timestepper-implicit-mass-dae-cuda:
+    needs: [timestepper-implicit-mass-dae-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify nontrivial mass and coupled DAEs when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping implicit CUDA test: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping implicit CUDA test: nvcc unavailable"
+            exit 0
+          fi
+          make test_implicit_mass_dae_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_mass_dae_cuda"
+          timeout 300s ./"$BUILD_DIR"/implicit_mass_dae_cuda/test_implicit_mass_dae_cuda.bin
+
+  timestepper-implicit-lifecycle-cpu:
+    needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify failure rollback and lifecycle on serial CPU and OMP
+        run: |
+          make -j2 test_implicit_lifecycle_cpu.bin test_implicit_lifecycle_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_lifecycle"
+          for backend in cpu cpu_omp; do
+            OMP_NUM_THREADS=2 timeout 120s ./"$BUILD_DIR"/implicit_lifecycle/"test_implicit_lifecycle_${backend}.bin"
+          done
+
+  timestepper-implicit-lifecycle-cuda:
+    needs: [timestepper-implicit-lifecycle-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify failure rollback and lifecycle when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping implicit CUDA test: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping implicit CUDA test: nvcc unavailable"
+            exit 0
+          fi
+          make test_implicit_lifecycle_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_lifecycle_cuda"
+          timeout 300s ./"$BUILD_DIR"/implicit_lifecycle_cuda/test_implicit_lifecycle_cuda.bin
+
+  timestepper-implicit-lorenz-cpu:
+    needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify Lorenz implicit integration on serial CPU and OMP
+        run: |
+          make -j2 test_implicit_lorenz_cpu.bin test_implicit_lorenz_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_lorenz"
+          for backend in cpu cpu_omp; do
+            OMP_NUM_THREADS=2 timeout 120s ./"$BUILD_DIR"/implicit_lorenz/"test_implicit_lorenz_${backend}.bin"
+          done
+
+  timestepper-implicit-lorenz-cuda:
+    needs: [timestepper-implicit-lorenz-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify Lorenz implicit integration when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping implicit CUDA test: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping implicit CUDA test: nvcc unavailable"
+            exit 0
+          fi
+          make test_implicit_lorenz_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_lorenz_cuda"
+          timeout 300s ./"$BUILD_DIR"/implicit_lorenz_cuda/test_implicit_lorenz_cuda.bin
+
+  timestepper-implicit-rossler-cpu:
+    needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify Rossler implicit integration on serial CPU and OMP
+        run: |
+          make -j2 test_implicit_rossler_cpu.bin test_implicit_rossler_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_rossler"
+          for backend in cpu cpu_omp; do
+            OMP_NUM_THREADS=2 timeout 120s ./"$BUILD_DIR"/implicit_rossler/"test_implicit_rossler_${backend}.bin"
+          done
+
+  timestepper-implicit-rossler-cuda:
+    needs: [timestepper-implicit-rossler-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify Rossler implicit integration when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping implicit CUDA test: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping implicit CUDA test: nvcc unavailable"
+            exit 0
+          fi
+          make test_implicit_rossler_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_rossler_cuda"
+          timeout 300s ./"$BUILD_DIR"/implicit_rossler_cuda/test_implicit_rossler_cuda.bin
+
+  timestepper-implicit-vdp-cpu:
+    needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify regular and stiff Van der Pol on serial CPU and OMP
+        run: |
+          make -j2 test_implicit_vdp_cpu.bin test_implicit_vdp_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_vdp"
+          for backend in cpu cpu_omp; do
+            OMP_NUM_THREADS=2 timeout 120s ./"$BUILD_DIR"/implicit_vdp/"test_implicit_vdp_${backend}.bin"
+          done
+
+  timestepper-implicit-vdp-cuda:
+    needs: [timestepper-implicit-vdp-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify regular and stiff Van der Pol when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping implicit CUDA test: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping implicit CUDA test: nvcc unavailable"
+            exit 0
+          fi
+          make test_implicit_vdp_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_vdp_cuda"
+          timeout 300s ./"$BUILD_DIR"/implicit_vdp_cuda/test_implicit_vdp_cuda.bin
+
+
+  timestepper-explicit-nonautonomous-cpu:
+    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify explicit non-autonomous systems on serial CPU and OMP
+        run: |
+          make -j2 test_explicit_nonautonomous_cpu.bin test_explicit_nonautonomous_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/explicit_nonautonomous"
+          for backend in cpu cpu_omp; do
+            OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/explicit_nonautonomous/"test_explicit_nonautonomous_${backend}.bin"
+          done
+
+  timestepper-explicit-nonautonomous-cuda:
+    needs: [timestepper-explicit-nonautonomous-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify explicit non-autonomous systems when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping non-autonomous CUDA test: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping non-autonomous CUDA test: nvcc unavailable"
+            exit 0
+          fi
+          make test_explicit_nonautonomous_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_nonautonomous_cuda"
+          timeout 300s ./"$BUILD_DIR"/explicit_nonautonomous_cuda/test_explicit_nonautonomous_cuda.bin
+
+  timestepper-implicit-nonautonomous-cpu:
+    needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify implicit non-autonomous systems on serial CPU and OMP
+        run: |
+          make -j2 test_implicit_nonautonomous_cpu.bin test_implicit_nonautonomous_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_nonautonomous"
+          for backend in cpu cpu_omp; do
+            OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/implicit_nonautonomous/"test_implicit_nonautonomous_${backend}.bin"
+          done
+
+  timestepper-implicit-nonautonomous-cuda:
+    needs: [timestepper-implicit-nonautonomous-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify implicit non-autonomous systems when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping non-autonomous CUDA test: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping non-autonomous CUDA test: nvcc unavailable"
+            exit 0
+          fi
+          make test_implicit_nonautonomous_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_nonautonomous_cuda"
+          timeout 300s ./"$BUILD_DIR"/implicit_nonautonomous_cuda/test_implicit_nonautonomous_cuda.bin
+
+  timestepper-implicit-sanitizers-cpu:
+    needs: [timestepper-implicit-dirk-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Check implicit stage storage and rollback with sanitizers
+        run: |
+          make -j2 test_implicit_dirk_cpu.bin test_implicit_mass_dae_cpu.bin test_implicit_lifecycle_cpu.bin test_implicit_nonautonomous_cpu.bin test_explicit_nonautonomous_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          for test in dirk mass_dae lifecycle nonautonomous; do
+            OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
+          done
+          OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/test_explicit_nonautonomous_cpu.bin
+
   timestepper-tables-explicit-cpu:
     runs-on: ubuntu-latest
     steps:

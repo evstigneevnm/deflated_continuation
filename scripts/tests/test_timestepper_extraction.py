@@ -19,7 +19,8 @@ class TimestepperExtractionTest(unittest.TestCase):
     def make(self, directory, *arguments):
         env = os.environ.copy()
         for name in ("MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "CPPFLAGS", "CPATH",
-                     "NMFD_OPERATIONS_ROOT", "SCFD_ROOT", "NMFD_TIMESTEPPERS_ROOT"):
+                     "NMFD_OPERATIONS_ROOT", "SCFD_ROOT", "NMFD_TIMESTEPPERS_ROOT",
+                     "NMFD_NEWTON_ROOT", "NMFD_LINSOLVERS_ROOT"):
             env.pop(name, None)
         return subprocess.run(
             ["make", "--no-print-directory", "-n", *arguments], cwd=directory,
@@ -48,7 +49,9 @@ class TimestepperExtractionTest(unittest.TestCase):
             for header in re.findall(r'^\s*#\s*include\s*[<"]([^>"]+)', path.read_text(), re.MULTILINE):
                 with self.subTest(path=path.relative_to(MODULE), header=header):
                     self.assertFalse(header.startswith(("time_stepper/", "common/", "contrib/",
-                                                       "numerical_algos/", "nmfd/solvers/")))
+                                                       "numerical_algos/")))
+                    if public in path.parents or not path.name.startswith(("implicit_", "test_implicit_")):
+                        self.assertFalse(header.startswith("nmfd/solvers/"))
                     if header.startswith("nmfd/time_steppers/"):
                         self.assertTrue((public / header).is_file())
 
@@ -91,6 +94,30 @@ class TimestepperExtractionTest(unittest.TestCase):
         gpu = workflow["jobs"]["timestepper-explicit-cuda"]
         self.assertIn("check_timestepper_headers_cpu", "\n".join(step.get("run", "") for step in cpu["steps"]))
         self.assertIn("check_timestepper_headers_cuda", "\n".join(step.get("run", "") for step in gpu["steps"]))
+
+    def test_implicit_solver_dependencies_are_test_only(self):
+        output = self.make(MODULE, "test_implicit_dirk_cpu.bin", "BUILD_DIR=build/implicit_probe")
+        self.assertIn("-I../nmfd-newton/include", output)
+        self.assertIn("-I../nmfd-linsolvers/include", output)
+        header = (MODULE / "include/nmfd/time_steppers/runge_kutta/implicit_time_step.h").read_text()
+        self.assertNotIn("#include <nmfd/solvers/", header)
+        workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
+        for test in ("dirk", "mass-dae", "lifecycle", "lorenz", "rossler", "vdp", "nonautonomous"):
+            for backend in ("cpu", "cuda"):
+                self.assertIn(f"timestepper-implicit-{test}-{backend}", workflow["jobs"])
+
+    def test_nonautonomous_matrix_preserves_explicit_independence(self):
+        workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
+        for mode in ("explicit", "implicit"):
+            output = self.make(ROOT, f"test_{mode}_nonautonomous_cpu.bin",
+                               "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc",
+                               "BUILD_DIR=build/nonautonomous_probe")
+            self.assertIn(f"tests/test_{mode}_nonautonomous.cpp", output)
+            if mode == "explicit":
+                self.assertNotIn("nmfd-newton/include", output)
+                self.assertNotIn("nmfd-linsolvers/include", output)
+            for backend in ("cpu", "cuda"):
+                self.assertIn(f"timestepper-{mode}-nonautonomous-{backend}", workflow["jobs"])
 
 
 if __name__ == "__main__":

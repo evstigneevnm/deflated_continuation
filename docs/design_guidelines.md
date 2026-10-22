@@ -393,6 +393,15 @@ public:
 
 Support explicit RK, (S)DIRK, Rosenbrock/W, BDF, and IMEX with method-specific engines. IRK and exponential RK are to be supported layer.
 
+The current implicit RK engine supports nonzero-diagonal DIRK/SDIRK tables with
+an injected nonlinear solver. At stage i, `previous_state()` holds the RK reference
+`u_n+h*sum(a_ij*k_j)`, `known_rhs()` is zero, and `alpha=1/(h*a_ii)`.
+The solver is bound once; stage calls use `solve(stage_state)`. Problem buffers
+must not alias caller states or solver scratch. No mass inverse is required.
+DAE initial data and externally modified endpoints must be consistent; use a
+method suitable for the formulation (initial DAE tests use stiff accuracy).
+Embedded adaptation, zero-diagonal stages, and implicit dense output are deferred.
+
 The status of a single step is given as the following structure:
 
 ```cpp

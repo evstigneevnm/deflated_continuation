@@ -1071,8 +1071,19 @@ test_nmfd_dense_%_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_dense.cpp
 	$(NVCC) $(NVCCFLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) $(BUILD_DIR)/test_nmfd_dense_$*_cuda_main.o $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LCUDA) -lcublas -lcusolver -o $(BUILD_DIR)/$@
 
 TIME_STEPPER_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/include/nmfd/time_steppers/runge_kutta/*.h $(NMFD_TIMESTEPPERS_ROOT)/include/nmfd/time_steppers/integration/*.h $(NMFD_TIMESTEPPERS_ROOT)/include/nmfd/time_steppers/detail/*.h)
-TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/explicit_*_problem.h)
+TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/explicit_*_problem.h $(NMFD_TIMESTEPPERS_ROOT)/tests/nonautonomous_test_problems.h)
 TIME_STEPPER_VECTOR_WRAP_HEADER = $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
+TIME_STEPPER_IMPLICIT_TEST_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/implicit_*.h $(NMFD_TIMESTEPPERS_ROOT)/tests/nonautonomous_test_problems.h)
+
+test_implicit_%_cpu.bin: $(NMFD_TIMESTEPPERS_ROOT)/tests/test_implicit_%.cpp $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_IMPLICIT_TEST_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS) $(NEWTON_TEST_HEADERS)
+	$(G++) $(G++FLAGS) $(ITIME_STEPPER) $(INMFD_NEWTON) $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_implicit_%_cpu_omp.bin: $(NMFD_TIMESTEPPERS_ROOT)/tests/test_implicit_%.cpp $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_IMPLICIT_TEST_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS) $(NEWTON_TEST_HEADERS)
+	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP $(ITIME_STEPPER) $(INMFD_NEWTON) $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_implicit_%_cuda.bin: $(NMFD_TIMESTEPPERS_ROOT)/tests/test_implicit_%.cpp $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_IMPLICIT_TEST_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS) $(NEWTON_TEST_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(ITIME_STEPPER) $(INMFD_NEWTON) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_implicit_$*_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_implicit_$*_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
 
 test_rk_tables_%.bin: $(NMFD_TIMESTEPPERS_ROOT)/tests/test_butcher_tables_%.cpp $(NMFD_TIMESTEPPERS_ROOT)/tests/table_order_checks.h $(TIME_STEPPER_HEADERS)
 	$(G++) $(G++FLAGS) $(ITIME_STEPPER) $< -o $(BUILD_DIR)/$@ 2>$(RESULTS)
