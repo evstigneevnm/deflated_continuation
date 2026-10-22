@@ -16,7 +16,12 @@ ACTIVE_DIRECTORIES = (
     "source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/",
     "source/models/bratu/", "source/models/star_shaped/",
 )
-ACTIVE_FILES = {"source/nonlinear_operators/projected_system_operator.h"}
+ACTIVE_FILES = {
+    "source/nonlinear_operators/projected_system_operator.h",
+    "source/nonlinear_operators/fixed_parameter_operator.h",
+    "source/nonlinear_operators/tests/test_fixed_parameter_newton.cpp",
+    "source/numerical_algos/recovering_linear_solver.h",
+}
 ACTIVE_MODELS = re.compile(
     r"^source/models/(?:circle/circle_(?:bd|stability|prepare_visualization|linear_solvers|backend_typedefs)"
     r"|KS_[12]D/(?:KS[12]D_|test_KS[12]D_))"

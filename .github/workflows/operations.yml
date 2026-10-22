@@ -115,6 +115,7 @@ jobs:
       - nmfd-dense1-extended-cpu
       - nmfd-direct-solver-cpu
       - nmfd-newton-direct-solver-cpu
+      - project-newton-fixed-parameter-sanitizers-cpu
       - nmfd-short-recurrence-cpu
       - nmfd-short-recurrence-baseline-cpu
       - nmfd-legacy-linear-solve-recovery-cpu
@@ -331,6 +332,64 @@ jobs:
           make test_nmfd_newton_direct_solver_cpu.bin \
             CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_direct
           timeout 30s build/newton_direct/test_nmfd_newton_direct_solver_cpu.bin
+
+  project-newton-fixed-parameter-cpu:
+    name: Project Newton / fixed-parameter operator and circle
+    needs: [nmfd-newton-backend-cpu-omp, nmfd-short-recurrence-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify Jacobians, roots, retries, rollback and ownership
+        run: |
+          make test_fixed_parameter_newton_cpu.bin test_fixed_parameter_newton_cpu_omp.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_fixed_parameter
+          timeout 60s build/newton_fixed_parameter/test_fixed_parameter_newton_cpu.bin
+          OMP_NUM_THREADS=2 timeout 60s build/newton_fixed_parameter/test_fixed_parameter_newton_cpu_omp.bin
+
+  project-newton-fixed-parameter-sanitizers-cpu:
+    name: Project Newton / fixed-parameter sanitizers
+    needs: project-newton-fixed-parameter-cpu
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify fixed-parameter workspace and dependency lifetimes
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          make test_fixed_parameter_newton_cpu.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_fixed_parameter_sanitizers \
+            NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          timeout 60s build/newton_fixed_parameter_sanitizers/test_fixed_parameter_newton_cpu.bin
+
+  project-newton-fixed-parameter-cuda:
+    name: Project Newton / fixed-parameter CUDA
+    needs: [project-newton-fixed-parameter-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify fixed-parameter Newton on CUDA when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+            echo "Skipping CUDA fixed-parameter Newton: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1; then
+            echo "Skipping CUDA fixed-parameter Newton: nvcc unavailable"
+            exit 0
+          fi
+          make test_fixed_parameter_newton_cuda.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_fixed_parameter_cuda
+          timeout 120s build/newton_fixed_parameter_cuda/test_fixed_parameter_newton_cuda.bin
 
   nmfd-direct-solver-cuda:
     name: Direct solver and dense operations / CUDA

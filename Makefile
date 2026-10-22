@@ -1023,6 +1023,18 @@ test_nmfd_newton_short_recurrence_cpu.bin: source/common/tests/test_nmfd_newton_
 test_nmfd_newton_direct_solver_cpu.bin: source/common/tests/test_nmfd_newton_direct_solver.cpp $(NEWTON_TEST_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@
 
+FIXED_PARAMETER_NEWTON_HEADERS = source/nonlinear_operators/fixed_parameter_operator.h source/nonlinear_operators/projected_operator_helpers.h source/numerical_algos/recovering_linear_solver.h $(LINEAR_SOLVE_RECOVERY_HEADER) $(CONTINUATION_SYMMETRY_HEADERS) $(CIRCLE_MODEL_HEADERS) $(NEWTON_TEST_HEADERS) $(wildcard $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/detail/*.h)
+
+test_fixed_parameter_newton_cpu.bin: source/nonlinear_operators/tests/test_fixed_parameter_newton.cpp $(FIXED_PARAMETER_NEWTON_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@
+
+test_fixed_parameter_newton_cpu_omp.bin: source/nonlinear_operators/tests/test_fixed_parameter_newton.cpp $(FIXED_PARAMETER_NEWTON_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) -DTEST_VECTOR_BACKEND_OMP $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_fixed_parameter_newton_cuda.bin: source/nonlinear_operators/tests/test_fixed_parameter_newton.cpp $(FIXED_PARAMETER_NEWTON_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -DTEST_VECTOR_BACKEND_CUDA -x cu -c $< -o $(BUILD_DIR)/test_fixed_parameter_newton_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_fixed_parameter_newton_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
+
 test_nmfd_short_recurrence_baseline_cpu.bin: source/numerical_algos/tests/test_nmfd_short_recurrence.cpp $(NEWTON_TEST_HEADERS) $(wildcard $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/detail/*.h $(LEGACY_LINSOLVERS)/*.h)
 	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) $< $(OPENMP) -o $(BUILD_DIR)/$@
 

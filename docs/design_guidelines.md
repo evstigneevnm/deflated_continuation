@@ -137,6 +137,12 @@ condition, or implicit stage residual. It is not automatically a physical RHS.
 The returned Jacobian exposes `apply(perturbation, result)`; derivative-free
 solvers may need only the nonlinear `apply()`.
 
+Fixed-parameter corrections bind the parameter outside the Newton unknown.
+`nonlinear_operators::fixed_parameter_operator` delegates to the existing
+parameterized residual and linearization, including projected entry points.
+Parameter changes require fresh linearization; residual trials must preserve it.
+Project linear-solve retry policy remains outside NMFD's Newton iteration.
+
 Optional capabilities include adjoint/parameter actions, preconditioners,
 symmetries, exact branches, seed generation, physical output, and consistency
 operations. Request only what the selected algorithm uses. Do not mandate
