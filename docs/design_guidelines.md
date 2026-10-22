@@ -125,8 +125,12 @@ A Newton-compatible operator requires:
 ```cpp
 void apply(const vector_type& state, residual_vector_type& residual);
 void set_linearization_point(const vector_type& state);
-linear_operator_type get_jacobi_operator();
+std::shared_ptr<const jacobi_operator_type> get_jacobi_operator();
 ```
+
+The current default NMFD Newton iteration and convergence strategy require
+`residual_vector_type` to be the same as `vector_type`, so `apply()` currently
+takes `(const vector_type&, vector_type&)`. The general signature permits distinct unknown and residual spaces with compatible iteration and convergence strategies to be mdified later.
 
 `apply()` evaluates the equation being solved: an equilibrium, orbit matching
 condition, or implicit stage residual. It is not automatically a physical RHS.
@@ -136,8 +140,8 @@ solvers may need only the nonlinear `apply()`.
 Optional capabilities include adjoint/parameter actions, preconditioners,
 symmetries, exact branches, seed generation, physical output, and consistency
 operations. Request only what the selected algorithm uses. Do not mandate
-`linear_residual`, `nonlinear_residual`, public workspaces, or separate adapters
-for every algorithm.
+`linear_residual`, `nonlinear_residual`, public workspaces, or separate adapters for every algorithm.
+`get_jacobi_operator()` returns a cheap shared handle to the prepared Jacobian, without copying matrices, vectors, or workspaces. Any internally borrowed data must remain valid throughout its use.
 
 ### Linearization Lifetime
 
