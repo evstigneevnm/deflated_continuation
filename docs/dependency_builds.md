@@ -1,8 +1,9 @@
 # Dependency Builds
 
-The parent pins four direct submodules under `source/contrib`: `scfd`,
-`nmfd-operations`, `nmfd-linsolvers`, and `nmfd-newton`. Parent CI initializes
-only these checkouts and supplies their absolute paths to all library builds.
+The parent pins five direct submodules under `source/contrib`: `scfd`,
+`nmfd-operations`, `nmfd-linsolvers`, `nmfd-newton`, and `nmfd-timesteppers`.
+Parent CI initializes only these checkouts and supplies their absolute paths
+to all library builds.
 No dependency repository's nested checkout is used by parent integration tests.
 
 ## Local Integration
@@ -26,9 +27,9 @@ python3 run_local_ci.py --job nmfd-newton-operations-cpu
 
 ## Standalone CI
 
-Each library retains direct pinned submodules for standalone builds. Its
-Makefile defaults to those direct dependencies and accepts the root overrides
-above. Library builds do not require recursive initialization.
+Operations, linear-solvers, and Newton retain direct pinned submodules for
+standalone builds. Each Makefile defaults to those direct dependencies and accepts
+the root overrides above. Library builds do not require recursive initialization.
 
 - Pinned jobs test committed gitlinks, without `--remote`.
 - `latest-dependencies` tests the designated `.gitmodules` branch tips. It runs
@@ -53,6 +54,23 @@ SCFD tracks `nevstigneev`, operations tracks `master`, and linear solvers tracks
 `nevstigneev/sync_with_bifurcator`. Branch choices do not change the committed
 pins. Promote tested revisions through normal reviewed commits; commit library
 changes before updating their parent-project gitlinks.
+
+## Timesteppers Development
+
+`nmfd-timesteppers` currently uses flat sibling dependencies, without nested
+submodules or separate repository workflows. Existing parent timestepper CI jobs
+build its tests, including CPU/OpenMP/CUDA, public headers, and Python comparisons.
+They do not add NMFD-newton or NMFD-linsolvers include paths to explicit builds.
+
+```sh
+make -C source/contrib/nmfd-timesteppers -j2 test_cpu check_headers_cpu
+make test_explicit_lorenz_simulation_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+```
+
+Set `SCFD_ROOT`, `NMFD_OPERATIONS_ROOT`, or `JSON_INCLUDE` for other flat layouts.
+Standalone dependency pins and repository CI are deferred until the interface
+stabilizes. Commit and push the extracted module before committing its parent
+gitlink; otherwise a fresh checkout cannot obtain the extracted code.
 
 ## Migration Validation
 

@@ -189,8 +189,13 @@ workspaces. Preconditioners consume the complete prepared operator.
 
 ## Time Integration
 
-Refactored timestepper APIs live in `nmfd::time_steppers`, with `runge_kutta`,
-`integration`, and `detail` subnamespaces. Unmigrated legacy steppers remain in
+Refactored timesteppers live in the `source/contrib/nmfd-timesteppers` submodule,
+with public includes under `nmfd/time_steppers/` and APIs in `nmfd::time_steppers`.
+The module uses flat NMFD-operations/SCFD dependencies during development; explicit
+integration must not require nonlinear or linear solver headers. Parent CI owns
+the validation jobs until standalone module CI and dependency pins are introduced.
+The APIs have `runge_kutta`, `integration`, and `detail` subnamespaces.
+Unmigrated legacy steppers remain in
 `::time_steppers`; new code must use the NMFD namespace. Simple examples for the timesteppers should be incapsulated in a single file and should contain minimum methods required without generating spagetti code or overcomplecated structures.
 
 The structure of the timesteppers is designed as follows:

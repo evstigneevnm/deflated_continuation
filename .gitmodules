@@ -10,3 +10,6 @@
 [submodule "source/contrib/nmfd-operations"]
 	path = source/contrib/nmfd-operations
 	url = https://github.com/evstigneevnm/NMFD-operations.git
+[submodule "source/contrib/nmfd-timesteppers"]
+	path = source/contrib/nmfd-timesteppers
+	url = https://github.com/evstigneevnm/NMFD-timesteppers.git
