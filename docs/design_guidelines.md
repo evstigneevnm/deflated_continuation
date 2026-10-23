@@ -143,6 +143,18 @@ parameterized residual and linearization, including projected entry points.
 Parameter changes require fresh linearization; residual trials must preserve it.
 Project linear-solve retry policy remains outside NMFD's Newton iteration.
 
+`continuation::corrector_operator` uses the pair `(state, parameter)` and composes
+the physical and scalar-constraint residuals. The constraint provides
+`apply(state, parameter)` and `linearize(state, parameter, row, parameter_derivative)`.
+The default arclength constraint is linear in the supplied chart coordinates;
+nonlinear charts must supply the corresponding constraint derivative, not merely
+reuse the tangent. Chart selection/restoration stays in continuation assembly.
+Prepared projected problems use `projected_F_in_frozen_chart()` for residual
+trials when available. The optional trial projector borrows the unchanged Newton
+base iterate only during trial processing; that iterate must remain alive.
+The bordered binding preserves existing Sherman-Morrison recovery and residual
+checks, including its explicit failure when the scalar elimination pivot is zero.
+
 Optional capabilities include adjoint/parameter actions, preconditioners,
 symmetries, exact branches, seed generation, physical output, and consistency
 operations. Request only what the selected algorithm uses. Do not mandate

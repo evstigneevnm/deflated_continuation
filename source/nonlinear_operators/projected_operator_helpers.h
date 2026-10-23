@@ -51,6 +51,25 @@ void residual( NonlinearOperator *op, const Vector &x, const Scalar &lambda, Vec
 }
 
 template <class NonlinearOperator, class Vector, class Scalar>
+auto residual_in_frozen_chart( NonlinearOperator *op, const Vector &x, const Scalar &lambda, Vector &out, int )
+    -> decltype( op->projected_F_in_frozen_chart( x, lambda, out ), void() )
+{
+    op->projected_F_in_frozen_chart( x, lambda, out );
+}
+
+template <class NonlinearOperator, class Vector, class Scalar>
+void residual_in_frozen_chart( NonlinearOperator *op, const Vector &x, const Scalar &lambda, Vector &out, long )
+{
+    residual( op, x, lambda, out );
+}
+
+template <class NonlinearOperator, class Vector, class Scalar>
+void residual_in_frozen_chart( NonlinearOperator *op, const Vector &x, const Scalar &lambda, Vector &out )
+{
+    residual_in_frozen_chart( op, x, lambda, out, 0 );
+}
+
+template <class NonlinearOperator, class Vector, class Scalar>
 auto residual_at_linearization( NonlinearOperator *op, const Vector &, const Scalar &, Vector &out, int )
     -> decltype( op->projected_F_at_linearization( out ), void() )
 {

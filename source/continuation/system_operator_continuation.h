@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include <numerical_algos/linear_solve_recovery.h>
+#include <continuation/arclength_constraint.h>
 #include <continuation/tangent_normalization.h>
 
 namespace continuation
@@ -308,12 +309,9 @@ private:
     void assign_mul(const scalar_type mul_x, const vector_type& x, const scalar_type mul_y, const vector_type& y, vector_type& z)const;
       size_t sz =  vec_ops->get_vector_size();
 */
-        vec_ops->assign_mul( T( 1 ), x_1, T( -1 ), x_0, dx ); //dx = x_1-x_0
-        T x_proj      = vec_ops->scalar_prod( dx, x_0_s );    //(dx,x_0_s)
-        T lambda_proj = ( lambda_1 - lambda_0 ) * lambda_0_s;
         // auto N = vec_ops->get_vector_size();
         // double N_ = 1.0*N;
-        return ( x_proj + lambda_proj - ds_l );
+        return evaluate_arclength_constraint( *vec_ops, x_0, lambda_0, x_0_s, lambda_0_s, ds_l, x_1, lambda_1, dx );
     }
 };
 

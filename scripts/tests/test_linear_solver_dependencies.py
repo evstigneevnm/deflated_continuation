@@ -13,6 +13,8 @@ from check_linear_solver_dependencies import violations
 class LinearSolverDependenciesTest(unittest.TestCase):
     def test_active_components_reject_archived_solver_headers(self):
         for path in ("source/continuation/system_operator_continuation.h",
+                     "source/continuation/corrector_operator.h",
+                     "source/continuation/bordered_linear_solver.h",
                      "source/deflation/system_operator_deflation.h",
                      "source/nonlinear_operators/projected_system_operator.h",
                      "source/nonlinear_operators/fixed_parameter_operator.h",
@@ -53,6 +55,9 @@ class LinearSolverDependenciesTest(unittest.TestCase):
             ("test_fixed_parameter_newton_cpu.bin", False),
             ("test_fixed_parameter_newton_cpu_omp.bin", False),
             ("test_fixed_parameter_newton_cuda.bin", False),
+            ("test_continuation_operator_cpu.bin", False),
+            ("test_continuation_newton_cpu_omp.bin", False),
+            ("test_continuation_newton_cuda.bin", False),
             ("circle_bd_cpu_omp", False), ("circle_bd_var_prec", False),
             ("KS1D_full_bd_cpu_omp", False), ("KS2D_stability_cpu_omp", False),
             ("test_explicit_lorenz_cpu.bin", False),

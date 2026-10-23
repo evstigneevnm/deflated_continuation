@@ -5,6 +5,7 @@
 #include <string>
 
 #include <continuation/chart_helpers.h>
+#include <continuation/arclength_constraint.h>
 #include <continuation/tangent_normalization.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
 #include <numerical_algos/linear_solve_recovery.h>
@@ -283,10 +284,9 @@ private:
         }
         vec_ops->assign_mul( T( 1 ), x_1_chart, T( -1 ), x_1, chart_delta );
         const T chart_displacement = vec_ops->norm_l2( chart_delta );
-        vec_ops->assign_mul( T( 1 ), x_1_chart, T( -1 ), x_0_chart, dx );
-        const T x_proj      = vec_ops->scalar_prod( dx, x_0_s_chart );
-        const T lambda_proj = ( lambda_1 - lambda_0 ) * lambda_0_s;
-        const T residual    = x_proj + lambda_proj - ds_l;
+        const T residual           = evaluate_arclength_constraint(
+            *vec_ops, x_0_chart, lambda_0, x_0_s_chart, lambda_0_s, ds_l, x_1_chart, lambda_1, dx
+        );
         if ( verbose )
         {
             log->info_f(

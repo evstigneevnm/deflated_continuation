@@ -116,6 +116,7 @@ jobs:
       - nmfd-direct-solver-cpu
       - nmfd-newton-direct-solver-cpu
       - project-newton-fixed-parameter-sanitizers-cpu
+      - project-newton-continuation-sanitizers-cpu
       - nmfd-short-recurrence-cpu
       - nmfd-short-recurrence-baseline-cpu
       - nmfd-legacy-linear-solve-recovery-cpu
@@ -390,6 +391,104 @@ jobs:
           make test_fixed_parameter_newton_cuda.bin \
             CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_fixed_parameter_cuda
           timeout 120s build/newton_fixed_parameter_cuda/test_fixed_parameter_newton_cuda.bin
+
+  project-newton-continuation-operator-cpu:
+    name: Project Newton / continuation operator
+    needs: project-newton-fixed-parameter-cpu
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify arclength, chart derivatives, frozen contexts and construction
+        run: |
+          make test_continuation_operator_cpu.bin test_continuation_operator_cpu_omp.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_continuation_operator
+          timeout 60s build/newton_continuation_operator/test_continuation_operator_cpu.bin
+          OMP_NUM_THREADS=2 timeout 60s build/newton_continuation_operator/test_continuation_operator_cpu_omp.bin
+
+  project-newton-continuation-cpu:
+    name: Project Newton / continuation corrections
+    needs: [project-newton-continuation-operator-cpu, nmfd-sherman-morrison-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify folds, bordered residuals, recovery, rollback and ownership
+        run: |
+          make test_continuation_newton_cpu.bin test_continuation_newton_cpu_omp.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_continuation
+          timeout 60s build/newton_continuation/test_continuation_newton_cpu.bin
+          OMP_NUM_THREADS=2 timeout 60s build/newton_continuation/test_continuation_newton_cpu_omp.bin
+
+  project-newton-continuation-operator-cuda:
+    name: Project Newton / continuation operator CUDA
+    needs: [project-newton-continuation-operator-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify continuation operator on CUDA when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+            echo "Skipping CUDA continuation operator: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1; then
+            echo "Skipping CUDA continuation operator: nvcc unavailable"
+            exit 0
+          fi
+          make test_continuation_operator_cuda.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_continuation_cuda
+          timeout 120s build/newton_continuation_cuda/test_continuation_operator_cuda.bin
+
+  project-newton-continuation-cuda:
+    name: Project Newton / continuation corrections CUDA
+    needs: [project-newton-continuation-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify continuation corrections on CUDA when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+            echo "Skipping CUDA continuation corrections: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1; then
+            echo "Skipping CUDA continuation corrections: nvcc unavailable"
+            exit 0
+          fi
+          make test_continuation_newton_cuda.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_continuation_cuda
+          timeout 120s build/newton_continuation_cuda/test_continuation_newton_cuda.bin
+
+  project-newton-continuation-sanitizers-cpu:
+    name: Project Newton / continuation sanitizers
+    needs: [project-newton-continuation-operator-cpu, project-newton-continuation-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify continuation workspace and dependency lifetimes
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          make test_continuation_operator_cpu.bin test_continuation_newton_cpu.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_continuation_sanitizers \
+            NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          timeout 60s build/newton_continuation_sanitizers/test_continuation_operator_cpu.bin
+          timeout 60s build/newton_continuation_sanitizers/test_continuation_newton_cpu.bin
 
   nmfd-direct-solver-cuda:
     name: Direct solver and dense operations / CUDA
