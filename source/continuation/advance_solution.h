@@ -22,6 +22,22 @@
 namespace continuation
 {
 
+namespace detail
+{
+template <class Correction, class Vector, class T>
+auto prepare_corrector(
+    Correction *correction, const Vector &state, T parameter, const Vector &tangent, T tangent_parameter, T step,
+    char type, int
+) -> decltype( correction->set_tangent_space( state, parameter, tangent, tangent_parameter, step, type ), void() )
+{
+    correction->set_tangent_space( state, parameter, tangent, tangent_parameter, step, type );
+}
+template <class Correction, class Vector, class T>
+void prepare_corrector( Correction *, const Vector &, T, const Vector &, T, T, char, long )
+{
+}
+}
+
 template <
     class VectorOperations, class Loggin, class NewtonMethodExtended, class NewtonMethod, class NonlinearOperator,
     class SystemOperator, class Predictoror, class ConvergenceNewtonExtended>
@@ -265,6 +281,10 @@ public:
                     )
                 );
             }
+            detail::prepare_corrector(
+                newton_extended, continuation_type == 'S' ? x0 : x_p, continuation_type == 'S' ? lambda0 : lambda_p,
+                x0_s, lambda0_s, ds_l, continuation_type, 0
+            );
             converged = newton_extended->solve( nonlin_op, x1, lambda1 );
             if ( !converged )
             {
@@ -452,6 +472,10 @@ public:
                     )
                 );
             }
+            detail::prepare_corrector(
+                newton_extended, continuation_type == 'S' ? x0 : x1_l, continuation_type == 'S' ? lambda0 : lambda1_l,
+                x0_s, lambda0_s, ds_m, continuation_type, 0
+            );
             converged_m = newton_extended->solve( nonlin_op, x1_l, lambda1_l );
             if ( converged_m )
             {

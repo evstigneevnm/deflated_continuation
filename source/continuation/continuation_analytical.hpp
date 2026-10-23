@@ -27,15 +27,16 @@ std::string scalar_to_string( const T &value )
 template <
     class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperations, class LinearOperator,
     class Knots, class LinearSolver, class Newton, class Curve,
-    template <class, class, class, class, class> class SystemOperatorContinuation = system_operator_continuation>
+    template <class, class, class, class, class> class SystemOperatorContinuation = system_operator_continuation,
+    class NewtonTypes                                                             = void>
 class continuation_analytical : public continuation<
                                     VectorOperations, VectorFileOperations, Log, NonlinearOperations, LinearOperator,
-                                    Knots, LinearSolver, Newton, Curve, SystemOperatorContinuation>
+                                    Knots, LinearSolver, Newton, Curve, SystemOperatorContinuation, NewtonTypes>
 {
 private:
     typedef continuation<
         VectorOperations, VectorFileOperations, Log, NonlinearOperations, LinearOperator, Knots, LinearSolver, Newton,
-        Curve, SystemOperatorContinuation>
+        Curve, SystemOperatorContinuation, NewtonTypes>
         parent_t;
 
     typedef typename parent_t::T     T;
@@ -48,13 +49,7 @@ private:
 
 
 public:
-    continuation_analytical(
-        VectorOperations *&vec_ops_, VectorFileOperations *&file_ops_, Log *&log_, NonlinearOperations *&nonlin_op_,
-        LinearOperator *&lin_op_, Knots *&knots_, LinearSolver *&SM_, Newton *&newton_
-    )
-        : parent_t( vec_ops_, file_ops_, log_, nonlin_op_, lin_op_, knots_, SM_, newton_ )
-    {
-    }
+    using parent_t::parent_t;
     ~continuation_analytical()
     {
     }

@@ -143,6 +143,17 @@ parameterized residual and linearization, including projected entry points.
 Parameter changes require fresh linearization; residual trials must preserve it.
 Project linear-solve retry policy remains outside NMFD's Newton iteration.
 
+Production circle workflows select `main_classes::nmfd_newton_types` in assembly.
+Fixed, continuation, and deflation convergence strategies are independent template
+choices. Assembly configures them; algorithm classes only invoke corrections and
+read their reports. A custom strategy with different settings overrides its role's
+configuration function, without changing deflation or continuation algorithms.
+`parameterized_correction` bridges `(state, parameter)` calls to NMFD's vector-only
+solver, reuses candidate storage, and commits both components only on success.
+It contains no Newton loop. Tangent construction remains separate from the new
+continuation corrector. Unmigrated PDEs and variable-precision circle Newton retain
+the old construction path until their respective migration gates pass.
+
 `deflation::deflated_operator` composes `D=m*F` and `J_D=m*J_F+F*Dm` at a
 fixed parameter, delegating distances and symmetry pullbacks to solution storage.
 Storage supplies `c=-grad(m)` in the operations' inner product; its norm weight

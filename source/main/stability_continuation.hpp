@@ -46,7 +46,7 @@ template <
     class VectorOperations, class VectorFileOperations, class Log, class Monitor, class NonlinearOperations,
     class LinearOperator, class Preconditioner, template <class, class, class, class, class> class LinearSolver,
     template <class, class, class, class> class SystemOperator, class Parameters, class EigensolverAdapter,
-    class StabilityLinearizationProvider = NonlinearOperations>
+    class StabilityLinearizationProvider = NonlinearOperations, class NewtonTypes = void>
 class stability_continuation
 {
 private:
@@ -57,14 +57,18 @@ private:
     //linear solver
     using lin_slv_t = LinearSolver<LinearOperator, Preconditioner, VectorOperations, Monitor, Log>;
 
-    typedef nonlinear_operators::newton_method::convergence_strategy<VectorOperations, NonlinearOperations, Log>
-        convergence_newton_t;
-
-    typedef SystemOperator<VectorOperations, NonlinearOperations, LinearOperator, lin_slv_t> system_operator_t;
-
-    typedef numerical_algos::newton_method::newton_solver<
-        VectorOperations, NonlinearOperations, system_operator_t, convergence_newton_t>
-        newton_t;
+    struct legacy_types
+    {
+        using fixed_operator_type = SystemOperator<VectorOperations, NonlinearOperations, LinearOperator, lin_slv_t>;
+        using fixed_convergence_type =
+            nonlinear_operators::newton_method::convergence_strategy<VectorOperations, NonlinearOperations, Log>;
+        using fixed_correction_type = numerical_algos::newton_method::newton_solver<
+            VectorOperations, NonlinearOperations, fixed_operator_type, fixed_convergence_type>;
+    };
+    using selected_newton_types = std::conditional_t<std::is_void_v<NewtonTypes>, legacy_types, NewtonTypes>;
+    using system_operator_t     = typename selected_newton_types::fixed_operator_type;
+    using convergence_newton_t  = typename selected_newton_types::fixed_convergence_type;
+    using newton_t              = typename selected_newton_types::fixed_correction_type;
 
     struct solver_bundle_types
     {
@@ -78,7 +82,7 @@ private:
         using system_operator_type      = system_operator_t;
         using newton_type               = newton_t;
     };
-    using solver_bundle_t = stability_continuation_detail::solver_bundle<solver_bundle_types>;
+    using solver_bundle_t = stability_continuation_detail::solver_bundle<solver_bundle_types, NewtonTypes>;
     using state_storage_t = nmfd::detail::vector_wrap<VectorOperations, false, false>;
 
     static VectorOperations *checked_vector_operations( VectorOperations *operations )
@@ -325,9 +329,12 @@ public:
         bool store_norms_history_ = parameters->stability_continuation.newton.store_norms_history;
         bool verbose_             = parameters->stability_continuation.newton.verbose;
 
-        convergence_newton->set_convergence_constants(
-            tolerance_, maximum_iterations_, newton_wight_, store_norms_history_, verbose_
-        );
+        if constexpr ( std::is_void_v<NewtonTypes> )
+            convergence_newton->set_convergence_constants(
+                tolerance_, maximum_iterations_, newton_wight_, store_norms_history_, verbose_
+            );
+        else
+            NewtonTypes::configure_fixed( convergence_newton, parameters->stability_continuation.newton );
     }
 
     void set_linear_operator_stable_eigenvalues_halfplane()

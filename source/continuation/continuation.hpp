@@ -14,6 +14,8 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <memory>
+#include <type_traits>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -107,7 +109,8 @@ inline void record_symmetry_intersection_if_available( ... )
 template <
     class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperator, class LinearOperator,
     class Knots, class LinearSolver, class Newton, class Curve,
-    template <class, class, class, class, class> class SystemOperatorContinuation = system_operator_continuation>
+    template <class, class, class, class, class> class SystemOperatorContinuation = system_operator_continuation,
+    class NewtonTypes                                                             = void>
 class continuation
 {
 protected:
@@ -139,14 +142,16 @@ private:
     typedef SystemOperatorContinuation<VectorOperations, NonlinearOperator, LinearOperator, LinearSolver, Log>
         system_operator_cont_t;
 
-    typedef newton_method_extended::convergence_strategy<VectorOperations, NonlinearOperator, Log>
-        convergence_newton_cont_t;
-
-    typedef numerical_algos::newton_method_extended::newton_solver_extended<
-        VectorOperations, NonlinearOperator, system_operator_cont_t, convergence_newton_cont_t,
-        T /* point solution class here instead of real!*/
-        >
-        newton_cont_t;
+    struct legacy_types
+    {
+        using continuation_convergence_type =
+            newton_method_extended::convergence_strategy<VectorOperations, NonlinearOperator, Log>;
+        using continuation_correction_type = numerical_algos::newton_method_extended::newton_solver_extended<
+            VectorOperations, NonlinearOperator, system_operator_cont_t, continuation_convergence_type, T>;
+    };
+    using selected_types            = std::conditional_t<std::is_void_v<NewtonTypes>, legacy_types, NewtonTypes>;
+    using convergence_newton_cont_t = typename selected_types::continuation_convergence_type;
+    using newton_cont_t             = typename selected_types::continuation_correction_type;
 
     typedef predictor_adaptive<VectorOperations, Log> predictor_cont_t;
 
@@ -164,16 +169,29 @@ private:
 public:
     continuation(
         VectorOperations *vec_ops_, VectorFileOperations *file_ops_, Log *log_, NonlinearOperator *nonlin_op_,
-        LinearOperator *lin_op_, Knots *knots_, LinearSolver *SM_, Newton *newton_
+        LinearOperator *lin_op_, Knots *knots_, LinearSolver *SM_, Newton *newton_,
+        std::shared_ptr<newton_cont_t> correction = nullptr
     )
         : vec_ops( vec_ops_ ), file_ops( file_ops_ ), log( log_ ), nonlin_op( nonlin_op_ ), knots( knots_ ), SM( SM_ ),
           newton( newton_ ), lin_op( lin_op_ ), seed_tangent_cache( vec_ops_ )
     {
+        if constexpr ( !std::is_void_v<NewtonTypes> )
+            if ( !correction )
+                throw std::invalid_argument( "Continuation requires an assembled correction" );
         predict              = new predictor_cont_t( vec_ops, log );
         system_operator_cont = new system_operator_cont_t( vec_ops, log, lin_op, SM );
-        conv_newton_cont     = new convergence_newton_cont_t( vec_ops, log );
-        newton_cont          = new newton_cont_t( vec_ops, system_operator_cont, conv_newton_cont );
-        continuation_step    = new advance_step_cont_t(
+        if constexpr ( std::is_void_v<NewtonTypes> )
+        {
+            conv_newton_cont = new convergence_newton_cont_t( vec_ops, log );
+            newton_cont      = new newton_cont_t( vec_ops, system_operator_cont, conv_newton_cont );
+        }
+        else
+        {
+            correction_owner_ = std::move( correction );
+            newton_cont       = correction_owner_.get();
+            conv_newton_cont  = newton_cont->get_convergence_strategy_handle();
+        }
+        continuation_step = new advance_step_cont_t(
             vec_ops, log, system_operator_cont, newton_cont, newton, predict, conv_newton_cont
         );
         init_tangent = new tangent_0_cont_t( vec_ops, log, newton, lin_op, SM );
@@ -188,8 +206,11 @@ public:
         unset_all_vectors();
         delete init_tangent;
         delete continuation_step;
-        delete newton_cont;
-        delete conv_newton_cont;
+        if constexpr ( std::is_void_v<NewtonTypes> )
+        {
+            delete newton_cont;
+            delete conv_newton_cont;
+        }
         delete system_operator_cont;
         delete predict;
     }
@@ -243,9 +264,14 @@ public:
             tolerance_, maximum_iterations_, relax_tolerance_factor_, relax_tolerance_steps_, newton_wight_,
             store_norms_history_, verbose_, stagnation_max_p, maximum_norm_increase_p, newton_wight_threshold_p
         );
-        continuation_step->set_verbose( verbose_ );
-        detail::set_verbose_if_available( system_operator_cont, verbose_, 0 );
-        epsilon = T( 100.0 ) * tolerance_; //tolerance to check distance between vectors in curves.
+        set_corrector_controls( tolerance_, verbose_ );
+    }
+
+    void set_corrector_controls( T tolerance, bool verbose )
+    {
+        continuation_step->set_verbose( verbose );
+        detail::set_verbose_if_available( system_operator_cont, verbose, 0 );
+        epsilon = T( 100 ) * tolerance;
     }
 
     void set_solution_postprocessor( std::function<void( T_vec & )> solution_postprocessor_ )
@@ -475,14 +501,15 @@ protected: //changed to protected for inheritance
     LinearOperator       *lin_op;
 
     //created localy:
-    predictor_cont_t          *predict;
-    system_operator_cont_t    *system_operator_cont;
-    convergence_newton_cont_t *conv_newton_cont;
-    newton_cont_t             *newton_cont;
-    advance_step_cont_t       *continuation_step;
-    tangent_0_cont_t          *init_tangent;
-    Curve                     *bif_diag;
-    seed_tangent_cache_t       seed_tangent_cache;
+    predictor_cont_t              *predict;
+    system_operator_cont_t        *system_operator_cont;
+    convergence_newton_cont_t     *conv_newton_cont;
+    std::shared_ptr<newton_cont_t> correction_owner_;
+    newton_cont_t                 *newton_cont;
+    advance_step_cont_t           *continuation_step;
+    tangent_0_cont_t              *init_tangent;
+    Curve                         *bif_diag;
+    seed_tangent_cache_t           seed_tangent_cache;
 
     int          direction         = -1;
     int          initial_direciton = 1;

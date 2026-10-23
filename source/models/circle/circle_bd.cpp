@@ -26,6 +26,7 @@
 // problem dependant ends
 
 #include <main/deflation_continuation.hpp>
+#include <main/nmfd_newton_types.h>
 #include <main/parameters.hpp>
 #include <nmfd/detail/vector_wrap.h>
 
@@ -196,11 +197,21 @@ int main( int argc, char const *argv[] )
     // test continuaiton process of a single curve
     using linear_system_type =
         nmfd::solvers::sherman_morrison<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t, nmfd::solvers::cgs>;
+    using storage_type = deflation::solution_storage<vec_ops_real, log_t>;
+#if defined( CIRCLE_VECTOR_BACKEND_VAR_PREC )
+    // NMFD's default convergence strategy still needs a separate multiprecision-math pass.
+    using newton_types = void;
+#else
+    using newton_types =
+        main_classes::nmfd_newton_types<vec_ops_real, log_t, circle_t, lin_op_t, linear_system_type, storage_type>;
+#endif
     using deflation_continuation_t = main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, circle_t, lin_op_t, prec_t, circle_model::cgs,
-        nonlinear_operators::system_operator, parameters_t, deflation::solution_storage<vec_ops_real, log_t>,
-        continuation::system_operator_continuation, linear_system_type>;
+        nonlinear_operators::system_operator, parameters_t, storage_type, continuation::system_operator_continuation,
+        linear_system_type, newton_types>;
 
+    std::cout << "Newton solver: " << ( deflation_continuation_t::uses_nmfd_newton ? "NMFD" : "project legacy" )
+              << '\n';
     deflation_continuation_t DC( vec_ops_R, file_ops, &log, &log_linsolver, CIRCLE, parameters );
 
     DC.set_parameters();

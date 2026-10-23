@@ -97,6 +97,8 @@ ICUDA = -I$(CUDA_ROOT_PATH)/include
 IPROJECT = -I $(COMMON_NMFD_OPERATIONS) -I source/ -I $(CONTRIB_SCFD)/include
 INMFD_LINSOLVERS = -I $(CONTRIB_NMFD_LINSOLVERS)/include
 INMFD_NEWTON = -I $(CONTRIB_NMFD_NEWTON)/include $(INMFD_LINSOLVERS)
+CIRCLE_NMFD_NEWTON_TARGETS = circle_bd_cuda circle_bd_cpu_omp circle_bd_hip circle_bd_var_prec circle_stability_cuda circle_stability_cpu_omp circle_stability_hip
+$(CIRCLE_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
 ITIME_STEPPER = -I $(NMFD_TIMESTEPPERS_ROOT)/include -I $(COMMON_NMFD_OPERATIONS) -I $(CONTRIB_SCFD)/include -I source/contrib/json
 LINEAR_SOLVE_RECOVERY_HEADER = source/numerical_algos/linear_solve_recovery.h
 LEGACY_LINSOLVERS = source/numerical_algos/legacy/include/numerical_algos/lin_solvers
@@ -158,6 +160,7 @@ KS2D_REFACTORED_HEADERS = source/models/KS_2D/KS2D_backend_typedefs.h source/non
 VISUALIZATION_HEADERS = source/visualization/bd_curve_file_reader.h source/visualization/physical_solution_writer.h source/visualization/structured_physical_solution_writer.h source/visualization/io/numpy_array_writer.h source/visualization/bd_prepare_visualization.hpp
 CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/models/circle/circle_linear_solvers.h $(wildcard source/contrib/nmfd-linsolvers/include/nmfd/solvers/*.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/detail/*.h) source/nonlinear_operators/circle/circle.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/linear_operator_circle.h source/nonlinear_operators/circle/preconditioner_circle.h source/nonlinear_operators/circle/system_operator.h $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 CIRCLE_STABILITY_HEADERS = $(CIRCLE_MODEL_HEADERS) source/stability/eigensolvers/direct_scalar_eigensolver.h source/stability/eigensolvers/transformations/scaled_real_operator.h
+CIRCLE_MODEL_HEADERS += source/main/nmfd_newton_types.h source/numerical_algos/parameterized_correction.h source/nonlinear_operators/fixed_parameter_operator.h source/continuation/corrector_operator.h source/continuation/bordered_linear_solver.h source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h $(wildcard source/contrib/nmfd-newton/include/nmfd/solvers/*.h)
 NMFD_DIRECT_SOLVER_HEADERS = $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/direct_solver.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/default_monitor.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/iter_solver_base.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/sherman_morrison.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/dense_operations_base.h
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/models/bratu/bratu_model_config.h source/models/bratu/bratu_linear_solvers.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h $(NMFD_DIRECT_SOLVER_HEADERS)
 STAR_SHAPED_MODEL_HEADERS = source/models/star_shaped/star_shaped_backend_typedefs.h source/models/star_shaped/star_shaped_linear_solvers.h source/nonlinear_operators/star_shaped/star_shaped.h source/nonlinear_operators/star_shaped/convergence_strategy.h source/nonlinear_operators/star_shaped/linear_operator_star_shaped.h source/nonlinear_operators/star_shaped/preconditioner_star_shaped.h source/nonlinear_operators/star_shaped/system_operator.h $(NMFD_DIRECT_SOLVER_HEADERS)
@@ -1049,6 +1052,16 @@ test_continuation_%_cuda.bin: source/continuation/tests/test_continuation_%.cpp 
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_continuation_$*_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
 
 DEFLATION_WRAPPER_TEST_HEADERS = source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h source/deflation/solution_storage.h source/deflation/symmetry_solution_storage.h source/deflation/tests/deflation_newton_fixture.h $(FIXED_PARAMETER_NEWTON_HEADERS)
+
+test_nmfd_newton_assembly_cpu.bin: source/main/tests/test_nmfd_newton_assembly.cpp $(DEFLATION_WRAPPER_TEST_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@
+
+test_nmfd_newton_assembly_cpu_omp.bin: source/main/tests/test_nmfd_newton_assembly.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) -DTEST_VECTOR_BACKEND_OMP $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_nmfd_newton_assembly_cuda.bin: source/main/tests/test_nmfd_newton_assembly.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -DTEST_VECTOR_BACKEND_CUDA -x cu -c $< -o $(BUILD_DIR)/test_nmfd_newton_assembly_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_nmfd_newton_assembly_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
 
 test_deflation_%_cpu.bin: source/deflation/tests/test_deflation_%.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@

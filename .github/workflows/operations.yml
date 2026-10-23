@@ -118,6 +118,7 @@ jobs:
       - project-newton-fixed-parameter-sanitizers-cpu
       - project-newton-continuation-sanitizers-cpu
       - project-newton-deflation-sanitizers-cpu
+      - project-newton-assembly-sanitizers-cpu
       - nmfd-newton-residual-norm-cpu
       - nmfd-short-recurrence-cpu
       - nmfd-short-recurrence-baseline-cpu
@@ -603,6 +604,64 @@ jobs:
           timeout 60s build/newton_deflation_sanitizers/test_deflation_operator_cpu.bin
           timeout 60s build/newton_deflation_sanitizers/test_deflation_newton_cpu.bin
           timeout 60s build/newton_deflation_sanitizers/test_newton_residual_norm_cpu.bin
+
+  project-newton-assembly-cpu:
+    name: Project Newton / application bindings and strategy selection
+    needs: [project-newton-continuation-cpu, project-newton-deflation-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify binding, strategy substitution, rollback, lifetimes and workspace reuse
+        run: |
+          make test_nmfd_newton_assembly_cpu.bin test_nmfd_newton_assembly_cpu_omp.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_assembly
+          timeout 60s build/newton_assembly/test_nmfd_newton_assembly_cpu.bin
+          OMP_NUM_THREADS=2 timeout 60s build/newton_assembly/test_nmfd_newton_assembly_cpu_omp.bin
+
+  project-newton-assembly-cuda:
+    name: Project Newton / application bindings CUDA
+    needs: [project-newton-assembly-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify application bindings on CUDA when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+            echo "Skipping CUDA application bindings: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA application bindings: nvcc unavailable"
+            exit 0
+          fi
+          make test_nmfd_newton_assembly_cuda.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_assembly_cuda
+          timeout 120s build/newton_assembly_cuda/test_nmfd_newton_assembly_cuda.bin
+
+  project-newton-assembly-sanitizers-cpu:
+    name: Project Newton / application binding sanitizers
+    needs: project-newton-assembly-cpu
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify application binding lifetimes and construction failures
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          make test_nmfd_newton_assembly_cpu.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_assembly_sanitizers \
+            NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          timeout 60s build/newton_assembly_sanitizers/test_nmfd_newton_assembly_cpu.bin
 
   nmfd-direct-solver-cuda:
     name: Direct solver and dense operations / CUDA
@@ -2798,8 +2857,30 @@ jobs:
           timeout 120s ./"$CIRCLE_BUILD"/circle_bd_cpu_omp.bin "$CIRCLE_BUILD/circle_ci.json" --analytical-solution --quiet
           python3 scripts/validate_circle_diagram.py "$CIRCLE_BUILD/project" --tolerance 1e-5 --min-points 8
 
+  circle-newton-deflation-cpu-omp:
+    needs: project-newton-assembly-cpu
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev
+          fi
+      - name: Verify production NMFD deflation without analytical or exact seeding
+        run: |
+          CIRCLE_BUILD="$BUILD_DIR/circle_newton_deflation"
+          make circle_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$CIRCLE_BUILD" REAL_TYPE=double
+          OMP_NUM_THREADS=2 python3 scripts/test_circle_nmfd.py \
+            --bd-executable "$CIRCLE_BUILD/circle_bd_cpu_omp.bin" --work-dir "$CIRCLE_BUILD/discovery"
+
   circle-bd-full-cpu-omp:
-    needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
+    needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu, project-newton-assembly-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -3033,6 +3114,8 @@ jobs:
           cmp "$CIRCLE_BUILD/stability_diagram.before_restart.dat" "$CIRCLE_BUILD/project/stability_diagram.dat"
           cmp "$CIRCLE_BUILD/stability_curve.before_restart.dat" "$CIRCLE_BUILD/project/0/debug_curve_stability.dat"
 
+          python3 scripts/test_circle_nmfd.py --bd-executable "$CIRCLE_BUILD/circle_bd_cuda.bin" --work-dir "$CIRCLE_BUILD/discovery"
+
   star-shaped-bd-cuda:
     needs: [eigensolver-foundation-cuda, fft-facade-cuda, lapack-wrap-cuda]
     runs-on: ubuntu-latest
@@ -3163,6 +3246,8 @@ jobs:
           timeout 120s ./"$CIRCLE_BUILD"/circle_stability_hip.bin "$CIRCLE_BUILD/circle_ci.json" --quiet
           cmp "$CIRCLE_BUILD/stability_diagram.before_restart.dat" "$CIRCLE_BUILD/project/stability_diagram.dat"
           cmp "$CIRCLE_BUILD/stability_curve.before_restart.dat" "$CIRCLE_BUILD/project/0/debug_curve_stability.dat"
+
+          python3 scripts/test_circle_nmfd.py --bd-executable "$CIRCLE_BUILD/circle_bd_hip.bin" --work-dir "$CIRCLE_BUILD/discovery"
 
   star-shaped-bd-hip:
     needs: [scfd-vector-operations-hip]

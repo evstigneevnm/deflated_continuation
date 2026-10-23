@@ -9,6 +9,15 @@ namespace main_classes
 namespace detail
 {
 
+template <class Types>
+struct nonlinear_solver_state : Types::state
+{
+};
+template <>
+struct nonlinear_solver_state<void>
+{
+};
+
 template <class Component, class Problem>
 std::shared_ptr<Component> make_problem_component( Problem *problem )
 {

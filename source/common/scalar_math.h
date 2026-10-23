@@ -2,11 +2,21 @@
 #define __COMMON_SCALAR_MATH_H__
 
 #include <cmath>
+#include <type_traits>
 
 namespace common
 {
 namespace scalar_math
 {
+
+template <class T>
+T power( const T &value, const T &exponent )
+{
+    if constexpr ( std::is_arithmetic_v<T> )
+        return std::pow( value, exponent );
+    else
+        return pow( value, exponent ); // ADL supplies multiprecision and user-defined scalar math.
+}
 
 template <class T>
 T abs( const T &value )

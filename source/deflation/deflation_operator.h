@@ -39,7 +39,9 @@ void randomize_deflation_seed(
 
 } // namespace detail
 
-template <class VectorOperations, class NewtonMethod, class NonlinearOperator, class SolutionStorage, class Logging>
+template <
+    class VectorOperations, class NewtonMethod, class NonlinearOperator, class SolutionStorage, class Logging,
+    bool CatchExceptions = true>
 class deflation_operator
 {
 public:
@@ -117,14 +119,21 @@ public:
             // vec_ops->add_mul_scalar(0.0, lambda_0, u_in);
             // vec_ops->add_mul(0.1, u_out, u_in);
 
-            try
+            if constexpr ( !CatchExceptions )
             {
                 found_solution = newton->solve( nonlin_op, u_in, lambda_0, u_out, lambda );
             }
-            catch ( const std::exception &e )
+            else
             {
-                log->error_f( "deflation::find_solution: exception: %s\n", e.what() );
-                found_solution = false;
+                try
+                {
+                    found_solution = newton->solve( nonlin_op, u_in, lambda_0, u_out, lambda );
+                }
+                catch ( const std::exception &e )
+                {
+                    log->error_f( "deflation::find_solution: exception: %s\n", e.what() );
+                    found_solution = false;
+                }
             }
             retries++;
             if ( !found_solution )

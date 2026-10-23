@@ -7,6 +7,7 @@
 #include <iostream>
 #include <algorithm>
 #include <limits>
+#include <common/scalar_math.h>
 
 namespace deflation
 {
@@ -196,8 +197,8 @@ private:
         vec_ops->assign_mul( T( 1 ), x, T( -1 ), reference, distance_help );
         const T norm      = vec_ops->norm_l2( distance_help );
         minimum_distance_ = std::min( minimum_distance_, norm );
-        distance += T( 1 ) / ( std::pow( norm, p ) * T( count ) );
-        const T factor = p / ( std::pow( norm, p + T( 2 ) ) * T( count ) * norm_weight );
+        distance += T( 1 ) / ( common::scalar_math::power( norm, p ) * T( count ) );
+        const T factor = p / ( common::scalar_math::power( norm, T( p + T( 2 ) ) ) * T( count ) * norm_weight );
         // Storage returns the negative multiplier gradient in the operations' inner product.
         vec_ops->add_mul( factor, distance_help, T( 1 ), c );
     }

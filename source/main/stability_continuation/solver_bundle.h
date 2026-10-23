@@ -11,7 +11,7 @@ namespace main_classes
 namespace stability_continuation_detail
 {
 
-template <class Types>
+template <class Types, class NewtonTypes = void>
 class solver_bundle
 {
 public:
@@ -75,13 +75,26 @@ public:
 private:
     void initialize( vector_operations_type *operations, log_type *log )
     {
-        auto *linear_operator = linear_operator_.get();
-        auto *linear_solver   = linear_solver_.get();
-        convergence_          = std::make_unique<convergence_type>( operations, log );
-        auto *convergence     = convergence_.get();
-        system_operator_      = std::make_unique<system_operator_type>( operations, linear_operator, linear_solver );
-        auto *system_operator = system_operator_.get();
-        newton_               = std::make_unique<newton_type>( operations, system_operator, convergence );
+        if constexpr ( !std::is_void_v<NewtonTypes> )
+        {
+            system_operator_ = std::make_shared<system_operator_type>(
+                problem_owner_, linear_operator_, typename vector_operations_type::scalar_type( 0 )
+            );
+            newton_ = NewtonTypes::fixed_method::make(
+                operations_owner_, problem_owner_, system_operator_, operations_owner_, linear_solver_, log,
+                std::make_shared<typename NewtonTypes::projector_type>( problem_owner_ )
+            );
+        }
+        else
+        {
+            auto *linear_operator = linear_operator_.get();
+            auto *linear_solver   = linear_solver_.get();
+            convergence_          = std::make_shared<convergence_type>( operations, log );
+            auto *convergence     = convergence_.get();
+            system_operator_ = std::make_shared<system_operator_type>( operations, linear_operator, linear_solver );
+            auto *system_operator = system_operator_.get();
+            newton_               = std::make_shared<newton_type>( operations, system_operator, convergence );
+        }
     }
 
 public:
@@ -102,7 +115,10 @@ public:
     }
     convergence_type *convergence() const
     {
-        return convergence_.get();
+        if constexpr ( std::is_void_v<NewtonTypes> )
+            return convergence_.get();
+        else
+            return newton_->get_convergence_strategy_handle();
     }
     system_operator_type *system_operator() const
     {
@@ -119,9 +135,9 @@ private:
     std::shared_ptr<linear_operator_type>      linear_operator_;
     std::shared_ptr<preconditioner_type>       preconditioner_;
     std::shared_ptr<linear_solver_type>        linear_solver_;
-    std::unique_ptr<convergence_type>          convergence_;
-    std::unique_ptr<system_operator_type>      system_operator_;
-    std::unique_ptr<newton_type>               newton_;
+    std::shared_ptr<convergence_type>          convergence_;
+    std::shared_ptr<system_operator_type>      system_operator_;
+    std::shared_ptr<newton_type>               newton_;
 };
 
 } // namespace stability_continuation_detail

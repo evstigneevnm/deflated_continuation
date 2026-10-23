@@ -104,6 +104,13 @@ public:
         return parameter_;
     }
 
+    void set_exclusion_distance( scalar_type distance )
+    {
+        if ( !std::isfinite( distance ) || distance < scalar_type( 0 ) )
+            throw std::invalid_argument( "Deflation exclusion distance must be finite and nonnegative" );
+        exclusion_distance_ = distance;
+    }
+
     void apply( const vector_type &state, vector_type &residual )
     {
         physical_residual( state, residual );

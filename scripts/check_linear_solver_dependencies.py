@@ -21,6 +21,7 @@ ACTIVE_FILES = {
     "source/nonlinear_operators/fixed_parameter_operator.h",
     "source/nonlinear_operators/tests/test_fixed_parameter_newton.cpp",
     "source/numerical_algos/recovering_linear_solver.h",
+    "source/numerical_algos/parameterized_correction.h",
 }
 ACTIVE_MODELS = re.compile(
     r"^source/models/(?:circle/circle_(?:bd|stability|prepare_visualization|linear_solvers|backend_typedefs)"

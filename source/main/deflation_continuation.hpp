@@ -187,10 +187,13 @@ template <
     class SolutionStorage = deflation::solution_storage<VectorOperations, Log>,
     template <class, class, class, class, class> class ContinuationSystemOperator =
         continuation::system_operator_continuation,
-    class LinearSystem = void>
+    class LinearSystem = void, class NewtonTypes = void>
 class deflation_continuation
 {
     static_assert( !std::is_void<LinearSystem>::value, "Select the workflow LinearSystem explicitly" );
+
+public:
+    static constexpr bool uses_nmfd_newton = !std::is_void_v<NewtonTypes>;
 
 private:
     typedef typename VectorOperations::scalar_type T;
@@ -202,17 +205,18 @@ private:
 
     //general system operator for the newton's method
     //TODO: move to nonlinear_operators?
-    typedef SystemOperator<
-        VectorOperations, NonlinearOperations, LinearOperator, sherman_morrison_linear_system_solve_t>
-        system_operator_t;
-
-    //convergence strategy for the newton's method for F(x) = 0
-    typedef nonlinear_operators::newton_method::convergence_strategy<VectorOperations, NonlinearOperations, Log>
-        convergence_newton_t;
-    //newton's method for F(x) = 0
-    typedef numerical_algos::newton_method::newton_solver<
-        VectorOperations, NonlinearOperations, system_operator_t, convergence_newton_t>
-        newton_t;
+    struct legacy_types
+    {
+        using fixed_operator_type = SystemOperator<VectorOperations, NonlinearOperations, LinearOperator, LinearSystem>;
+        using fixed_convergence_type =
+            nonlinear_operators::newton_method::convergence_strategy<VectorOperations, NonlinearOperations, Log>;
+        using fixed_correction_type = numerical_algos::newton_method::newton_solver<
+            VectorOperations, NonlinearOperations, fixed_operator_type, fixed_convergence_type>;
+    };
+    using selected_newton_types = std::conditional_t<std::is_void_v<NewtonTypes>, legacy_types, NewtonTypes>;
+    using system_operator_t     = typename selected_newton_types::fixed_operator_type;
+    using convergence_newton_t  = typename selected_newton_types::fixed_convergence_type;
+    using newton_t              = typename selected_newton_types::fixed_correction_type;
 
     typedef container::knots<T>                   knots_t;
     typedef container::knot_registry<T>           knot_registry_t;
@@ -235,17 +239,17 @@ private:
 
     typedef continuation::continuation<
         VectorOperations, VectorFileOperations, Log, NonlinearOperations, LinearOperator, knots_t,
-        sherman_morrison_linear_system_solve_t, newton_t, bif_diag_curve_t, ContinuationSystemOperator>
+        sherman_morrison_linear_system_solve_t, newton_t, bif_diag_curve_t, ContinuationSystemOperator, NewtonTypes>
         continuate_t;
 
     typedef continuation::continuation_analytical<
         VectorOperations, VectorFileOperations, Log, NonlinearOperations, LinearOperator, knots_t,
-        sherman_morrison_linear_system_solve_t, newton_t, bif_diag_curve_t, ContinuationSystemOperator>
+        sherman_morrison_linear_system_solve_t, newton_t, bif_diag_curve_t, ContinuationSystemOperator, NewtonTypes>
         continuate_analytical_t;
 
     typedef deflation::deflation<
         VectorOperations, VectorFileOperations, Log, NonlinearOperations, LinearOperator,
-        sherman_morrison_linear_system_solve_t, sol_storage_def_t>
+        sherman_morrison_linear_system_solve_t, sol_storage_def_t, NewtonTypes>
         deflate_t;
 
     struct solver_bundle_types
@@ -267,7 +271,7 @@ private:
         using diagram_type                 = bif_diag_t;
         using deflation_type               = deflate_t;
     };
-    typedef deflation_continuation_detail::solver_bundle<solver_bundle_types> solver_bundle_t;
+    typedef deflation_continuation_detail::solver_bundle<solver_bundle_types, NewtonTypes> solver_bundle_t;
 
     typedef container::intersection_status        intersection_status_t;
     typedef container::symmetry_event_registry<T> symmetry_event_registry_t;
@@ -498,26 +502,46 @@ public:
     void set_newton()
     /*T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true*/
     {
-        deflation_continuation_detail::configure_newton_convergence(
-            conv_newton, parameters->nonlinear_operator.newton
-        );
+        if constexpr ( std::is_void_v<NewtonTypes> )
+            deflation_continuation_detail::configure_newton_convergence(
+                conv_newton, parameters->nonlinear_operator.newton
+            );
+        else
+            NewtonTypes::configure_fixed( conv_newton, parameters->nonlinear_operator.newton );
     }
 
     void set_newton_continuation()
     /*T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.8), bool store_norms_history_ = false, bool verbose_ = true*/
     {
-        deflation_continuation_detail::configure_continuation_newton(
-            continuate, parameters->deflation_continuation.newton_extended_continuation,
-            parameters->deflation_continuation.restart_policy.allow_knot_interpolation_failure
-        );
+        if constexpr ( std::is_void_v<NewtonTypes> )
+            deflation_continuation_detail::configure_continuation_newton(
+                continuate, parameters->deflation_continuation.newton_extended_continuation,
+                parameters->deflation_continuation.restart_policy.allow_knot_interpolation_failure
+            );
+        else
+        {
+            const auto &settings = parameters->deflation_continuation.newton_extended_continuation;
+            solver_bundle->configure_continuation( settings );
+            for ( auto *algorithm :
+                  { static_cast<continuate_t *>( continuate ), static_cast<continuate_t *>( continuate_analytical ) } )
+            {
+                algorithm->set_corrector_controls( settings.tolerance, settings.verbose );
+                algorithm->set_allow_knot_interpolation_failure(
+                    parameters->deflation_continuation.restart_policy.allow_knot_interpolation_failure
+                );
+            }
+        }
     }
 
     void set_newton_deflation()
     /*T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true*/
     {
-        deflation_continuation_detail::configure_deflation_newton(
-            deflate, parameters->deflation_continuation.newton_extended_deflation
-        );
+        if constexpr ( std::is_void_v<NewtonTypes> )
+            deflation_continuation_detail::configure_deflation_newton(
+                deflate, parameters->deflation_continuation.newton_extended_deflation
+            );
+        else
+            solver_bundle->configure_deflation( parameters->deflation_continuation.newton_extended_deflation );
     }
 
     void set_steps()

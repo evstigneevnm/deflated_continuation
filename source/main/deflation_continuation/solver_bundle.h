@@ -12,7 +12,7 @@ namespace main_classes
 namespace deflation_continuation_detail
 {
 
-template <class Types>
+template <class Types, class NewtonTypes = void>
 class solver_bundle
 {
 public:
@@ -52,10 +52,13 @@ public:
         linear_system_   = detail::make_linear_system<linear_system_type>(
             vector_operations_owner_, linear_operator_, preconditioner_, linear_solver_log
         );
-        initialize(
-            vector_operations_owner_.get(), file_operations_owner_.get(), log, nonlinear_operations_owner_.get(),
-            project_directory, skip_files, external_solution_storage_owner_.get()
-        );
+        if constexpr ( std::is_void_v<NewtonTypes> )
+            initialize(
+                vector_operations_owner_.get(), file_operations_owner_.get(), log, nonlinear_operations_owner_.get(),
+                project_directory, skip_files, external_solution_storage_owner_.get()
+            );
+        else
+            initialize_nmfd( log, project_directory, skip_files );
     }
 
     // Borrowed construction remains for callers not migrated yet.
@@ -80,6 +83,64 @@ public:
     }
 
 private:
+    void initialize_nmfd( log_type *log, const std::string &project_directory, unsigned int skip_files )
+    {
+        using fixed_method    = typename NewtonTypes::fixed_method;
+        using original_solver = typename linear_system_type::linear_solver_original_type;
+        auto original =
+            std::shared_ptr<original_solver>( linear_system_, linear_system_->get_linsolver_handle_original() );
+        system_operator_ =
+            std::make_shared<system_operator_type>( nonlinear_operations_owner_, linear_operator_, scalar_type( 0 ) );
+        newton_ = fixed_method::make(
+            vector_operations_owner_, nonlinear_operations_owner_, system_operator_, vector_operations_owner_, original,
+            log, std::make_shared<typename NewtonTypes::projector_type>( nonlinear_operations_owner_ )
+        );
+        knots_ = std::make_unique<knots_type>();
+        if ( external_solution_storage_owner_ )
+            storage_owner_ = external_solution_storage_owner_;
+        else
+            storage_owner_ = std::make_shared<solution_storage_type>(
+                vector_operations_owner_.get(), 50, scalar_type( vector_operations_owner_->get_vector_size() ),
+                scalar_type( 2 ), log
+            );
+        solution_storage_        = storage_owner_.get();
+        nmfd_.corrector_operator = std::make_shared<typename NewtonTypes::corrector_operator_type>(
+            vector_operations_owner_, nonlinear_operations_owner_, linear_operator_
+        );
+        nmfd_.corrector = NewtonTypes::continuation_method::make(
+            vector_operations_owner_, nonlinear_operations_owner_, nmfd_.corrector_operator,
+            nmfd_.corrector_operator->space(), std::make_shared<typename NewtonTypes::bordered_type>( linear_system_ ),
+            log,
+            std::make_shared<typename NewtonTypes::corrector_operator_type::trial_projector>( nmfd_.corrector_operator )
+        );
+        nmfd_.deflated_operator = std::make_shared<typename NewtonTypes::deflated_operator_type>(
+            vector_operations_owner_, nonlinear_operations_owner_, linear_operator_, storage_owner_, scalar_type( 0 ),
+            scalar_type( 0 )
+        );
+        nmfd_.deflated = NewtonTypes::deflation_method::make(
+            vector_operations_owner_, nonlinear_operations_owner_, nmfd_.deflated_operator, vector_operations_owner_,
+            std::make_shared<typename NewtonTypes::rank_one_type>( linear_system_ ), log,
+            std::make_shared<typename NewtonTypes::deflated_operator_type::trial_projector>(
+                nonlinear_operations_owner_
+            )
+        );
+        auto *ops     = vector_operations_owner_.get();
+        auto *files   = file_operations_owner_.get();
+        auto *problem = nonlinear_operations_owner_.get();
+        auto *op      = linear_operator_.get();
+        auto *system  = linear_system_.get();
+        auto *knots   = knots_.get();
+        auto *fixed   = newton_.get();
+        continuation_ =
+            std::make_unique<continuation_type>( ops, files, log, problem, op, knots, system, fixed, nmfd_.corrector );
+        analytical_continuation_ = std::make_unique<analytical_continuation_type>(
+            ops, files, log, problem, op, knots, system, fixed, nmfd_.corrector
+        );
+        diagram_ = std::make_unique<diagram_type>( ops, files, log, problem, fixed, project_directory, skip_files );
+        deflation_ =
+            std::make_unique<deflation_type>( ops, files, log, problem, op, system, solution_storage_, nmfd_.deflated );
+    }
+
     void initialize(
         vector_operations_type *vector_operations, vector_file_operations_type *file_operations, log_type *log,
         nonlinear_operations_type *nonlinear_operations, const std::string &project_directory, unsigned int skip_files,
@@ -88,11 +149,11 @@ private:
     {
         linear_operator_type *linear_operator = linear_operator_.get();
         linear_system_type   *linear_system   = linear_system_.get();
-        convergence_                          = std::make_unique<convergence_type>( vector_operations, log );
+        convergence_                          = std::make_shared<convergence_type>( vector_operations, log );
         convergence_type *convergence         = convergence_.get();
-        system_operator_ = std::make_unique<system_operator_type>( vector_operations, linear_operator, linear_system );
+        system_operator_ = std::make_shared<system_operator_type>( vector_operations, linear_operator, linear_system );
         system_operator_type *system_operator = system_operator_.get();
-        newton_             = std::make_unique<newton_type>( vector_operations, system_operator, convergence );
+        newton_             = std::make_shared<newton_type>( vector_operations, system_operator, convergence );
         newton_type *newton = newton_.get();
         knots_              = std::make_unique<knots_type>();
         knots_type *knots   = knots_.get();
@@ -142,7 +203,10 @@ public:
     }
     convergence_type *convergence() const
     {
-        return convergence_.get();
+        if constexpr ( std::is_void_v<NewtonTypes> )
+            return convergence_.get();
+        else
+            return newton_->get_convergence_strategy_handle();
     }
     system_operator_type *system_operator() const
     {
@@ -178,7 +242,19 @@ public:
     }
     bool owns_solution_storage() const
     {
-        return owned_solution_storage_ != nullptr;
+        return owned_solution_storage_ != nullptr || ( storage_owner_ && !external_solution_storage_owner_ );
+    }
+
+    template <class Parameters>
+    void configure_continuation( const Parameters &parameters )
+    {
+        NewtonTypes::configure_continuation( nmfd_.corrector->get_convergence_strategy_handle(), parameters );
+    }
+    template <class Parameters>
+    void configure_deflation( const Parameters &parameters )
+    {
+        NewtonTypes::configure_deflation( nmfd_.deflated->get_convergence_strategy_handle(), parameters );
+        nmfd_.deflated_operator->set_exclusion_distance( scalar_type( 100 ) * parameters.tolerance );
     }
 
 private:
@@ -190,12 +266,14 @@ private:
     std::shared_ptr<linear_operator_type>         linear_operator_;
     std::shared_ptr<preconditioner_type>          preconditioner_;
     std::shared_ptr<linear_system_type>           linear_system_;
-    std::unique_ptr<convergence_type>             convergence_;
-    std::unique_ptr<system_operator_type>         system_operator_;
-    std::unique_ptr<newton_type>                  newton_;
+    std::shared_ptr<convergence_type>             convergence_;
+    std::shared_ptr<system_operator_type>         system_operator_;
+    std::shared_ptr<newton_type>                  newton_;
     std::unique_ptr<knots_type>                   knots_;
     std::unique_ptr<solution_storage_type>        owned_solution_storage_;
     solution_storage_type                        *solution_storage_ = nullptr;
+    std::shared_ptr<solution_storage_type>        storage_owner_;
+    detail::nonlinear_solver_state<NewtonTypes>   nmfd_;
     std::unique_ptr<continuation_type>            continuation_;
     std::unique_ptr<analytical_continuation_type> analytical_continuation_;
     std::unique_ptr<diagram_type>                 diagram_;
