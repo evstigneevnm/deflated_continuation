@@ -45,7 +45,10 @@ public:
     // Evaluate the selected residual without changing the prepared Jacobian.
     void apply( const vector_type &state, vector_type &residual )
     {
-        detail::residual( problem_.get(), state, parameter_, residual );
+        if ( prepared_ )
+            detail::residual_in_frozen_chart( problem_.get(), state, parameter_, residual );
+        else
+            detail::residual( problem_.get(), state, parameter_, residual );
     }
 
     void set_linearization_point( const vector_type &state )

@@ -665,7 +665,10 @@ public:
         spectrum_to_vector( source_gradient_spectrum, gradient );
     }
 
-    void stabilizer_differential_from_last( const vector_type &source_tangent, vector_type &tangent_on_slice )
+    // Prepared actions use the cached base, not the most recently evaluated trial.
+    void stabilizer_differential_from_last(
+        const vector_type &source_tangent, vector_type &tangent_on_slice, bool at_linearization = false
+    )
     {
         check_vector_size( source_tangent );
         check_vector_size( tangent_on_slice );
@@ -674,7 +677,8 @@ public:
         if ( linearization_chart_frozen )
         {
             source_gradient_spectrum = frozen_linearization_chart.stabilizer_differential(
-                frozen_linearization_evaluation, gradient_spectrum
+                at_linearization ? prepared_linearization_evaluation : frozen_linearization_evaluation,
+                gradient_spectrum
             );
             spectrum_to_vector( source_gradient_spectrum, tangent_on_slice );
             return;
@@ -720,8 +724,10 @@ public:
         spectrum_to_vector( source_gradient_spectrum, tangent_on_slice );
     }
 
-    void
-    project_tangent( const vector_type &state_on_slice, const vector_type &vector_on_slice, vector_type &projected )
+    void project_tangent(
+        const vector_type &state_on_slice, const vector_type &vector_on_slice, vector_type &projected,
+        bool at_linearization = false
+    )
     {
         check_vector_size( state_on_slice );
         check_vector_size( vector_on_slice );
@@ -730,8 +736,10 @@ public:
         vector_to_spectrum( vector_on_slice, gradient_spectrum );
         if ( linearization_chart_frozen )
         {
-            source_gradient_spectrum =
-                frozen_linearization_chart.project_tangent( frozen_linearization_evaluation, gradient_spectrum );
+            source_gradient_spectrum = frozen_linearization_chart.project_tangent(
+                at_linearization ? prepared_linearization_evaluation : frozen_linearization_evaluation,
+                gradient_spectrum
+            );
             spectrum_to_vector( source_gradient_spectrum, projected );
             return;
         }
@@ -760,7 +768,8 @@ public:
 
     void projected_vector_field_differential_from_last(
         const vector_type &tangent_on_slice, const vector_type &vector_field_on_slice,
-        const vector_type &vector_field_derivative_on_slice, vector_type &projected_derivative
+        const vector_type &vector_field_derivative_on_slice, vector_type &projected_derivative,
+        bool at_linearization = false
     )
     {
         check_vector_size( tangent_on_slice );
@@ -774,8 +783,8 @@ public:
         if ( linearization_chart_frozen )
         {
             source_gradient_spectrum = frozen_linearization_chart.projected_vector_field_differential(
-                frozen_linearization_evaluation, tangent_spectrum, vector_field_spectrum,
-                vector_field_derivative_spectrum
+                at_linearization ? prepared_linearization_evaluation : frozen_linearization_evaluation,
+                tangent_spectrum, vector_field_spectrum, vector_field_derivative_spectrum
             );
             spectrum_to_vector( source_gradient_spectrum, projected_derivative );
             return;
@@ -866,10 +875,12 @@ private:
     void finish_loaded_linearization_chart( vector_type &destination )
     {
         frozen_linearization_evaluation = frozen_linearization_chart.evaluate( spectrum );
-        stabilized_spectrum             = frozen_linearization_evaluation.state_on_slice;
-        last_data                       = frozen_linearization_evaluation.data;
-        last_data_uses_lsq              = frozen_linearization_evaluation.uses_lsq;
-        linearization_chart_frozen      = true;
+        // Cache once per preparation; residual trials must not move the Jacobian base.
+        prepared_linearization_evaluation = frozen_linearization_evaluation;
+        stabilized_spectrum               = frozen_linearization_evaluation.state_on_slice;
+        last_data                         = frozen_linearization_evaluation.data;
+        last_data_uses_lsq                = frozen_linearization_evaluation.uses_lsq;
+        linearization_chart_frozen        = true;
         spectrum_to_vector( stabilized_spectrum, destination );
     }
 
@@ -1237,6 +1248,7 @@ private:
     bool                                     continuation_chart_anchor_valid    = false;
     continuation_chart_state_type            continuation_state;
     frozen_chart_evaluation_type             frozen_linearization_evaluation;
+    frozen_chart_evaluation_type             prepared_linearization_evaluation;
     bool                                     linearization_chart_frozen = false;
     std::vector<complex_type>                spectrum;
     std::vector<complex_type>                reference_spectrum;

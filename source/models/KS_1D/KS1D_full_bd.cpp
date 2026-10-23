@@ -21,6 +21,7 @@
 #include <nonlinear_operators/projected_system_operator.h>
 
 #include <main/deflation_continuation.hpp>
+#include <main/nmfd_newton_types.h>
 #include <main/parameters.hpp>
 
 #include "KS1D_backend_typedefs.h"
@@ -282,16 +283,20 @@ int main( int argc, char const *argv[] )
     log_t log_linsolver;
     log.set_verbosity( quiet ? 0 : 1 );
     log_linsolver.set_verbosity( quiet ? 0 : 1 );
-    auto sol_storage_with_log = std::make_shared<sol_storage_t>(
-        vec_ops_R, 50, vec_ops_R->get_l2_size(), real( 2 ), quotient_adapter, 1e-10, &log
-    );
+    // RMS distance paired with the Euclidean dot product needs gradient weight N.
+    auto sol_storage_with_log =
+        std::make_shared<sol_storage_t>( vec_ops_R, 50, real( state_size ), real( 2 ), quotient_adapter, 1e-10, &log );
 
     using linear_system_t =
         nmfd::solvers::sherman_morrison<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t, nmfd::solvers::bicgstabl>;
+    using newton_types =
+        main_classes::nmfd_newton_types<vec_ops_real, log_t, ks1d_t, lin_op_t, linear_system_t, sol_storage_t>;
     using deflation_continuation_t = main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, ks1d_t, lin_op_t, prec_t, ks1d_model::bicgstabl,
         nonlinear_operators::projected_system_operator, parameters_t, sol_storage_t,
-        continuation::projected_system_operator_continuation, linear_system_t>;
+        continuation::projected_system_operator_continuation, linear_system_t, newton_types>;
+    static_assert( deflation_continuation_t::uses_nmfd_newton, "Full KS1D requires NMFD Newton" );
+    std::cout << "Newton solver: NMFD\n";
 
     deflation_continuation_t DC( vec_ops_R, file_ops, &log, &log_linsolver, KS1D, configuration, sol_storage_with_log );
 

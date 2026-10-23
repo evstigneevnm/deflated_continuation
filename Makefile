@@ -99,7 +99,7 @@ INMFD_LINSOLVERS = -I $(CONTRIB_NMFD_LINSOLVERS)/include
 INMFD_NEWTON = -I $(CONTRIB_NMFD_NEWTON)/include $(INMFD_LINSOLVERS)
 CIRCLE_NMFD_NEWTON_TARGETS = circle_bd_cuda circle_bd_cpu_omp circle_bd_hip circle_bd_var_prec circle_stability_cuda circle_stability_cpu_omp circle_stability_hip
 $(CIRCLE_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
-KS1D_NMFD_NEWTON_TARGETS = KS1D_bd_cpu_omp KS1D_bd_cuda KS1D_stability_cpu_omp KS1D_stability_cuda KS1D_bd_hip KS1D_stability_hip
+KS1D_NMFD_NEWTON_TARGETS = KS1D_bd_cpu_omp KS1D_bd_cuda KS1D_stability_cpu_omp KS1D_stability_cuda KS1D_bd_hip KS1D_stability_hip KS1D_full_bd_cpu_omp KS1D_full_bd_cuda KS1D_full_stability_cpu_omp KS1D_full_stability_cuda
 $(KS1D_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
 ITIME_STEPPER = -I $(NMFD_TIMESTEPPERS_ROOT)/include -I $(COMMON_NMFD_OPERATIONS) -I $(CONTRIB_SCFD)/include -I source/contrib/json
 LINEAR_SOLVE_RECOVERY_HEADER = source/numerical_algos/linear_solve_recovery.h
@@ -816,6 +816,13 @@ KS1D_operator_cpu_omp.bin: source/models/KS_1D/test_KS1D_operator.cpp $(KS1D_MOD
 	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) source/models/KS_1D/test_KS1D_operator.cpp $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/test_KS1D_operator_cpu_omp.bin 2>$(RESULTS)
 
 KS1D_NEWTON_TEST_HEADERS = $(KS1D_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(NMFD_NEWTON_ASSEMBLY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) $(CONTINUATION_CHART_HEADERS) $(LINEAR_SOLVE_RECOVERY_HEADER)
+
+test_KS1D_full_newton_cpu_omp.bin: source/models/KS_1D/test_KS1D_full_newton.cpp $(KS1D_NEWTON_TEST_HEADERS) $(KS1D_FULL_MODEL_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_KS1D_full_newton_cuda.bin: source/models/KS_1D/test_KS1D_full_newton.cpp $(KS1D_NEWTON_TEST_HEADERS) $(KS1D_FULL_MODEL_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_NEWTON) -x cu $< -c -o $(BUILD_DIR)/test_KS1D_full_newton_cuda_main.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS1D_full_newton_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
 test_KS1D_newton_hip.bin: source/models/KS_1D/test_KS1D_newton.cpp $(KS1D_NEWTON_TEST_HEADERS) source/common/hip_init_scfd.h $(KS1D_HIP_REDUCTION_OBJECT)
 	$(HIPCC) $(HIPFLAGS) -DKS1D_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_NEWTON) $< $(KS1D_HIP_REDUCTION_OBJECT) $(HIPFFT_LIBS) -o $(BUILD_DIR)/$@ 2>$(RESULTS)

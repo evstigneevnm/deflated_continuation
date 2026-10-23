@@ -242,7 +242,7 @@ public:
 
     void project_current_tangent( const T_vec &source, T_vec &destination )
     {
-        symmetry_adapter.project_tangent( u_0, source, destination );
+        symmetry_adapter.project_tangent( u_0, source, destination, true );
     }
 
     void project_tangent_at( const T_vec &state_on_slice, const T_vec &source, T_vec &destination )
@@ -272,11 +272,11 @@ public:
 
     void projected_jacobian_u( const T_vec &du, T_vec &dv )
     {
-        symmetry_adapter.stabilizer_differential_from_last( du, projected_vector );
+        symmetry_adapter.stabilizer_differential_from_last( du, projected_vector, true );
         jacobian_u( projected_vector, projected_residual );
         F( u_0, lambda_0, projected_field );
         symmetry_adapter.projected_vector_field_differential_from_last(
-            projected_vector, projected_field, projected_residual, dv
+            projected_vector, projected_field, projected_residual, dv, true
         );
     }
 

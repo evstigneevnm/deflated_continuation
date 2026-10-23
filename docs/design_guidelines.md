@@ -143,7 +143,7 @@ parameterized residual and linearization, including projected entry points.
 Parameter changes require fresh linearization; residual trials must preserve it.
 Project linear-solve retry policy remains outside NMFD's Newton iteration.
 
-Production circle and symmetric KS1D workflows select
+Production circle and symmetric/full KS1D workflows select
 `main_classes::nmfd_newton_types` in assembly.
 Fixed, continuation, and deflation convergence strategies are independent template
 choices. Assembly configures them; algorithm classes only invoke corrections and
@@ -152,13 +152,20 @@ configuration function, without changing deflation or continuation algorithms.
 `parameterized_correction` bridges `(state, parameter)` calls to NMFD's vector-only
 solver, reuses candidate storage, and commits both components only on success.
 It contains no Newton loop. Tangent construction remains separate from the new
-continuation corrector. Full KS1D, KS2D, other unmigrated PDEs, and variable-precision
+continuation corrector. KS2D, other unmigrated PDEs, and variable-precision
 circle Newton retain the old construction path until their migration gates pass.
 
 Symmetric KS1D also supports HIP with an unnormalized hipFFT R2C adapter.
 Native AMD HIP currently requires ordinary reductions: compensated BLAS1 is not
 implemented there. Unsupported high-precision requests must fail explicitly;
 never silently downgrade them when comparing backends.
+
+Full KS1D keeps its existing single-mode continuation charts and orbit-aware
+storage. Fixed, continuation, and deflation residual trials use the frozen chart;
+the prepared projected Jacobian retains a separate base-point evaluation.
+Residual evaluations must not overwrite that evaluation. Stability correction
+uses the same NMFD fixed-parameter assembly without changing quotient gauges or
+eigensolver definitions. LSQ continuation remains disabled.
 
 `deflation::deflated_operator` composes `D=m*F` and `J_D=m*J_F+F*Dm` at a
 fixed parameter, delegating distances and symmetry pullbacks to solution storage.

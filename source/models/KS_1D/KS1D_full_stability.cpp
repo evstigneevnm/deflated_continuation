@@ -12,6 +12,7 @@
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h>
 #include <nonlinear_operators/projected_system_operator.h>
+#include <main/nmfd_newton_types.h>
 
 #include <main/parameters.hpp>
 #include <main/stability_continuation.hpp>
@@ -126,11 +127,17 @@ int main( int argc, char **argv )
         using newton_monitor_type = nmfd::solvers::default_monitor<vec_ops_real, log_t>;
         using linearization_provider_type =
             symmetry::linearization::projected_linearization_provider<vec_ops_real, nonlinear_operator_type>;
+        using newton_linear_type = nmfd::solvers::bicgstabl<
+            vec_ops_real, newton_monitor_type, log_t, newton_operator_type, newton_preconditioner_type>;
+        using newton_types = main_classes::nmfd_fixed_newton_types<
+            vec_ops_real, log_t, nonlinear_operator_type, newton_operator_type, newton_linear_type>;
         using driver_type = main_classes::stability_continuation<
             vec_ops_real, file_operations_type, log_t, newton_monitor_type, nonlinear_operator_type,
             newton_operator_type, newton_preconditioner_type, ks1d_model::bicgstabl,
             nonlinear_operators::projected_system_operator, parameters_type, eigensolver_type,
-            linearization_provider_type>;
+            linearization_provider_type, newton_types>;
+        static_assert( driver_type::uses_nmfd_newton, "Full KS1D stability corrections require NMFD Newton" );
+        std::cout << "Newton solver: NMFD\n";
 
         auto real_space    = std::make_shared<vec_ops_real>( state_size );
         auto complex_space = std::make_shared<complex_space_type>( state_size );

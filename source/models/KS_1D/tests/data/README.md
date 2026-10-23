@@ -29,3 +29,11 @@ deflation attempts. Existing symmetry policies and tolerances are unchanged.
 The full replay compares this curve, checks its (1, 0) unstable signature,
 verifies byte-identical stability restart, and exercises nonzero deflation.
 The original state/transition fixtures and their manifest remain unchanged.
+
+`test_KS1D_full_newton.cpp` uses the same seed with the production NMFD assembly
+to check fixed and arclength corrections, frozen-chart/Jacobian lifetime,
+Jacobian finite differences, orbit exclusion, failure rollback, and recovery.
+Symmetry-aware storage uses gradient weight `N` for RMS distance paired with
+the Euclidean scalar product. The workflow replay requires explicit NMFD Newton
+selection and unchanged saved results on continuation/deflation restart; only
+the enabled seed-attempt ledger may advance during deflation restart.

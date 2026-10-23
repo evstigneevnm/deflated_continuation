@@ -181,6 +181,8 @@ jobs:
       - circle-newton-deflation-cpu-omp
       - fourier-discretization-cuda
       - ks1d-nmfd-newton-sanitizers-cpu-omp
+      - ks1d-full-nmfd-newton-sanitizers-cpu-omp
+      - ks1d-full-nmfd-newton-cuda
       - ks1d-sym-cuda
       - ks1d-sym-hip
       - nmfd-direct-solver-cuda
@@ -3001,8 +3003,94 @@ jobs:
           make test_KS1D_full_linear_solvers_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           timeout 60s ./"$KS1D_BUILD"/test_KS1D_full_linear_solvers_cpu_omp.bin
 
+  ks1d-full-nmfd-newton-cpu-omp:
+    name: Full KS1D / NMFD Newton / ${{ matrix.compiler }}
+    needs: [project-newton-assembly-cpu, fftw-operations-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      KS1D_CI_COMPILER: ${{ matrix.compiler }}
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make libfftw3-dev
+            if [ "$KS1D_CI_COMPILER" = clang ]; then
+              sudo apt-get install -y --no-install-recommends clang libomp-dev
+            fi
+          fi
+      - name: Verify frozen charts, projected corrections, orbit exclusion and rollback
+        run: |
+          export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
+          KS1D_BUILD="$BUILD_DIR/ks1d_full_newton_$KS1D_CI_COMPILER"
+          if [ "$KS1D_CI_COMPILER" = clang ]; then
+            make test_KS1D_full_newton_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double G++:=clang++
+          else
+            make test_KS1D_full_newton_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          fi
+          timeout 60s ./"$KS1D_BUILD"/test_KS1D_full_newton_cpu_omp.bin
+
+  ks1d-full-nmfd-newton-sanitizers-cpu-omp:
+    name: Full KS1D / NMFD Newton sanitizers
+    needs: ks1d-full-nmfd-newton-cpu-omp
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make libfftw3-dev
+          fi
+      - name: Verify projected correction workspaces
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
+          KS1D_BUILD="$BUILD_DIR/ks1d_full_newton_sanitizers"
+          make test_KS1D_full_newton_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double \
+            NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          timeout 60s ./"$KS1D_BUILD"/test_KS1D_full_newton_cpu_omp.bin
+
+  ks1d-full-nmfd-newton-cuda:
+    name: Full KS1D / NMFD Newton CUDA
+    needs: [ks1d-full-nmfd-newton-cpu-omp, fft-facade-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify projected correction bindings on CUDA when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+            echo "Skipping CUDA full KS1D Newton: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA full KS1D Newton: nvcc unavailable"
+            exit 0
+          fi
+          KS1D_BUILD="$BUILD_DIR/ks1d_full_newton_cuda"
+          make test_KS1D_full_newton_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          timeout 120s ./"$KS1D_BUILD"/test_KS1D_full_newton_cuda.bin
+
   ks1d-full-cpu-omp:
-    needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
+    needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu, ks1d-full-nmfd-newton-cpu-omp]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -3046,11 +3134,17 @@ jobs:
           timeout 300s ./"$KS1D_BUILD"/KS1D_full_stability_cpu_omp.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet
           cmp "$KS1D_BUILD/full_stability_plot.before_restart.dat" "$KS1D_BUILD/project_full/0/debug_curve_stability_plot.dat"
 
-      - name: Verify nonzero full-KS1D NMFD continuation, stability restart, and deflation
+      - name: Verify NMFD Newton selection, reference continuation, stability, deflation and unchanged restart
         run: |
           export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
           KS1D_BUILD="$BUILD_DIR/ks1d_full_cpu_omp"
           python3 scripts/test_ks1d_full_nmfd.py --bd-executable "$KS1D_BUILD/KS1D_full_bd_cpu_omp.bin" --stability-executable "$KS1D_BUILD/KS1D_full_stability_cpu_omp.bin" --work-dir "$KS1D_BUILD/nonzero_nmfd"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ks1d-full-newton-replay
+          path: ${{ env.BUILD_DIR }}/ks1d_full_cpu_omp/nonzero_nmfd/*.log
+          if-no-files-found: ignore
 
   circle-bd-cpu-omp:
     needs: [scfd-vector-operations-cpu, fftw-operations-cpu, lapack-wrap-cpu]
