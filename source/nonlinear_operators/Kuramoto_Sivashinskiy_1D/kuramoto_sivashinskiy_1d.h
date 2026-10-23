@@ -12,13 +12,10 @@
 #include <utility>
 #include <vector>
 
-#if defined( __CUDACC__ )
-#    include <cufft.h>
-#endif
-
 #include <common/scalar_math.h>
 #include <external_libraries/fft_facade.h>
 #include <nmfd/detail/vector_wrap.h>
+#include <nmfd/operations/backend/complex.h>
 #include <nonlinear_operators/detail/linear_nonlinear_terms.h>
 #include <scfd/arrays/array.h>
 #include <scfd/utils/device_tag.h>
@@ -85,78 +82,7 @@ struct vector_access<VectorOperations, std::void_t<typename VectorOperations::fo
 };
 
 template <class Complex>
-struct complex_access;
-
-template <class T>
-struct complex_access<std::complex<T>>
-{
-    using real_type = T;
-
-    __DEVICE_TAG__ static std::complex<T> make( const T real, const T imag )
-    {
-        return std::complex<T>( real, imag );
-    }
-
-    __DEVICE_TAG__ static T real( const std::complex<T> &value )
-    {
-        return value.real();
-    }
-
-    __DEVICE_TAG__ static T imag( const std::complex<T> &value )
-    {
-        return value.imag();
-    }
-};
-
-#if defined( __CUDACC__ )
-template <>
-struct complex_access<cufftComplex>
-{
-    using real_type = float;
-
-    __DEVICE_TAG__ static cufftComplex make( const float real, const float imag )
-    {
-        cufftComplex value;
-        value.x = real;
-        value.y = imag;
-        return value;
-    }
-
-    __DEVICE_TAG__ static float real( const cufftComplex &value )
-    {
-        return value.x;
-    }
-
-    __DEVICE_TAG__ static float imag( const cufftComplex &value )
-    {
-        return value.y;
-    }
-};
-
-template <>
-struct complex_access<cufftDoubleComplex>
-{
-    using real_type = double;
-
-    __DEVICE_TAG__ static cufftDoubleComplex make( const double real, const double imag )
-    {
-        cufftDoubleComplex value;
-        value.x = real;
-        value.y = imag;
-        return value;
-    }
-
-    __DEVICE_TAG__ static double real( const cufftDoubleComplex &value )
-    {
-        return value.x;
-    }
-
-    __DEVICE_TAG__ static double imag( const cufftDoubleComplex &value )
-    {
-        return value.y;
-    }
-};
-#endif
+using complex_access = nmfd::operations::backend::complex_value_traits<Complex>;
 
 template <class T>
 T abs( const T &value )

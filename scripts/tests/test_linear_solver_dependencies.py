@@ -25,6 +25,9 @@ class LinearSolverDependenciesTest(unittest.TestCase):
                      "source/numerical_algos/parameterized_correction.h",
                      "source/main/nmfd_newton_types.h",
                      "source/models/circle/circle_bd.cpp",
+                     "source/models/KS_1D/KS1D_bd.cpp",
+                     "source/models/KS_1D/KS1D_stability.cpp",
+                     "source/models/KS_1D/test_KS1D_newton.cpp",
                      "source/models/KS_1D/KS1D_full_bd.cpp",
                      "source/models/KS_2D/KS2D_stability.cpp",
                      "source/numerical_algos/tests/test_linear_solve_recovery.cpp"):
@@ -69,6 +72,11 @@ class LinearSolverDependenciesTest(unittest.TestCase):
             ("test_nmfd_newton_assembly_cpu_omp.bin", False),
             ("test_nmfd_newton_assembly_cuda.bin", False),
             ("circle_bd_cpu_omp", False), ("circle_bd_var_prec", False),
+            ("KS1D_bd_cpu_omp", False), ("KS1D_bd_cuda", False),
+            ("KS1D_stability_cpu_omp", False), ("KS1D_stability_cuda", False),
+            ("KS1D_bd_hip", False), ("KS1D_stability_hip", False),
+            ("test_KS1D_newton_cpu_omp.bin", False), ("test_KS1D_newton_cuda.bin", False),
+            ("test_KS1D_newton_hip.bin", False),
             ("KS1D_full_bd_cpu_omp", False), ("KS2D_stability_cpu_omp", False),
             ("test_explicit_lorenz_cpu.bin", False),
             ("test_legacy_linear_solve_recovery.bin", True),
@@ -83,6 +91,8 @@ class LinearSolverDependenciesTest(unittest.TestCase):
                     cwd=ROOT, env=env, check=True, capture_output=True, text=True, timeout=30,
                 )
                 self.assertEqual("-I source/numerical_algos/legacy/include" in result.stdout, archived)
+                if target.startswith(("KS1D_bd", "KS1D_stability", "test_KS1D_newton")):
+                    self.assertIn("-I source/contrib/nmfd-newton/include", result.stdout)
 
 
 if __name__ == "__main__":

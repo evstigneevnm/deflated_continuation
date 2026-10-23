@@ -14,6 +14,7 @@
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/system_operator.h>
 
 #include <main/deflation_continuation.hpp>
+#include <main/nmfd_newton_types.h>
 #include <main/parameters.hpp>
 
 #include "KS1D_backend_typedefs.h"
@@ -21,6 +22,8 @@
 
 #if defined( KS1D_VECTOR_BACKEND_CUDA )
 #    include <common/cuda_init_scfd.h>
+#elif defined( KS1D_VECTOR_BACKEND_HIP )
+#    include <common/hip_init_scfd.h>
 #endif
 
 namespace
@@ -48,7 +51,7 @@ T parse_scalar( const std::string &value, const char *label )
 
 bool backend_needs_device_init()
 {
-#if defined( KS1D_VECTOR_BACKEND_CUDA )
+#if defined( KS1D_VECTOR_BACKEND_CUDA ) || defined( KS1D_VECTOR_BACKEND_HIP )
     return true;
 #else
     return false;
@@ -59,6 +62,8 @@ int init_device_from_selector( const std::string &selector )
 {
 #if defined( KS1D_VECTOR_BACKEND_CUDA )
     return common::init_cuda_from_scfd_selector( selector );
+#elif defined( KS1D_VECTOR_BACKEND_HIP )
+    return common::init_hip_from_scfd_selector( selector );
 #else
     (void)selector;
     return -1;
@@ -200,10 +205,15 @@ int main( int argc, char const *argv[] )
 
     using linear_system_t =
         nmfd::solvers::sherman_morrison<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t, nmfd::solvers::bicgstabl>;
+    using storage_type = deflation::solution_storage<vec_ops_real, log_t>;
+    using newton_types =
+        main_classes::nmfd_newton_types<vec_ops_real, log_t, ks1d_t, lin_op_t, linear_system_t, storage_type>;
     using deflation_continuation_t = main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, ks1d_t, lin_op_t, prec_t, ks1d_model::bicgstabl,
-        nonlinear_operators::system_operator, parameters_t, deflation::solution_storage<vec_ops_real, log_t>,
-        continuation::system_operator_continuation, linear_system_t>;
+        nonlinear_operators::system_operator, parameters_t, storage_type, continuation::system_operator_continuation,
+        linear_system_t, newton_types>;
+    static_assert( deflation_continuation_t::uses_nmfd_newton, "KS1D requires NMFD Newton" );
+    std::cout << "Newton solver: NMFD\n";
 
     deflation_continuation_t DC( vec_ops_R, file_ops, &log, &log_linsolver, KS1D, configuration );
 

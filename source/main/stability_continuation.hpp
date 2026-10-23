@@ -127,6 +127,7 @@ private:
     using vector_workspace_t     = stability::analysis::detail::vector_workspace<VectorOperations>;
 
 public:
+    static constexpr bool uses_nmfd_newton = !std::is_void_v<NewtonTypes>;
     using stability_result_type            = typename stability_t::analysis_result_type;
     using stability_transition_result_type = typename stability_t::transition_result_type;
     struct newton_correction_replay_result

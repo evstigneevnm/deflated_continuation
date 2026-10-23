@@ -86,7 +86,8 @@ auto stabilize_solution_if_available( SolutionStorage *storage, Vector &x )
     storage->stabilize_in_place( x );
 }
 
-inline void stabilize_solution_if_available( ... )
+template <class... Args>
+void stabilize_solution_if_available( const Args &... )
 {
 }
 
@@ -131,7 +132,8 @@ auto nearest_stabilized_distance_if_available( SolutionStorage *storage, Vector 
     return true;
 }
 
-inline bool nearest_stabilized_distance_if_available( ... )
+template <class... Args>
+bool nearest_stabilized_distance_if_available( const Args &... )
 {
     return false;
 }
@@ -145,7 +147,8 @@ auto symmetry_orbit_distance_if_available(
     return true;
 }
 
-inline bool symmetry_orbit_distance_if_available( ... )
+template <class... Args>
+bool symmetry_orbit_distance_if_available( const Args &... )
 {
     return false;
 }
@@ -160,7 +163,8 @@ auto align_endpoint_geometry_if_available(
     return true;
 }
 
-inline bool align_endpoint_geometry_if_available( ... )
+template <class... Args>
+bool align_endpoint_geometry_if_available( const Args &... )
 {
     return false;
 }

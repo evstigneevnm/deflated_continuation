@@ -8,6 +8,8 @@
 
 #if defined( KS1D_VECTOR_BACKEND_CUDA )
 #    include <common/cuda_init_scfd.h>
+#elif defined( KS1D_VECTOR_BACKEND_HIP )
+#    include <common/hip_init_scfd.h>
 #endif
 
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h>
@@ -535,16 +537,20 @@ void test_half_period_shift_equivariance( vec_ops_real &vec_ops, ks1d_t &ks )
 
 int main( int argc, char **argv )
 {
-#if defined( KS1D_VECTOR_BACKEND_CUDA )
+#if defined( KS1D_VECTOR_BACKEND_CUDA ) || defined( KS1D_VECTOR_BACKEND_HIP )
     const std::string selector = argc > 1 ? argv[1] : "auto";
     try
     {
+#    if defined( KS1D_VECTOR_BACKEND_HIP )
+        const int device = common::init_hip_from_scfd_selector( selector );
+#    else
         const int device = common::init_cuda_from_scfd_selector( selector );
-        std::cout << "Using CUDA device " << device << std::endl;
+#    endif
+        std::cout << "Using device " << device << std::endl;
     }
     catch ( const std::exception &e )
     {
-        std::cerr << "Failed to initialize CUDA selector '" << selector << "': " << e.what() << std::endl;
+        std::cerr << "Failed to initialize device selector '" << selector << "': " << e.what() << std::endl;
         return EXIT_FAILURE;
     }
 #else

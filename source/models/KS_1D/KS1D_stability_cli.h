@@ -10,6 +10,8 @@
 
 #if defined( KS1D_VECTOR_BACKEND_CUDA )
 #    include <common/cuda_init_scfd.h>
+#elif defined( KS1D_VECTOR_BACKEND_HIP )
+#    include <common/hip_init_scfd.h>
 #endif
 
 namespace ks1d_stability_model
@@ -32,7 +34,7 @@ struct command_line_options
 
 inline bool backend_needs_device_init()
 {
-#if defined( KS1D_VECTOR_BACKEND_CUDA )
+#if defined( KS1D_VECTOR_BACKEND_CUDA ) || defined( KS1D_VECTOR_BACKEND_HIP )
     return true;
 #else
     return false;
@@ -153,6 +155,8 @@ inline int initialize_device( const std::string &selector )
 {
 #if defined( KS1D_VECTOR_BACKEND_CUDA )
     return common::init_cuda_from_scfd_selector( selector );
+#elif defined( KS1D_VECTOR_BACKEND_HIP )
+    return common::init_hip_from_scfd_selector( selector );
 #else
     (void)selector;
     return -1;

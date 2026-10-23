@@ -2140,6 +2140,8 @@ jobs:
           ./"$BUILD_DIR"/parameters_json/test_parameters_json.bin
           make test_solver_bundle.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/solver_bundle"
           ./"$BUILD_DIR"/solver_bundle/test_solver_bundle.bin
+          make test_optional_symmetry_callbacks.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/solver_bundle"
+          ./"$BUILD_DIR"/solver_bundle/test_optional_symmetry_callbacks.bin
           make test_parameter_application.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/parameter_application"
           ./"$BUILD_DIR"/parameter_application/test_parameter_application.bin
           make test_rejected_candidate_cache.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/rejected_candidate_cache"
@@ -2710,8 +2712,81 @@ jobs:
           make test_KS1D_linear_solvers_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_linear_solvers_cpu_omp.bin
 
+  ks1d-nmfd-newton-cpu-omp:
+    name: Symmetric KS1D / NMFD Newton bindings
+    needs: [project-newton-assembly-cpu, fftw-operations-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make libfftw3-dev
+          fi
+      - name: Verify spectral corrections, deflation derivatives, rejection and recovery
+        run: |
+          export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
+          KS1D_BUILD="$BUILD_DIR/ks1d_newton_cpu_omp"
+          make test_KS1D_newton_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          timeout 60s ./"$KS1D_BUILD"/test_KS1D_newton_cpu_omp.bin
+
+  ks1d-nmfd-newton-sanitizers-cpu-omp:
+    name: Symmetric KS1D / NMFD Newton sanitizers
+    needs: ks1d-nmfd-newton-cpu-omp
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make libfftw3-dev
+          fi
+      - name: Verify spectral correction workspaces with address and undefined-behavior sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
+          KS1D_BUILD="$BUILD_DIR/ks1d_newton_sanitizers"
+          make test_KS1D_newton_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double \
+            NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          timeout 60s ./"$KS1D_BUILD"/test_KS1D_newton_cpu_omp.bin
+
+  ks1d-nmfd-newton-cuda:
+    name: Symmetric KS1D / NMFD Newton CUDA
+    needs: [ks1d-nmfd-newton-cpu-omp, fft-facade-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify spectral correction bindings on CUDA when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+            echo "Skipping CUDA KS1D Newton: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA KS1D Newton: nvcc unavailable"
+            exit 0
+          fi
+          KS1D_BUILD="$BUILD_DIR/ks1d_newton_cuda"
+          make test_KS1D_newton_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          timeout 120s ./"$KS1D_BUILD"/test_KS1D_newton_cuda.bin
+
   ks1d-sym-cpu-omp:
-    needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu]
+    needs: [continuation-core-cpu, fftw-operations-cpu, eigensolver-foundation-cpu, ks1d-nmfd-newton-cpu-omp]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -2756,7 +2831,7 @@ jobs:
           cmp "$KS1D_BUILD/stability_curve.before_restart.dat" "$KS1D_BUILD/project/0/debug_curve_stability.dat"
           cmp "$KS1D_BUILD/stability_plot.before_restart.dat" "$KS1D_BUILD/project/0/debug_curve_stability_plot.dat"
 
-      - name: Replay nonzero symmetric KS1D against archived continuation and stability
+      - name: Verify NMFD Newton selection, archived continuation, stability correction, restart and discovery
         run: |
           export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
           KS1D_BUILD="$BUILD_DIR/ks1d_sym_cpu_omp"
@@ -3151,7 +3226,7 @@ jobs:
           cmp "$STAR_BUILD/stability_curve.before_restart.dat" "$STAR_BUILD/project/0/debug_curve_stability.dat"
 
   ks1d-sym-cuda:
-    needs: [eigensolver-foundation-cuda, fft-facade-cuda]
+    needs: [eigensolver-foundation-cuda, fft-facade-cuda, ks1d-nmfd-newton-cuda]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -3199,6 +3274,48 @@ jobs:
           timeout 120s ./"$KS1D_BUILD"/KS1D_full_stability_cuda.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet auto
           python3 scripts/validate_stability_diagram.py "$KS1D_BUILD/project_full" --expected-curves 1 --min-points 10 --require-complete --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
           python3 scripts/test_ks1d_full_nmfd.py --bd-executable "$KS1D_BUILD/KS1D_full_bd_cuda.bin" --stability-executable "$KS1D_BUILD/KS1D_full_stability_cuda.bin" --work-dir "$KS1D_BUILD/nonzero_full_nmfd" --device auto
+
+  ks1d-sym-hip:
+    name: Symmetric KS1D / HIP FFT, operators and Newton
+    needs: [project-newton-assembly-cpu, ks1d-nmfd-newton-cpu-omp]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify HIP numerics when the compiler, hipFFT and a GPU are available
+        run: |
+          HIPCC_BIN="$(command -v "${HIPCC:-hipcc}" || true)"
+          if [ -z "$HIPCC_BIN" ]; then
+            echo "Skipping HIP KS1D: hipcc not found"
+            exit 0
+          fi
+          HIP_ROOT="${ROCM_PATH:-$(dirname "$(dirname "$HIPCC_BIN")")}"
+          if [ ! -f "$HIP_ROOT/include/hipfft/hipfft.h" ]; then
+            echo "Skipping HIP KS1D: hipFFT development files not found"
+            exit 0
+          fi
+          if "$HIPCC_BIN" --version | grep -qi nvcc; then
+            if ! nvidia-smi -L >/dev/null 2>&1; then
+              echo "Skipping HIP KS1D: no usable NVIDIA GPU"
+              exit 0
+            fi
+            HIP_TARGET="${HIP_ARCH_LIST:-75}"
+          else
+            if ! "$HIP_ROOT/bin/rocm-smi" >/dev/null 2>&1; then
+              echo "Skipping HIP KS1D: no usable AMD GPU"
+              exit 0
+            fi
+            HIP_TARGET="${HIP_ARCH_LIST:-native}"
+          fi
+          KS1D_BUILD="$BUILD_DIR/ks1d_sym_hip"
+          make test_fft_facade_hipfft.bin KS1D_operator_hip.bin test_KS1D_newton_hip.bin \
+            CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double \
+            HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
+          timeout 120s ./"$KS1D_BUILD"/test_fft_facade_hipfft.bin auto
+          timeout 120s ./"$KS1D_BUILD"/test_KS1D_operator_hip.bin auto
+          timeout 120s ./"$KS1D_BUILD"/test_KS1D_newton_hip.bin
 
   circle-bd-hip:
     needs: [scfd-vector-operations-hip]

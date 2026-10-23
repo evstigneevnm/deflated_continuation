@@ -99,6 +99,8 @@ INMFD_LINSOLVERS = -I $(CONTRIB_NMFD_LINSOLVERS)/include
 INMFD_NEWTON = -I $(CONTRIB_NMFD_NEWTON)/include $(INMFD_LINSOLVERS)
 CIRCLE_NMFD_NEWTON_TARGETS = circle_bd_cuda circle_bd_cpu_omp circle_bd_hip circle_bd_var_prec circle_stability_cuda circle_stability_cpu_omp circle_stability_hip
 $(CIRCLE_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
+KS1D_NMFD_NEWTON_TARGETS = KS1D_bd_cpu_omp KS1D_bd_cuda KS1D_stability_cpu_omp KS1D_stability_cuda KS1D_bd_hip KS1D_stability_hip
+$(KS1D_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
 ITIME_STEPPER = -I $(NMFD_TIMESTEPPERS_ROOT)/include -I $(COMMON_NMFD_OPERATIONS) -I $(CONTRIB_SCFD)/include -I source/contrib/json
 LINEAR_SOLVE_RECOVERY_HEADER = source/numerical_algos/linear_solve_recovery.h
 LEGACY_LINSOLVERS = source/numerical_algos/legacy/include/numerical_algos/lin_solvers
@@ -153,6 +155,7 @@ SYMMETRY_CORE_HEADERS = source/symmetry/slice_data.h source/symmetry/slice_proje
 SYMMETRY_FOURIER_HEADERS = $(CONTINUATION_SYMMETRY_HEADERS) source/symmetry/fourier/mode_descriptor.h source/symmetry/fourier/mode_access.h source/symmetry/fourier/phase_conditions.h source/symmetry/fourier/translation_generators.h source/symmetry/fourier/translation_action.h source/symmetry/fourier/periodic_affine_element_2d.h source/symmetry/fourier/periodic_affine_action_2d.h source/symmetry/fourier/residual_translation_group_2d.h source/symmetry/fourier/residual_translation_orbit_aligner_2d.h source/symmetry/fourier/active_mode_basis.h source/symmetry/fourier/fourier_spectrum_ops.h source/symmetry/fourier/fourier_isotropy_1d.h source/symmetry/fourier/fourier_slice_1d.h source/symmetry/fourier/fourier_slice_differential_1d.h source/symmetry/fourier/lsq_phase_solver_1d.h source/symmetry/fourier/lsq_fourier_slice_1d_policy.h source/symmetry/fourier/lsq_fourier_slice_1d_strategy.h source/symmetry/fourier/frozen_fourier_chart_1d.h source/symmetry/fourier/fourier_slice.h source/symmetry/fourier/real_packed_fourier_codec_1d.h source/symmetry/fourier/real_packed_fourier_slice_1d_policy.h source/symmetry/fourier/real_packed_fourier_slice_1d_policy_json.h source/symmetry/fourier/real_packed_fourier_slice_1d_adapter.h source/symmetry/fourier/real_packed_fourier_actions_1d.h $(SYMMETRY_CORE_HEADERS) $(COMPLEX_TRAITS_HEADERS) $(SMALL_DENSE_LINALG_HEADERS)
 DEFLATION_SYMMETRY_HEADERS = source/deflation/symmetry_solution_storage.h $(SYMMETRY_FOURIER_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 FFT_FACADE_HEADERS = source/external_libraries/fft_facade.h source/external_libraries/fft_facade_fftw.h source/external_libraries/fft_facade_cufft.h source/external_libraries/fftw_wrap.h source/external_libraries/cufft_wrap.h
+FFT_FACADE_HEADERS += source/external_libraries/fft_facade_hipfft.h
 RESIDUAL_DECOMPOSITION_TEST_HEADER = source/nonlinear_operators/tests/linear_nonlinear_decomposition_test.h
 ADJOINT_JACOBIAN_TEST_HEADERS = source/nonlinear_operators/adjoint_jacobian_capability.h source/nonlinear_operators/tests/adjoint_jacobian_test.h
 FOURIER_DISCRETIZATION_HEADERS = source/discretization/common/structured_extent.h source/discretization/common/component_field.h source/discretization/fourier/periodic_grid.h source/discretization/fourier/r2c_index_space.h source/discretization/fourier/spectral_field.h source/discretization/fourier/normalized_fft.h source/discretization/fourier/wavevector_table.h source/discretization/fourier/diagonal_symbols.h source/discretization/fourier/dealiasing_policy.h source/discretization/fourier/initialization/low_mode_odd_field.h source/discretization/fourier/codecs/codec_descriptor_2d.h source/discretization/fourier/codecs/full_real_field.h source/discretization/fourier/codecs/translation_equivariant_real_field.h source/discretization/fourier/codecs/inversion_odd_field.h source/discretization/fourier/codecs/component_product.h source/discretization/fourier/operations/derivative.h source/discretization/fourier/operations/laplacian.h source/discretization/fourier/operations/inverse_laplacian.h source/discretization/fourier/operations/pseudospectral_product.h source/discretization/fourier/operations/vector_advection.h
@@ -160,7 +163,8 @@ KS2D_REFACTORED_HEADERS = source/models/KS_2D/KS2D_backend_typedefs.h source/non
 VISUALIZATION_HEADERS = source/visualization/bd_curve_file_reader.h source/visualization/physical_solution_writer.h source/visualization/structured_physical_solution_writer.h source/visualization/io/numpy_array_writer.h source/visualization/bd_prepare_visualization.hpp
 CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/models/circle/circle_linear_solvers.h $(wildcard source/contrib/nmfd-linsolvers/include/nmfd/solvers/*.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/detail/*.h) source/nonlinear_operators/circle/circle.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/linear_operator_circle.h source/nonlinear_operators/circle/preconditioner_circle.h source/nonlinear_operators/circle/system_operator.h $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 CIRCLE_STABILITY_HEADERS = $(CIRCLE_MODEL_HEADERS) source/stability/eigensolvers/direct_scalar_eigensolver.h source/stability/eigensolvers/transformations/scaled_real_operator.h
-CIRCLE_MODEL_HEADERS += source/main/nmfd_newton_types.h source/numerical_algos/parameterized_correction.h source/nonlinear_operators/fixed_parameter_operator.h source/continuation/corrector_operator.h source/continuation/bordered_linear_solver.h source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h $(wildcard source/contrib/nmfd-newton/include/nmfd/solvers/*.h)
+NMFD_NEWTON_ASSEMBLY_HEADERS = source/main/nmfd_newton_types.h source/numerical_algos/parameterized_correction.h source/numerical_algos/recovering_linear_solver.h source/nonlinear_operators/fixed_parameter_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/corrector_operator.h source/continuation/bordered_linear_solver.h source/continuation/arclength_constraint.h source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h source/deflation/solution_storage.h $(wildcard source/contrib/nmfd-newton/include/nmfd/solvers/*.h)
+CIRCLE_MODEL_HEADERS += $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 NMFD_DIRECT_SOLVER_HEADERS = $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/direct_solver.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/default_monitor.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/iter_solver_base.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/sherman_morrison.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/dense_operations_base.h
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/models/bratu/bratu_model_config.h source/models/bratu/bratu_linear_solvers.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h $(NMFD_DIRECT_SOLVER_HEADERS)
 STAR_SHAPED_MODEL_HEADERS = source/models/star_shaped/star_shaped_backend_typedefs.h source/models/star_shaped/star_shaped_linear_solvers.h source/nonlinear_operators/star_shaped/star_shaped.h source/nonlinear_operators/star_shaped/convergence_strategy.h source/nonlinear_operators/star_shaped/linear_operator_star_shaped.h source/nonlinear_operators/star_shaped/preconditioner_star_shaped.h source/nonlinear_operators/star_shaped/system_operator.h $(NMFD_DIRECT_SOLVER_HEADERS)
@@ -172,6 +176,7 @@ STABILITY_CONTINUATION_HEADERS = source/main/stability_continuation.hpp source/m
 KS1D_STABILITY_HEADERS = source/models/KS_1D/KS1D_stability_cli.h $(STABILITY_CONTINUATION_HEADERS)
 KS1D_STABILITY_REPLAY_SCRIPT = scripts/test_ks1d_full_stability_replay.py
 KS1D_STABILITY_REPLAY_MANIFEST = source/models/KS_1D/tests/data/stability_replay/manifest.json
+$(KS1D_NMFD_NEWTON_TARGETS): $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 CIRCLE_MODEL_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
 KS1D_FULL_MODEL_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
 WORKFLOW_OWNERSHIP_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
@@ -183,6 +188,8 @@ LIBS2 = $(LCUDA) -lcufft $(LIBS1)
 LIBS3 = $(LCUDA) -lcusolver $(LIBS2)
 LIBSAll = $(LCUDA) -lcublas -lcurand -lcufft -lcusolver
 HIPLIBS = -L$(HIP_PATH)/lib -lhipblas -lhipsolver $(if $(filter 1,$(HIP_NVIDIA_BACKEND)),$(LIBS1),-lhiprand)
+HIPFFT_LIBS = -L$(HIP_ROOT_PATH)/lib -lhipfft $(HIPLIBS)
+KS1D_HIP_REDUCTION_OBJECT = $(if $(filter 1,$(HIP_NVIDIA_BACKEND)),$(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o)
 LIBBOOST = -lboost_serialization
 LLAPACK = -L$(OPENBLAS_ROOT_PATH)/lib -lopenblas
 LFFTW = -lfftw3 -lfftw3f
@@ -223,6 +230,9 @@ test_fftw_operations.bin: source/external_libraries/tests/test_fftw_operations.c
 
 test_fft_facade_fftw.bin: source/external_libraries/tests/test_fft_facade_fftw.cpp $(FFT_FACADE_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/external_libraries/tests/test_fft_facade_fftw.cpp $(LFFTW) -o $(BUILD_DIR)/test_fft_facade_fftw.bin 2>$(RESULTS)
+
+test_fft_facade_hipfft.bin: source/external_libraries/tests/test_fft_facade_hipfft.cpp $(FFT_FACADE_HEADERS) source/common/hip_init_scfd.h
+	$(HIPCC) $(HIPFLAGS) $(IPROJECT) $< $(HIPFFT_LIBS) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
 test_fft_facade_cufft.bin: source/external_libraries/tests/test_fft_facade_cufft.cu $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h
 	$(NVCC) $(NVCCFLAGS) --extended-lambda $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) source/external_libraries/tests/test_fft_facade_cufft.cu $(LIBS2) -o $(BUILD_DIR)/test_fft_facade_cufft.bin 2>$(RESULTS)
@@ -486,6 +496,9 @@ test_parameters_json.bin: source/main/tests/test_parameters_json.cpp source/main
 
 test_solver_bundle.bin: source/main/tests/test_solver_bundle.cpp source/main/deflation_continuation/solver_bundle.h source/main/stability_continuation/solver_bundle.h $(WORKFLOW_OWNERSHIP_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_solver_bundle.cpp -o $(BUILD_DIR)/test_solver_bundle.bin 2>$(RESULTS)
+
+test_optional_symmetry_callbacks.bin: source/main/tests/test_optional_symmetry_callbacks.cpp $(WORKFLOW_OWNERSHIP_HEADERS) $(CIRCLE_MODEL_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_NEWTON) $(IBOOST) $< -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
 test_workflow_ownership_cpu.bin: source/main/tests/test_workflow_ownership.cpp $(WORKFLOW_OWNERSHIP_HEADERS) $(CIRCLE_STABILITY_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) $< $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/$@
@@ -802,6 +815,21 @@ star_shaped_prepare_visualization_cpu_omp: source/models/star_shaped/star_shaped
 KS1D_operator_cpu_omp.bin: source/models/KS_1D/test_KS1D_operator.cpp $(KS1D_MODEL_HEADERS) $(RESIDUAL_DECOMPOSITION_TEST_HEADER) $(ADJOINT_JACOBIAN_TEST_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
 	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) source/models/KS_1D/test_KS1D_operator.cpp $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/test_KS1D_operator_cpu_omp.bin 2>$(RESULTS)
 
+KS1D_NEWTON_TEST_HEADERS = $(KS1D_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(NMFD_NEWTON_ASSEMBLY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) $(CONTINUATION_CHART_HEADERS) $(LINEAR_SOLVE_RECOVERY_HEADER)
+
+test_KS1D_newton_hip.bin: source/models/KS_1D/test_KS1D_newton.cpp $(KS1D_NEWTON_TEST_HEADERS) source/common/hip_init_scfd.h $(KS1D_HIP_REDUCTION_OBJECT)
+	$(HIPCC) $(HIPFLAGS) -DKS1D_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_NEWTON) $< $(KS1D_HIP_REDUCTION_OBJECT) $(HIPFFT_LIBS) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+KS1D_operator_hip.bin: source/models/KS_1D/test_KS1D_operator.cpp $(KS1D_NEWTON_TEST_HEADERS) $(RESIDUAL_DECOMPOSITION_TEST_HEADER) $(ADJOINT_JACOBIAN_TEST_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) source/common/hip_init_scfd.h $(KS1D_HIP_REDUCTION_OBJECT)
+	$(HIPCC) $(HIPFLAGS) -DKS1D_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $< $(KS1D_HIP_REDUCTION_OBJECT) $(HIPFFT_LIBS) -o $(BUILD_DIR)/test_KS1D_operator_hip.bin 2>$(RESULTS)
+
+test_KS1D_newton_cpu_omp.bin: source/models/KS_1D/test_KS1D_newton.cpp $(KS1D_NEWTON_TEST_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_KS1D_newton_cuda.bin: source/models/KS_1D/test_KS1D_newton.cpp $(KS1D_NEWTON_TEST_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_NEWTON) -x cu $< -c -o $(BUILD_DIR)/test_KS1D_newton_cuda_main.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS1D_newton_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
 test_KS1D_linear_solvers_cpu_omp.bin: source/models/KS_1D/test_KS1D_linear_solvers.cpp $(KS1D_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(AFFINE_PRECONDITIONER_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/numerical_algos/linear_solve_recovery.h
 	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $< $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
@@ -841,6 +869,14 @@ KS1D_full_bd_cpu_omp: source/models/KS_1D/KS1D_full_bd.cpp $(KS1D_FULL_MODEL_HEA
 	$(G++) $(G++FLAGS) -DKS1D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/KS_1D/KS1D_full_bd.cpp $(OPENMP) $(LFFTW) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_full_bd_cpu_omp.bin 2>$(RESULTS)
 
 KS1D_bd: KS1D_bd_cuda
+
+KS1D_bd_hip: source/models/KS_1D/KS1D_bd.cpp $(KS1D_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/hip_init_scfd.h $(KS1D_HIP_REDUCTION_OBJECT)
+	$(HIPCC) $(HIPFLAGS) -DKS1D_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -c source/models/KS_1D/KS1D_bd.cpp -o $(BUILD_DIR)/KS1D_bd_hip_main.o 2>$(RESULTS)
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/KS1D_bd_hip_main.o $(KS1D_HIP_REDUCTION_OBJECT) $(HIPFFT_LIBS) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_bd_hip.bin 2>$(RESULTS)
+
+KS1D_stability_hip: source/models/KS_1D/KS1D_stability.cpp $(KS1D_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(KS1D_STABILITY_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/hip_init_scfd.h $(KS1D_HIP_REDUCTION_OBJECT)
+	$(HIPCC) $(HIPFLAGS) -DKS1D_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -c source/models/KS_1D/KS1D_stability.cpp -o $(BUILD_DIR)/KS1D_stability_hip_main.o 2>$(RESULTS)
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/KS1D_stability_hip_main.o $(KS1D_HIP_REDUCTION_OBJECT) $(HIPFFT_LIBS) $(LLAPACK) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS1D_stability_hip.bin 2>$(RESULTS)
 
 KS1D_bd_cuda: source/models/KS_1D/KS1D_bd.cpp $(KS1D_MODEL_HEADERS) $(KS1D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS1D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) -x cu source/models/KS_1D/KS1D_bd.cpp -c -o $(BUILD_DIR)/KS1D_bd_cuda_main.o 2>$(RESULTS)
