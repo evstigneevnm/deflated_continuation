@@ -197,9 +197,46 @@ void test_corrections()
     );
     const auto *history = deflated->get_convergence_strategy_handle()->get_norms_history_handle();
     require(
-        !history->empty() && std::abs( history->back() - space->norm_l2( *work ) ) < 1e-12,
-        "Deflation history does not report the physical residual"
+        !history->empty() && std::abs( history->back() - deflated_op->deflated_residual_norm( *state, *work ) ) < 1e-12,
+        "Deflation history does not report the acceptance residual"
     );
+}
+
+// At lambda=4*k^2 the k-th zero-state eigenvalue vanishes. Small nonzero
+// predictors can satisfy physical tolerance while m*F remains unresolved.
+void test_singular_knots()
+{
+    auto                          space     = std::make_shared<space_type>( 31 );
+    auto                          problem   = std::make_shared<problem_type>( 2., 4., 64, space );
+    auto                          jacobian  = std::make_shared<jacobian_type>( problem );
+    auto                          solutions = std::make_shared<storage_type>( space.get(), 4, 31. );
+    types::deflated_operator_type op( space, problem, jacobian, solutions, 4., 1e-6 );
+    buffer_type                   state( *space ), work( *space ), direction( *space );
+    for ( auto *buffer : { &state, &work, &direction } )
+    {
+        buffer->init();
+        buffer->start_use();
+        space->assign_scalar( 0., **buffer );
+    }
+    settings parameters;
+    parameters.tolerance = 1e-8;
+    types::deflation_convergence_type strategy( space, nullptr );
+    types::configure_deflation( &strategy, parameters );
+    for ( std::size_t mode : { 1u, 2u } )
+    {
+        std::vector<real> values( 31, 0. );
+        values[mode - 1] = 1e-4;
+        space->set( values.data(), *state, values.size() );
+        op.set_parameter( 4. * mode * mode );
+        require( op.original_residual_norm( *state, *work ) < parameters.tolerance, "Missing singular-knot predictor" );
+        require(
+            op.deflated_residual_norm( *state, *work ) > .1, "Singular-knot predictor resolved deflated residual"
+        );
+        strategy.reset_iterations();
+        require(
+            !strategy.check_convergence( &op, nullptr, nullptr, *state, *direction ), "Approximate zero branch accepted"
+        );
+    }
 }
 
 }
@@ -214,6 +251,7 @@ int main()
         common::init_hip_from_scfd_selector( "auto" );
 #endif
         test_corrections();
+        test_singular_knots();
         std::cout << "Symmetric KS1D NMFD Newton: " << checks << " checks, 0 failures\n";
     }
     catch ( const std::exception &error )

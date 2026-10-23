@@ -388,7 +388,7 @@ public:
     double nearest_stabilized_distance( const T_vec &vect )
     {
         require_symmetry_adapter();
-        T nearest = std::numeric_limits<T>::infinity();
+        T nearest = ignore_zero_ ? std::numeric_limits<T>::infinity() : orbit_distance( x0_hat, vect );
         for ( const auto &stored : container )
         {
             nearest = std::min( nearest, orbit_distance( stored.get_ref(), vect ) );

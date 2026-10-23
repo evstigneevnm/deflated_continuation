@@ -24,7 +24,7 @@ using newton_convergence = nmfd::solvers::default_convergence_strategy<Space, Lo
 
 template <class Space, class Log, class Operator, class Projector, class Quality>
 using deflation_convergence = nmfd::solvers::default_convergence_strategy<
-    Space, Log, Operator, Projector, Quality, deflation::original_residual_norm>;
+    Space, Log, Operator, Projector, Quality, deflation::deflated_residual_norm>;
 
 // One construction path for all roles; convergence remains a replaceable type.
 template <
@@ -131,7 +131,7 @@ struct nmfd_newton_types
     template <class Parameters>
     static void configure_deflation( deflation_convergence_type *strategy, const Parameters &parameters )
     {
-        // Use the configured damping and permit physical-residual growth during deflation.
+        // Keep damping configurable; deflation escape need not decrease the physical residual.
         strategy->set_convergence_constants(
             parameters.tolerance, parameters.newton_max_it, scalar_type( 1 ), 0, parameters.newton_wight,
             parameters.store_norms_history, parameters.verbose, 10, scalar_type( 1e16 )

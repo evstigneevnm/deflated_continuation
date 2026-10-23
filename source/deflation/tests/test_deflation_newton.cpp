@@ -32,7 +32,7 @@ struct controlled_preconditioner
 };
 
 // At fixed lambda the circle has two equilibria. Deflate the positive one and
-// find the negative one, retaining physical-residual convergence and rank-one recovery.
+// find the negative one, resolving both residuals and retaining rank-one recovery.
 template <class T, template <class, class, class, class, class> class LinearSolver>
 void test_newton( test_report &report )
 {
@@ -51,7 +51,7 @@ void test_newton( test_report &report )
     using projector_type = typename operator_type::trial_projector;
     using quality_type   = nmfd::operations::zero_functional<space_type>;
     using strategy_type  = nmfd::solvers::default_convergence_strategy<
-         space_type, log_type, operator_type, projector_type, quality_type, deflation::original_residual_norm>;
+         space_type, log_type, operator_type, projector_type, quality_type, deflation::deflated_residual_norm>;
     using solver_type = nmfd::solvers::nonlinear_solver<
         space_type, log_type, operator_type, iteration_type, projector_type, quality_type, strategy_type>;
     std::shared_ptr<space_type>                          space;

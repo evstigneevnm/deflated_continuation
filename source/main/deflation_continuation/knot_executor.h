@@ -6,6 +6,7 @@
 #include <functional>
 #include <limits>
 #include <string>
+#include <stdexcept>
 #include <utility>
 
 #include <continuation/continuation_result.h>
@@ -227,8 +228,12 @@ public:
                     if ( !candidate_duplicate && policy_.check_duplicate_after_deflation )
                     {
                         scalar_type nearest_distance = std::numeric_limits<scalar_type>::infinity();
-                        if ( callbacks_.nearest_known_distance( deflated_solution, nearest_distance ) &&
-                             nearest_distance <= policy_.duplicate_after_deflation_tolerance )
+                        if ( !callbacks_.nearest_known_distance ||
+                             !callbacks_.nearest_known_distance( deflated_solution, nearest_distance ) )
+                            throw std::logic_error( "Enabled duplicate checking requires a known-solution distance" );
+                        if ( !( nearest_distance >= scalar_type( 0 ) ) )
+                            throw std::logic_error( "Known-solution distance must be nonnegative and not NaN" );
+                        if ( nearest_distance <= policy_.duplicate_after_deflation_tolerance )
                         {
                             candidate_duplicate = true;
                             is_new_solution     = false;

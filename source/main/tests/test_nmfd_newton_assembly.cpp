@@ -14,10 +14,10 @@ using deflation::tests::test_report;
 // must never call the default strategy's setters on this type.
 template <class Space, class Log, class Operator, class Projector, class Quality>
 class selected_deflation_strategy : public nmfd::solvers::default_convergence_strategy<
-                                        Space, Log, Operator, Projector, Quality, deflation::original_residual_norm>
+                                        Space, Log, Operator, Projector, Quality, deflation::deflated_residual_norm>
 {
     using base_type = nmfd::solvers::default_convergence_strategy<
-        Space, Log, Operator, Projector, Quality, deflation::original_residual_norm>;
+        Space, Log, Operator, Projector, Quality, deflation::deflated_residual_norm>;
     using T           = typename Space::scalar_type;
     using vector_type = typename Space::vector_type;
 

@@ -139,6 +139,7 @@ jobs:
       - ks1d-full-nmfd-linear-solvers-cpu-omp
       - ks2d-nmfd-linear-solvers-cpu-omp
       - ks1d-sym-cpu-omp
+      - ks1d-deflation-restart-cpu-omp
       - ks1d-full-cpu-omp
       - ks2d-cpu-omp
       - circle-bd-cpu-omp
@@ -515,7 +516,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify gradients, symmetry pullbacks, exclusion and frozen contexts
+      - name: Verify gradients, RMS and orbit duplicates, dual residual acceptance and frozen contexts
         run: |
           make test_deflation_operator_cpu.bin test_deflation_operator_cpu_omp.bin \
             CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_deflation_operator
@@ -531,7 +532,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify rank-one solves, physical convergence, recovery and rollback
+      - name: Verify rank-one solves, physical and deflated convergence, recovery and rollback
         run: |
           make test_deflation_newton_cpu.bin test_deflation_newton_cpu_omp.bin \
             CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_deflation
@@ -2734,6 +2735,36 @@ jobs:
           KS1D_BUILD="$BUILD_DIR/ks1d_newton_cpu_omp"
           make test_KS1D_newton_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           timeout 60s ./"$KS1D_BUILD"/test_KS1D_newton_cpu_omp.bin
+
+  ks1d-deflation-restart-cpu-omp:
+    name: Symmetric KS1D / deflation novelty and restart
+    needs: ks1d-nmfd-newton-cpu-omp
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make libboost-dev libboost-serialization-dev libfftw3-dev
+          fi
+      - name: Reject singular-knot duplicates and preserve both known intersections on restart
+        run: |
+          export OMP_NUM_THREADS=1 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
+          KS1D_BUILD="$BUILD_DIR/ks1d_deflation_restart"
+          make KS1D_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
+          python3 scripts/test_ks1d_deflation_restart.py \
+            --bd-executable "$KS1D_BUILD/KS1D_bd_cpu_omp.bin" --work-dir "$KS1D_BUILD/replay"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ks1d-deflation-restart
+          path: ${{ env.BUILD_DIR }}/ks1d_deflation_restart/replay/*.log
+          if-no-files-found: ignore
 
   ks1d-nmfd-newton-sanitizers-cpu-omp:
     name: Symmetric KS1D / NMFD Newton sanitizers

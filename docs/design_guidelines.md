@@ -165,13 +165,20 @@ fixed parameter, delegating distances and symmetry pullbacks to solution storage
 Storage supplies `c=-grad(m)` in the operations' inner product; its norm weight
 must match that pairing (for RMS distance and Euclidean dot product, weight=N).
 The existing rank-one solver binding preserves recovery and true-residual checks.
-Select `deflation::original_residual_norm` as the default convergence strategy's
-optional `ResidualNorm` policy to assess physical `F`, not `D`, using existing scratch.
-Supply an explicit exclusion radius consistent with the nonlinear tolerance:
-known roots and their symmetry orbits must not pass physical-residual convergence.
+Select `deflation::deflated_residual_norm` as the default convergence strategy's
+optional `ResidualNorm` policy: accept only when both `||F||` and `||mF||` meet
+tolerance. `original_residual_norm()` remains a physical-accuracy diagnostic.
+Reuse existing scratch and supply an explicit state-space exclusion radius:
+known roots and their symmetry orbits must not pass convergence. Do not enlarge
+that radius to hide unresolved singular roots or merge nearby distinct branches.
 Deflation may increase `||F||` while escaping a root; configure allowed increases
 explicitly rather than assuming monotone physical-residual backtracking.
 Keep solution storage and physical parameters unchanged during each solve.
+After solving, check novelty against all corrected intersections at the same
+effective parameter. Ordinary storage uses RMS distance; symmetry-aware storage
+uses orbit distance. An enabled duplicate check must not silently be skipped.
+Use existing knot relocation when intersection correction fails at a singular
+parameter; do not hard-code model-specific bifurcation values in generic code.
 
 `continuation::corrector_operator` uses the pair `(state, parameter)` and composes
 the physical and scalar-constraint residuals. The constraint provides

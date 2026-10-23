@@ -1,6 +1,7 @@
 #ifndef __DEFLATION_DEFLATED_OPERATOR_H__
 #define __DEFLATION_DEFLATED_OPERATOR_H__
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -21,6 +22,17 @@ struct original_residual_norm
     evaluate( Space &, Operator &op, const typename Space::vector_type &state, typename Space::vector_type &work )
     {
         return op.original_residual_norm( state, work );
+    }
+};
+
+// Both equations must be resolved before accepting a deflated solution.
+struct deflated_residual_norm
+{
+    template <class Space, class Operator>
+    static auto
+    evaluate( Space &, Operator &op, const typename Space::vector_type &state, typename Space::vector_type &work )
+    {
+        return op.deflated_residual_norm( state, work );
     }
 };
 
@@ -122,13 +134,12 @@ public:
     // Reuse the strategy's work vector. Excluded roots and overflowing D are not convergence.
     scalar_type original_residual_norm( const vector_type &state, vector_type &work )
     {
-        scalar_type multiplier;
-        solutions_->calc_distance( state, multiplier, *gradient_work_ );
-        if ( !std::isfinite( multiplier ) || solutions_->last_minimum_distance() <= exclusion_distance_ )
-            return std::numeric_limits<scalar_type>::infinity();
-        physical_residual( state, work );
-        const scalar_type norm = operations_->norm_l2( work );
-        return std::isfinite( multiplier * norm ) ? norm : std::numeric_limits<scalar_type>::infinity();
+        return residual_norm<false>( state, work );
+    }
+
+    scalar_type deflated_residual_norm( const vector_type &state, vector_type &work )
+    {
+        return residual_norm<true>( state, work );
     }
 
     void set_linearization_point( const vector_type &state )
@@ -163,6 +174,23 @@ public:
     };
 
 private:
+    template <bool Deflated>
+    scalar_type residual_norm( const vector_type &state, vector_type &work )
+    {
+        scalar_type multiplier;
+        solutions_->calc_distance( state, multiplier, *gradient_work_ );
+        if ( !std::isfinite( multiplier ) || solutions_->last_minimum_distance() <= exclusion_distance_ )
+            return std::numeric_limits<scalar_type>::infinity();
+        physical_residual( state, work );
+        const scalar_type norm          = operations_->norm_l2( work );
+        const scalar_type deflated_norm = std::abs( multiplier ) * norm;
+        if ( !std::isfinite( norm ) || !std::isfinite( deflated_norm ) )
+            return std::numeric_limits<scalar_type>::infinity();
+        if constexpr ( Deflated )
+            return std::max( norm, deflated_norm );
+        return norm;
+    }
+
     void physical_residual( const vector_type &state, vector_type &residual )
     {
         if ( prepared_ )

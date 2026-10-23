@@ -199,7 +199,10 @@ int main()
         };
         callbacks.get_deflated_solution  = []( std::vector<double> &output ) { output = { 1.0, 2.0 }; };
         callbacks.stabilize              = []( std::vector<double> & ) {};
-        callbacks.nearest_known_distance = []( std::vector<double> &, double & ) { return false; };
+        callbacks.nearest_known_distance = []( std::vector<double> &, double &distance ) {
+            distance = std::numeric_limits<double>::infinity();
+            return true;
+        };
         callbacks.continue_candidate = []( std::vector<double> &, const double & ) { return complete_continuation(); };
         callbacks.accept_candidate =
             [&accepted]( const double &, const continuation::continuation_curve_result<double> & ) { ++accepted; };
@@ -254,6 +257,64 @@ int main()
         require( partial_result.discarded_curves == 0, "partial curve is not discarded" );
         require( discarded == 1, "partial preservation does not invoke discard callback" );
         require( vector_operations.active_vectors == 0, "partial path releases rejection-cache vectors" );
+
+        // Duplicate retries must not create a curve; a nearby distinct state can.
+        fake_knots   duplicate_knots( { 10.0 } );
+        unsigned int attempts = 0, new_curves = 0;
+        callbacks.find_deflated_solution = [&attempts]( const double & ) { return ++attempts <= 3; };
+        callbacks.nearest_known_distance = [&attempts]( std::vector<double> &, double &distance ) {
+            distance = attempts < 3 ? 0. : 1e-4;
+            return true;
+        };
+        callbacks.continue_candidate = []( std::vector<double> &, const double & ) { return complete_continuation(); };
+        callbacks.accept_candidate =
+            [&new_curves]( const double &, const continuation::continuation_curve_result<double> & ) { ++new_curves; };
+        policy.duplicate_after_deflation_retries = 2;
+        executor_type duplicate_executor( &vector_operations, &duplicate_knots, &log, policy, callbacks );
+        require(
+            duplicate_executor.execute().accepted_curves == 1 && new_curves == 1, "Duplicate retries or nearby root"
+        );
+
+        fake_knots restart_knots( { 10.0 } );
+        callbacks.load_archive           = []() { return true; };
+        callbacks.find_deflated_solution = []( const double & ) { return true; };
+        callbacks.nearest_known_distance = []( std::vector<double> &, double &distance ) {
+            distance = 0.;
+            return true;
+        };
+        executor_type restarted( &vector_operations, &restart_knots, &log, policy, callbacks );
+        require( restarted.execute().accepted_curves == 0 && new_curves == 1, "Restart added a known solution" );
+
+        for ( unsigned int invalid = 0; invalid < 4; ++invalid )
+        {
+            fake_knots unsupported_knots( { 10.0 } );
+            callbacks.nearest_known_distance = [invalid]( std::vector<double> &, double &distance ) {
+                distance = invalid == 2 ? -1. : std::numeric_limits<double>::quiet_NaN();
+                return invalid != 0;
+            };
+            if ( invalid == 3 )
+                callbacks.nearest_known_distance = {};
+            bool rejected = false;
+            try
+            {
+                executor_type unsupported( &vector_operations, &unsupported_knots, &log, policy, callbacks );
+                unsupported.execute();
+            }
+            catch ( const std::logic_error & )
+            {
+                rejected = true;
+            }
+            require( rejected && new_curves == 1, "Enabled duplicate checking silently failed open" );
+            require( vector_operations.active_vectors == 0, "Failed duplicate query leaked scratch" );
+        }
+
+        fake_knots unchecked_knots( { 10.0 } );
+        attempts                               = 0;
+        callbacks.find_deflated_solution       = [&attempts]( const double & ) { return ++attempts == 1; };
+        policy.check_duplicate_after_deflation = false;
+        executor_type unchecked( &vector_operations, &unchecked_knots, &log, policy, callbacks );
+        require( unchecked.execute().accepted_curves == 1, "Explicitly disabled duplicate checking was required" );
+        require( vector_operations.active_vectors == 0, "Disabled duplicate checking leaked scratch" );
     }
     catch ( const std::exception &error )
     {

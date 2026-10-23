@@ -100,6 +100,15 @@ public:
         return elements_number;
     }
 
+    // Ordinary storage uses the identity chart and the same RMS metric as deflation.
+    T nearest_stabilized_distance( const T_vec &x )
+    {
+        T nearest = ignore_zero_ ? std::numeric_limits<T>::infinity() : distance_to( x, x0_ );
+        for ( unsigned int j = 0; j < elements_number; ++j )
+            nearest = std::min( nearest, distance_to( x, container[j].get_ref() ) );
+        return nearest;
+    }
+
     void calc_distance( const T_vec &x, T &beta, T_vec &c )
     {
         calc_distance_norms( x, c, P );
@@ -194,13 +203,18 @@ private:
 
     void add_distance( const T_vec &x, const T_vec &reference, T_vec &c, T p, unsigned int count )
     {
-        vec_ops->assign_mul( T( 1 ), x, T( -1 ), reference, distance_help );
-        const T norm      = vec_ops->norm_l2( distance_help );
+        const T norm      = distance_to( x, reference );
         minimum_distance_ = std::min( minimum_distance_, norm );
         distance += T( 1 ) / ( common::scalar_math::power( norm, p ) * T( count ) );
         const T factor = p / ( common::scalar_math::power( norm, T( p + T( 2 ) ) ) * T( count ) * norm_weight );
         // Storage returns the negative multiplier gradient in the operations' inner product.
         vec_ops->add_mul( factor, distance_help, T( 1 ), c );
+    }
+
+    T distance_to( const T_vec &x, const T_vec &reference )
+    {
+        vec_ops->assign_mul( T( 1 ), x, T( -1 ), reference, distance_help );
+        return vec_ops->norm_l2( distance_help );
     }
 
 

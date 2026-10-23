@@ -52,6 +52,11 @@ void test_operator( test_report &report )
         f.space->norm_l2( *f.residual ) > T( 2 ) * physical_norm,
         "Deflation test did not distinguish physical and deflated norms"
     );
+    report.require(
+        std::abs( f.op->deflated_residual_norm( *f.state, *f.plus ) - f.space->norm_l2( *f.residual ) ) <
+            T( 10 ) * fixture_type::tolerance,
+        "Deflation acceptance ignored the deflated equation"
+    );
     f.space->assign_scalar( T( -.4 ), *f.minus );
     f.op->apply( *f.minus, *f.residual );
     f.op->original_residual_norm( *f.minus, *f.residual );
@@ -128,6 +133,46 @@ void test_weighted_storage( test_report &report )
             std::abs( derivative + space->scalar_prod( *gradient, *direction ) ) < 1e-12,
         "Ordinary and identity-symmetry storage disagree"
     );
+    const auto allocations = space->allocations;
+    report.require( ordinary.nearest_stabilized_distance( *base ) == 0., "Ordinary storage omitted its base root" );
+    report.require( symmetric.nearest_stabilized_distance( *base ) == 0., "Symmetry storage omitted its base root" );
+    ordinary.set_ignore_zero();
+    report.require( std::isinf( ordinary.nearest_stabilized_distance( *base ) ), "Empty storage reported a root" );
+    ordinary.push_back( *base );
+    const double nearby[] = { 1. + 1e-5, -.3 };
+    space->set( nearby, *state, 2 );
+    report.require(
+        std::abs( ordinary.nearest_stabilized_distance( *state ) - 1e-5 / std::sqrt( 2. ) ) < 1e-15,
+        "Ordinary duplicate distance is not RMS"
+    );
+    space->assign_mul( -1., *base, *state );
+    report.require( ordinary.nearest_stabilized_distance( *state ) > 1., "Equal diagram norms were called duplicates" );
+    ordinary.clear();
+    report.require( std::isinf( ordinary.nearest_stabilized_distance( *state ) ), "Distance retained cleared roots" );
+    report.require( space->allocations == allocations + 1, "Duplicate queries allocated work vectors" );
+}
+
+// At the double root F(u,1)=u^2, a small physical residual is not enough:
+// deflating zero gives (1+1/u^2)F, which stays near one.
+void test_acceptance_near_bifurcation( test_report &report )
+{
+    deflation::tests::circle_fixture<double> f;
+    f.space->assign_scalar( 0., *f.initial );
+    f.solutions->set_known_solution( *f.initial );
+    f.op->set_parameter( 1. );
+    f.space->assign_scalar( 1e-5, *f.state );
+    report.require( f.op->original_residual_norm( *f.state, *f.residual ) < 1e-8, "Missing near-root test case" );
+    report.require( f.op->deflated_residual_norm( *f.state, *f.residual ) > .9, "Approximate known root was accepted" );
+    // Nearby distinct roots must remain admissible without enlarging exclusions.
+    const double parameter = std::sqrt( 1. - 1e-6 );
+    const double root      = std::sqrt( 1. - parameter * parameter );
+    f.op->set_parameter( parameter );
+    f.solutions->set_ignore_zero();
+    f.space->assign_scalar( root, *f.initial );
+    f.solutions->push_back( *f.initial );
+    f.space->assign_scalar( -root, *f.state );
+    report.require( f.solutions->nearest_stabilized_distance( *f.state ) > 1e-3, "Distinct nearby roots were merged" );
+    report.require( f.op->deflated_residual_norm( *f.state, *f.residual ) < 1e-8, "Nearby distinct root was excluded" );
 }
 
 // Canonical reflection u -> |u| identifies both signs as the same orbit.
@@ -174,6 +219,9 @@ void test_symmetry_and_construction( test_report &report )
     report.require(
         !std::isfinite( op.original_residual_norm( *f.state, *f.residual ) ),
         "Reflection-equivalent stored root was not excluded"
+    );
+    report.require(
+        solutions->nearest_stabilized_distance( *f.state ) == 0., "Symmetry duplicate query missed an orbit"
     );
     f.space->assign_scalar( -.4, *f.state );
     op.set_linearization_point( *f.state );
@@ -330,6 +378,7 @@ int main()
         test_operator<float>( report );
         test_operator<double>( report );
         test_weighted_storage( report );
+        test_acceptance_near_bifurcation( report );
         test_symmetry_and_construction( report );
         test_projected_operator( report );
         std::printf( "Deflation operator: %u checks passed\n", report.checks );
