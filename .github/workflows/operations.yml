@@ -117,6 +117,8 @@ jobs:
       - nmfd-newton-direct-solver-cpu
       - project-newton-fixed-parameter-sanitizers-cpu
       - project-newton-continuation-sanitizers-cpu
+      - project-newton-deflation-sanitizers-cpu
+      - nmfd-newton-residual-norm-cpu
       - nmfd-short-recurrence-cpu
       - nmfd-short-recurrence-baseline-cpu
       - nmfd-legacy-linear-solve-recovery-cpu
@@ -489,6 +491,118 @@ jobs:
             NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
           timeout 60s build/newton_continuation_sanitizers/test_continuation_operator_cpu.bin
           timeout 60s build/newton_continuation_sanitizers/test_continuation_newton_cpu.bin
+
+  nmfd-newton-residual-norm-cpu:
+    name: NMFD Newton / residual assessment policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - run: |
+          make test_newton_residual_norm_cpu.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_residual_norm
+          timeout 60s build/newton_residual_norm/test_newton_residual_norm_cpu.bin
+
+  project-newton-deflation-operator-cpu:
+    name: Project Newton / deflation operator
+    needs: project-newton-fixed-parameter-cpu
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify gradients, symmetry pullbacks, exclusion and frozen contexts
+        run: |
+          make test_deflation_operator_cpu.bin test_deflation_operator_cpu_omp.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_deflation_operator
+          timeout 60s build/newton_deflation_operator/test_deflation_operator_cpu.bin
+          OMP_NUM_THREADS=2 timeout 60s build/newton_deflation_operator/test_deflation_operator_cpu_omp.bin
+
+  project-newton-deflation-cpu:
+    name: Project Newton / deflation corrections
+    needs: [project-newton-deflation-operator-cpu, nmfd-newton-residual-norm-cpu, nmfd-sherman-morrison-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify rank-one solves, physical convergence, recovery and rollback
+        run: |
+          make test_deflation_newton_cpu.bin test_deflation_newton_cpu_omp.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_deflation
+          timeout 60s build/newton_deflation/test_deflation_newton_cpu.bin
+          OMP_NUM_THREADS=2 timeout 60s build/newton_deflation/test_deflation_newton_cpu_omp.bin
+
+  project-newton-deflation-operator-cuda:
+    name: Project Newton / deflation operator CUDA
+    needs: [project-newton-deflation-operator-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify deflation operator on CUDA when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+            echo "Skipping CUDA deflation operator: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1; then
+            echo "Skipping CUDA deflation operator: nvcc unavailable"
+            exit 0
+          fi
+          make test_deflation_operator_cuda.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_deflation_cuda
+          timeout 120s build/newton_deflation_cuda/test_deflation_operator_cuda.bin
+
+  project-newton-deflation-cuda:
+    name: Project Newton / deflation corrections CUDA
+    needs: [project-newton-deflation-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify deflation corrections on CUDA when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+            echo "Skipping CUDA deflation corrections: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1; then
+            echo "Skipping CUDA deflation corrections: nvcc unavailable"
+            exit 0
+          fi
+          make test_deflation_newton_cuda.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_deflation_cuda
+          timeout 120s build/newton_deflation_cuda/test_deflation_newton_cuda.bin
+
+  project-newton-deflation-sanitizers-cpu:
+    name: Project Newton / deflation sanitizers
+    needs: [project-newton-deflation-operator-cpu, project-newton-deflation-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify deflation workspace and dependency lifetimes
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          make test_deflation_operator_cpu.bin test_deflation_newton_cpu.bin test_newton_residual_norm_cpu.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_deflation_sanitizers \
+            NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          timeout 60s build/newton_deflation_sanitizers/test_deflation_operator_cpu.bin
+          timeout 60s build/newton_deflation_sanitizers/test_deflation_newton_cpu.bin
+          timeout 60s build/newton_deflation_sanitizers/test_newton_residual_norm_cpu.bin
 
   nmfd-direct-solver-cuda:
     name: Direct solver and dense operations / CUDA

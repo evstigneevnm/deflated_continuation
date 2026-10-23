@@ -1048,6 +1048,18 @@ test_continuation_%_cuda.bin: source/continuation/tests/test_continuation_%.cpp 
 	$(NVCC) $(NVCCFLAGS) --extended-lambda $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -DTEST_VECTOR_BACKEND_CUDA -x cu -c $< -o $(BUILD_DIR)/test_continuation_$*_cuda.o
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_continuation_$*_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
 
+DEFLATION_WRAPPER_TEST_HEADERS = source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h source/deflation/solution_storage.h source/deflation/symmetry_solution_storage.h source/deflation/tests/deflation_newton_fixture.h $(FIXED_PARAMETER_NEWTON_HEADERS)
+
+test_deflation_%_cpu.bin: source/deflation/tests/test_deflation_%.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@
+
+test_deflation_%_cpu_omp.bin: source/deflation/tests/test_deflation_%.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) -DTEST_VECTOR_BACKEND_OMP $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_deflation_%_cuda.bin: source/deflation/tests/test_deflation_%.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -DTEST_VECTOR_BACKEND_CUDA -x cu -c $< -o $(BUILD_DIR)/test_deflation_$*_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_deflation_$*_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
+
 test_nmfd_short_recurrence_baseline_cpu.bin: source/numerical_algos/tests/test_nmfd_short_recurrence.cpp $(NEWTON_TEST_HEADERS) $(wildcard $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/detail/*.h $(LEGACY_LINSOLVERS)/*.h)
 	$(G++) $(G++FLAGS) $(IPROJECT) $(INMFD_LINSOLVERS) $< $(OPENMP) -o $(BUILD_DIR)/$@
 

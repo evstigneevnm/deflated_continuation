@@ -143,6 +143,19 @@ parameterized residual and linearization, including projected entry points.
 Parameter changes require fresh linearization; residual trials must preserve it.
 Project linear-solve retry policy remains outside NMFD's Newton iteration.
 
+`deflation::deflated_operator` composes `D=m*F` and `J_D=m*J_F+F*Dm` at a
+fixed parameter, delegating distances and symmetry pullbacks to solution storage.
+Storage supplies `c=-grad(m)` in the operations' inner product; its norm weight
+must match that pairing (for RMS distance and Euclidean dot product, weight=N).
+The existing rank-one solver binding preserves recovery and true-residual checks.
+Select `deflation::original_residual_norm` as the default convergence strategy's
+optional `ResidualNorm` policy to assess physical `F`, not `D`, using existing scratch.
+Supply an explicit exclusion radius consistent with the nonlinear tolerance:
+known roots and their symmetry orbits must not pass physical-residual convergence.
+Deflation may increase `||F||` while escaping a root; configure allowed increases
+explicitly rather than assuming monotone physical-residual backtracking.
+Keep solution storage and physical parameters unchanged during each solve.
+
 `continuation::corrector_operator` uses the pair `(state, parameter)` and composes
 the physical and scalar-constraint residuals. The constraint provides
 `apply(state, parameter)` and `linearize(state, parameter, row, parameter_derivative)`.

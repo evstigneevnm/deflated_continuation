@@ -438,6 +438,12 @@ public:
         beta = distance;
     }
 
+    // Includes the optional base solution; updated by calc_distance without another orbit search.
+    T last_minimum_distance() const
+    {
+        return minimum_distance_;
+    }
+
     void calc_distance( const T_vec &x, const T_vec &x_translate, T &beta, T_vec &c )
     {
         (void)x_translate;
@@ -522,6 +528,7 @@ private:
 
         unsigned int total_elements = elements_number + 1;
         distance                    = T( 0 );
+        minimum_distance_           = std::numeric_limits<T>::infinity();
 
         if ( !ignore_zero_ )
         {
@@ -551,7 +558,8 @@ private:
     void add_distance_from_reference( const T_vec &x, T_vec &reference, const unsigned int total_elements )
     {
         vec_ops->assign_mul( T( 1 ), x, T( -1 ), reference, distance_help );
-        const T norm = vec_ops->norm_l2( distance_help );
+        const T norm      = vec_ops->norm_l2( distance_help );
+        minimum_distance_ = std::min( minimum_distance_, norm );
         distance += distance_contribution( norm, static_cast<T>( total_elements ) );
         const T factor = distance_derivative_factor( norm, static_cast<T>( total_elements ) );
         vec_ops->add_mul( factor / norm_weight, distance_help, T( 1 ), slice_gradient );
@@ -565,6 +573,7 @@ private:
     Log                                                      *log;
     double                                                    duplicate_tolerance_;
     T                                                         norm_weight;
+    T                                                         minimum_distance_ = std::numeric_limits<T>::infinity();
     T                                                         P;
     bool                                                      ignore_zero_ = false;
     unsigned int                                              number_of_solutions_;

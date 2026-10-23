@@ -5,6 +5,8 @@
 #include <vector>
 #include <cmath>
 #include <iostream>
+#include <algorithm>
+#include <limits>
 
 namespace deflation
 {
@@ -103,6 +105,12 @@ public:
         beta = distance;
     }
 
+    // Minimum distance, including the optional base solution, from the last unshifted evaluation.
+    T last_minimum_distance() const
+    {
+        return minimum_distance_;
+    }
+
 
     void calc_distance( const T_vec &x, const T_vec &x_translate, T &beta, T_vec &c )
     {
@@ -117,7 +125,8 @@ public:
 
 
 private:
-    T            distance = 1;
+    T            minimum_distance_ = std::numeric_limits<T>::infinity();
+    T            distance          = 1;
     T_vec        distance_help;
     T_vec        distance_help_translate;
     T_vec        x0_;
@@ -168,45 +177,29 @@ private:
 
     void calc_distance_norms( const T_vec &x, T_vec &c, const T p )
     {
-        T distance_der;
-        //M=(1./(S.*(w.*normE(x_s-x0_s(:,1))).^p));
-        //V=(-p./(S.*(w.*normE(x_s-x0_s(:,1))).^(p+2))).*w.*(x_s-x0_s(:,1))';
-        vec_ops->assign_mul( static_cast<T>( 1.0 ), x, static_cast<T>( -1.0 ), x0_, distance_help );
-        auto total_elements = elements_number + 1;
-        distance            = static_cast<T>( 1.0 ) /
-                   ( pow( vec_ops->norm_l2( distance_help ), p ) * ( total_elements ) ); //distance to zero
-        if ( ignore_zero_ )
+        const auto total_elements = elements_number + ( ignore_zero_ ? 0u : 1u );
+        minimum_distance_         = std::numeric_limits<T>::infinity();
+        distance                  = T( 1 );
+        vec_ops->assign_scalar( T( 0 ), c );
+        if ( !ignore_zero_ )
         {
-            distance       = 0;
-            total_elements = elements_number;
+            add_distance( x, x0_, c, p, total_elements );
         }
-        distance_der = static_cast<T>( p ) / ( pow( vec_ops->norm_l2( distance_help ), p + T( 2.0 ) ) *
-                                               ( total_elements ) ); //distance to zero
-        if ( ignore_zero_ )
+        for ( unsigned int j = 0; j < elements_number; ++j )
         {
-            distance_der = 0;
+            add_distance( x, container[j].get_ref(), c, p, total_elements );
         }
-        //calc: y := mul_x*x
-        // c = distance_der*(x-0)
-        vec_ops->assign_mul( distance_der / norm_weight, x, c );
-        //xxx vec_ops->assign_scalar(0.0, c);
-        for ( int j = 0; j < elements_number; j++ )
-        {
+    }
 
-            //calc: z := mul_x*x + mul_y*y
-            //distance_help := x - container[j].get_ref()
-            vec_ops->assign_mul(
-                static_cast<T>( 1.0 ), x, static_cast<T>( -1.0 ), container[j].get_ref(), distance_help
-            );
-
-            distance += static_cast<T>( 1.0 ) / ( pow( vec_ops->norm_l2( distance_help ), p ) * ( total_elements ) );
-            distance_der =
-                static_cast<T>( p ) / ( pow( vec_ops->norm_l2( distance_help ), p + T( 2.0 ) ) * ( total_elements ) );
-            //calc: y := mul_x*x + mul_y*y
-            //c := c + distance_der*distance_help
-            vec_ops->add_mul( distance_der / norm_weight, distance_help, static_cast<T>( 1.0 ), c );
-        }
-        distance += static_cast<T>( 1.0 );
+    void add_distance( const T_vec &x, const T_vec &reference, T_vec &c, T p, unsigned int count )
+    {
+        vec_ops->assign_mul( T( 1 ), x, T( -1 ), reference, distance_help );
+        const T norm      = vec_ops->norm_l2( distance_help );
+        minimum_distance_ = std::min( minimum_distance_, norm );
+        distance += T( 1 ) / ( std::pow( norm, p ) * T( count ) );
+        const T factor = p / ( std::pow( norm, p + T( 2 ) ) * T( count ) * norm_weight );
+        // Storage returns the negative multiplier gradient in the operations' inner product.
+        vec_ops->add_mul( factor, distance_help, T( 1 ), c );
     }
 
 
