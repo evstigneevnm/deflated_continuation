@@ -119,6 +119,7 @@ jobs:
       - project-newton-fixed-parameter-sanitizers-cpu
       - project-newton-continuation-sanitizers-cpu
       - project-newton-deflation-sanitizers-cpu
+      - project-newton-deflation-fixed-damping-sanitizers-cpu
       - project-newton-assembly-sanitizers-cpu
       - nmfd-newton-residual-norm-cpu
       - nmfd-short-recurrence-cpu
@@ -202,6 +203,7 @@ jobs:
       - project-newton-continuation-cuda
       - project-newton-continuation-operator-cuda
       - project-newton-deflation-cuda
+      - project-newton-deflation-fixed-damping-cuda
       - project-newton-deflation-operator-cuda
       - project-newton-fixed-parameter-cuda
       - star-shaped-bd-cuda
@@ -652,6 +654,69 @@ jobs:
             CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_deflation
           timeout 60s build/newton_deflation/test_deflation_newton_cpu.bin
           OMP_NUM_THREADS=2 timeout 60s build/newton_deflation/test_deflation_newton_cpu_omp.bin
+
+  project-newton-deflation-fixed-damping-cpu:
+    name: Project Newton / fixed-damping deflation (${{ matrix.backend }})
+    needs: project-newton-deflation-cpu
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [cpu, cpu_omp]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify fixed weights, growing residuals, exclusion, rollback and ownership
+        env:
+          OMP_NUM_THREADS: 2
+        run: |
+          make test_deflation_fixed_damping_${{ matrix.backend }}.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/deflation_fixed_damping
+          timeout 60s build/deflation_fixed_damping/test_deflation_fixed_damping_${{ matrix.backend }}.bin
+
+  project-newton-deflation-fixed-damping-cuda:
+    name: Project Newton / fixed-damping deflation CUDA
+    needs: [project-newton-deflation-fixed-damping-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify fixed-damping deflation on CUDA when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+            echo "Skipping CUDA fixed-damping deflation: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA fixed-damping deflation: nvcc unavailable"
+            exit 0
+          fi
+          make test_deflation_fixed_damping_cuda.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/deflation_fixed_damping_cuda
+          timeout 120s build/deflation_fixed_damping_cuda/test_deflation_fixed_damping_cuda.bin
+
+  project-newton-deflation-fixed-damping-sanitizers-cpu:
+    name: Project Newton / fixed-damping deflation sanitizers
+    needs: project-newton-deflation-fixed-damping-cpu
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify fixed-damping deflation memory safety
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          make test_deflation_fixed_damping_cpu.bin \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/deflation_fixed_damping_sanitizers \
+            NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          timeout 60s build/deflation_fixed_damping_sanitizers/test_deflation_fixed_damping_cpu.bin
 
   project-newton-deflation-operator-cuda:
     name: Project Newton / deflation operator CUDA
@@ -3005,7 +3070,7 @@ jobs:
 
   ks1d-full-nmfd-newton-cpu-omp:
     name: Full KS1D / NMFD Newton / ${{ matrix.compiler }}
-    needs: [project-newton-assembly-cpu, fftw-operations-cpu]
+    needs: [project-newton-assembly-cpu, project-newton-deflation-fixed-damping-cpu, fftw-operations-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

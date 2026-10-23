@@ -164,6 +164,7 @@ VISUALIZATION_HEADERS = source/visualization/bd_curve_file_reader.h source/visua
 CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/models/circle/circle_linear_solvers.h $(wildcard source/contrib/nmfd-linsolvers/include/nmfd/solvers/*.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/detail/*.h) source/nonlinear_operators/circle/circle.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/linear_operator_circle.h source/nonlinear_operators/circle/preconditioner_circle.h source/nonlinear_operators/circle/system_operator.h $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 CIRCLE_STABILITY_HEADERS = $(CIRCLE_MODEL_HEADERS) source/stability/eigensolvers/direct_scalar_eigensolver.h source/stability/eigensolvers/transformations/scaled_real_operator.h
 NMFD_NEWTON_ASSEMBLY_HEADERS = source/main/nmfd_newton_types.h source/numerical_algos/parameterized_correction.h source/numerical_algos/recovering_linear_solver.h source/nonlinear_operators/fixed_parameter_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/corrector_operator.h source/continuation/bordered_linear_solver.h source/continuation/arclength_constraint.h source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h source/deflation/solution_storage.h $(wildcard source/contrib/nmfd-newton/include/nmfd/solvers/*.h)
+NMFD_NEWTON_ASSEMBLY_HEADERS += source/deflation/fixed_damping_convergence_strategy.h
 CIRCLE_MODEL_HEADERS += $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 NMFD_DIRECT_SOLVER_HEADERS = $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/direct_solver.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/default_monitor.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/iter_solver_base.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/sherman_morrison.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/dense_operations_base.h
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/models/bratu/bratu_model_config.h source/models/bratu/bratu_linear_solvers.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h $(NMFD_DIRECT_SOLVER_HEADERS)
@@ -1111,6 +1112,16 @@ test_nmfd_newton_assembly_cuda.bin: source/main/tests/test_nmfd_newton_assembly.
 
 test_deflation_%_cpu.bin: source/deflation/tests/test_deflation_%.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@
+
+test_deflation_fixed_damping_cpu.bin: source/deflation/tests/test_fixed_damping_convergence.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(NMFD_NEWTON_ASSEMBLY_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@
+
+test_deflation_fixed_damping_cpu_omp.bin: source/deflation/tests/test_fixed_damping_convergence.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(NMFD_NEWTON_ASSEMBLY_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) -DTEST_VECTOR_BACKEND_OMP $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_deflation_fixed_damping_cuda.bin: source/deflation/tests/test_fixed_damping_convergence.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(NMFD_NEWTON_ASSEMBLY_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -DTEST_VECTOR_BACKEND_CUDA -x cu -c $< -o $(BUILD_DIR)/test_deflation_fixed_damping_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_deflation_fixed_damping_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
 
 test_deflation_%_cpu_omp.bin: source/deflation/tests/test_deflation_%.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) -DTEST_VECTOR_BACKEND_OMP $< $(OPENMP) -o $(BUILD_DIR)/$@

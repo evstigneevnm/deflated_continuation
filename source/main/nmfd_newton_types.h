@@ -10,6 +10,7 @@
 #include <continuation/corrector_operator.h>
 #include <continuation/bordered_linear_solver.h>
 #include <deflation/deflated_operator.h>
+#include <deflation/fixed_damping_convergence_strategy.h>
 #include <deflation/rank_one_linear_solver.h>
 #include <main/solver_construction.h>
 
@@ -25,6 +26,32 @@ using newton_convergence = nmfd::solvers::default_convergence_strategy<Space, Lo
 template <class Space, class Log, class Operator, class Projector, class Quality>
 using deflation_convergence = nmfd::solvers::default_convergence_strategy<
     Space, Log, Operator, Projector, Quality, deflation::deflated_residual_norm>;
+
+template <class Space, class Log, class Operator, class Projector, class Quality>
+using fixed_damping_deflation_convergence =
+    deflation::fixed_damping_convergence_strategy<Space, Log, Operator, Projector, Quality>;
+
+template <class Strategy, class Parameters>
+void configure_deflation_strategy( Strategy *strategy, const Parameters &parameters )
+{
+    using T = typename Strategy::vector_space_type::scalar_type;
+    strategy->set_convergence_constants(
+        parameters.tolerance, parameters.newton_max_it, T( 1 ), 0, parameters.newton_wight,
+        parameters.store_norms_history, parameters.verbose, 10, T( 1e16 )
+    );
+}
+
+template <class Space, class Log, class Operator, class Projector, class Quality, class Parameters>
+void configure_deflation_strategy(
+    fixed_damping_deflation_convergence<Space, Log, Operator, Projector, Quality> *strategy,
+    const Parameters                                                              &parameters
+)
+{
+    strategy->set_convergence_constants(
+        parameters.tolerance, parameters.newton_max_it, parameters.newton_wight, parameters.store_norms_history,
+        parameters.verbose
+    );
+}
 
 // One construction path for all roles; convergence remains a replaceable type.
 template <
@@ -131,11 +158,7 @@ struct nmfd_newton_types
     template <class Parameters>
     static void configure_deflation( deflation_convergence_type *strategy, const Parameters &parameters )
     {
-        // Keep damping configurable; deflation escape need not decrease the physical residual.
-        strategy->set_convergence_constants(
-            parameters.tolerance, parameters.newton_max_it, scalar_type( 1 ), 0, parameters.newton_wight,
-            parameters.store_norms_history, parameters.verbose, 10, scalar_type( 1e16 )
-        );
+        detail::configure_deflation_strategy( strategy, parameters );
     }
 };
 

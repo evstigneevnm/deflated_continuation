@@ -44,8 +44,9 @@ using adapter_type  = symmetry::fourier::real_packed_fourier_slice_1d_adapter<sp
 using actions_type  = symmetry::finite_action_registry<space_type>;
 using quotient_type = symmetry::finite_quotient_adapter<space_type, adapter_type>;
 using storage_type  = deflation::symmetry_solution_storage<space_type, quotient_type, log_t>;
-using types =
-    main_classes::nmfd_newton_types<space_type, log_t, problem_type, jacobian_type, system_type, storage_type>;
+using types         = main_classes::nmfd_newton_types<
+            space_type, log_t, problem_type, jacobian_type, system_type, storage_type, main_classes::detail::newton_convergence,
+            main_classes::detail::newton_convergence, main_classes::detail::fixed_damping_deflation_convergence>;
 
 struct settings
 {
