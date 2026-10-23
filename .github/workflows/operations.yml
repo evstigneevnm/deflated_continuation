@@ -32,6 +32,7 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p test_linear_solver_dependencies.py
           python3 -m unittest discover -s scripts/tests -p test_nmfd_standalone.py
           python3 -m unittest discover -s scripts/tests -p test_timestepper_extraction.py
+          python3 -m unittest discover -s scripts/tests -p test_ks1d_reference.py
           python3 scripts/check_operations_dependencies.py
           python3 scripts/check_linear_solver_dependencies.py
           git submodule status
@@ -166,6 +167,117 @@ jobs:
           test "$APPLICATION_RESULT" = success
           echo "All required pinned, integration, reference, sanitizer and MPI gates passed."
           echo "GPU runtime validation is recorded separately on available hardware."
+
+  all-tests-passed:
+    name: All preliminary tests passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Terminal jobs cover the entire preceding test graph, including matrices.
+    # test_ks1d_reference.py rejects any test job omitted from this ancestry.
+    needs:
+      - bratu-bd-cpu-omp
+      - circle-bd-cuda
+      - circle-bd-hip
+      - circle-newton-deflation-cpu-omp
+      - fourier-discretization-cuda
+      - ks1d-nmfd-newton-sanitizers-cpu-omp
+      - ks1d-sym-cuda
+      - ks1d-sym-hip
+      - nmfd-direct-solver-cuda
+      - nmfd-jacobi-cpu
+      - nmfd-migration-validation-cpu
+      - nmfd-newton-backend-cuda
+      - nmfd-newton-backtracking-cpu
+      - nmfd-newton-cahn-hilliard-cpu
+      - nmfd-newton-convergence-cpu
+      - nmfd-newton-linsolvers-cpu
+      - nmfd-newton-short-recurrence-cpu
+      - nmfd-operations-standalone-cpu
+      - nmfd-scfd-dense-cuda
+      - nmfd-vector-space-hierarchy-cpu
+      - nmfd-vector-space-hierarchy-cuda
+      - project-newton-assembly-cuda
+      - project-newton-continuation-cuda
+      - project-newton-continuation-operator-cuda
+      - project-newton-deflation-cuda
+      - project-newton-deflation-operator-cuda
+      - project-newton-fixed-parameter-cuda
+      - star-shaped-bd-cuda
+      - star-shaped-bd-hip
+      - timestepper-dense-output-cuda
+      - timestepper-dense-output-lorenz-cpu
+      - timestepper-dense-output-rk-cpu
+      - timestepper-dense-output-rossler-cpu
+      - timestepper-dense-output-vdp-cpu
+      - timestepper-dop853-adaptive-cuda
+      - timestepper-dop853-dense-cuda
+      - timestepper-dop853-dense-python-cpu
+      - timestepper-dop853-fixed-cuda
+      - timestepper-explicit-nonautonomous-cuda
+      - timestepper-explicit-rossler-cpu
+      - timestepper-explicit-vdp-cpu
+      - timestepper-fsal-cuda
+      - timestepper-implicit-dirk-cuda
+      - timestepper-implicit-lifecycle-cuda
+      - timestepper-implicit-lorenz-cuda
+      - timestepper-implicit-mass-dae-cuda
+      - timestepper-implicit-nonautonomous-cuda
+      - timestepper-implicit-rossler-cuda
+      - timestepper-implicit-sanitizers-cpu
+      - timestepper-implicit-vdp-cuda
+      - timestepper-lorenz-simulation-python-cpu
+      - timestepper-ownership-cuda
+      - timestepper-rk4-simulation-python-cpu
+      - timestepper-scipy-adaptation-cuda
+      - workflow-ownership-cuda
+    steps:
+      - run: echo "All preliminary test jobs passed; N=64 reference validation may start."
+
+  ks1d-n64-reference-cpu-omp:
+    name: Symmetric KS1D / N=64 reference and unchanged restart
+    needs: all-tests-passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OMP_NUM_THREADS: 1
+      OMP_DYNAMIC: "FALSE"
+      OPENBLAS_NUM_THREADS: 1
+      MKL_NUM_THREADS: 1
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make libboost-dev libboost-serialization-dev libfftw3-dev
+          fi
+      - name: Download pinned checksum-verified reference
+        run: python3 scripts/download_reference_data.py --version 20260730 --destination "$BUILD_DIR/ks1d_n64_reference/asset"
+      - name: Build production workflow and physical reference checker
+        run: |
+          make KS1D_bd_cpu_omp test_KS1D_reference_cpu_omp.bin \
+            CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/ks1d_n64_reference" REAL_TYPE=double
+      - name: Validate nine branches, residuals, endpoints and restart
+        run: |
+          python3 scripts/validate_ks1d_reference.py \
+            --bd-executable "$BUILD_DIR/ks1d_n64_reference/KS1D_bd_cpu_omp.bin" \
+            --checker-executable "$BUILD_DIR/ks1d_n64_reference/test_KS1D_reference_cpu_omp.bin" \
+            --reference-dir "$BUILD_DIR/ks1d_n64_reference/asset/data/reference/KS1D/N64/symmetric" \
+            --work-dir "$BUILD_DIR/ks1d_n64_reference/replay"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ks1d-n64-reference
+          path: |
+            ${{ env.BUILD_DIR }}/ks1d_n64_reference/results.make
+            ${{ env.BUILD_DIR }}/ks1d_n64_reference/replay/*.log
+            ${{ env.BUILD_DIR }}/ks1d_n64_reference/replay/*.json
+            ${{ env.BUILD_DIR }}/ks1d_n64_reference/replay/predictor_*.dat
+            ${{ env.BUILD_DIR }}/ks1d_n64_reference/replay/project
+          if-no-files-found: warn
 
   nmfd-newton-operations-cpu:
     runs-on: ubuntu-latest
