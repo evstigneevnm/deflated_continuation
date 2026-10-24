@@ -1,4 +1,5 @@
 #include "continuation_newton_fixture.h"
+#include <limits>
 #include <scfd/utils/log_std.h>
 #include <numerical_algos/detail/str_source_helper.h>
 #include <continuation/system_operator_continuation.h>
@@ -6,6 +7,71 @@
 namespace
 {
 using continuation::tests::test_report;
+
+// A constant physical residual has the same RMS norm on every grid. The
+// arclength residual is a separate scalar and must not be divided by sqrt(N).
+template <class T>
+void test_residual_norm( test_report &report )
+{
+    using operations_type = nmfd::operations::scfd_vector_space<continuation::tests::backend_type, T>;
+    using scalar_space    = nmfd::operations::static_vector_space<T, 1, scfd::static_vec::vec<T, 1>>;
+    using space_type      = nmfd::operations::pair_vector_space<operations_type, scalar_space>;
+    using vector_type     = typename space_type::vector_type;
+    struct constant_residual
+    {
+        operations_type &operations;
+        T                state_value = 0, constraint = 0;
+        unsigned int     calls = 0;
+        void             apply( const vector_type &, vector_type &out )
+        {
+            ++calls;
+            operations.assign_scalar( state_value, out.first );
+            out.second[0] = constraint;
+        }
+    };
+    struct values
+    {
+        T state, constraint;
+    };
+    const values cases[]   = { { std::ldexp( T( 1 ), -37 ), T( 0 ) }, { T( 0 ), T( .75 ) }, { T( .25 ), T( -.75 ) } };
+    const T      tolerance = T( 32 ) * std::numeric_limits<T>::epsilon();
+    for ( std::size_t size : { 1u, 16u, 1024u, 32766u } )
+    {
+        auto                                                operations = std::make_shared<operations_type>( size );
+        space_type                                          space( operations, std::make_shared<scalar_space>() );
+        nmfd::detail::vector_wrap<space_type, false, false> state( space ), residual( space );
+        for ( auto *storage : { &state, &residual } )
+        {
+            storage->init();
+            storage->start_use();
+        }
+        space.assign_scalar( T( 0 ), *state );
+        for ( const auto &value : cases )
+        {
+            constant_residual op{ *operations, value.state, value.constraint };
+            const T           norm = continuation::corrector_residual_norm::evaluate( space, op, *state, *residual );
+            const T           expected = std::sqrt( value.state * value.state + value.constraint * value.constraint );
+            report.require(
+                std::abs( norm - expected ) <= tolerance * expected,
+                "Corrector merit changed with state dimension or diluted the scalar constraint"
+            );
+            report.require(
+                op.calls == 1 && ( *residual ).second[0] == value.constraint,
+                "Corrector assessment reevaluated or rescaled the residual"
+            );
+            const T squared = T( size ) * value.state * value.state + value.constraint * value.constraint;
+            report.require(
+                std::abs( space.scalar_prod( *residual, *residual ) - squared ) <= tolerance * squared,
+                "Corrector assessment changed the pair-space inner product"
+            );
+            if ( size == 32766 && value.constraint == T( 0 ) )
+                report.require(
+                    norm < T( 1e-9 ) && space.norm_l2( *residual ) > T( 1e-9 ),
+                    "Large-state continuation still uses the overly strict Euclidean residual norm"
+                );
+        }
+    }
+}
 
 // Circle F=u^2+lambda^2-1 with a linear arclength equation. The complete
 // two-block Jacobian is checked against finite differences in both components.
@@ -314,6 +380,8 @@ int main()
     continuation::tests::test_report report;
     try
     {
+        test_residual_norm<float>( report );
+        test_residual_norm<double>( report );
         test_operator<float>( report );
         test_operator<double>( report );
         test_chart_and_construction( report );

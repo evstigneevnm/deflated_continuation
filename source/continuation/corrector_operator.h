@@ -9,12 +9,29 @@
 #include <nmfd/operations/pair_vector_space.h>
 #include <nmfd/operations/static_vector_space.h>
 #include <scfd/static_vec/vec.h>
+#include <common/scalar_math.h>
 #include <continuation/arclength_constraint.h>
 #include <continuation/chart_helpers.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
 
 namespace continuation
 {
+
+// Match the legacy corrector merit without changing the bordered algebra.
+struct corrector_residual_norm
+{
+    template <class Space, class Operator>
+    static auto evaluate(
+        const Space &space, Operator &op, const typename Space::vector_type &state,
+        typename Space::vector_type &residual
+    )
+    {
+        op.apply( state, residual );
+        const auto state_norm      = space.first()->norm_l2( residual.first );
+        const auto constraint_norm = space.second()->norm_l2( residual.second );
+        return common::scalar_math::sqrt( state_norm * state_norm + constraint_norm * constraint_norm );
+    }
+};
 
 template <
     class VectorOperations, class NonlinearOperator, class LinearOperator,

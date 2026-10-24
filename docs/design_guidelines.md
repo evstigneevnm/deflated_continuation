@@ -149,6 +149,14 @@ Fixed, continuation, and deflation convergence strategies are independent templa
 choices. Assembly configures them; algorithm classes only invoke corrections and
 read their reports. A custom strategy with different settings overrides its role's
 configuration function, without changing deflation or continuation algorithms.
+Requested tolerance remains unchanged. On weight, stagnation, backtracking, or
+iteration limits, an enabled relaxed-tolerance fallback may restore a valid best
+state but must never override invalid-state or failed-increment errors. Both
+acceptance levels return success; `used_relaxed_tolerance()` on the convergence strategy
+distinguishes relaxed acceptance and resets before each solve.
+Continuation assesses `sqrt(norm_l2(F)^2 + g^2)`: the state-space norm (RMS in
+current project spaces) and the unscaled arclength constraint. Keep this policy
+separate from pair-space inner products, residual vectors, and bordered Jacobians.
 `parameterized_correction` bridges `(state, parameter)` calls to NMFD's vector-only
 solver, reuses candidate storage, and commits both components only on success.
 It contains no Newton loop. Tangent construction remains separate from the new

@@ -291,7 +291,7 @@ int main( int argc, char const *argv[] )
         nmfd::solvers::sherman_morrison<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t, nmfd::solvers::bicgstabl>;
     using newton_types = main_classes::nmfd_newton_types<
         vec_ops_real, log_t, ks1d_t, lin_op_t, linear_system_t, sol_storage_t, main_classes::detail::newton_convergence,
-        main_classes::detail::newton_convergence, main_classes::detail::fixed_damping_deflation_convergence>;
+        main_classes::detail::continuation_convergence, main_classes::detail::fixed_damping_deflation_convergence>;
     using deflation_continuation_t = main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, ks1d_t, lin_op_t, prec_t, ks1d_model::bicgstabl,
         nonlinear_operators::projected_system_operator, parameters_t, sol_storage_t,

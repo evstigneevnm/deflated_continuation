@@ -73,13 +73,13 @@ template <class Fixture, class System>
 struct selection : main_classes::nmfd_newton_types<
                        typename Fixture::space_type, scfd::utils::log_std, typename Fixture::problem_type,
                        typename Fixture::state_operator_type, System, typename Fixture::solutions_type,
-                       main_classes::detail::newton_convergence, main_classes::detail::newton_convergence,
+                       main_classes::detail::newton_convergence, main_classes::detail::continuation_convergence,
                        selected_deflation_strategy>
 {
     using base_type = main_classes::nmfd_newton_types<
         typename Fixture::space_type, scfd::utils::log_std, typename Fixture::problem_type,
         typename Fixture::state_operator_type, System, typename Fixture::solutions_type,
-        main_classes::detail::newton_convergence, main_classes::detail::newton_convergence,
+        main_classes::detail::newton_convergence, main_classes::detail::continuation_convergence,
         selected_deflation_strategy>;
     template <class Parameters>
     static void
@@ -102,7 +102,19 @@ void test_assembly( test_report &report )
     using prec_type     = controlled_preconditioner<space_type, jacobian_type>;
     using system_type   = nmfd::solvers::sherman_morrison<
           space_type, monitor_type, log_type, jacobian_type, prec_type, nmfd::solvers::cgs>;
-    using types = selection<fixture_type, system_type>;
+    using types         = selection<fixture_type, system_type>;
+    using default_types = main_classes::nmfd_newton_types<
+        space_type, log_type, typename fixture_type::problem_type, jacobian_type, system_type,
+        typename fixture_type::solutions_type>;
+    using expected_convergence = nmfd::solvers::default_convergence_strategy<
+        typename types::pair_space_type, log_type, typename types::corrector_operator_type,
+        typename types::corrector_operator_type::trial_projector,
+        nmfd::operations::zero_functional<typename types::pair_space_type>, continuation::corrector_residual_norm>;
+    static_assert(
+        std::is_same_v<typename default_types::continuation_convergence_type, expected_convergence> &&
+            std::is_same_v<typename types::continuation_convergence_type, expected_convergence>,
+        "Default and custom assembly must retain the continuation residual norm"
+    );
     std::shared_ptr<space_type>                                 space;
     std::weak_ptr<typename types::fixed_correction_type>        fixed_lifetime;
     std::weak_ptr<typename types::continuation_correction_type> coupled_lifetime;

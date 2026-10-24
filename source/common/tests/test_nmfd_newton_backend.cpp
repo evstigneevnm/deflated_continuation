@@ -254,6 +254,29 @@ void test( bool full_check )
         retained_problem.expired() && retained_projection.expired() && solver.solve( *initial, *state ),
         "backend shared rebinding did not release shared owners"
     );
+
+    p.abs_tol                    = T( 0 );
+    p.rel_tol                    = T( .125 );
+    p.relax_tolerance_factor     = T( 4 );
+    p.max_iters_num              = 1;
+    p.newton_weight_initial      = T( .5 );
+    auto        relaxed_strategy = std::make_shared<strategy_type>( operations, nullptr, p );
+    solver_type relaxed_solver( operations, nullptr, iteration, relaxed_strategy );
+    problem.apply( *initial, *residual );
+    const T initial_norm = operations->norm_l2( *residual );
+    require(
+        relaxed_solver.solve( &problem, nullptr, nullptr, *initial, *state ) &&
+            relaxed_strategy->used_relaxed_tolerance() && relaxed_strategy->get_result_status() == 0,
+        "backend final correction was not accepted at relaxed tolerance"
+    );
+    problem.apply( *state, *residual );
+    require( operations->norm_l2( *residual ) == T( .5 ) * initial_norm, "backend relaxed state is incorrect" );
+    operations->assign_scalar( T( 1 ), *initial );
+    require(
+        relaxed_solver.solve( &problem, nullptr, nullptr, *initial, *state ) &&
+            !relaxed_strategy->used_relaxed_tolerance(),
+        "backend strict restart retained relaxed acceptance"
+    );
 }
 
 int main()

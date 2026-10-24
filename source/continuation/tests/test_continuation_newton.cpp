@@ -49,10 +49,11 @@ void test_newton( test_report &report )
     using recovery_type  = numerical_algos::recovering_linear_solver<pair_space_type, binding_type>;
     using iteration_type = nmfd::solvers::newton_iteration<pair_space_type, operator_type, recovery_type>;
     using projector_type = typename operator_type::trial_projector;
-    using solver_type =
-        nmfd::solvers::nonlinear_solver<pair_space_type, log_type, operator_type, iteration_type, projector_type>;
-    using strategy_type =
-        nmfd::solvers::default_convergence_strategy<pair_space_type, log_type, operator_type, projector_type>;
+    using quality_type   = nmfd::operations::zero_functional<pair_space_type>;
+    using strategy_type  = nmfd::solvers::default_convergence_strategy<
+         pair_space_type, log_type, operator_type, projector_type, quality_type, continuation::corrector_residual_norm>;
+    using solver_type = nmfd::solvers::nonlinear_solver<
+        pair_space_type, log_type, operator_type, iteration_type, projector_type, quality_type, strategy_type>;
     std::shared_ptr<space_type>                        operations;
     std::weak_ptr<operator_type>                       operator_lifetime;
     std::weak_ptr<typename fixture_type::problem_type> problem_lifetime;

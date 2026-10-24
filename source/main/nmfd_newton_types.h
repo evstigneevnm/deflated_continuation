@@ -24,6 +24,10 @@ template <class Space, class Log, class Operator, class Projector, class Quality
 using newton_convergence = nmfd::solvers::default_convergence_strategy<Space, Log, Operator, Projector, Quality>;
 
 template <class Space, class Log, class Operator, class Projector, class Quality>
+using continuation_convergence = nmfd::solvers::default_convergence_strategy<
+    Space, Log, Operator, Projector, Quality, continuation::corrector_residual_norm>;
+
+template <class Space, class Log, class Operator, class Projector, class Quality>
 using deflation_convergence = nmfd::solvers::default_convergence_strategy<
     Space, Log, Operator, Projector, Quality, deflation::deflated_residual_norm>;
 
@@ -111,7 +115,7 @@ struct nmfd_fixed_newton_types
 template <
     class Space, class Log, class Problem, class Jacobian, class LinearSystem, class Storage,
     template <class, class, class, class, class> class FixedConvergence        = detail::newton_convergence,
-    template <class, class, class, class, class> class ContinuationConvergence = detail::newton_convergence,
+    template <class, class, class, class, class> class ContinuationConvergence = detail::continuation_convergence,
     template <class, class, class, class, class> class DeflationConvergence    = detail::deflation_convergence>
 struct nmfd_newton_types
     : nmfd_fixed_newton_types<
