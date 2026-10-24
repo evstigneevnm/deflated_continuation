@@ -101,6 +101,8 @@ CIRCLE_NMFD_NEWTON_TARGETS = circle_bd_cuda circle_bd_cpu_omp circle_bd_hip circ
 $(CIRCLE_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
 KS1D_NMFD_NEWTON_TARGETS = KS1D_bd_cpu_omp KS1D_bd_cuda KS1D_stability_cpu_omp KS1D_stability_cuda KS1D_bd_hip KS1D_stability_hip KS1D_full_bd_cpu_omp KS1D_full_bd_cuda KS1D_full_stability_cpu_omp KS1D_full_stability_cuda
 $(KS1D_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
+KS2D_NMFD_NEWTON_TARGETS = KS2D_bd_cpu_omp KS2D_bd_cuda KS2D_stability_cpu_omp KS2D_stability_cuda
+$(KS2D_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
 ITIME_STEPPER = -I $(NMFD_TIMESTEPPERS_ROOT)/include -I $(COMMON_NMFD_OPERATIONS) -I $(CONTRIB_SCFD)/include -I source/contrib/json
 LINEAR_SOLVE_RECOVERY_HEADER = source/numerical_algos/linear_solve_recovery.h
 LEGACY_LINSOLVERS = source/numerical_algos/legacy/include/numerical_algos/lin_solvers
@@ -178,6 +180,7 @@ KS1D_STABILITY_HEADERS = source/models/KS_1D/KS1D_stability_cli.h $(STABILITY_CO
 KS1D_STABILITY_REPLAY_SCRIPT = scripts/test_ks1d_full_stability_replay.py
 KS1D_STABILITY_REPLAY_MANIFEST = source/models/KS_1D/tests/data/stability_replay/manifest.json
 $(KS1D_NMFD_NEWTON_TARGETS): $(NMFD_NEWTON_ASSEMBLY_HEADERS)
+$(KS2D_NMFD_NEWTON_TARGETS): $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 CIRCLE_MODEL_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
 KS1D_FULL_MODEL_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
 WORKFLOW_OWNERSHIP_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
@@ -272,14 +275,22 @@ test_KS2D_stability_cli.bin: source/models/KS_2D/tests/test_KS2D_stability_cli.c
 test_numpy_array_writer.bin: source/visualization/tests/test_numpy_array_writer.cpp source/visualization/io/numpy_array_writer.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/visualization/tests/test_numpy_array_writer.cpp -o $(BUILD_DIR)/test_numpy_array_writer.bin 2>$(RESULTS)
 
-KS2D_LINEAR_SOLVER_HEADERS = source/models/KS_2D/KS2D_linear_solvers.h $(wildcard source/contrib/nmfd-linsolvers/include/nmfd/solvers/*.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/detail/*.h) source/nonlinear_operators/circle/system_operator.h source/nonlinear_operators/circle/convergence_strategy.h source/numerical_algos/newton_solvers/newton_solver.h $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
+KS2D_LINEAR_SOLVER_HEADERS = source/models/KS_2D/KS2D_linear_solvers.h $(wildcard source/contrib/nmfd-linsolvers/include/nmfd/solvers/*.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/detail/*.h) $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
+KS2D_NEWTON_TEST_HEADERS = $(KS2D_REFACTORED_HEADERS) $(KS2D_LINEAR_SOLVER_HEADERS) $(NMFD_NEWTON_ASSEMBLY_HEADERS) source/models/KS_2D/tests/data/symmetric_lambda4_333.dat
 
-test_KS2D_linear_solvers_cpu_omp.bin: source/models/KS_2D/test_KS2D_linear_solvers.cpp $(KS2D_REFACTORED_HEADERS) $(KS2D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS)
-	$(G++) $(G++FLAGS) -DKS2D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $< $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+test_KS2D_linear_solvers_cpu_omp.bin: source/models/KS_2D/test_KS2D_linear_solvers.cpp $(KS2D_NEWTON_TEST_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) -DKS2D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
-test_KS2D_linear_solvers_cuda.bin: source/models/KS_2D/test_KS2D_linear_solvers.cpp $(KS2D_REFACTORED_HEADERS) $(KS2D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
-	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS2D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_LINSOLVERS) -x cu $< -c -o $(BUILD_DIR)/test_KS2D_linear_solvers_cuda_main.o 2>$(RESULTS)
+test_KS2D_linear_solvers_cuda.bin: source/models/KS_2D/test_KS2D_linear_solvers.cpp $(KS2D_NEWTON_TEST_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS2D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_NEWTON) -x cu $< -c -o $(BUILD_DIR)/test_KS2D_linear_solvers_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS2D_linear_solvers_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_KS2D_newton_cpu_omp.bin: source/models/KS_2D/test_KS2D_newton.cpp $(KS2D_NEWTON_TEST_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) -DKS2D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_NEWTON) $< $(OPENMP) $(LFFTW) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_KS2D_newton_cuda.bin: source/models/KS_2D/test_KS2D_newton.cpp $(KS2D_NEWTON_TEST_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS2D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_NEWTON) -x cu $< -c -o $(BUILD_DIR)/test_KS2D_newton_cuda_main.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS2D_newton_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
 KS2D_bd_cpu_omp: source/models/KS_2D/KS2D_bd.cpp $(KS2D_REFACTORED_HEADERS) $(KS2D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS)
 	$(G++) $(G++FLAGS) -DKS2D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/KS_2D/KS2D_bd.cpp $(OPENMP) $(LFFTW) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS2D_bd_cpu_omp.bin 2>$(RESULTS)

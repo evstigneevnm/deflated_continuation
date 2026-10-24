@@ -15,6 +15,7 @@
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/system_operator.h>
 
 #include <main/deflation_continuation.hpp>
+#include <main/nmfd_newton_types.h>
 #include <main/parameters.hpp>
 
 #include <symmetry/finite_action_registry.h>
@@ -222,17 +223,21 @@ int main( int argc, char **argv )
             vector_operations, identity_adapter, finite_actions, residual_translation_aligner
         );
         auto solution_storage = std::make_shared<solution_storage_type>(
-            vector_operations, 50, vector_operations->get_l2_size(), real( 2 ), quotient_adapter,
+            vector_operations, 50, real( state_size ), real( 2 ), quotient_adapter,
             static_cast<double>( parameters.deflation_continuation.restart_policy.duplicate_after_deflation_tolerance ),
             &log
         );
 
         using linear_system_type = nmfd::solvers::sherman_morrison<
             vec_ops_real, monitor_type, log_t, linear_operator_type, preconditioner_type, nmfd::solvers::bicgstabl>;
+        using newton_types = main_classes::nmfd_newton_types<
+            vec_ops_real, log_t, nonlinear_operator_type, linear_operator_type, linear_system_type,
+            solution_storage_type>;
         using driver_type = main_classes::deflation_continuation<
             vec_ops_real, file_operations_type, log_t, monitor_type, nonlinear_operator_type, linear_operator_type,
             preconditioner_type, ks2d_model::bicgstabl, nonlinear_operators::system_operator, parameters_type,
-            solution_storage_type, continuation::system_operator_continuation, linear_system_type>;
+            solution_storage_type, continuation::system_operator_continuation, linear_system_type, newton_types>;
+        static_assert( driver_type::uses_nmfd_newton, "KS2D requires NMFD Newton" );
         driver_type driver(
             vector_operations, file_operations, &log, &linear_solver_log, nonlinear_operator, configuration,
             solution_storage

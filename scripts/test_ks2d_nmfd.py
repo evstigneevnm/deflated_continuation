@@ -20,6 +20,16 @@ def read_rows(path: Path) -> list[list[float]]:
     return rows
 
 
+def diagram_snapshot(project: Path) -> dict[Path, bytes]:
+    paths = [project / name for name in (
+        "bifurcation_diagram.dat", "branch_topology.json", "symmetry_group.json")]
+    paths.extend(path for directory in project.iterdir()
+                 if directory.is_dir() and directory.name.isdigit()
+                 for path in directory.iterdir() if path.is_file())
+    paths.extend((project / "branch_topology" / "endpoints").glob("*.dat"))
+    return {path.relative_to(project): path.read_bytes() for path in paths}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bd-executable", required=True, type=Path)
@@ -64,6 +74,10 @@ def main() -> None:
     if not min(row[0] for row in points) < 4.332 or not max(row[0] for row in points) > 4.334:
         raise RuntimeError("both semicurves must advance")
     run(sys.executable, "scripts/validate_symmetry_group_manifest.py", project, "--expected-order", 8)
+    diagram = diagram_snapshot(project)
+    run(args.bd_executable.resolve(), config, "--quiet", *device)
+    if diagram != diagram_snapshot(project):
+        raise RuntimeError("deflation/continuation restart changed committed KS2D results")
     run(args.stability_executable.resolve(), config, "--quiet", *device)
     run(sys.executable, "scripts/validate_stability_diagram.py", project,
         "--expected-curves", 1, "--min-points", 18, "--require-complete", "--require-plot-sidecar",

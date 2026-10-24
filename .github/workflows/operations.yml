@@ -184,6 +184,8 @@ jobs:
       - ks1d-nmfd-newton-sanitizers-cpu-omp
       - ks1d-full-nmfd-newton-sanitizers-cpu-omp
       - ks1d-full-nmfd-newton-cuda
+      - ks2d-nmfd-newton-sanitizers-cpu-omp
+      - ks2d-nmfd-newton-cuda
       - ks1d-sym-cuda
       - ks1d-sym-hip
       - nmfd-direct-solver-cuda
@@ -2453,7 +2455,7 @@ jobs:
           ./"$FOURIER_BUILD"/test_finite_group_manifest.bin
 
   ks2d-nmfd-linear-solvers-cpu-omp:
-    needs: [fftw-operations-cpu, nmfd-sherman-morrison-cpu, nmfd-short-recurrence-cpu]
+    needs: [fftw-operations-cpu, nmfd-sherman-morrison-cpu, nmfd-short-recurrence-cpu, project-newton-assembly-cpu]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -2473,8 +2475,88 @@ jobs:
           make test_KS2D_linear_solvers_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
           timeout 60s ./"$KS2D_BUILD"/test_KS2D_linear_solvers_cpu_omp.bin
 
+  ks2d-nmfd-newton-cpu-omp:
+    name: Symmetry-restricted KS2D / NMFD Newton bindings
+    needs: ks2d-nmfd-linear-solvers-cpu-omp
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make libfftw3-dev
+          fi
+      - name: Verify corrections, orbit exclusion, derivatives, rollback and rebinding
+        run: |
+          export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
+          KS2D_BUILD="$BUILD_DIR/ks2d_newton_cpu_omp"
+          make test_KS2D_newton_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          timeout 60s ./"$KS2D_BUILD"/test_KS2D_newton_cpu_omp.bin
+
+  ks2d-nmfd-newton-sanitizers-cpu-omp:
+    name: Symmetry-restricted KS2D / NMFD Newton sanitizers
+    needs: ks2d-nmfd-newton-cpu-omp
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted Ubuntu CPU dependencies
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential make libfftw3-dev
+          fi
+      - name: Verify correction and fallback workspace ownership
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
+          KS2D_BUILD="$BUILD_DIR/ks2d_newton_sanitizers"
+          make test_KS2D_newton_cpu_omp.bin test_KS2D_linear_solvers_cpu_omp.bin \
+            CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double \
+            NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          timeout 60s ./"$KS2D_BUILD"/test_KS2D_newton_cpu_omp.bin
+          timeout 60s ./"$KS2D_BUILD"/test_KS2D_linear_solvers_cpu_omp.bin
+
+  ks2d-nmfd-newton-cuda:
+    name: Symmetry-restricted KS2D / NMFD Newton CUDA
+    needs: [ks2d-nmfd-newton-cpu-omp, fft-facade-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify corrections and reference workflow on CUDA when available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+            echo "Skipping CUDA KS2D Newton: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping CUDA KS2D Newton: nvcc unavailable"
+            exit 0
+          fi
+          export OPENBLAS_NUM_THREADS=1
+          KS2D_BUILD="$BUILD_DIR/ks2d_newton_cuda"
+          make test_KS2D_newton_cuda.bin test_KS2D_linear_solvers_cuda.bin KS2D_bd_cuda KS2D_stability_cuda \
+            CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          timeout 120s ./"$KS2D_BUILD"/test_KS2D_newton_cuda.bin
+          timeout 120s ./"$KS2D_BUILD"/test_KS2D_linear_solvers_cuda.bin
+          python3 scripts/test_ks2d_nmfd.py --bd-executable "$KS2D_BUILD/KS2D_bd_cuda.bin" \
+            --stability-executable "$KS2D_BUILD/KS2D_stability_cuda.bin" --work-dir "$KS2D_BUILD/replay" --device auto
+
   ks2d-cpu-omp:
-    needs: [fourier-discretization-cpu, eigensolver-foundation-cpu]
+    needs: [fourier-discretization-cpu, eigensolver-foundation-cpu, ks2d-nmfd-newton-cpu-omp]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

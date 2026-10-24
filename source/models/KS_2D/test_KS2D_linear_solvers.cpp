@@ -7,6 +7,7 @@
 #include <common/gpu_file_operations.h>
 #include <deflation/symmetry_solution_storage.h>
 #include <main/stability_continuation/solver_bundle.h>
+#include <main/nmfd_newton_types.h>
 #include <nmfd/detail/vector_wrap.h>
 #include <nmfd/solvers/gmres.h>
 #include <nmfd/solvers/monitor_krylov.h>
@@ -15,7 +16,6 @@
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/linear_operator_KS_2D.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/preconditioner_KS_2D.h>
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/system_operator.h>
-#include <numerical_algos/newton_solvers/newton_solver.h>
 #include <stability/analysis/transition_state_alignment.h>
 #include <symmetry/finite_quotient_adapter.h>
 #include <symmetry/fourier/residual_translation_orbit_aligner_2d.h>
@@ -97,14 +97,14 @@ struct fallback_types
     using preconditioner_type       = ::preconditioner_type;
     using linear_solver_type        = nmfd::solvers::gmres<
                vector_space, nmfd::solvers::monitor_krylov<vector_space, log_t>, log_t, operator_type, preconditioner_type>;
-    using convergence_type =
-        nonlinear_operators::newton_method::convergence_strategy<vector_space, problem_type, log_t>;
-    using system_operator_type =
-        nonlinear_operators::system_operator<vector_space, problem_type, operator_type, linear_solver_type>;
-    using newton_type = numerical_algos::newton_method::newton_solver<
-        vector_space, problem_type, system_operator_type, convergence_type>;
+    using newton_types =
+        main_classes::nmfd_fixed_newton_types<vector_space, log_t, problem_type, operator_type, linear_solver_type>;
+    using convergence_type     = typename newton_types::fixed_convergence_type;
+    using system_operator_type = typename newton_types::fixed_operator_type;
+    using newton_type          = typename newton_types::fixed_correction_type;
 };
-using fallback_bundle = main_classes::stability_continuation_detail::solver_bundle<fallback_types>;
+using fallback_bundle =
+    main_classes::stability_continuation_detail::solver_bundle<fallback_types, fallback_types::newton_types>;
 
 template <class Factory>
 void test_partial_construction( const std::shared_ptr<vector_space> &space, int count, Factory make )
@@ -248,7 +248,7 @@ void test_symmetry_ownership()
     auto identity = std::make_shared<identity_type>( space );
     auto aligner  = std::make_shared<aligner_type>( space, problem->state_modes() );
     auto quotient = std::make_shared<quotient_type>( space, identity, actions, aligner );
-    auto storage  = std::make_shared<storage_type>( space, 1, space->get_l2_size(), 2.0, quotient, 1e-8 );
+    auto storage  = std::make_shared<storage_type>( space, 1, real( space->get_vector_size() ), 2.0, quotient, 1e-8 );
     auto op       = std::make_shared<operator_type>( problem );
     auto prec     = std::make_shared<preconditioner_type>( problem );
     prec->set_operator( op );
@@ -314,11 +314,12 @@ void test_fallback_bundle()
     p.monitor.max_iters_num = 300;
     auto solver             = std::make_shared<fallback_types::linear_solver_type>( space, &log, p, prec );
     solver->set_operator( op );
-    test_partial_construction( space, 4, [&]() {
+    const int activations = space->activations;
+    auto      bundle      = std::make_shared<fallback_bundle>( space, &log, problem, op, prec, solver );
+    test_partial_construction( space, space->activations - activations, [&]() {
         return std::make_shared<fallback_bundle>( space, &log, problem, op, prec, solver );
     } );
-    auto bundle = std::make_shared<fallback_bundle>( space, &log, problem, op, prec, solver );
-    bundle->convergence()->set_convergence_constants( 1e-10, 40, 1.0, false, false );
+    bundle->convergence()->set_convergence_constants( 1e-10, 40, 1.0, 0, 1.0, false, false );
     std::shared_ptr<fallback_types::newton_type> newton( bundle, bundle->newton() );
     std::weak_ptr<fallback_bundle>               weak_bundle  = bundle;
     std::weak_ptr<problem_type>                  weak_problem = problem;
@@ -334,8 +335,10 @@ void test_fallback_bundle()
     op.reset();
     prec.reset();
     solver.reset();
+    real parameter = 4.334;
     require(
-        newton->solve( borrowed_problem, **state, 4.334 ), "owned fallback failed after releasing caller dependencies"
+        newton->solve( borrowed_problem, **state, parameter ),
+        "owned fallback failed after releasing caller dependencies"
     );
     require( !weak_bundle.expired() && !weak_problem.expired(), "fallback alias lost its solver bundle" );
     state.reset();

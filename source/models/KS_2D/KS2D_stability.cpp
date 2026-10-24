@@ -17,13 +17,13 @@
 #include <nonlinear_operators/Kuramoto_Sivashinskiy_2D/system_operator.h>
 
 #include <main/parameters.hpp>
+#include <main/nmfd_newton_types.h>
 #include <main/stability_continuation.hpp>
 
 #include <nmfd/operations/linalg/host_small_dense_lapack.h>
 #include <nmfd/solvers/gmres.h>
 #include <nmfd/solvers/monitor_krylov.h>
 
-#include <numerical_algos/newton_solvers/newton_solver.h>
 #include <symmetry/finite_action_registry.h>
 #include <symmetry/finite_group_manifest.h>
 #include <symmetry/finite_quotient_adapter.h>
@@ -115,25 +115,12 @@ int main( int argc, char **argv )
         using fallback_monitor_type = nmfd::solvers::monitor_krylov<vec_ops_real, log_t>;
         using fallback_solver_type  = nmfd::solvers::gmres<
              vec_ops_real, fallback_monitor_type, log_t, newton_operator_type, newton_preconditioner_type>;
-        using fallback_system_operator_type = nonlinear_operators::system_operator<
-            vec_ops_real, nonlinear_operator_type, newton_operator_type, fallback_solver_type>;
-        using fallback_convergence_type =
-            nonlinear_operators::newton_method::convergence_strategy<vec_ops_real, nonlinear_operator_type, log_t>;
-        using fallback_newton_type = numerical_algos::newton_method::newton_solver<
-            vec_ops_real, nonlinear_operator_type, fallback_system_operator_type, fallback_convergence_type>;
-        struct fallback_types
-        {
-            using vector_operations_type    = vec_ops_real;
-            using nonlinear_operations_type = nonlinear_operator_type;
-            using log_type                  = log_t;
-            using linear_operator_type      = newton_operator_type;
-            using preconditioner_type       = newton_preconditioner_type;
-            using linear_solver_type        = fallback_solver_type;
-            using convergence_type          = fallback_convergence_type;
-            using system_operator_type      = fallback_system_operator_type;
-            using newton_type               = fallback_newton_type;
-        };
-        using fallback_bundle_type  = main_classes::stability_continuation_detail::solver_bundle<fallback_types>;
+        using fallback_newton_types = main_classes::nmfd_fixed_newton_types<
+            vec_ops_real, log_t, nonlinear_operator_type, newton_operator_type, fallback_solver_type>;
+        using newton_linear_type = nmfd::solvers::bicgstabl<
+            vec_ops_real, newton_monitor_type, log_t, newton_operator_type, newton_preconditioner_type>;
+        using newton_types = main_classes::nmfd_fixed_newton_types<
+            vec_ops_real, log_t, nonlinear_operator_type, newton_operator_type, newton_linear_type>;
         using finite_actions_type   = symmetry::finite_action_registry<vec_ops_real>;
         using identity_adapter_type = deflation::identity_symmetry_adapter<vec_ops_real>;
         using residual_translation_aligner_type =
@@ -143,7 +130,9 @@ int main( int argc, char **argv )
         using driver_type = main_classes::stability_continuation<
             vec_ops_real, file_operations_type, log_t, newton_monitor_type, nonlinear_operator_type,
             newton_operator_type, newton_preconditioner_type, ks2d_model::bicgstabl,
-            nonlinear_operators::system_operator, parameters_type, eigensolver_type>;
+            nonlinear_operators::system_operator, parameters_type, eigensolver_type, nonlinear_operator_type,
+            newton_types>;
+        static_assert( driver_type::uses_nmfd_newton, "KS2D stability corrections require NMFD Newton" );
 
         auto real_space    = std::make_shared<vec_ops_real>( state_size );
         auto complex_space = std::make_shared<complex_space_type>( state_size );
@@ -262,14 +251,15 @@ int main( int argc, char **argv )
             fallback_solver_parameters, fallback_preconditioner
         );
         fallback_solver->set_operator( newton_operator );
-        auto fallback_bundle = std::make_shared<fallback_bundle_type>(
-            real_space, &log, nonlinear_operator, newton_operator, fallback_preconditioner, fallback_solver
+        auto fallback_operator = std::make_shared<fallback_newton_types::fixed_operator_type>(
+            nonlinear_operator, newton_operator, real( 0 )
         );
-        fallback_bundle->convergence()->set_convergence_constants(
-            parameters.stability_continuation.newton.tolerance, parameters.stability_continuation.newton.newton_max_it,
-            parameters.stability_continuation.newton.newton_wight,
-            parameters.stability_continuation.newton.store_norms_history,
-            parameters.stability_continuation.newton.verbose
+        auto fallback_newton = fallback_newton_types::fixed_method::make(
+            real_space, nonlinear_operator, fallback_operator, real_space, fallback_solver, &log,
+            std::make_shared<fallback_newton_types::projector_type>( nonlinear_operator )
+        );
+        fallback_newton_types::configure_fixed(
+            fallback_newton->get_convergence_strategy_handle(), parameters.stability_continuation.newton
         );
 
         if ( !command_line.quiet )
@@ -284,9 +274,7 @@ int main( int argc, char **argv )
         );
         (void)finite_action_workspace;
         driver.set_transition_state_aligner( quotient_adapter );
-        driver.set_transition_fallback_newton(
-            std::shared_ptr<fallback_newton_type>( fallback_bundle, fallback_bundle->newton() )
-        );
+        driver.set_transition_fallback_newton( fallback_newton );
         driver.set_parameters();
         if ( command_line.curve_transition )
         {
