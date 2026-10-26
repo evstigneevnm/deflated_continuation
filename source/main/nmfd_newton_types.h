@@ -2,6 +2,8 @@
 #define __MAIN_NMFD_NEWTON_TYPES_H__
 
 #include <memory>
+#include <type_traits>
+#include <stdexcept>
 #include <nmfd/solvers/newton_iteration.h>
 #include <nmfd/solvers/nonlinear_solver.h>
 #include <nonlinear_operators/fixed_parameter_operator.h>
@@ -35,6 +37,34 @@ template <class Space, class Log, class Operator, class Projector, class Quality
 using fixed_damping_deflation_convergence =
     deflation::fixed_damping_convergence_strategy<Space, Log, Operator, Projector, Quality>;
 
+template <class Parameters, class = void>
+struct inexact_increment_setting
+{
+    static bool enabled( const Parameters & )
+    {
+        return false;
+    }
+};
+template <class Parameters>
+struct inexact_increment_setting<
+    Parameters, std::void_t<decltype( std::declval<Parameters>().allow_inexact_increment )>>
+{
+    static bool enabled( const Parameters &parameters )
+    {
+        return parameters.allow_inexact_increment;
+    }
+};
+
+template <class Strategy, class = void>
+struct has_inexact_increment_setting : std::false_type
+{
+};
+template <class Strategy>
+struct has_inexact_increment_setting<
+    Strategy, std::void_t<decltype( std::declval<Strategy &>().set_allow_inexact_increment( false ) )>> : std::true_type
+{
+};
+
 template <class Strategy, class Parameters>
 void configure_deflation_strategy( Strategy *strategy, const Parameters &parameters )
 {
@@ -63,10 +93,10 @@ template <
     template <class, class, class, class, class> class Convergence>
 struct nmfd_correction_method
 {
-    using recovery_type    = numerical_algos::recovering_linear_solver<Space, Linear>;
-    using iteration_type   = nmfd::solvers::newton_iteration<Space, Operator, recovery_type>;
     using quality_type     = nmfd::operations::zero_functional<Space>;
     using convergence_type = Convergence<Space, Log, Operator, Projector, quality_type>;
+    using recovery_type    = numerical_algos::recovering_linear_solver<Space, Linear, convergence_type>;
+    using iteration_type   = nmfd::solvers::newton_iteration<Space, Operator, recovery_type>;
     using solver_type      = nmfd::solvers::nonlinear_solver<
              Space, Log, Operator, iteration_type, Projector, quality_type, convergence_type>;
     using correction_type = numerical_algos::parameterized_correction<StateSpace, Problem, Operator, solver_type>;
@@ -77,9 +107,9 @@ struct nmfd_correction_method
         Log *log, std::shared_ptr<Projector> projector
     )
     {
-        auto recovery    = std::make_shared<recovery_type>( space, linear );
-        auto iteration   = std::make_shared<iteration_type>( space, recovery );
         auto convergence = std::make_shared<convergence_type>( space, log );
+        auto recovery    = std::make_shared<recovery_type>( space, linear, convergence );
+        auto iteration   = std::make_shared<iteration_type>( space, recovery );
         auto solver      = std::make_shared<solver_type>( space, log, iteration, convergence );
         solver->set_nonlinear_operator( op );
         solver->set_project_operator( std::move( projector ) );
@@ -105,10 +135,18 @@ struct nmfd_fixed_newton_types
     template <class Parameters>
     static void configure_fixed( fixed_convergence_type *strategy, const Parameters &parameters )
     {
+        const bool allow_inexact = detail::inexact_increment_setting<Parameters>::enabled( parameters );
+        if constexpr ( !detail::has_inexact_increment_setting<fixed_convergence_type>::value )
+        {
+            if ( allow_inexact )
+                throw std::invalid_argument( "Selected convergence strategy does not support inexact increments" );
+        }
         strategy->set_convergence_constants(
             parameters.tolerance, parameters.newton_max_it, scalar_type( 1 ), 0, parameters.newton_wight,
             parameters.store_norms_history, parameters.verbose
         );
+        if constexpr ( detail::has_inexact_increment_setting<fixed_convergence_type>::value )
+            strategy->set_allow_inexact_increment( allow_inexact );
     }
 };
 

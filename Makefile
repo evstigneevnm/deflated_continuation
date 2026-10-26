@@ -167,6 +167,7 @@ CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/mod
 CIRCLE_STABILITY_HEADERS = $(CIRCLE_MODEL_HEADERS) source/stability/eigensolvers/direct_scalar_eigensolver.h source/stability/eigensolvers/transformations/scaled_real_operator.h
 NMFD_NEWTON_ASSEMBLY_HEADERS = source/main/nmfd_newton_types.h source/numerical_algos/parameterized_correction.h source/numerical_algos/recovering_linear_solver.h source/nonlinear_operators/fixed_parameter_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/corrector_operator.h source/continuation/bordered_linear_solver.h source/continuation/arclength_constraint.h source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h source/deflation/solution_storage.h $(wildcard source/contrib/nmfd-newton/include/nmfd/solvers/*.h)
 NMFD_NEWTON_ASSEMBLY_HEADERS += source/deflation/fixed_damping_convergence_strategy.h
+NMFD_NEWTON_ASSEMBLY_HEADERS += $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/krylov/operator_apply.h
 CIRCLE_MODEL_HEADERS += $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 NMFD_DIRECT_SOLVER_HEADERS = $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/direct_solver.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/default_monitor.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/iter_solver_base.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/sherman_morrison.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/dense_operations_base.h
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/models/bratu/bratu_model_config.h source/models/bratu/bratu_linear_solvers.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h $(NMFD_DIRECT_SOLVER_HEADERS)
@@ -1065,6 +1066,7 @@ abc_flow_lyapunov_exponents: source/models/abc_flow/abc_flow_lyapunov_exponents.
 
 NEWTON_TEST_HEADERS = $(CONTRIB_NMFD_NEWTON)/test/solvers/newton_test_fixture.h $(wildcard $(CONTRIB_NMFD_NEWTON)/include/nmfd/solvers/*.h $(CONTRIB_NMFD_NEWTON)/include/nmfd/detail/*.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/*.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/preconditioners/*.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/detail/*.h) $(COMMON_NMFD_OPERATIONS)/nmfd/operations/static_vector_space.h $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 NEWTON_TEST_HEADERS += $(COMMON_NMFD_OPERATIONS)/nmfd/operations/pair_vector_space.h
+NEWTON_TEST_HEADERS += $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/krylov/operator_apply.h
 NEWTON_TEST_INCLUDES = -I$(COMMON_NMFD_OPERATIONS) $(INMFD_NEWTON) -I$(CONTRIB_SCFD)/include -I$(CONTRIB_NMFD_NEWTON)/contrib/json
 NEWTON_TEST_FLAGS ?=
 
@@ -1087,6 +1089,9 @@ test_nmfd_newton_direct_solver_cpu.bin: source/common/tests/test_nmfd_newton_dir
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@
 
 FIXED_PARAMETER_NEWTON_HEADERS = source/nonlinear_operators/fixed_parameter_operator.h source/nonlinear_operators/projected_operator_helpers.h source/numerical_algos/recovering_linear_solver.h $(LINEAR_SOLVE_RECOVERY_HEADER) $(CONTINUATION_SYMMETRY_HEADERS) $(CIRCLE_MODEL_HEADERS) $(NEWTON_TEST_HEADERS) $(wildcard $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/detail/*.h)
+
+test_inexact_linear_solve_recovery_cpu.bin: source/numerical_algos/tests/test_inexact_linear_solve_recovery.cpp $(FIXED_PARAMETER_NEWTON_HEADERS) $(NMFD_NEWTON_ASSEMBLY_HEADERS)
+	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@
 
 test_fixed_parameter_newton_cpu.bin: source/nonlinear_operators/tests/test_fixed_parameter_newton.cpp $(FIXED_PARAMETER_NEWTON_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@

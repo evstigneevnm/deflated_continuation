@@ -142,6 +142,15 @@ Fixed-parameter corrections bind the parameter outside the Newton unknown.
 parameterized residual and linearization, including projected entry points.
 Parameter changes require fresh linearization; residual trials must preserve it.
 Project linear-solve retry policy remains outside NMFD's Newton iteration.
+`allow_inexact_increment` is opt-in and defaults to false. After linear failure,
+the convergence strategy may accept a finite correction only when the true,
+unpreconditioned defect satisfies `norm(b-J*delta) <= eta*norm(b)`; the default
+`maximum_relative_linear_residual` is 0.1 and must be finite and in `(0,1)`.
+Recovery assesses each failed correction before clearing it for retry, using the
+same strategy instance as Newton. Normal nonlinear tolerance and backtracking
+still apply. `used_inexact_increment()` records this fallback and resets per solve.
+Project fixed corrections expose `nonlinear_operator.newton.allow_inexact_increment`;
+continuation and deflation settings remain unchanged.
 
 Production circle, symmetric/full KS1D, and symmetry-restricted KS2D workflows select
 `main_classes::nmfd_newton_types` in assembly.

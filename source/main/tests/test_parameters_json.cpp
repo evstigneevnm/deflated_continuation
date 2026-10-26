@@ -102,6 +102,7 @@ void verify_full_configuration( const std::string &file_name )
     require( close_value( continuation.newton_extended_deflation.newton_wight, T( 0.5 ) ), "deflation Newton weight" );
 
     require( parameters.nonlinear_operator.N_size.size() == 1, "nonlinear dimensions size" );
+    require( !parameters.nonlinear_operator.newton.allow_inexact_increment, "fixed Newton fallback is opt-in" );
     const std::size_t nonlinear_dimension = parameters.nonlinear_operator.N_size.front();
     require(
         nonlinear_dimension >= 32 && ( nonlinear_dimension & ( nonlinear_dimension - 1 ) ) == 0, "nonlinear dimension"
@@ -262,7 +263,8 @@ void verify_optional_policy_defaults( const std::string &file_name )
 template <class T>
 void verify_stability_classifier_overrides( const std::string &file_name )
 {
-    auto  json                                                                 = main_classes::read_json( file_name );
+    auto json                                                                  = main_classes::read_json( file_name );
+    json["nonlinear_operator"]["newton"]["allow_inexact_increment"]            = true;
     auto &stability_json                                                       = json.at( "stability_continuation" );
     stability_json["stability_boundary_tolerance"]                             = 2.5e-5;
     stability_json["real_eigenvalue_tolerance"]                                = 3.5e-6;
@@ -290,8 +292,9 @@ void verify_stability_classifier_overrides( const std::string &file_name )
         { "retain_resolved", false }
     };
 
-    const auto  parameters = json.get<main_classes::parameters<T>>();
-    const auto &stability  = parameters.stability_continuation;
+    const auto parameters = json.get<main_classes::parameters<T>>();
+    require( parameters.nonlinear_operator.newton.allow_inexact_increment, "fixed Newton fallback override" );
+    const auto &stability = parameters.stability_continuation;
     require(
         close_value( stability.stability_boundary_tolerance, T( 2.5e-5 ) ), "stability boundary tolerance override"
     );

@@ -1050,14 +1050,16 @@ struct parameters
             bool         store_norms_history;
             bool         verbose;
             T            tolerance;
+            bool         allow_inexact_increment = false;
 
             void set_default()
             {
-                newton_max_it       = 300;
-                newton_wight        = T( 1.0 );
-                store_norms_history = true;
-                verbose             = true;
-                tolerance           = 1.0e-9;
+                newton_max_it           = 300;
+                newton_wight            = T( 1.0 );
+                store_norms_history     = true;
+                verbose                 = true;
+                tolerance               = 1.0e-9;
+                allow_inexact_increment = false;
             }
 
             void plot_all()
@@ -1067,6 +1069,7 @@ struct parameters
                 std::cout << "||  |==store_norms_history: " << store_norms_history << std::endl;
                 std::cout << "||  |==verbose: " << verbose << std::endl;
                 std::cout << "||  |==tolerance: " << tolerance << std::endl;
+                std::cout << "||  |==allow_inexact_increment: " << allow_inexact_increment << std::endl;
             }
         };
 

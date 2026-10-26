@@ -798,9 +798,10 @@ jobs:
           submodules: true
       - name: Verify binding, strategy substitution, rollback, lifetimes and workspace reuse
         run: |
-          make test_nmfd_newton_assembly_cpu.bin test_nmfd_newton_assembly_cpu_omp.bin \
+          make test_nmfd_newton_assembly_cpu.bin test_nmfd_newton_assembly_cpu_omp.bin test_inexact_linear_solve_recovery_cpu.bin \
             CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_assembly
           timeout 60s build/newton_assembly/test_nmfd_newton_assembly_cpu.bin
+          timeout 30s build/newton_assembly/test_inexact_linear_solve_recovery_cpu.bin
           OMP_NUM_THREADS=2 timeout 60s build/newton_assembly/test_nmfd_newton_assembly_cpu_omp.bin
 
   project-newton-assembly-cuda:
@@ -840,10 +841,11 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: |
-          make test_nmfd_newton_assembly_cpu.bin \
+          make test_nmfd_newton_assembly_cpu.bin test_inexact_linear_solve_recovery_cpu.bin \
             CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_assembly_sanitizers \
             NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
           timeout 60s build/newton_assembly_sanitizers/test_nmfd_newton_assembly_cpu.bin
+          timeout 30s build/newton_assembly_sanitizers/test_inexact_linear_solve_recovery_cpu.bin
 
   nmfd-direct-solver-cuda:
     name: Direct solver and dense operations / CUDA
@@ -1107,8 +1109,10 @@ jobs:
           submodules: true
       - name: Verify tolerance, stagnation, iteration limits, restart, and rollback
         run: |
-          make test_newton_convergence_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_convergence"
+          make test_newton_convergence_cpu.bin test_newton_inexact_increment_cpu.bin test_newton_inexact_increment_json_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_convergence"
           timeout 30s ./"$BUILD_DIR"/newton_convergence/test_newton_convergence_cpu.bin
+          timeout 30s ./"$BUILD_DIR"/newton_convergence/test_newton_inexact_increment_cpu.bin
+          timeout 30s ./"$BUILD_DIR"/newton_convergence/test_newton_inexact_increment_json_cpu.bin
 
   nmfd-newton-configuration-cpu:
     runs-on: ubuntu-latest
@@ -1171,8 +1175,8 @@ jobs:
           submodules: true
       - name: Run Newton regressions with address and undefined-behavior sanitizers
         run: |
-          make test_newton_failure_reporting_cpu.bin test_newton_backtracking_cpu.bin test_newton_convergence_cpu.bin test_newton_vector_ownership_cpu.bin test_newton_backtracking_json_cpu.bin test_newton_configuration_cpu.bin test_newton_configuration_json_cpu.bin test_newton_operator_binding_cpu.bin test_newton_dependency_ownership_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_sanitizers" NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-          for test in failure_reporting backtracking convergence vector_ownership backtracking_json configuration configuration_json operator_binding dependency_ownership; do
+          make test_newton_failure_reporting_cpu.bin test_newton_backtracking_cpu.bin test_newton_convergence_cpu.bin test_newton_inexact_increment_cpu.bin test_newton_inexact_increment_json_cpu.bin test_newton_vector_ownership_cpu.bin test_newton_backtracking_json_cpu.bin test_newton_configuration_cpu.bin test_newton_configuration_json_cpu.bin test_newton_operator_binding_cpu.bin test_newton_dependency_ownership_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/newton_sanitizers" NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          for test in failure_reporting backtracking convergence inexact_increment inexact_increment_json vector_ownership backtracking_json configuration configuration_json operator_binding dependency_ownership; do
             timeout 30s ./"$BUILD_DIR"/newton_sanitizers/"test_newton_${test}_cpu.bin"
           done
 

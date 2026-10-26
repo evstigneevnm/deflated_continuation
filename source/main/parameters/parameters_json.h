@@ -647,6 +647,7 @@ void parse_nonlinear_operator( const nlohmann::json &json, typename parameters<T
     params.problem_int_parameters_vector  = json.at( "problem_int_parameters_vector" ).template get<std::vector<int>>();
     parse_linear_solver<T>( json.at( "linear_solver" ), params.linear_solver );
     parse_newton<T>( json.at( "newton" ), params.newton );
+    params.newton.allow_inexact_increment = json.at( "newton" ).value( "allow_inexact_increment", false );
 }
 
 template <class Params>
