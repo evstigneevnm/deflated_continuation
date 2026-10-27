@@ -219,8 +219,9 @@ reuse the tangent. Chart selection/restoration stays in continuation assembly.
 Prepared projected problems use `projected_F_in_frozen_chart()` for residual
 trials when available. The optional trial projector borrows the unchanged Newton
 base iterate only during trial processing; that iterate must remain alive.
-The bordered binding preserves existing Sherman-Morrison recovery and residual
-checks, including its explicit failure when the scalar elimination pivot is zero.
+The corrector supplies the complete prepared augmented Jacobian. Solver selection
+and recovery belong to workflow assembly; a zero scalar elimination pivot does
+not by itself invalidate the augmented system.
 
 Optional capabilities include adjoint/parameter actions, preconditioners,
 symmetries, exact branches, seed generation, physical output, and consistency
@@ -271,6 +272,87 @@ workspaces. Preconditioners consume the complete prepared operator.
   least-squares stationary point does not certify a root.
 - Validate the requested invariant object: an RE satisfies its drift-inclusive
   equations, not necessarily the unprojected stationary equation.
+
+## Augmented Linear Systems
+
+The problem formulates the complete residual and prepared Jacobian. The linear
+solver consumes that Jacobian; the preconditioner supplies an approximate inverse.
+
+For a two-block system:
+```text
+K = [ A  B ],    K * (du, dp) = (b, beta).
+    [ C  E ]
+```
+
+The second block may contain one parameter, k parameters, another physical field,
+or a nested product. E may be zero. Neither symmetry nor C = B* is assumed.
+
+### Spaces And Operators
+
+- NMFD-operations owns vector spaces and algebraic views.
+  `product_vector_space<X, Y>` supports heterogeneous blocks;
+  `glued_vector_space<X, n>` supports blocks with the same concrete space type.
+  Glued component dimensions may differ and may be runtime-sized; only the number
+  of components `n` is fixed at compile time in the current implementation.
+  Neither representation requires concatenating numerical data into one allocation.
+- The Jacobian exposes `apply(input, output)`. Block-aware preconditioners
+  additionally consume typed block accessors or views backed by that Jacobian.
+  Ordinary Krylov solvers require no block knowledge.
+- Preserve component metrics and application-specific residual norms.
+  Replicated parameters contribute only once to MPI-global reductions.
+- Prepared blocks remain unchanged throughout a linear solve. Changes to values,
+  layout, or distribution invalidate dependent preconditioner setup, even when
+  the operator pointer remains unchanged.
+
+### Solvers And Preconditioners
+
+Use the ordinary solver interface on the complete product space:
+```cpp
+solver.set_operator( jacobian );
+bool converged = solver.solve( rhs, correction );
+```
+
+GMRES and BiCGStab(L) require fixed linear preconditioning within each solve.
+Variable or nonlinear preconditioning requires a suitable flexible solver.
+A fixed number of inner Krylov iterations does not generally define a linear map.
+
+Check the true residual of the complete original system before reporting linear
+convergence. Keep nonlinear acceptance, inexact-increment policy, and retry
+decisions separate from preconditioning.
+
+### Block-Schur Preconditioning
+
+NMFD-linsolvers owns the reusable block-Schur algorithm. With H approximating
+A inverse and Q approximating the inverse of S = E - C*H*B, its full action is:
+```text
+w = H*r;
+z = Q*(s - C*w);
+x = w - H*(B*z);
+```
+
+Supply H and Q independently of the application. Small parameter borders may
+assemble and factor S using dense operations; never form its explicit inverse.
+Caching columns of H*B is optional. Large second blocks use supplied scalable
+Schur approximations, not mandatory dense matrices or per-column state storage.
+
+E = 0 does not imply that K is singular. A may also be singular while K is
+nonsingular. Unusable approximate factors are preconditioner failures, not proof
+of singularity of K. Any shifts or regularization affect only the preconditioner.
+Select recovery explicitly and restart the Krylov recurrence when required.
+
+For Navier-Stokes, the blocks may represent velocity and pressure. Pressure
+gauges, compatible nullspaces, and velocity/pressure inverse approximations
+remain application responsibilities.
+
+### Integration And Verification
+
+Use the augmented path for corrector, initial-tangent, and tangent-update solves.
+Keep Sherman-Morrison available for explicitly selected elimination and rank-one
+paths; do not require scalar elimination for every augmented system.
+
+Verify k = 1 and k > 1, zero E, singular A with nonsingular K, true residuals,
+repeated preparation, failed setup, recovery, and rollback. Include assembled
+reference comparisons, a gauge-fixed Stokes case, and supported backend/MPI tests.
 
 ## Time Integration
 
