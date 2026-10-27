@@ -338,7 +338,7 @@ jobs:
           submodules: true
       - name: Verify linear solvers with canonical parent dependencies
         run: |
-          make -C source/contrib/nmfd-linsolvers -j2 check_operations_cpu check_public_headers_cpu \
+          make -C source/contrib/nmfd-linsolvers -j2 check_operations_cpu check_public_headers_cpu check_block_schur_cpu \
             CONFIG_FILE=build_configs/config_github_ubuntu_gcc.inc \
             BUILD_DIR=build/operations_integration TEST_OMP_NUM_THREADS=2
 

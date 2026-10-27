@@ -279,6 +279,7 @@ The problem formulates the complete residual and prepared Jacobian. The linear
 solver consumes that Jacobian; the preconditioner supplies an approximate inverse.
 
 For a two-block system:
+
 ```text
 K = [ A  B ],    K * (du, dp) = (b, beta).
     [ C  E ]
@@ -307,6 +308,7 @@ or a nested product. E may be zero. Neither symmetry nor C = B* is assumed.
 ### Solvers And Preconditioners
 
 Use the ordinary solver interface on the complete product space:
+
 ```cpp
 solver.set_operator( jacobian );
 bool converged = solver.solve( rhs, correction );
@@ -324,6 +326,7 @@ decisions separate from preconditioning.
 
 NMFD-linsolvers owns the reusable block-Schur algorithm. With H approximating
 A inverse and Q approximating the inverse of S = E - C*H*B, its full action is:
+
 ```text
 w = H*r;
 z = Q*(s - C*w);
@@ -334,6 +337,29 @@ Supply H and Q independently of the application. Small parameter borders may
 assemble and factor S using dense operations; never form its explicit inverse.
 Caching columns of H*B is optional. Large second blocks use supplied scalable
 Schur approximations, not mandatory dense matrices or per-column state storage.
+
+`operations::block_operator<ProductSpace, A, B, C, E>` composes typed blocks;
+`block_11()`, `block_12()`, `block_21()`, and `block_22()` return retained handles.
+Its `apply(in, out)` requires distinct vectors; zero blocks are operators, not
+null handles. Existing prepared Jacobians may expose the same block accessors.
+
+`preconditioners::block_schur<Space, Operator, H, Q, Access>` retains supplied
+inverse approximations. `set_operator()` prepares H from A and Q from the
+matrix-free `schur_complement_operator`; `update_operator()` rebuilds even for
+the same handle. Component setup and in-place `apply(vector)` return void or bool.
+`ready()` is false after failed setup. `apply(rhs, out)` and `apply(in_out)`
+return bool and publish no partial or nonfinite result. Recreate workspaces when
+component layouts change. Concurrent solves require independent mutable setup.
+MPI component actions must agree on failure before subsequent collectives.
+
+The default `operations::two_block_access<Space, Operator>` maps product vectors
+and typed operator blocks without state. For `glued_matrix_operator<Operations, 2>`,
+pass `Access(operations)` as the fourth constructor argument, using the same
+shared operations as the glued matrix. Access retains operations and applies raw
+blocks directly; glued matrix/vector interfaces remain unchanged. No numerical
+data is copied by access. Shared block handles are acquired only during setup.
+The Schur view's `get_operator()` exposes the retained original system for
+matrix-aware Q setup. Larger glued grids require an explicit two-block partition.
 
 E = 0 does not imply that K is singular. A may also be singular while K is
 nonsingular. Unusable approximate factors are preconditioner failures, not proof
