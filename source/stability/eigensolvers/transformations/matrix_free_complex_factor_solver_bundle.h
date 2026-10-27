@@ -118,8 +118,7 @@ public:
         SolverParametersFactory &&solver_parameters_factory, log_type *log = nullptr
     )
         : real_space_( std::move( real_space ) ), complex_space_( std::move( complex_space ) ),
-          provider_( checked_provider( std::move( provider ) ) ),
-          product_space_( checked_real_space(), checked_real_space() ),
+          provider_( checked_provider( std::move( provider ) ) ), product_space_( real_space_, real_space_ ),
           bridge_( product_space_, checked_complex_space() ),
           complexified_operator_( product_space_, bridge_, real_operator ),
           identity_operator_( checked_complex_space() ),

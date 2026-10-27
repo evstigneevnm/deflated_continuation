@@ -20,7 +20,7 @@ int main( int argc, char const *argv[] )
 
     for ( int j = 0; j < 10; j++ )
     {
-        auto &x = vec_ops.at( V, 10, j );
+        auto &x = V[j];
         for ( int k = 0; k < 100; k++ )
         {
 
@@ -31,7 +31,7 @@ int main( int argc, char const *argv[] )
 
     for ( int j = 0; j < 10; j++ )
     {
-        auto &x = vec_ops.at( V, 10, j );
+        auto &x = V[j];
         for ( int k = 0; k < 100; k++ )
         {
 

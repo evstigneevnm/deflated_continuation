@@ -1295,7 +1295,7 @@ void run_multivector_suite(
 
     for ( std::size_t k = 0; k < m; ++k )
     {
-        auto &vector = vec_ops.at( values, m, k );
+        auto &vector = values[k];
         vec_ops.assign_scalar(
             make_scalar<scalar_type>( static_cast<long double>( k + 1 ), 0.25L * static_cast<long double>( k ) ), vector
         );
@@ -1303,12 +1303,12 @@ void run_multivector_suite(
 
     for ( std::size_t k = 0; k < m; ++k )
     {
-        auto      &vector   = vec_ops.at( values, m, k );
+        auto      &vector   = values[k];
         const auto expected = std::vector<scalar_type>(
             n, make_scalar<scalar_type>( static_cast<long double>( k + 1 ), 0.25L * static_cast<long double>( k ) )
         );
         check_vector_close(
-            report, label + " multivector at " + std::to_string( k ), access.read( vec_ops, vector, n ), expected
+            report, label + " multivector column " + std::to_string( k ), access.read( vec_ops, vector, n ), expected
         );
     }
 
