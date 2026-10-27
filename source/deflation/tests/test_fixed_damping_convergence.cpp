@@ -274,7 +274,7 @@ void test_integration( test_report &report )
     using types = main_classes::nmfd_newton_types<
         space_type, log_type, typename fixture_type::problem_type, state_operator_type, system_type,
         typename fixture_type::solutions_type, main_classes::detail::newton_convergence,
-        main_classes::detail::newton_convergence, main_classes::detail::fixed_damping_deflation_convergence>;
+        main_classes::detail::continuation_convergence, main_classes::detail::fixed_damping_deflation_convergence>;
     static_assert(
         std::is_same_v<typename types::fixed_convergence_type, typename default_types::fixed_convergence_type>
     );

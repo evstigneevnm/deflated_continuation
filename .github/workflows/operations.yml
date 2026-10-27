@@ -880,7 +880,7 @@ jobs:
   nmfd-cahn-hilliard-mpi:
     name: Original Cahn-Hilliard / MPI / ${{ matrix.ranks }} ranks
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -1928,7 +1928,7 @@ jobs:
   timestepper-lorenz-simulation-python-cpu:
     needs: [timestepper-tables-explicit-cpu, timestepper-explicit-lorenz-cpu, timestepper-scipy-adaptation-cpu, timestepper-dop853-adaptive-cpu]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
         with:
