@@ -11,6 +11,8 @@
 #include <numerical_algos/recovering_linear_solver.h>
 #include <continuation/corrector_operator.h>
 #include <continuation/bordered_linear_solver.h>
+#include <continuation/augmented_linear_solver.h>
+#include <continuation/augmented_tangent.h>
 #include <deflation/deflated_operator.h>
 #include <deflation/fixed_damping_convergence_strategy.h>
 #include <deflation/rank_one_linear_solver.h>
@@ -154,16 +156,22 @@ template <
     class Space, class Log, class Problem, class Jacobian, class LinearSystem, class Storage,
     template <class, class, class, class, class> class FixedConvergence        = detail::newton_convergence,
     template <class, class, class, class, class> class ContinuationConvergence = detail::continuation_convergence,
-    template <class, class, class, class, class> class DeflationConvergence    = detail::deflation_convergence>
+    template <class, class, class, class, class> class DeflationConvergence    = detail::deflation_convergence,
+    class AugmentedLinear                                                      = void>
 struct nmfd_newton_types
     : nmfd_fixed_newton_types<
           Space, Log, Problem, Jacobian, typename LinearSystem::linear_solver_original_type, FixedConvergence>
 {
-    using scalar_type             = typename Space::scalar_type;
-    using corrector_operator_type = continuation::corrector_operator<Space, Problem, Jacobian>;
-    using pair_space_type         = typename corrector_operator_type::vector_space_type;
-    using bordered_type =
-        continuation::bordered_linear_solver<typename corrector_operator_type::jacobi_operator_type, LinearSystem>;
+    static constexpr bool uses_augmented_linear_solver = !std::is_void_v<AugmentedLinear>;
+    using scalar_type                                  = typename Space::scalar_type;
+    using corrector_operator_type                      = continuation::corrector_operator<Space, Problem, Jacobian>;
+    using pair_space_type                              = typename corrector_operator_type::vector_space_type;
+    using bordered_type                                = std::conditional_t<
+                                       std::is_void_v<AugmentedLinear>,
+                                       continuation::bordered_linear_solver<typename corrector_operator_type::jacobi_operator_type, LinearSystem>,
+                                       AugmentedLinear>;
+    using tangent_solver_type = std::conditional_t<
+        std::is_void_v<AugmentedLinear>, void, continuation::augmented_tangent<corrector_operator_type, bordered_type>>;
     using continuation_method = detail::nmfd_correction_method<
         Space, pair_space_type, Log, Problem, corrector_operator_type, bordered_type,
         typename corrector_operator_type::trial_projector, ContinuationConvergence>;
@@ -180,11 +188,34 @@ struct nmfd_newton_types
 
     struct state
     {
+        std::shared_ptr<bordered_type>                bordered;
+        std::shared_ptr<tangent_solver_type>          tangent;
         std::shared_ptr<corrector_operator_type>      corrector_operator;
         std::shared_ptr<continuation_correction_type> corrector;
         std::shared_ptr<deflated_operator_type>       deflated_operator;
         std::shared_ptr<deflation_correction_type>    deflated;
     };
+
+    template <class Preconditioner>
+    static auto make_bordered(
+        const std::shared_ptr<pair_space_type> &space, const std::shared_ptr<LinearSystem> &system,
+        const std::shared_ptr<Preconditioner> &preconditioner, Log *log
+    )
+    {
+        if constexpr ( std::is_void_v<AugmentedLinear> )
+            return std::make_shared<bordered_type>( system );
+        else
+            return std::make_shared<bordered_type>( space, preconditioner, log );
+    }
+
+    static std::shared_ptr<tangent_solver_type>
+    make_tangent( const std::shared_ptr<corrector_operator_type> &op, const std::shared_ptr<bordered_type> &linear )
+    {
+        if constexpr ( std::is_void_v<AugmentedLinear> )
+            return nullptr;
+        else
+            return std::make_shared<tangent_solver_type>( op, linear );
+    }
 
     template <class Parameters>
     static void configure_continuation( continuation_convergence_type *strategy, const Parameters &parameters )
@@ -203,6 +234,14 @@ struct nmfd_newton_types
         detail::configure_deflation_strategy( strategy, parameters );
     }
 };
+
+template <class Space, class Log, class Problem, class Jacobian, class LinearSystem, class Storage, class FirstInverse>
+using nmfd_augmented_newton_types = nmfd_newton_types<
+    Space, Log, Problem, Jacobian, LinearSystem, Storage, detail::newton_convergence, detail::continuation_convergence,
+    detail::deflation_convergence,
+    continuation::augmented_linear_solver<
+        typename continuation::corrector_operator<Space, Problem, Jacobian>::vector_space_type,
+        typename continuation::corrector_operator<Space, Problem, Jacobian>::jacobi_operator_type, FirstInverse, Log>>;
 
 }
 

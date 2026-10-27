@@ -8,6 +8,7 @@
 #include <nmfd/detail/vector_wrap.h>
 #include <nmfd/operations/pair_vector_space.h>
 #include <nmfd/operations/static_vector_space.h>
+#include <nmfd/operations/two_block_access.h>
 #include <scfd/static_vec/vec.h>
 #include <common/scalar_math.h>
 #include <continuation/arclength_constraint.h>
@@ -16,6 +17,24 @@
 
 namespace continuation
 {
+
+// Access the prepared corrector directly: no block objects, handle copies, or extra vectors.
+template <class Space, class Operator>
+struct corrector_block_access : nmfd::operations::two_block_access<Space, Operator>
+{
+    template <std::size_t I, std::size_t J>
+    static const auto &block( const Operator &op )
+    {
+        static_assert( I == 0 && J == 0, "Only state-inverse setup requires a retained block handle" );
+        return op.state_operator;
+    }
+
+    template <std::size_t I, std::size_t J, class Input, class Output>
+    bool apply_block( const Operator &op, const Input &in, Output &out ) const
+    {
+        return op.template apply_block<I, J>( in, out );
+    }
+};
 
 // Match the legacy corrector merit without changing the bordered algebra.
 struct corrector_residual_norm
@@ -65,6 +84,26 @@ public:
             parameter_column.start_use();
             constraint_row.init();
             constraint_row.start_use();
+        }
+
+        template <std::size_t I, std::size_t J, class Input, class Output>
+        bool apply_block( const Input &in, Output &out ) const
+        {
+            static_assert( I < 2 && J < 2, "Corrector block index must be 0 or 1" );
+            if constexpr ( I == 0 && J == 0 )
+            {
+                if constexpr ( std::is_void_v<decltype( state_operator->apply( in, out ) )> )
+                    state_operator->apply( in, out );
+                else
+                    return state_operator->apply( in, out );
+            }
+            else if constexpr ( I == 0 && J == 1 )
+                operations->assign_lin_comb( in[0], *parameter_column, out );
+            else if constexpr ( I == 1 && J == 0 )
+                out[0] = operations->scalar_prod( *constraint_row, in );
+            else
+                out[0] = constraint_parameter * in[0];
+            return true;
         }
 
         // Apply [J F_parameter; constraint_state constraint_parameter] without aliasing.
@@ -152,6 +191,20 @@ public:
         reference_           = &state.first;
         reference_parameter_ = state.second[0];
         prepared_            = true;
+    }
+
+    // Tangent equations use the same prepared Jacobian, with a supplied normalization row.
+    void prepare_tangent(
+        const state_vector_type &state, scalar_type parameter, const state_vector_type &row, scalar_type row_parameter
+    )
+    {
+        prepared_  = false;
+        reference_ = nullptr;
+        nonlinear_operators::detail::set_linearization_point( problem_.get(), state, parameter );
+        nonlinear_operators::detail::jacobian_alpha( problem_.get(), *jacobian_->parameter_column );
+        operations_->assign( row, *jacobian_->constraint_row );
+        jacobian_->constraint_parameter = row_parameter;
+        prepared_                       = true;
     }
 
     std::shared_ptr<const jacobi_operator_type> get_jacobi_operator() const

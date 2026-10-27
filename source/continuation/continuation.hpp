@@ -144,12 +144,14 @@ private:
 
     struct legacy_types
     {
+        using tangent_solver_type = void;
         using continuation_convergence_type =
             newton_method_extended::convergence_strategy<VectorOperations, NonlinearOperator, Log>;
         using continuation_correction_type = numerical_algos::newton_method_extended::newton_solver_extended<
             VectorOperations, NonlinearOperator, system_operator_cont_t, continuation_convergence_type, T>;
     };
     using selected_types            = std::conditional_t<std::is_void_v<NewtonTypes>, legacy_types, NewtonTypes>;
+    using tangent_solver_type       = typename selected_types::tangent_solver_type;
     using convergence_newton_cont_t = typename selected_types::continuation_convergence_type;
     using newton_cont_t             = typename selected_types::continuation_correction_type;
 
@@ -157,10 +159,11 @@ private:
 
     typedef advance_solution<
         VectorOperations, Log, newton_cont_t, Newton, NonlinearOperator, system_operator_cont_t, predictor_cont_t,
-        convergence_newton_cont_t>
+        convergence_newton_cont_t, tangent_solver_type>
         advance_step_cont_t;
 
-    typedef initial_tangent<VectorOperations, Log, Newton, NonlinearOperator, LinearOperator, LinearSolver>
+    typedef initial_tangent<
+        VectorOperations, Log, Newton, NonlinearOperator, LinearOperator, LinearSolver, tangent_solver_type>
         tangent_0_cont_t;
 
     using seed_tangent_cache_t = semicurve_tangent_cache<VectorOperations>;
@@ -170,7 +173,8 @@ public:
     continuation(
         VectorOperations *vec_ops_, VectorFileOperations *file_ops_, Log *log_, NonlinearOperator *nonlin_op_,
         LinearOperator *lin_op_, Knots *knots_, LinearSolver *SM_, Newton *newton_,
-        std::shared_ptr<newton_cont_t> correction = nullptr
+        std::shared_ptr<newton_cont_t>       correction     = nullptr,
+        std::shared_ptr<tangent_solver_type> tangent_solver = nullptr
     )
         : vec_ops( vec_ops_ ), file_ops( file_ops_ ), log( log_ ), nonlin_op( nonlin_op_ ), knots( knots_ ), SM( SM_ ),
           newton( newton_ ), lin_op( lin_op_ ), seed_tangent_cache( vec_ops_ )
@@ -178,6 +182,9 @@ public:
         if constexpr ( !std::is_void_v<NewtonTypes> )
             if ( !correction )
                 throw std::invalid_argument( "Continuation requires an assembled correction" );
+        if constexpr ( !std::is_void_v<tangent_solver_type> )
+            if ( !tangent_solver )
+                throw std::invalid_argument( "Continuation requires an assembled augmented tangent solver" );
         predict              = new predictor_cont_t( vec_ops, log );
         system_operator_cont = new system_operator_cont_t( vec_ops, log, lin_op, SM );
         if constexpr ( std::is_void_v<NewtonTypes> )
@@ -195,6 +202,8 @@ public:
             vec_ops, log, system_operator_cont, newton_cont, newton, predict, conv_newton_cont
         );
         init_tangent = new tangent_0_cont_t( vec_ops, log, newton, lin_op, SM );
+        continuation_step->set_tangent_solver( tangent_solver );
+        init_tangent->set_tangent_solver( std::move( tangent_solver ) );
 
 
         max_S = 100;

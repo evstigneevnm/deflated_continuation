@@ -361,6 +361,13 @@ data is copied by access. Shared block handles are acquired only during setup.
 The Schur view's `get_operator()` exposes the retained original system for
 matrix-aware Q setup. Larger glued grids require an explicit two-block partition.
 
+`preconditioners::small_schur_inverse<Space, Operator, Capacity>` samples and factors
+only the small Schur block during setup, then reuses its LU factors. The parameter
+space supplies `size()`, `set/get()`, and basis-entry assignment. It must be locally
+addressable or replicated, not an arbitrary distributed physical field. Capacity
+defaults to 16 and is configurable; the existing small-dense LU currently supports
+real floating-point scalars. Failed setup disables stale factors.
+
 E = 0 does not imply that K is singular. A may also be singular while K is
 nonsingular. Unusable approximate factors are preconditioner failures, not proof
 of singularity of K. Any shifts or regularization affect only the preconditioner.
@@ -375,6 +382,13 @@ remain application responsibilities.
 Use the augmented path for corrector, initial-tangent, and tangent-update solves.
 Keep Sherman-Morrison available for explicitly selected elimination and rank-one
 paths; do not require scalar elimination for every augmented system.
+
+Circle selects `main_classes::nmfd_augmented_newton_types`; other workflows retain
+their explicitly selected scalar-elimination path until migrated. Its corrector
+and tangent solves reuse the prepared corrector Jacobian and fixed state inverse.
+The application boundary verifies the original augmented residual and commits
+only successful corrections. Existing recovery may retry without preconditioning;
+Schur setup failure does not classify the original Jacobian as singular.
 
 Verify k = 1 and k > 1, zero E, singular A with nonsingular K, true residuals,
 repeated preparation, failed setup, recovery, and rollback. Include assembled

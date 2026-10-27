@@ -11,6 +11,7 @@
 #include <cmath>
 #include <type_traits>
 #include <limits>
+#include <memory>
 
 #include <common/scalar_math.h>
 #include <continuation/chart_helpers.h>
@@ -25,7 +26,7 @@ namespace continuation
 
 template <
     class VectorOperations, class Loggin, class NewtonMethod, class NonlinearOperator, class LinearOperator,
-    class LinearSystemSolver>
+    class LinearSystemSolver, class TangentSolver = void>
 class initial_tangent
 {
 
@@ -76,6 +77,11 @@ public:
     void set_predictor_chart_policy( const predictor_chart_policy<T> &policy )
     {
         chart_validator.set_policy( policy );
+    }
+
+    void set_tangent_solver( std::shared_ptr<TangentSolver> solver )
+    {
+        tangent_solver_ = std::move( solver );
     }
 
     void set_projected_tangent_quality_policy( const projected_tangent_quality_policy<T> &policy )
@@ -218,6 +224,14 @@ public:
 
         if ( !linear_system_converged )
         {
+            if constexpr ( !std::is_void_v<TangentSolver> )
+            {
+                if ( tangent_solver_->initial( x, lambda, sign, x_s, lambda_s ) &&
+                     validate_tangent_candidate(
+                         nonlin_op, x, lambda, x_s, lambda_s, predictor_ds, "augmented solve"
+                     ) )
+                    return true;
+            }
             log->warning(
                 "continuation::initial_tangent: execute failed to converge. Attempting to use an approximate tangent "
                 "from Newton-Raphson secants."
@@ -240,6 +254,8 @@ public:
 
 
 private:
+    std::shared_ptr<TangentSolver> tangent_solver_;
+
     bool execute_projected_bordered_tangent(
         NonlinearOperator *nonlin_op, const T sign, const T_vec &x, const T &lambda, T_vec &x_s, T &lambda_s,
         const T &predictor_ds

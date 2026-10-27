@@ -6,6 +6,7 @@
 #include <string>
 #include <utility>
 #include <main/solver_construction.h>
+#include <main/deflation_continuation/parameter_application.h>
 
 namespace main_classes
 {
@@ -107,10 +108,12 @@ private:
         nmfd_.corrector_operator = std::make_shared<typename NewtonTypes::corrector_operator_type>(
             vector_operations_owner_, nonlinear_operations_owner_, linear_operator_
         );
+        nmfd_.bordered =
+            NewtonTypes::make_bordered( nmfd_.corrector_operator->space(), linear_system_, preconditioner_, log );
+        nmfd_.tangent   = NewtonTypes::make_tangent( nmfd_.corrector_operator, nmfd_.bordered );
         nmfd_.corrector = NewtonTypes::continuation_method::make(
             vector_operations_owner_, nonlinear_operations_owner_, nmfd_.corrector_operator,
-            nmfd_.corrector_operator->space(), std::make_shared<typename NewtonTypes::bordered_type>( linear_system_ ),
-            log,
+            nmfd_.corrector_operator->space(), nmfd_.bordered, log,
             std::make_shared<typename NewtonTypes::corrector_operator_type::trial_projector>( nmfd_.corrector_operator )
         );
         nmfd_.deflated_operator = std::make_shared<typename NewtonTypes::deflated_operator_type>(
@@ -131,10 +134,11 @@ private:
         auto *system  = linear_system_.get();
         auto *knots   = knots_.get();
         auto *fixed   = newton_.get();
-        continuation_ =
-            std::make_unique<continuation_type>( ops, files, log, problem, op, knots, system, fixed, nmfd_.corrector );
+        continuation_ = std::make_unique<continuation_type>(
+            ops, files, log, problem, op, knots, system, fixed, nmfd_.corrector, nmfd_.tangent
+        );
         analytical_continuation_ = std::make_unique<analytical_continuation_type>(
-            ops, files, log, problem, op, knots, system, fixed, nmfd_.corrector
+            ops, files, log, problem, op, knots, system, fixed, nmfd_.corrector, nmfd_.tangent
         );
         diagram_ = std::make_unique<diagram_type>( ops, files, log, problem, fixed, project_directory, skip_files );
         deflation_ =
@@ -243,6 +247,14 @@ public:
     bool owns_solution_storage() const
     {
         return owned_solution_storage_ != nullptr || ( storage_owner_ && !external_solution_storage_owner_ );
+    }
+
+    template <class Parameters>
+    void configure_augmented( const Parameters &parameters )
+    {
+        if constexpr ( !std::is_void_v<NewtonTypes> )
+            if constexpr ( !std::is_void_v<typename NewtonTypes::tangent_solver_type> )
+                configure_linear_solver<scalar_type>( nmfd_.bordered.get(), parameters );
     }
 
     template <class Parameters>

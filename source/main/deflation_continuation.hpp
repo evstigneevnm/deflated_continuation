@@ -502,6 +502,7 @@ public:
             SM->get_linsolver_handle(), linear_solver_parameters
         );
         SM->is_small_alpha( linear_solver_parameters.is_small_alpha );
+        solver_bundle->configure_augmented( linear_solver_parameters );
     }
     void set_newton()
     /*T tolerance_, unsigned int maximum_iterations_, T newton_wight_ = T(0.5), bool store_norms_history_ = false, bool verbose_ = true*/

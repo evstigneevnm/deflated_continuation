@@ -168,6 +168,7 @@ CIRCLE_STABILITY_HEADERS = $(CIRCLE_MODEL_HEADERS) source/stability/eigensolvers
 NMFD_NEWTON_ASSEMBLY_HEADERS = source/main/nmfd_newton_types.h source/numerical_algos/parameterized_correction.h source/numerical_algos/recovering_linear_solver.h source/nonlinear_operators/fixed_parameter_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/corrector_operator.h source/continuation/bordered_linear_solver.h source/continuation/arclength_constraint.h source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h source/deflation/solution_storage.h $(wildcard source/contrib/nmfd-newton/include/nmfd/solvers/*.h)
 NMFD_NEWTON_ASSEMBLY_HEADERS += source/deflation/fixed_damping_convergence_strategy.h
 NMFD_NEWTON_ASSEMBLY_HEADERS += $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/krylov/operator_apply.h
+NMFD_NEWTON_ASSEMBLY_HEADERS += source/continuation/augmented_linear_solver.h source/continuation/augmented_tangent.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/preconditioners/block_schur.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/preconditioners/small_schur_inverse.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/two_block_access.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/linalg/small_dense.h
 CIRCLE_MODEL_HEADERS += $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 NMFD_DIRECT_SOLVER_HEADERS = $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/direct_solver.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/default_monitor.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/iter_solver_base.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/sherman_morrison.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/dense_operations_base.h
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/models/bratu/bratu_model_config.h source/models/bratu/bratu_linear_solvers.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h $(NMFD_DIRECT_SOLVER_HEADERS)
@@ -1104,6 +1105,7 @@ test_fixed_parameter_newton_cuda.bin: source/nonlinear_operators/tests/test_fixe
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_fixed_parameter_newton_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
 
 CONTINUATION_WRAPPER_TEST_HEADERS = source/continuation/corrector_operator.h source/continuation/arclength_constraint.h source/continuation/bordered_linear_solver.h source/continuation/tests/continuation_newton_fixture.h source/continuation/system_operator_continuation.h $(FIXED_PARAMETER_NEWTON_HEADERS) $(CONTINUATION_CHART_HEADERS) $(COMMON_NMFD_OPERATIONS)/nmfd/operations/pair_vector_space.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/static_vector_space.h
+CONTINUATION_WRAPPER_TEST_HEADERS += $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 
 test_continuation_%_cpu.bin: source/continuation/tests/test_continuation_%.cpp $(CONTINUATION_WRAPPER_TEST_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@
@@ -1114,6 +1116,10 @@ test_continuation_%_cpu_omp.bin: source/continuation/tests/test_continuation_%.c
 test_continuation_%_cuda.bin: source/continuation/tests/test_continuation_%.cpp $(CONTINUATION_WRAPPER_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda $(IPROJECT) $(INMFD_NEWTON) $(ICUDA) -DTEST_VECTOR_BACKEND_CUDA -x cu -c $< -o $(BUILD_DIR)/test_continuation_$*_cuda.o
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_continuation_$*_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
+
+test_continuation_%_hip.bin: source/continuation/tests/test_continuation_%.cpp $(CONTINUATION_WRAPPER_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
+	$(HIPCC) $(HIPFLAGS) $(IPROJECT) $(INMFD_NEWTON) -DTEST_VECTOR_BACKEND_HIP -c $< -o $(BUILD_DIR)/test_continuation_$*_hip.o
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_continuation_$*_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $(BUILD_DIR)/$@
 
 DEFLATION_WRAPPER_TEST_HEADERS = source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h source/deflation/solution_storage.h source/deflation/symmetry_solution_storage.h source/deflation/tests/deflation_newton_fixture.h $(FIXED_PARAMETER_NEWTON_HEADERS)
 

@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include <cmath>
 #include <limits>
+#include <memory>
+#include <type_traits>
 #include <common/scalar_math.h>
 #include <continuation/chart_helpers.h>
 #include <continuation/continuation_step_state.h>
@@ -40,7 +42,7 @@ void prepare_corrector( Correction *, const Vector &, T, const Vector &, T, T, c
 
 template <
     class VectorOperations, class Loggin, class NewtonMethodExtended, class NewtonMethod, class NonlinearOperator,
-    class SystemOperator, class Predictoror, class ConvergenceNewtonExtended>
+    class SystemOperator, class Predictoror, class ConvergenceNewtonExtended, class TangentSolver = void>
 class advance_solution
 {
 public:
@@ -83,6 +85,11 @@ public:
         vec_ops->free_vector( x1_l );
         vec_ops->stop_use_vector( x_p );
         vec_ops->free_vector( x_p );
+    }
+
+    void set_tangent_solver( std::shared_ptr<TangentSolver> solver )
+    {
+        tangent_solver_ = std::move( solver );
     }
 
 
@@ -429,7 +436,12 @@ public:
                     (double)predictor->get_ds(), (double)tangent_norm, (double)arclength_res
                 );
             }
-            tangent_obtained = sys_op->update_tangent_space( nonlin_op, x1, lambda1, x1_s, lambda1_s );
+            if constexpr ( !std::is_void_v<TangentSolver> )
+                tangent_obtained = tangent_solver_->apply(
+                    x1, lambda1, x0_s, lambda0_s, x1_s, lambda1_s, T( 1e-5 ) * vec_ops->get_l2_size(), 1000
+                );
+            else
+                tangent_obtained = sys_op->update_tangent_space( nonlin_op, x1, lambda1, x1_s, lambda1_s );
         }
         if ( ( converged ) && ( !tangent_obtained ) )
         {
@@ -588,6 +600,7 @@ public:
 
 
 private:
+    std::shared_ptr<TangentSolver> tangent_solver_;
     template <class Predictor>
     static auto predictor_retry_count( Predictor *predictor_, int ) -> decltype( predictor_->get_retry_count() )
     {

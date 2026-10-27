@@ -202,8 +202,9 @@ int main( int argc, char const *argv[] )
     // NMFD's default convergence strategy still needs a separate multiprecision-math pass.
     using newton_types = void;
 #else
-    using newton_types =
-        main_classes::nmfd_newton_types<vec_ops_real, log_t, circle_t, lin_op_t, linear_system_type, storage_type>;
+    using newton_types = main_classes::nmfd_augmented_newton_types<
+        vec_ops_real, log_t, circle_t, lin_op_t, linear_system_type, storage_type, prec_t>;
+    static_assert( newton_types::uses_augmented_linear_solver, "Circle continuation requires augmented Krylov solves" );
 #endif
     using deflation_continuation_t = main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, circle_t, lin_op_t, prec_t, circle_model::cgs,

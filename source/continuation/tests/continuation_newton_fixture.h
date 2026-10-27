@@ -9,6 +9,8 @@
 #include <type_traits>
 #if defined( TEST_VECTOR_BACKEND_CUDA )
 #    include <scfd/backend/cuda.h>
+#elif defined( TEST_VECTOR_BACKEND_HIP )
+#    include <scfd/backend/hip.h>
 #elif defined( TEST_VECTOR_BACKEND_OMP )
 #    include <scfd/backend/omp.h>
 #else
@@ -25,6 +27,8 @@ namespace tests
 {
 #if defined( TEST_VECTOR_BACKEND_CUDA )
 using backend_type = scfd::backend::cuda<std::ptrdiff_t>;
+#elif defined( TEST_VECTOR_BACKEND_HIP )
+using backend_type = scfd::backend::hip<std::ptrdiff_t>;
 #elif defined( TEST_VECTOR_BACKEND_OMP )
 using backend_type = scfd::backend::omp<std::ptrdiff_t>;
 #else
