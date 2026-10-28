@@ -60,6 +60,25 @@ class ReferenceWorkflowTest(unittest.TestCase):
 
 
 class ReferenceComparisonTest(unittest.TestCase):
+    def test_production_run_requires_augmented_selection(self):
+        newton = "Newton solver: NMFD\n"
+        augmented = "Continuation linear solver: augmented BiCGStab(L)\n"
+        for output, accepted in ((newton, False), (newton + augmented, True),
+                                 (newton + augmented + "ERROR: failed\n", False)):
+            with self.subTest(output=output), tempfile.TemporaryDirectory() as directory:
+                work = Path(directory)
+
+                def simulate(command, stdout, **kwargs):
+                    stdout.write(output)
+                    return reference.subprocess.CompletedProcess(command, 0)
+
+                with patch.object(reference.subprocess, "run", side_effect=simulate):
+                    if accepted:
+                        reference.run(["test"], "initial", work, 1, {})
+                    else:
+                        with self.assertRaises(RuntimeError):
+                            reference.run(["test"], "initial", work, 1, {})
+
     def test_assignment_ignores_curve_order_but_requires_distinct_branches(self):
         self.assertEqual(reference.assign_branches([[1., 1e-7], [1e-6, 1.]]), (1, 0))
         for costs in ([[1e-7, 1.], [1e-6, 1.]], [[math.inf]], [[math.nan]], []):

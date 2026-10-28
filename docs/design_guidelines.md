@@ -383,9 +383,13 @@ Use the augmented path for corrector, initial-tangent, and tangent-update solves
 Keep Sherman-Morrison available for explicitly selected elimination and rank-one
 paths; do not require scalar elimination for every augmented system.
 
-Circle selects `main_classes::nmfd_augmented_newton_types`; other workflows retain
-their explicitly selected scalar-elimination path until migrated. Its corrector
-and tangent solves reuse the prepared corrector Jacobian and fixed state inverse.
+Circle selects `main_classes::nmfd_augmented_newton_types` with GMRES; symmetric
+KS1D selects BiCGStab(L). The helper's last template argument selects Krylov.
+Configure algorithm-specific controls through the augmented solver's borrowed
+`krylov_solver()` reference; monitor, basis size, and residual settings belong to
+that native solver. Other workflows retain scalar elimination until migrated.
+Corrector and tangent solves reuse the prepared corrector Jacobian and fixed
+state inverse.
 The application boundary verifies the original augmented residual and commits
 only successful corrections. Existing recovery may retry without preconditioning;
 Schur setup failure does not classify the original Jacobian as singular.

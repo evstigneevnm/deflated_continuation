@@ -46,6 +46,7 @@ public:
     using scalar_type          = typename Space::scalar_type;
     using vector_type          = typename Space::vector_type;
     using linear_operator_type = Operator;
+    using krylov_solver_type   = solver_type;
 
     augmented_linear_solver( std::shared_ptr<Space> space, std::shared_ptr<FirstInverse> inverse, Log *log = nullptr )
         : space_( space ? std::move( space ) : throw std::invalid_argument( "Missing augmented space" ) ),
@@ -66,6 +67,12 @@ public:
     auto &monitor()
     {
         return solver_.monitor();
+    }
+
+    // Configure the selected algorithm directly; no forwarding setters or ownership copies.
+    krylov_solver_type &krylov_solver()
+    {
+        return solver_;
     }
 
     void set_operator( std::shared_ptr<const Operator> op )

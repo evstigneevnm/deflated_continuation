@@ -206,14 +206,16 @@ int main( int argc, char const *argv[] )
     using linear_system_t =
         nmfd::solvers::sherman_morrison<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t, nmfd::solvers::bicgstabl>;
     using storage_type = deflation::solution_storage<vec_ops_real, log_t>;
-    using newton_types =
-        main_classes::nmfd_newton_types<vec_ops_real, log_t, ks1d_t, lin_op_t, linear_system_t, storage_type>;
+    using newton_types = main_classes::nmfd_augmented_newton_types<
+        vec_ops_real, log_t, ks1d_t, lin_op_t, linear_system_t, storage_type, prec_t, nmfd::solvers::bicgstabl>;
+    static_assert( newton_types::uses_augmented_linear_solver, "Symmetric KS1D requires augmented Krylov solves" );
     using deflation_continuation_t = main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, ks1d_t, lin_op_t, prec_t, ks1d_model::bicgstabl,
         nonlinear_operators::system_operator, parameters_t, storage_type, continuation::system_operator_continuation,
         linear_system_t, newton_types>;
     static_assert( deflation_continuation_t::uses_nmfd_newton, "KS1D requires NMFD Newton" );
     std::cout << "Newton solver: NMFD\n";
+    std::cout << "Continuation linear solver: augmented BiCGStab(L)\n";
 
     deflation_continuation_t DC( vec_ops_R, file_ops, &log, &log_linsolver, KS1D, configuration );
 

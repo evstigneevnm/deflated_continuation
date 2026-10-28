@@ -59,7 +59,7 @@ public:
                 project_directory, skip_files, external_solution_storage_owner_.get()
             );
         else
-            initialize_nmfd( log, project_directory, skip_files );
+            initialize_nmfd( log, linear_solver_log, project_directory, skip_files );
     }
 
     // Borrowed construction remains for callers not migrated yet.
@@ -84,7 +84,9 @@ public:
     }
 
 private:
-    void initialize_nmfd( log_type *log, const std::string &project_directory, unsigned int skip_files )
+    void initialize_nmfd(
+        log_type *log, log_type *linear_solver_log, const std::string &project_directory, unsigned int skip_files
+    )
     {
         using fixed_method    = typename NewtonTypes::fixed_method;
         using original_solver = typename linear_system_type::linear_solver_original_type;
@@ -108,8 +110,9 @@ private:
         nmfd_.corrector_operator = std::make_shared<typename NewtonTypes::corrector_operator_type>(
             vector_operations_owner_, nonlinear_operations_owner_, linear_operator_
         );
-        nmfd_.bordered =
-            NewtonTypes::make_bordered( nmfd_.corrector_operator->space(), linear_system_, preconditioner_, log );
+        nmfd_.bordered = NewtonTypes::make_bordered(
+            nmfd_.corrector_operator->space(), linear_system_, preconditioner_, linear_solver_log
+        );
         nmfd_.tangent   = NewtonTypes::make_tangent( nmfd_.corrector_operator, nmfd_.bordered );
         nmfd_.corrector = NewtonTypes::continuation_method::make(
             vector_operations_owner_, nonlinear_operations_owner_, nmfd_.corrector_operator,
@@ -254,7 +257,7 @@ public:
     {
         if constexpr ( !std::is_void_v<NewtonTypes> )
             if constexpr ( !std::is_void_v<typename NewtonTypes::tangent_solver_type> )
-                configure_linear_solver<scalar_type>( nmfd_.bordered.get(), parameters );
+                configure_linear_solver<scalar_type>( &nmfd_.bordered->krylov_solver(), parameters );
     }
 
     template <class Parameters>

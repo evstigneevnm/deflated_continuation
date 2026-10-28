@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <type_traits>
 
 #include <common/gpu_file_operations.h>
 #include <deflation/solution_storage.h>
@@ -40,8 +41,10 @@ using monitor_type        = nmfd::solvers::default_monitor<space_type, log_t>;
 using system_type         = nmfd::solvers::sherman_morrison<
             space_type, monitor_type, log_t, jacobian_type, preconditioner_type, nmfd::solvers::bicgstabl>;
 using storage_type = deflation::solution_storage<space_type, log_t>;
-using types =
-    main_classes::nmfd_newton_types<space_type, log_t, problem_type, jacobian_type, system_type, storage_type>;
+using types        = main_classes::nmfd_augmented_newton_types<
+           space_type, log_t, problem_type, jacobian_type, system_type, storage_type, preconditioner_type,
+           nmfd::solvers::bicgstabl>;
+static_assert( types::uses_augmented_linear_solver, "Symmetric KS1D tests require augmented solves" );
 
 struct settings
 {
@@ -55,7 +58,8 @@ struct settings
 template <class Solver>
 void configure_linear( Solver &solver )
 {
-    monitor_type::params parameters;
+    using solver_monitor_type = std::remove_reference_t<decltype( solver.monitor() )>;
+    typename solver_monitor_type::params parameters;
     parameters.rel_tol       = 1e-11;
     parameters.abs_tol       = 1e-12;
     parameters.max_iters_num = 300;
@@ -67,13 +71,15 @@ void configure_linear( Solver &solver )
 // The inversion-odd, zero-mean KS discretization has 63 real Fourier modes on
 // 128 grid points. The archived nonzero equilibrium at lambda=6 is stable in
 // this subspace. Exercise physical residuals, coupled arclength correction,
-// and deflation using the same NMFD assembly as the production workflows.
+// and deflation using the production assembly. Augmented BiCGStab(L) acts on
+// the complete pair system; the Fourier inverse only preconditions its state block.
 void test_corrections()
 {
     auto space    = std::make_shared<space_type>( 63 );
     auto problem  = std::make_shared<problem_type>( 2.0, 4.0, 128, space );
     auto jacobian = std::make_shared<jacobian_type>( problem );
-    auto system   = std::make_shared<system_type>( space, jacobian, std::make_shared<preconditioner_type>( problem ) );
+    auto inverse  = std::make_shared<preconditioner_type>( problem );
+    auto system   = std::make_shared<system_type>( space, jacobian, inverse );
     configure_linear( *system->get_linsolver_handle() );
     configure_linear( *system->get_linsolver_handle_original() );
     buffer_type reference( *space ), state( *space ), tangent( *space ), direction( *space ), work( *space ),
@@ -123,8 +129,83 @@ void test_corrections()
     const real tangent_parameter = 1 / std::sqrt( 1 + space->scalar_prod( *tangent, *tangent ) );
     space->scale( tangent_parameter, *tangent );
     auto coupled_op = std::make_shared<types::corrector_operator_type>( space, problem, jacobian );
-    auto coupled    = types::continuation_method::make(
-        space, problem, coupled_op, coupled_op->space(), std::make_shared<types::bordered_type>( system ), nullptr,
+    auto augmented  = types::make_bordered( coupled_op->space(), system, inverse, nullptr );
+    configure_linear( augmented->krylov_solver() );
+    augmented->krylov_solver().set_resid_recalc_freq( 1 );
+    using pair_buffer_type      = nmfd::detail::vector_wrap<types::pair_space_type, false, false>;
+    auto            &pair_space = *coupled_op->space();
+    pair_buffer_type rhs( pair_space ), correction( pair_space ), residual( pair_space );
+    for ( auto *buffer : { &rhs, &correction, &residual } )
+    {
+        buffer->init();
+        buffer->start_use();
+    }
+
+    // Rebinding the same handle must refresh Fourier and Schur setup, including E = 0.
+    coupled_op->prepare_tangent( *reference, 6., *tangent, 0. );
+    const auto prepared = coupled_op->get_jacobi_operator();
+    for ( const real value : { 6., 7., 6. } )
+    {
+        coupled_op->prepare_tangent( *reference, value, *tangent, 0. );
+        require( coupled_op->get_jacobi_operator() == prepared, "Prepared Jacobian handle changed" );
+        augmented->set_operator( prepared );
+        space->assign_mul( .001, *reference, ( *residual ).first );
+        ( *residual ).second[0] = .3;
+        require( prepared->apply( *residual, *rhs ), "Augmented right-hand side" );
+        require( augmented->solve( *rhs, *correction ), "Zero-border spectral solve failed" );
+        pair_space.add_lin_comb( -1., *residual, 1., *correction );
+        require( pair_space.norm( *correction ) < 1e-7, "Augmented manufactured solution" );
+        require( augmented->solve( *rhs, *correction ), "Repeated augmented solve failed" );
+        require( prepared->apply( *correction, *residual ), "True augmented residual action" );
+        pair_space.add_lin_comb( -1., *rhs, 1., *residual );
+        require(
+            pair_space.norm( *residual ) <=
+                augmented->monitor().abs_tol() + augmented->monitor().rel_tol() * pair_space.norm( *rhs ),
+            "True augmented residual exceeds tolerance"
+        );
+    }
+    pair_space.assign( *correction, *residual );
+    augmented->monitor().set_temp_max_iterations( 0 );
+    require( !augmented->solve( *rhs, *correction ), "Zero-iteration augmented solve reported convergence" );
+    pair_space.add_lin_comb( -1., *correction, 1., *residual );
+    require( pair_space.norm( *residual ) == 0., "Failed linear solve published a partial correction" );
+    augmented->monitor().restore_max_iterations();
+    require( augmented->solve( *rhs, *correction ), "Augmented iteration-limit recovery" );
+
+    // Make only the approximate Schur complement singular, then rebuild it.
+    space->assign( *prepared->parameter_column, *work );
+    inverse->apply( *work );
+    const real schur_product = space->scalar_prod( *tangent, *work );
+    coupled_op->prepare_tangent( *reference, 6., *tangent, schur_product );
+    augmented->set_operator( prepared );
+    require( !augmented->krylov_solver().preconditioner()->ready(), "Singular Schur setup was accepted" );
+    pair_space.assign( *correction, *residual );
+    require( !augmented->solve( *rhs, *correction ), "Unusable Schur factors were applied" );
+    pair_space.add_lin_comb( -1., *correction, 1., *residual );
+    require( pair_space.norm( *residual ) == 0., "Schur failure changed the correction" );
+    coupled_op->prepare_tangent( *reference, 6., *tangent, schur_product + 1. );
+    augmented->set_operator( prepared );
+    require( augmented->krylov_solver().preconditioner()->ready(), "Schur rebinding recovery" );
+
+    auto tangent_solver      = types::make_tangent( coupled_op, augmented );
+    real direction_parameter = 0.;
+    require(
+        tangent_solver->initial( *reference, 6., 1., *direction, direction_parameter ), "Augmented initial tangent"
+    );
+    jacobian->apply( *direction, *work );
+    problem->jacobian_alpha( *action );
+    space->add_mul( direction_parameter, *action, 1., *work );
+    require( space->norm_l2( *work ) < 1e-6 && direction_parameter > 0., "Initial tangent equation and orientation" );
+    require(
+        std::abs( space->norm_rank1( *direction, direction_parameter ) - 1. ) < 1e-12, "Initial tangent normalization"
+    );
+    require(
+        augmented->monitor().rel_tol() == 1e-11 && augmented->monitor().abs_tol() == 1e-12 &&
+            augmented->monitor().max_iters_num() == 300,
+        "Tangent solve changed correction controls"
+    );
+    auto coupled = types::continuation_method::make(
+        space, problem, coupled_op, coupled_op->space(), augmented, nullptr,
         std::make_shared<types::corrector_operator_type::trial_projector>( coupled_op )
     );
     types::configure_continuation( coupled->get_convergence_strategy_handle(), parameters );
@@ -138,6 +219,20 @@ void test_corrections()
         *space, *reference, 6.0, *tangent, tangent_parameter, .02, *state, parameter, *work
     );
     require( std::abs( constraint ) <= parameters.tolerance && parameter > 6, "Arclength constraint" );
+    require(
+        tangent_solver->apply(
+            *state, parameter, *tangent, tangent_parameter, *direction, direction_parameter, 1e-8, 300
+        ),
+        "Augmented tangent update failed"
+    );
+    jacobian->apply( *direction, *work );
+    problem->jacobian_alpha( *action );
+    space->add_mul( direction_parameter, *action, 1., *work );
+    require(
+        space->norm_l2( *work ) < 1e-6 &&
+            space->scalar_prod( *tangent, *direction ) + tangent_parameter * direction_parameter > 0.,
+        "Updated tangent equation and orientation"
+    );
     parameters.newton_max_it = 1;
     types::configure_continuation( coupled->get_convergence_strategy_handle(), parameters );
     space->assign_mul( 1.01, *reference, *state );
@@ -210,6 +305,7 @@ void test_singular_knots()
     auto                          problem   = std::make_shared<problem_type>( 2., 4., 64, space );
     auto                          jacobian  = std::make_shared<jacobian_type>( problem );
     auto                          solutions = std::make_shared<storage_type>( space.get(), 4, 31. );
+    preconditioner_type           inverse( problem );
     types::deflated_operator_type op( space, problem, jacobian, solutions, 4., 1e-6 );
     buffer_type                   state( *space ), work( *space ), direction( *space );
     for ( auto *buffer : { &state, &work, &direction } )
@@ -236,6 +332,20 @@ void test_singular_knots()
         require(
             !strategy.check_convergence( &op, nullptr, nullptr, *state, *direction ), "Approximate zero branch accepted"
         );
+
+        problem->set_linearization_point( *state, 4. * mode * mode );
+        inverse.set_operator( jacobian );
+        space->assign_scalar( 1., *work );
+        inverse.apply( *work );
+        space->assign_scalar( 2., *direction );
+        inverse.apply( *direction );
+        space->add_mul( -2., *work, 1., *direction );
+        require(
+            space->is_valid_number( *work ) && space->norm( *direction ) == 0.,
+            "Fourier inverse is not finite and linear at a pole"
+        );
+        space->get( *work, values.data(), values.size() );
+        require( values[mode - 1] == 1., "Pole guard changed the null Fourier component" );
     }
 }
 

@@ -32,6 +32,9 @@ def main() -> None:
         result.check_returncode()
         if solver and "Newton solver: NMFD" not in result.stdout:
             raise RuntimeError("production symmetric KS1D did not select NMFD Newton")
+        if solver and Path(command[0]).resolve() == args.bd_executable.resolve() and \
+                "Continuation linear solver: augmented BiCGStab(L)" not in result.stdout:
+            raise RuntimeError("production symmetric KS1D did not select augmented BiCGStab(L)")
 
     run(sys.executable, "scripts/write_ks1d_ci_config.py", config, project,
         "--grid-size", 128, "--knots", 5.9, 6, 6.1, "--steps", 6,

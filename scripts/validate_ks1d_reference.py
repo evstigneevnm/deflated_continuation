@@ -231,8 +231,9 @@ def run(command: list[str], label: str, work: Path, timeout: float, report: dict
         record["seconds"] = time.monotonic() - start
     if label in ("initial", "restart"):
         log = (work / f"{label}.log").read_text()
-        require("Newton solver: NMFD" in log and "ERROR:" not in log and "exception init_tangent" not in log,
-                f"Missing NMFD selection or numerical errors in {label}.log")
+        require("Newton solver: NMFD" in log and "Continuation linear solver: augmented BiCGStab(L)" in log
+                and "ERROR:" not in log and "exception init_tangent" not in log,
+                f"Missing augmented NMFD selection or numerical errors in {label}.log")
 
 
 def validate(args, report: dict) -> None:

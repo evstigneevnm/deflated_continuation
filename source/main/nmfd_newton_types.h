@@ -235,13 +235,16 @@ struct nmfd_newton_types
     }
 };
 
-template <class Space, class Log, class Problem, class Jacobian, class LinearSystem, class Storage, class FirstInverse>
+template <
+    class Space, class Log, class Problem, class Jacobian, class LinearSystem, class Storage, class FirstInverse,
+    template <class, class, class, class, class> class Krylov = continuation::augmented_gmres>
 using nmfd_augmented_newton_types = nmfd_newton_types<
     Space, Log, Problem, Jacobian, LinearSystem, Storage, detail::newton_convergence, detail::continuation_convergence,
     detail::deflation_convergence,
     continuation::augmented_linear_solver<
         typename continuation::corrector_operator<Space, Problem, Jacobian>::vector_space_type,
-        typename continuation::corrector_operator<Space, Problem, Jacobian>::jacobi_operator_type, FirstInverse, Log>>;
+        typename continuation::corrector_operator<Space, Problem, Jacobian>::jacobi_operator_type, FirstInverse, Log,
+        Krylov>>;
 
 }
 
