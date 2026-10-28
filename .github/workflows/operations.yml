@@ -294,6 +294,8 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
+      - name: Install test dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential make libboost-dev
       - name: Verify Newton with canonical parent dependencies
         run: |
           make -C source/contrib/nmfd-newton -j2 test_cpu check_headers_cpu \
