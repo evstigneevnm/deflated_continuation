@@ -28,6 +28,11 @@ public:
         nonlin_op->jacobian_u( x, f );
     }
 
+    void copy_matrix( T *values ) const
+    {
+        nonlin_op->copy_jacobian_matrix( values );
+    }
+
 private:
     std::shared_ptr<NonlinearOperator> owner_;
     NonlinearOperator                 *nonlin_op;

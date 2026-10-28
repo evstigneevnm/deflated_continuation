@@ -3,12 +3,44 @@
 
 #include <utility>
 
+namespace nmfd
+{
+namespace solvers
+{
+template <class Space, class Monitor, class Log, class Operator, class Inverse>
+class direct_solver;
+}
+}
+
 namespace numerical_algos
 {
 namespace lin_solvers
 {
 namespace recovery
 {
+
+// An inverse-only solve has no unpreconditioned fallback, regardless of its setters.
+template <class Space, class Monitor, class Log, class Operator, class Inverse>
+bool supports_unpreconditioned_retry(
+    const nmfd::solvers::direct_solver<Space, Monitor, Log, Operator, Inverse> *, int
+)
+{
+    return false;
+}
+
+template <class Solver>
+auto supports_unpreconditioned_retry( const Solver *solver, int )
+    -> decltype( solver->supports_unpreconditioned_retry() )
+{
+    return solver->supports_unpreconditioned_retry();
+}
+
+// Preserve the existing recovery contract for callers without an explicit capability.
+template <class Solver>
+bool supports_unpreconditioned_retry( const Solver *, long )
+{
+    return true;
+}
 
 template <class Solver>
 auto set_preconditioner_bypass( Solver *solver, const bool enabled, int )
@@ -31,7 +63,7 @@ bool solve_with_unpreconditioned_retry( Solver *solver, Solve &&solve, Reset &&r
     {
         return true;
     }
-    if ( !set_preconditioner_bypass( solver, true, 0 ) )
+    if ( !supports_unpreconditioned_retry( solver, 0 ) || !set_preconditioner_bypass( solver, true, 0 ) )
     {
         return false;
     }

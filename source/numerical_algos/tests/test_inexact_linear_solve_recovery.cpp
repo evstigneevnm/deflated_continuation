@@ -15,7 +15,8 @@ struct controlled_solver
     std::shared_ptr<const linear_operator_type> op;
     bool         bypass = false, converged = false, throws_on_retry = false, reset_observed = false;
     T            primary_fraction = T( 19 ) / T( 20 ), retry_fraction = T( 1 );
-    unsigned int calls = 0;
+    bool         allow_retry = true;
+    unsigned int calls       = 0;
     void         set_operator( std::shared_ptr<const linear_operator_type> value )
     {
         op = std::move( value );
@@ -23,6 +24,10 @@ struct controlled_solver
     void set_preconditioner_bypass( bool value )
     {
         bypass = value;
+    }
+    bool supports_unpreconditioned_retry() const
+    {
+        return allow_retry && !bypass;
     }
     bool solve( const vector_type &rhs, vector_type &out )
     {
@@ -107,6 +112,12 @@ void test_recovery( test_report &report )
     numerical_algos::recovering_linear_solver<typename fixture::space_type, linear_type> strict( f.space, linear );
     strict.set_operator( f.problem.get_jacobi_operator() );
     report.check<T>( !strict.solve( rhs, delta ), "two-argument recovery remains strict" );
+    linear->allow_retry = false;
+    linear->calls       = 0;
+    report.check<T>(
+        !strict.solve( rhs, delta ) && linear->calls == 1 && !linear->bypass,
+        "An inverse-only solver is not bypassed or reset after failure"
+    );
 }
 
 void test_lifetime( test_report &report )

@@ -111,10 +111,16 @@ int main( int argc, char **argv )
         using eigensolver_type =
             stability::analysis::matrix_free_stability_scan<factorization_types, inner_solver_type, dense_lapack_type>;
         using newton_monitor_type = bratu_model::monitor<vec_ops_real, log_t>;
-        using driver_type         = main_classes::stability_continuation<
-                    vec_ops_real, file_operations_type, log_t, newton_monitor_type, nonlinear_operator_type,
-                    newton_operator_type, newton_preconditioner_type, bratu_model::direct_solver,
-                    nonlinear_operators::system_operator, parameters_type, eigensolver_type>;
+        using newton_linear_type  = nmfd::solvers::direct_solver<
+             vec_ops_real, newton_monitor_type, log_t, newton_operator_type, newton_preconditioner_type>;
+        using newton_types = main_classes::nmfd_fixed_newton_types<
+            vec_ops_real, log_t, nonlinear_operator_type, newton_operator_type, newton_linear_type>;
+        using driver_type = main_classes::stability_continuation<
+            vec_ops_real, file_operations_type, log_t, newton_monitor_type, nonlinear_operator_type,
+            newton_operator_type, newton_preconditioner_type, bratu_model::direct_solver,
+            nonlinear_operators::system_operator, parameters_type, eigensolver_type, nonlinear_operator_type,
+            newton_types>;
+        static_assert( driver_type::uses_nmfd_newton, "Bratu stability corrections require NMFD Newton" );
 
         auto real_space    = std::make_shared<vec_ops_real>( state_size );
         auto complex_space = std::make_shared<complex_space_type>( state_size );

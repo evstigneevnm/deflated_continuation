@@ -130,8 +130,8 @@ void test_corrections()
     space->scale( tangent_parameter, *tangent );
     auto coupled_op = std::make_shared<types::corrector_operator_type>( space, problem, jacobian );
     auto augmented  = types::make_bordered( coupled_op->space(), system, inverse, nullptr );
-    configure_linear( augmented->krylov_solver() );
-    augmented->krylov_solver().set_resid_recalc_freq( 1 );
+    configure_linear( augmented->linear_solver() );
+    augmented->linear_solver().set_resid_recalc_freq( 1 );
     using pair_buffer_type      = nmfd::detail::vector_wrap<types::pair_space_type, false, false>;
     auto            &pair_space = *coupled_op->space();
     pair_buffer_type rhs( pair_space ), correction( pair_space ), residual( pair_space );
@@ -178,14 +178,14 @@ void test_corrections()
     const real schur_product = space->scalar_prod( *tangent, *work );
     coupled_op->prepare_tangent( *reference, 6., *tangent, schur_product );
     augmented->set_operator( prepared );
-    require( !augmented->krylov_solver().preconditioner()->ready(), "Singular Schur setup was accepted" );
+    require( !augmented->linear_solver().preconditioner()->ready(), "Singular Schur setup was accepted" );
     pair_space.assign( *correction, *residual );
     require( !augmented->solve( *rhs, *correction ), "Unusable Schur factors were applied" );
     pair_space.add_lin_comb( -1., *correction, 1., *residual );
     require( pair_space.norm( *residual ) == 0., "Schur failure changed the correction" );
     coupled_op->prepare_tangent( *reference, 6., *tangent, schur_product + 1. );
     augmented->set_operator( prepared );
-    require( augmented->krylov_solver().preconditioner()->ready(), "Schur rebinding recovery" );
+    require( augmented->linear_solver().preconditioner()->ready(), "Schur rebinding recovery" );
 
     auto tangent_solver      = types::make_tangent( coupled_op, augmented );
     real direction_parameter = 0.;

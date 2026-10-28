@@ -41,18 +41,14 @@ using preconditioner_type = symmetry::linearization::projected_preconditioner<sp
 using monitor_type        = nmfd::solvers::default_monitor<space_type, log_t>;
 using system_type         = nmfd::solvers::sherman_morrison<
             space_type, monitor_type, log_t, jacobian_type, preconditioner_type, nmfd::solvers::bicgstabl>;
-using adapter_type             = symmetry::fourier::real_packed_fourier_slice_1d_adapter<space_type>;
-using actions_type             = symmetry::finite_action_registry<space_type>;
-using quotient_type            = symmetry::finite_quotient_adapter<space_type, adapter_type>;
-using storage_type             = deflation::symmetry_solution_storage<space_type, quotient_type, log_t>;
-using corrector_type           = continuation::corrector_operator<space_type, problem_type, jacobian_type>;
-using continuation_linear_type = continuation::augmented_linear_solver<
-    corrector_type::vector_space_type, corrector_type::jacobi_operator_type, preconditioner_type, log_t,
-    nmfd::solvers::bicgstabl>;
-using types = main_classes::nmfd_newton_types<
-    space_type, log_t, problem_type, jacobian_type, system_type, storage_type, main_classes::detail::newton_convergence,
-    main_classes::detail::continuation_convergence, main_classes::detail::fixed_damping_deflation_convergence,
-    continuation_linear_type>;
+using adapter_type  = symmetry::fourier::real_packed_fourier_slice_1d_adapter<space_type>;
+using actions_type  = symmetry::finite_action_registry<space_type>;
+using quotient_type = symmetry::finite_quotient_adapter<space_type, adapter_type>;
+using storage_type  = deflation::symmetry_solution_storage<space_type, quotient_type, log_t>;
+using types         = main_classes::nmfd_augmented_newton_types<
+            space_type, log_t, problem_type, jacobian_type, system_type, storage_type, preconditioner_type,
+            nmfd::solvers::bicgstabl, main_classes::detail::newton_convergence, main_classes::detail::continuation_convergence,
+            main_classes::detail::fixed_damping_deflation_convergence>;
 static_assert( types::uses_augmented_linear_solver, "Full KS1D tests require full bordered solves" );
 
 struct settings
@@ -194,7 +190,7 @@ void test_continuation()
     require( f.fixed->solve( f.problem.get(), *f.reference, lambda ), "Reference correction failed" );
     auto op     = std::make_shared<types::corrector_operator_type>( f.space, f.problem, f.jacobian );
     auto linear = types::make_bordered( op->space(), f.system, f.preconditioner, nullptr );
-    configure_linear( &linear->krylov_solver() );
+    configure_linear( &linear->linear_solver() );
     auto tangent           = types::make_tangent( op, linear );
     real tangent_parameter = 0;
     require( tangent->initial( *f.reference, lambda, 1., *f.tangent, tangent_parameter ), "Projected initial tangent" );

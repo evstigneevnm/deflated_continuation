@@ -385,18 +385,24 @@ paths; do not require scalar elimination for every augmented system.
 
 Circle selects `main_classes::nmfd_augmented_newton_types` with GMRES.
 Symmetric/full KS1D and symmetry-restricted KS2D select BiCGStab(L).
-Full KS1D supplies `AugmentedLinear` directly to
-`nmfd_newton_types`, preserving its independent fixed-damping deflation strategy.
+Full KS1D retains its independent fixed-damping deflation strategy.
+Bratu uses a direct inverse of the complete assembled bordered matrix, without
+assuming that its state block is invertible. Variable-precision Bratu remains
+on its existing correction path until separately migrated.
 Projected initial-tangent candidates use the full bordered solve, including zero
 scalar borders, before the existing normalization, quality, and chart checks.
-The helper's last template argument selects Krylov.
-Configure algorithm-specific controls through the augmented solver's borrowed
-`krylov_solver()` reference; monitor, basis size, and residual settings belong to
-that native solver. Other workflows retain scalar elimination until migrated.
-Corrector and tangent solves reuse the prepared corrector Jacobian and fixed
-state inverse.
+Assembly selects and constructs the native solver and its inverse/preconditioner.
+The augmented boundary receives that prepared solver; it must not construct
+Schur factors or require a particular algorithm. Configure native controls through
+its borrowed `linear_solver()` reference. Corrector and tangent tolerance controls
+use the common monitor interface. Other workflows retain scalar elimination until migrated.
+Corrector and tangent solves reuse the prepared corrector Jacobian. Schur-based
+assembly also reuses the application's fixed state inverse.
 The application boundary verifies the original augmented residual and commits
-only successful corrections. Existing recovery may retry without preconditioning;
+only successful corrections. Recovery retries without preconditioning only when
+the solver supports it; a direct solver cannot bypass its only inverse.
+Assembly supplies a project-owned bypassable preconditioner only for iterative
+recovery. Canonical GMRES has no retry policy or bypass state.
 Schur setup failure does not classify the original Jacobian as singular.
 
 Verify k = 1 and k > 1, zero E, singular A with nonsingular K, true residuals,

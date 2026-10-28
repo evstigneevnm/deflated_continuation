@@ -289,14 +289,10 @@ int main( int argc, char const *argv[] )
 
     using linear_system_t =
         nmfd::solvers::sherman_morrison<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t, nmfd::solvers::bicgstabl>;
-    using corrector_t           = continuation::corrector_operator<vec_ops_real, ks1d_t, lin_op_t>;
-    using continuation_linear_t = continuation::augmented_linear_solver<
-        typename corrector_t::vector_space_type, typename corrector_t::jacobi_operator_type, prec_t, log_t,
-        nmfd::solvers::bicgstabl>;
-    using newton_types = main_classes::nmfd_newton_types<
-        vec_ops_real, log_t, ks1d_t, lin_op_t, linear_system_t, sol_storage_t, main_classes::detail::newton_convergence,
-        main_classes::detail::continuation_convergence, main_classes::detail::fixed_damping_deflation_convergence,
-        continuation_linear_t>;
+    using newton_types = main_classes::nmfd_augmented_newton_types<
+        vec_ops_real, log_t, ks1d_t, lin_op_t, linear_system_t, sol_storage_t, prec_t, nmfd::solvers::bicgstabl,
+        main_classes::detail::newton_convergence, main_classes::detail::continuation_convergence,
+        main_classes::detail::fixed_damping_deflation_convergence>;
     using deflation_continuation_t = main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, ks1d_t, lin_op_t, prec_t, ks1d_model::bicgstabl,
         nonlinear_operators::projected_system_operator, parameters_t, sol_storage_t,

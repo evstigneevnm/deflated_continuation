@@ -150,11 +150,23 @@ int main( int argc, char const *argv[] )
     log.set_verbosity( quiet ? 0 : 1 );
     log_linsolver.set_verbosity( quiet ? 0 : 1 );
 
-    using linear_system_type       = bratu_model::linear_system<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t>;
+    using linear_system_type = bratu_model::linear_system<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t>;
+#if !defined( BRATU_VECTOR_BACKEND_VAR_PREC )
+    using storage_type = deflation::solution_storage<vec_ops_real, log_t>;
+    using newton_types =
+        bratu_model::newton_types<vec_ops_real, log_t, bratu_t, lin_op_t, linear_system_type, storage_type>;
+    using deflation_continuation_t = main_classes::deflation_continuation<
+        vec_ops_real, files_ops_t, log_t, monitor_t, bratu_t, lin_op_t, prec_t, bratu_model::direct_solver,
+        nonlinear_operators::system_operator, parameters_t, storage_type, continuation::system_operator_continuation,
+        linear_system_type, newton_types>;
+    static_assert( deflation_continuation_t::uses_nmfd_newton, "Bratu requires NMFD Newton" );
+    static_assert( newton_types::uses_augmented_linear_solver, "Bratu requires full bordered solves" );
+#else
     using deflation_continuation_t = main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, bratu_t, lin_op_t, prec_t, bratu_model::direct_solver,
         nonlinear_operators::system_operator, parameters_t, deflation::solution_storage<vec_ops_real, log_t>,
         continuation::system_operator_continuation, linear_system_type>;
+#endif
 
     deflation_continuation_t DC(
         vector_operations, file_operations, &log, &log_linsolver, nonlinear_operator, configuration

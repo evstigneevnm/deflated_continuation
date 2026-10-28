@@ -6,9 +6,14 @@
 #include <stdexcept>
 #include <nmfd/solvers/newton_iteration.h>
 #include <nmfd/solvers/nonlinear_solver.h>
+#include <nmfd/solvers/gmres.h>
+#include <nmfd/solvers/monitor_krylov.h>
+#include <nmfd/preconditioners/block_schur.h>
+#include <nmfd/preconditioners/small_schur_inverse.h>
 #include <nonlinear_operators/fixed_parameter_operator.h>
 #include <numerical_algos/parameterized_correction.h>
 #include <numerical_algos/recovering_linear_solver.h>
+#include <numerical_algos/bypassable_preconditioner.h>
 #include <continuation/corrector_operator.h>
 #include <continuation/bordered_linear_solver.h>
 #include <continuation/augmented_linear_solver.h>
@@ -22,6 +27,35 @@ namespace main_classes
 {
 namespace detail
 {
+
+template <class Space, class Monitor, class Log, class Operator, class Preconditioner>
+using augmented_gmres = nmfd::solvers::gmres<Space, Monitor, Log, Operator, Preconditioner>;
+
+// Assembly owns algorithm and inverse selection; the solve boundary only verifies and commits.
+template <
+    class Space, class Operator, class FirstInverse, class Log,
+    template <class, class, class, class, class> class Algorithm>
+struct augmented_solver_types
+{
+    using access_type = continuation::corrector_block_access<Space, Operator>;
+    using schur_type  = nmfd::preconditioners::schur_complement_operator<Space, Operator, FirstInverse, access_type>;
+    using schur_inverse_type =
+        nmfd::preconditioners::small_schur_inverse<typename Space::second_space_type, schur_type>;
+    using schur_preconditioner_type =
+        nmfd::preconditioners::block_schur<Space, Operator, FirstInverse, schur_inverse_type, access_type>;
+    using preconditioner_type = numerical_algos::bypassable_preconditioner<schur_preconditioner_type>;
+    using solver_type = Algorithm<Space, nmfd::solvers::monitor_krylov<Space, Log>, Log, Operator, preconditioner_type>;
+    using linear_type = continuation::augmented_linear_solver<Space, Operator, solver_type>;
+
+    static auto make( const std::shared_ptr<Space> &space, const std::shared_ptr<FirstInverse> &inverse, Log *log )
+    {
+        auto preconditioner = std::make_shared<preconditioner_type>(
+            space, inverse, std::make_shared<schur_inverse_type>( space->second() )
+        );
+        auto solver = std::make_shared<solver_type>( space, log, typename solver_type::params(), preconditioner );
+        return std::make_shared<linear_type>( space, std::move( solver ), preconditioner );
+    }
+};
 
 // Match template arity explicitly: NVCC does not accept the defaulted sixth argument here.
 template <class Space, class Log, class Operator, class Projector, class Quality>
@@ -202,10 +236,8 @@ struct nmfd_newton_types
         const std::shared_ptr<Preconditioner> &preconditioner, Log *log
     )
     {
-        if constexpr ( std::is_void_v<AugmentedLinear> )
-            return std::make_shared<bordered_type>( system );
-        else
-            return std::make_shared<bordered_type>( space, preconditioner, log );
+        static_assert( std::is_void_v<AugmentedLinear>, "Augmented assembly must supply make_bordered" );
+        return std::make_shared<bordered_type>( system );
     }
 
     static std::shared_ptr<tangent_solver_type>
@@ -237,14 +269,32 @@ struct nmfd_newton_types
 
 template <
     class Space, class Log, class Problem, class Jacobian, class LinearSystem, class Storage, class FirstInverse,
-    template <class, class, class, class, class> class Krylov = continuation::augmented_gmres>
-using nmfd_augmented_newton_types = nmfd_newton_types<
-    Space, Log, Problem, Jacobian, LinearSystem, Storage, detail::newton_convergence, detail::continuation_convergence,
-    detail::deflation_convergence,
-    continuation::augmented_linear_solver<
-        typename continuation::corrector_operator<Space, Problem, Jacobian>::vector_space_type,
-        typename continuation::corrector_operator<Space, Problem, Jacobian>::jacobi_operator_type, FirstInverse, Log,
-        Krylov>>;
+    template <class, class, class, class, class> class Krylov                  = detail::augmented_gmres,
+    template <class, class, class, class, class> class FixedConvergence        = detail::newton_convergence,
+    template <class, class, class, class, class> class ContinuationConvergence = detail::continuation_convergence,
+    template <class, class, class, class, class> class DeflationConvergence    = detail::deflation_convergence>
+struct nmfd_augmented_newton_types
+    : nmfd_newton_types<
+          Space, Log, Problem, Jacobian, LinearSystem, Storage, FixedConvergence, ContinuationConvergence,
+          DeflationConvergence,
+          typename detail::augmented_solver_types<
+              typename continuation::corrector_operator<Space, Problem, Jacobian>::vector_space_type,
+              typename continuation::corrector_operator<Space, Problem, Jacobian>::jacobi_operator_type, FirstInverse,
+              Log, Krylov>::linear_type>
+{
+    using corrector_operator_type = continuation::corrector_operator<Space, Problem, Jacobian>;
+    using pair_space_type         = typename corrector_operator_type::vector_space_type;
+    using assembly_type           = detail::augmented_solver_types<
+                  pair_space_type, typename corrector_operator_type::jacobi_operator_type, FirstInverse, Log, Krylov>;
+
+    static auto make_bordered(
+        const std::shared_ptr<pair_space_type> &space, const std::shared_ptr<LinearSystem> &,
+        const std::shared_ptr<FirstInverse> &inverse, Log *log
+    )
+    {
+        return assembly_type::make( space, inverse, log );
+    }
+};
 
 }
 

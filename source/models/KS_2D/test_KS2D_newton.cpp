@@ -129,7 +129,7 @@ void test_corrections()
 
     auto coupled_op = std::make_shared<types::corrector_operator_type>( space, problem, jacobian );
     auto linear     = types::make_bordered( coupled_op->space(), system, preconditioner, nullptr );
-    configure_linear( linear->krylov_solver() );
+    configure_linear( linear->linear_solver() );
     auto tangent_solver    = types::make_tangent( coupled_op, linear );
     real tangent_parameter = 0;
     require(

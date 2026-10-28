@@ -103,6 +103,8 @@ KS1D_NMFD_NEWTON_TARGETS = KS1D_bd_cpu_omp KS1D_bd_cuda KS1D_stability_cpu_omp K
 $(KS1D_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
 KS2D_NMFD_NEWTON_TARGETS = KS2D_bd_cpu_omp KS2D_bd_cuda KS2D_stability_cpu_omp KS2D_stability_cuda
 $(KS2D_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
+BRATU_NMFD_NEWTON_TARGETS = bratu_bd_cpu_omp bratu_bd_var_prec bratu_stability_cpu_omp bratu_prepare_visualization_cpu_omp test_bratu_stability_operators_cpu_omp.bin test_bratu_newton_cpu_omp.bin
+$(BRATU_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
 ITIME_STEPPER = -I $(NMFD_TIMESTEPPERS_ROOT)/include -I $(COMMON_NMFD_OPERATIONS) -I $(CONTRIB_SCFD)/include -I source/contrib/json
 LINEAR_SOLVE_RECOVERY_HEADER = source/numerical_algos/linear_solve_recovery.h
 LEGACY_LINSOLVERS = source/numerical_algos/legacy/include/numerical_algos/lin_solvers
@@ -167,11 +169,13 @@ CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/mod
 CIRCLE_STABILITY_HEADERS = $(CIRCLE_MODEL_HEADERS) source/stability/eigensolvers/direct_scalar_eigensolver.h source/stability/eigensolvers/transformations/scaled_real_operator.h
 NMFD_NEWTON_ASSEMBLY_HEADERS = source/main/nmfd_newton_types.h source/numerical_algos/parameterized_correction.h source/numerical_algos/recovering_linear_solver.h source/nonlinear_operators/fixed_parameter_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/corrector_operator.h source/continuation/bordered_linear_solver.h source/continuation/arclength_constraint.h source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h source/deflation/solution_storage.h $(wildcard source/contrib/nmfd-newton/include/nmfd/solvers/*.h)
 NMFD_NEWTON_ASSEMBLY_HEADERS += source/deflation/fixed_damping_convergence_strategy.h
+NMFD_NEWTON_ASSEMBLY_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER) source/numerical_algos/bypassable_preconditioner.h $(NMFD_GMRES_HEADERS) $(wildcard $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/detail/*.h)
 NMFD_NEWTON_ASSEMBLY_HEADERS += $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/krylov/operator_apply.h
 NMFD_NEWTON_ASSEMBLY_HEADERS += source/continuation/augmented_linear_solver.h source/continuation/augmented_tangent.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/preconditioners/block_schur.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/preconditioners/small_schur_inverse.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/two_block_access.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/linalg/small_dense.h
 CIRCLE_MODEL_HEADERS += $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 NMFD_DIRECT_SOLVER_HEADERS = $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/direct_solver.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/default_monitor.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/iter_solver_base.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/sherman_morrison.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/dense_operations_base.h
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/models/bratu/bratu_model_config.h source/models/bratu/bratu_linear_solvers.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h $(NMFD_DIRECT_SOLVER_HEADERS)
+BRATU_MODEL_HEADERS += source/nonlinear_operators/bratu/augmented_inverse_bratu.h $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 STAR_SHAPED_MODEL_HEADERS = source/models/star_shaped/star_shaped_backend_typedefs.h source/models/star_shaped/star_shaped_linear_solvers.h source/nonlinear_operators/star_shaped/star_shaped.h source/nonlinear_operators/star_shaped/convergence_strategy.h source/nonlinear_operators/star_shaped/linear_operator_star_shaped.h source/nonlinear_operators/star_shaped/preconditioner_star_shaped.h source/nonlinear_operators/star_shaped/system_operator.h $(NMFD_DIRECT_SOLVER_HEADERS)
 KS1D_MODEL_HEADERS = source/models/KS_1D/KS1D_backend_typedefs.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/linear_operator_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/preconditioner_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/system_operator.h
 KS1D_LINEAR_SOLVER_HEADERS = source/models/KS_1D/KS1D_linear_solvers.h $(wildcard source/contrib/nmfd-linsolvers/include/nmfd/solvers/*.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/detail/*.h) $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
@@ -351,6 +355,9 @@ test_scalar_affine_inverse_cuda.bin: source/models/tests/test_scalar_affine_inve
 
 test_bratu_stability_operators_cpu_omp.bin: source/models/bratu/test_bratu_stability_operators.cpp $(BRATU_MODEL_HEADERS) $(RESIDUAL_DECOMPOSITION_TEST_HEADER) $(ADJOINT_JACOBIAN_TEST_HEADERS) source/stability/eigensolvers/host_dense_operator_eigensolver.h $(HOST_SMALL_DENSE_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) source/models/bratu/test_bratu_stability_operators.cpp $(OPENMP) $(LLAPACK) -o $(BUILD_DIR)/test_bratu_stability_operators_cpu_omp.bin 2>$(RESULTS)
+
+test_bratu_newton_cpu_omp.bin: source/models/bratu/test_bratu_newton.cpp $(BRATU_MODEL_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) -DBRATU_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $< $(OPENMP) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
 test_stability_analysis_pipeline_cpu_omp.bin: source/stability/tests/test_stability_analysis_pipeline.cpp $(STABILITY_ANALYSIS_HEADERS) $(CIRCLE_MODEL_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/stability/tests/test_stability_analysis_pipeline.cpp $(OPENMP) -o $(BUILD_DIR)/test_stability_analysis_pipeline_cpu_omp.bin 2>$(RESULTS)

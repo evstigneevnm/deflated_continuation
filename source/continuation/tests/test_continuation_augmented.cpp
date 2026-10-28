@@ -5,10 +5,95 @@
 #include <continuation/augmented_linear_solver.h>
 #include <continuation/augmented_tangent.h>
 #include <numerical_algos/recovering_linear_solver.h>
+#include <main/nmfd_newton_types.h>
 #include <scfd/utils/log_std.h>
 
 namespace
 {
+
+void test_preconditioner_wrapper( continuation::tests::test_report &report )
+{
+    struct preconditioner_type
+    {
+        using vector_type          = scfd::static_vec::vec<double, 1>;
+        mutable unsigned int calls = 0;
+        virtual bool         apply( vector_type &x ) const
+        {
+            ++calls;
+            x[0] *= 2.;
+            return true;
+        }
+    };
+    numerical_algos::bypassable_preconditioner<preconditioner_type> preconditioner;
+    preconditioner_type::vector_type                                x{ 3. };
+    report.require(
+        preconditioner.apply( x ) && x[0] == 6. && preconditioner.calls == 1,
+        "Wrapper calls a virtual base preconditioner without recursive dispatch"
+    );
+    preconditioner.enabled = true;
+    report.require(
+        preconditioner.apply( x ) && x[0] == 6. && preconditioner.calls == 1,
+        "Project bypass applies identity without touching the underlying inverse"
+    );
+}
+
+// Exercise both GMRES preconditioning sides with project-owned bypass control.
+void test_gmres_retry( continuation::tests::test_report &report )
+{
+    using fixture_type  = continuation::tests::circle_fixture<double>;
+    using space_type    = fixture_type::pair_space_type;
+    using jacobian_type = fixture_type::operator_type::jacobi_operator_type;
+    struct inverse_type
+    {
+        mutable unsigned int calls = 0;
+        bool                 fail  = false;
+        void                 set_operator( std::shared_ptr<const fixture_type::state_operator_type> )
+        {
+        }
+        bool apply( fixture_type::space_type::vector_type & ) const
+        {
+            ++calls;
+            return !fail;
+        }
+    };
+    using assembly_type = main_classes::detail::augmented_solver_types<
+        space_type, jacobian_type, inverse_type, scfd::utils::log_std, main_classes::detail::augmented_gmres>;
+    for ( char side : { 'L', 'R' } )
+    {
+        fixture_type f;
+        auto         inverse        = std::make_shared<inverse_type>();
+        auto         preconditioner = std::make_shared<assembly_type::preconditioner_type>(
+            f.space, inverse, std::make_shared<assembly_type::schur_inverse_type>( f.space->second() )
+        );
+        assembly_type::solver_type::params parameters;
+        parameters.preconditioner_side = side;
+        auto native = std::make_shared<assembly_type::solver_type>( f.space, nullptr, parameters, preconditioner );
+        auto linear = std::make_shared<assembly_type::linear_type>( f.space, native, preconditioner );
+        numerical_algos::recovering_linear_solver<space_type, assembly_type::linear_type> recovery( f.space, linear );
+        linear->monitor().set_tolerances( 0., 1e-12 );
+        f.set( *f.state, 1., 0. );
+        f.set( *f.tangent, 0., 1. );
+        f.op->prepare_tangent( ( *f.state ).first, 0., ( *f.tangent ).first, 1. );
+        recovery.set_operator( f.op->get_jacobi_operator() );
+        f.set( *f.rhs, .4, -.3 );
+        inverse->fail = true;
+        report.require( recovery.solve( *f.rhs, *f.action ), "Project preconditioner recovers on either GMRES side" );
+        report.require(
+            !linear->preconditioner_bypass_enabled() && !preconditioner->enabled,
+            "Recovery restores the shared project control"
+        );
+        linear->set_preconditioner_bypass( true );
+        inverse->calls = 0;
+        report.require(
+            linear->solve( *f.rhs, *f.action ) && inverse->calls == 0,
+            "Bypass skips every inverse action without changing canonical GMRES"
+        );
+        f.op->get_jacobi_operator()->apply( *f.action, *f.plus );
+        report.require( f.difference( *f.plus, *f.rhs ) < 1e-12, "Bypassed solve retains original-system accuracy" );
+        report.require( !linear->supports_unpreconditioned_retry(), "Do not retry an already bypassed solve" );
+        linear->set_preconditioner_bypass( false );
+    }
+}
 
 // u^2 + lambda^2 = 1. Its augmented Jacobian remains nonsingular at a fold
 // although J = 0 and the lower-right scalar block is exactly zero.
@@ -32,8 +117,9 @@ void test_augmented( continuation::tests::test_report &report )
             return !fail_apply;
         }
     };
-    using linear_type =
-        continuation::augmented_linear_solver<space_type, jacobian_type, inverse_type, scfd::utils::log_std, Krylov>;
+    using assembly_type = main_classes::detail::augmented_solver_types<
+        space_type, jacobian_type, inverse_type, scfd::utils::log_std, Krylov>;
+    using linear_type    = typename assembly_type::linear_type;
     using recovery_type  = numerical_algos::recovering_linear_solver<space_type, linear_type>;
     using iteration_type = nmfd::solvers::newton_iteration<space_type, operator_type, recovery_type>;
     using projector_type = typename operator_type::trial_projector;
@@ -52,7 +138,7 @@ void test_augmented( continuation::tests::test_report &report )
         operator_lifetime = f.op;
         const T tolerance = f.tolerance;
         auto    inverse   = std::make_shared<inverse_type>();
-        auto    linear    = std::make_shared<linear_type>( f.space, inverse );
+        auto    linear    = assembly_type::make( f.space, inverse, nullptr );
         solver_lifetime   = linear;
         linear->monitor().set_tolerances( T( 0 ), tolerance / T( 10 ) );
         auto                           recovery  = std::make_shared<recovery_type>( f.space, linear );
@@ -221,8 +307,10 @@ int main()
     try
     {
         continuation::tests::test_report report;
-        test_augmented<float, continuation::augmented_gmres>( report );
-        test_augmented<double, continuation::augmented_gmres>( report );
+        test_preconditioner_wrapper( report );
+        test_gmres_retry( report );
+        test_augmented<float, main_classes::detail::augmented_gmres>( report );
+        test_augmented<double, main_classes::detail::augmented_gmres>( report );
         test_augmented<float, nmfd::solvers::bicgstabl>( report );
         test_augmented<double, nmfd::solvers::bicgstabl>( report );
         std::printf( "Augmented continuation: %u checks passed\n", report.checks );

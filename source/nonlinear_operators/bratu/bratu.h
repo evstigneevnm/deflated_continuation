@@ -378,6 +378,12 @@ public:
         apply_spatial_jacobian<detail::linear_nonlinear_terms::all>( du, dv );
     }
 
+    // Export the prepared row-major state block for the full bordered direct solve.
+    void copy_jacobian_matrix( T *values ) const
+    {
+        vec_ops->get( jacobian_matrix, values, interior_size * interior_size );
+    }
+
     void linear_jacobian_u( const T_vec &du, T_vec &dv ) const
     {
         apply_spatial_jacobian<detail::linear_nonlinear_terms::linear>( du, dv );

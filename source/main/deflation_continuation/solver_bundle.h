@@ -257,7 +257,7 @@ public:
     {
         if constexpr ( !std::is_void_v<NewtonTypes> )
             if constexpr ( !std::is_void_v<typename NewtonTypes::tangent_solver_type> )
-                configure_linear_solver<scalar_type>( &nmfd_.bordered->krylov_solver(), parameters );
+                configure_linear_solver<scalar_type>( &nmfd_.bordered->linear_solver(), parameters );
     }
 
     template <class Parameters>
