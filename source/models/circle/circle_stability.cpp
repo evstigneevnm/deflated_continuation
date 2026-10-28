@@ -127,6 +127,7 @@ int main( int argc, char **argv )
             vec_ops_real, file_operations_type, log_t, monitor_type, nonlinear_operator_type, newton_operator_type,
             newton_preconditioner_type, circle_model::bicgstabl, nonlinear_operators::system_operator, parameters_type,
             eigensolver_type, nonlinear_operator_type, newton_types>;
+        static_assert( driver_type::uses_nmfd_newton, "Circle stability requires NMFD Newton" );
 
         auto vector_space = std::make_shared<vec_ops_real>( 1 );
         if ( parameters->use_high_precision_reduction )

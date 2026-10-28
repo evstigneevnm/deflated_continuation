@@ -33,7 +33,7 @@
 #include <nmfd/solvers/bicgstabl.h>
 #include <nmfd/solvers/default_monitor.h>
 #include <nmfd/solvers/sherman_morrison.h>
-#include <numerical_algos/newton_solvers/newton_solver.h>
+#include <main/nmfd_newton_types.h>
 #include <symmetry/finite_action_registry.h>
 #include <symmetry/fourier/real_packed_fourier_slice_1d_adapter.h>
 
@@ -53,11 +53,9 @@ using prec_t             = symmetry::linearization::projected_preconditioner<vec
 using monitor_t          = nmfd::solvers::default_monitor<vec_ops_real, log_t>;
 using sm_solver_t =
     nmfd::solvers::sherman_morrison<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t, nmfd::solvers::bicgstabl>;
-using projected_newton_system_t =
-    nonlinear_operators::projected_system_operator<vec_ops_real, ks1d_t, lin_op_t, sm_solver_t>;
-using convergence_strategy_t = nonlinear_operators::newton_method::convergence_strategy<vec_ops_real, ks1d_t, log_t>;
-using newton_t               = numerical_algos::newton_method::newton_solver<
-                  vec_ops_real, ks1d_t, projected_newton_system_t, convergence_strategy_t>;
+using newton_types = main_classes::nmfd_fixed_newton_types<
+    vec_ops_real, log_t, ks1d_t, lin_op_t, sm_solver_t::linear_solver_original_type>;
+using newton_t          = newton_types::fixed_correction_type;
 using initial_tangent_t = continuation::initial_tangent<vec_ops_real, log_t, newton_t, ks1d_t, lin_op_t, sm_solver_t>;
 using projected_continuation_system_t =
     continuation::projected_system_operator_continuation<vec_ops_real, ks1d_t, lin_op_t, sm_solver_t, log_t>;
@@ -1438,10 +1436,11 @@ void test_initial_tangent_projected_path_smoke(
 
     log_t log;
     log.set_verbosity( 0 );
-    auto        linear_operator = std::make_shared<lin_op_t>( problem );
-    auto        preconditioner  = std::make_shared<prec_t>( problem );
-    auto       &lin_op          = *linear_operator;
-    sm_solver_t sm_solver( operations, linear_operator, preconditioner, &log );
+    auto  linear_operator = std::make_shared<lin_op_t>( problem );
+    auto  preconditioner  = std::make_shared<prec_t>( problem );
+    auto &lin_op          = *linear_operator;
+    auto  linear_system   = std::make_shared<sm_solver_t>( operations, linear_operator, preconditioner, &log );
+    auto &sm_solver       = *linear_system;
     sm_solver.get_linsolver_handle()->monitor().configure( linear_monitor_parameters( 1000 ) );
     sm_solver.get_linsolver_handle()->set_basis_size( 16 );
     sm_solver.get_linsolver_handle()->set_use_precond_resid( true );
@@ -1451,14 +1450,21 @@ void test_initial_tangent_projected_path_smoke(
     sm_solver.get_linsolver_handle_original()->set_use_precond_resid( true );
     sm_solver.get_linsolver_handle_original()->set_resid_recalc_freq( 1 );
 
-    vec_ops_real             *vec_ops_ptr   = &vec_ops;
-    log_t                    *log_ptr       = &log;
-    lin_op_t                 *lin_op_ptr    = &lin_op;
-    sm_solver_t              *sm_solver_ptr = &sm_solver;
-    projected_newton_system_t newton_system( vec_ops_ptr, lin_op_ptr, sm_solver_ptr );
-    convergence_strategy_t    convergence( vec_ops_ptr, log_ptr, real( 1.0e-10 ), 10, real( 1 ), false, false );
-    newton_t                  newton( &vec_ops, &newton_system, &convergence );
-    initial_tangent_t         initial_tangent( vec_ops_ptr, &log, &newton, lin_op_ptr, sm_solver_ptr, false );
+    vec_ops_real *vec_ops_ptr   = &vec_ops;
+    lin_op_t     *lin_op_ptr    = &lin_op;
+    sm_solver_t  *sm_solver_ptr = &sm_solver;
+    auto          ordinary      = std::shared_ptr<sm_solver_t::linear_solver_original_type>(
+        linear_system, sm_solver.get_linsolver_handle_original()
+    );
+    auto fixed_op = std::make_shared<newton_types::fixed_operator_type>( problem, linear_operator, real( 5 ) );
+    auto newton   = newton_types::fixed_method::make(
+        operations, problem, fixed_op, operations, ordinary, &log,
+        std::make_shared<newton_types::projector_type>( problem )
+    );
+    newton->get_convergence_strategy_handle()->set_convergence_constants(
+        real( 1e-10 ), 10, real( 1 ), 0, real( 1 ), false, false
+    );
+    initial_tangent_t initial_tangent( vec_ops_ptr, &log, newton.get(), lin_op_ptr, sm_solver_ptr, false );
 
     ks1d_t    *ks_ptr   = &ks;
     real       lambda_s = real( 0 );

@@ -6,7 +6,7 @@
 
 #include <string>
 #include <stdexcept>
-#include "../detail/str_source_helper.h"
+#include <numerical_algos/detail/str_source_helper.h>
 
 
 namespace numerical_algos

@@ -99,12 +99,16 @@ INMFD_LINSOLVERS = -I $(CONTRIB_NMFD_LINSOLVERS)/include
 INMFD_NEWTON = -I $(CONTRIB_NMFD_NEWTON)/include $(INMFD_LINSOLVERS)
 CIRCLE_NMFD_NEWTON_TARGETS = circle_bd_cuda circle_bd_cpu_omp circle_bd_hip circle_bd_var_prec circle_stability_cuda circle_stability_cpu_omp circle_stability_hip
 $(CIRCLE_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
-KS1D_NMFD_NEWTON_TARGETS = KS1D_bd_cpu_omp KS1D_bd_cuda KS1D_stability_cpu_omp KS1D_stability_cuda KS1D_bd_hip KS1D_stability_hip KS1D_full_bd_cpu_omp KS1D_full_bd_cuda KS1D_full_stability_cpu_omp KS1D_full_stability_cuda
+KS1D_NMFD_NEWTON_TARGETS = KS1D_bd_cpu_omp KS1D_bd_cuda KS1D_stability_cpu_omp KS1D_stability_cuda KS1D_bd_hip KS1D_stability_hip KS1D_full_bd_cpu_omp KS1D_full_bd_cuda KS1D_full_stability_cpu_omp KS1D_full_stability_cuda KS1D_full_operator_cpu_omp.bin KS1D_full_operator_cuda.bin
 $(KS1D_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
 KS2D_NMFD_NEWTON_TARGETS = KS2D_bd_cpu_omp KS2D_bd_cuda KS2D_stability_cpu_omp KS2D_stability_cuda
 $(KS2D_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
 BRATU_NMFD_NEWTON_TARGETS = bratu_bd_cpu_omp bratu_bd_var_prec bratu_stability_cpu_omp bratu_prepare_visualization_cpu_omp test_bratu_stability_operators_cpu_omp.bin test_bratu_newton_cpu_omp.bin
 $(BRATU_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
+STAR_SHAPED_NMFD_NEWTON_TARGETS = star_shaped_bd_cpu_omp star_shaped_bd_cuda star_shaped_bd_hip star_shaped_bd_var_prec star_shaped_stability_cpu_omp star_shaped_stability_cuda test_star_shaped_newton_cpu_omp.bin test_star_shaped_newton_cuda.bin test_star_shaped_newton_hip.bin test_star_shaped_newton_var_prec.bin
+$(STAR_SHAPED_NMFD_NEWTON_TARGETS): private IPROJECT += $(INMFD_NEWTON)
+test_newton_multiprecision_cpu.bin: private NEWTON_TEST_INCLUDES += $(IBOOST)
+$(filter test_workflow_ownership% test_stability_continuation_interface_cpu.bin,$(MAKECMDGOALS)): private IPROJECT += $(INMFD_NEWTON)
 ITIME_STEPPER = -I $(NMFD_TIMESTEPPERS_ROOT)/include -I $(COMMON_NMFD_OPERATIONS) -I $(CONTRIB_SCFD)/include -I source/contrib/json
 LINEAR_SOLVE_RECOVERY_HEADER = source/numerical_algos/linear_solve_recovery.h
 LEGACY_LINSOLVERS = source/numerical_algos/legacy/include/numerical_algos/lin_solvers
@@ -126,6 +130,9 @@ LEGACY_LINEAR_SOLVER_TARGETS = cpu_1st_call_alloc_test.bin sm_test.bin iterative
   test_rossler_periodic_continuate_cpu test_rossler_periodic_orbit_gpu
 $(LEGACY_LINEAR_SOLVER_TARGETS): private IPROJECT += $(ILEGACY_LINSOLVERS)
 $(LEGACY_LINEAR_SOLVER_TARGETS): $(wildcard $(LEGACY_LINSOLVERS)/*.h $(LEGACY_LINSOLVERS)/detail/*.h)
+LEGACY_NEWTON_HEADERS = $(wildcard source/numerical_algos/legacy/include/numerical_algos/newton_solvers/*.h)
+$(LEGACY_LINEAR_SOLVER_TARGETS): private IPROJECT += -DPROJECT_ENABLE_LEGACY_NEWTON
+$(LEGACY_LINEAR_SOLVER_TARGETS): $(LEGACY_NEWTON_HEADERS)
 IBOOST = -I$(BOOST_ROOT_PATH)/include
 HIGH_PRECISION_BLAS1_CUDA_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_type.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl.cuh $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_functions.cuh $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_shmem.cuh
 HIGH_PRECISION_BLAS1_HIP_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita.h
@@ -169,6 +176,7 @@ CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/mod
 CIRCLE_STABILITY_HEADERS = $(CIRCLE_MODEL_HEADERS) source/stability/eigensolvers/direct_scalar_eigensolver.h source/stability/eigensolvers/transformations/scaled_real_operator.h
 NMFD_NEWTON_ASSEMBLY_HEADERS = source/main/nmfd_newton_types.h source/numerical_algos/parameterized_correction.h source/numerical_algos/recovering_linear_solver.h source/nonlinear_operators/fixed_parameter_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/corrector_operator.h source/continuation/bordered_linear_solver.h source/continuation/arclength_constraint.h source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h source/deflation/solution_storage.h $(wildcard source/contrib/nmfd-newton/include/nmfd/solvers/*.h)
 NMFD_NEWTON_ASSEMBLY_HEADERS += source/deflation/fixed_damping_convergence_strategy.h
+NMFD_NEWTON_ASSEMBLY_HEADERS += source/main/nmfd_direct_newton_types.h
 NMFD_NEWTON_ASSEMBLY_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER) source/numerical_algos/bypassable_preconditioner.h $(NMFD_GMRES_HEADERS) $(wildcard $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/detail/*.h)
 NMFD_NEWTON_ASSEMBLY_HEADERS += $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/krylov/operator_apply.h
 NMFD_NEWTON_ASSEMBLY_HEADERS += source/continuation/augmented_linear_solver.h source/continuation/augmented_tangent.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/preconditioners/block_schur.h $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/preconditioners/small_schur_inverse.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/two_block_access.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/linalg/small_dense.h
@@ -177,10 +185,11 @@ NMFD_DIRECT_SOLVER_HEADERS = $(CONTRIB_NMFD_LINSOLVERS)/include/nmfd/solvers/dir
 BRATU_MODEL_HEADERS = source/models/bratu/bratu_backend_typedefs.h source/models/bratu/bratu_model_config.h source/models/bratu/bratu_linear_solvers.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/bratu/bratu.h source/nonlinear_operators/bratu/convergence_strategy.h source/nonlinear_operators/bratu/linear_operator_bratu.h source/nonlinear_operators/bratu/preconditioner_bratu.h source/nonlinear_operators/bratu/system_operator.h $(NMFD_DIRECT_SOLVER_HEADERS)
 BRATU_MODEL_HEADERS += source/nonlinear_operators/bratu/augmented_inverse_bratu.h $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 STAR_SHAPED_MODEL_HEADERS = source/models/star_shaped/star_shaped_backend_typedefs.h source/models/star_shaped/star_shaped_linear_solvers.h source/nonlinear_operators/star_shaped/star_shaped.h source/nonlinear_operators/star_shaped/convergence_strategy.h source/nonlinear_operators/star_shaped/linear_operator_star_shaped.h source/nonlinear_operators/star_shaped/preconditioner_star_shaped.h source/nonlinear_operators/star_shaped/system_operator.h $(NMFD_DIRECT_SOLVER_HEADERS)
+STAR_SHAPED_MODEL_HEADERS += source/nonlinear_operators/star_shaped/augmented_inverse_star_shaped.h $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 KS1D_MODEL_HEADERS = source/models/KS_1D/KS1D_backend_typedefs.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/convergence_strategy.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/linear_operator_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/preconditioner_KS_1D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/system_operator.h
 KS1D_LINEAR_SOLVER_HEADERS = source/models/KS_1D/KS1D_linear_solvers.h $(wildcard source/contrib/nmfd-linsolvers/include/nmfd/solvers/*.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/detail/*.h) $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 KS1D_FULL_MODEL_HEADERS = $(KS1D_MODEL_HEADERS) source/nonlinear_operators/Kuramoto_Sivashinskiy_1D/kuramoto_sivashinskiy_1d_full.h $(SYMMETRY_LINEARIZATION_HEADERS) source/nonlinear_operators/projected_system_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/projected_system_operator_continuation.h $(CONTINUATION_CHART_HEADERS) $(DEFLATION_SYMMETRY_HEADERS)
-WORKFLOW_OWNERSHIP_HEADERS = source/main/deflation_continuation.hpp source/main/deflation_continuation/solver_bundle.h source/main/stability_continuation.hpp source/main/stability_continuation/solver_bundle.h source/main/solver_construction.h source/main/deflation_continuation/parameter_application.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/system_operator.h source/numerical_algos/newton_solvers/newton_solver.h
+WORKFLOW_OWNERSHIP_HEADERS = source/main/deflation_continuation.hpp source/main/deflation_continuation/solver_bundle.h source/main/stability_continuation.hpp source/main/stability_continuation/solver_bundle.h source/main/solver_construction.h source/main/deflation_continuation/parameter_application.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/system_operator.h source/numerical_algos/legacy_newton_declarations.h
 STABILITY_CONTINUATION_HEADERS = source/main/stability_continuation.hpp source/main/stability_continuation/solver_bundle.h source/containers/stability_diagram.h $(STABILITY_ANALYSIS_HEADERS) $(EIGENSOLVER_HEADERS) $(EIGENSOLVER_TRANSFORMATION_HEADERS) $(PRODUCT_VECTOR_SPACE_HEADERS) $(NMFD_GMRES_HEADERS) $(HOST_SMALL_DENSE_HEADERS)
 KS1D_STABILITY_HEADERS = source/models/KS_1D/KS1D_stability_cli.h $(STABILITY_CONTINUATION_HEADERS)
 KS1D_STABILITY_REPLAY_SCRIPT = scripts/test_ks1d_full_stability_replay.py
@@ -358,6 +367,20 @@ test_bratu_stability_operators_cpu_omp.bin: source/models/bratu/test_bratu_stabi
 
 test_bratu_newton_cpu_omp.bin: source/models/bratu/test_bratu_newton.cpp $(BRATU_MODEL_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) -DBRATU_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $< $(OPENMP) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_star_shaped_newton_cpu_omp.bin: source/models/star_shaped/test_star_shaped_newton.cpp $(STAR_SHAPED_MODEL_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) $< $(OPENMP) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_star_shaped_newton_var_prec.bin: source/models/star_shaped/test_star_shaped_newton.cpp $(STAR_SHAPED_MODEL_HEADERS) $(CPU_VECTOR_OPS_VAR_PREC_HEADERS)
+	$(G++) $(G++FLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_VAR_PREC $(IPROJECT) $(IBOOST) $< $(OPENMP) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_star_shaped_newton_cuda.bin: source/models/star_shaped/test_star_shaped_newton.cpp $(STAR_SHAPED_MODEL_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DSTAR_SHAPED_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) -x cu -c $< -o $(BUILD_DIR)/test_star_shaped_newton_cuda_main.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_star_shaped_newton_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBSAll) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_star_shaped_newton_hip.bin: source/models/star_shaped/test_star_shaped_newton.cpp $(STAR_SHAPED_MODEL_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(KS1D_HIP_REDUCTION_OBJECT)
+	$(HIPCC) $(HIPFLAGS) -DSTAR_SHAPED_VECTOR_BACKEND_HIP $(SCALAR_TYPE) $(IPROJECT) $(IBOOST) -c $< -o $(BUILD_DIR)/test_star_shaped_newton_hip_main.o 2>$(RESULTS)
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_star_shaped_newton_hip_main.o $(KS1D_HIP_REDUCTION_OBJECT) $(HIPLIBS) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
 test_stability_analysis_pipeline_cpu_omp.bin: source/stability/tests/test_stability_analysis_pipeline.cpp $(STABILITY_ANALYSIS_HEADERS) $(CIRCLE_MODEL_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/stability/tests/test_stability_analysis_pipeline.cpp $(OPENMP) -o $(BUILD_DIR)/test_stability_analysis_pipeline_cpu_omp.bin 2>$(RESULTS)

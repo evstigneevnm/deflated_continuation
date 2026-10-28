@@ -5,6 +5,7 @@
 
 #include <string>
 #include <stdexcept>
+#include <numerical_algos/detail/str_source_helper.h>
 
 #include <numerical_algos/linear_solve_recovery.h>
 #include <continuation/arclength_constraint.h>

@@ -21,7 +21,7 @@
 #include <filesystem>
 #include <sstream>
 #include <type_traits>
-#include <numerical_algos/newton_solvers/newton_solver.h>
+#include <numerical_algos/legacy_newton_declarations.h>
 
 #include <common/scalar_math.h>
 
@@ -195,6 +195,10 @@ template <
 class deflation_continuation
 {
     static_assert( !std::is_void<LinearSystem>::value, "Select the workflow LinearSystem explicitly" );
+    static_assert(
+        !std::is_void_v<NewtonTypes> || numerical_algos::legacy_newton_enabled,
+        "Inject NMFD Newton types; archived Newton is available only in historical builds"
+    );
 
 public:
     static constexpr bool uses_nmfd_newton = !std::is_void_v<NewtonTypes>;

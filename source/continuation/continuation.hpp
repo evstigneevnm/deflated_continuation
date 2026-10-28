@@ -19,7 +19,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <numerical_algos/newton_solvers/newton_solver_extended.h>
+#include <numerical_algos/legacy_newton_declarations.h>
 
 #include <continuation/predictor_adaptive.h>
 #include <continuation/system_operator_continuation.h>

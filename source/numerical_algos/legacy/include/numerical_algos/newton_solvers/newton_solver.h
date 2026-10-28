@@ -8,7 +8,7 @@
 #include <string>
 #include <stdexcept>
 #include <nmfd/detail/vector_wrap.h>
-#include "../detail/str_source_helper.h"
+#include <numerical_algos/detail/str_source_helper.h>
 
 namespace numerical_algos
 {

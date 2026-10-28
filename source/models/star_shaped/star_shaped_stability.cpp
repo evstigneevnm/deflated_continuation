@@ -125,10 +125,15 @@ int main( int argc, char **argv )
         using eigensolver_type =
             stability::eigensolvers::direct_scalar_eigensolver<vec_ops_real, stability_operator_type>;
         using monitor_type = star_shaped_model::monitor<vec_ops_real, log_t>;
-        using driver_type  = main_classes::stability_continuation<
-             vec_ops_real, file_operations_type, log_t, monitor_type, nonlinear_operator_type, newton_operator_type,
-             newton_preconditioner_type, star_shaped_model::direct_solver, nonlinear_operators::system_operator,
-             parameters_type, eigensolver_type>;
+        using linear_type  = star_shaped_model::direct_solver<
+             newton_operator_type, newton_preconditioner_type, vec_ops_real, monitor_type, log_t>;
+        using newton_types = main_classes::nmfd_fixed_newton_types<
+            vec_ops_real, log_t, nonlinear_operator_type, newton_operator_type, linear_type>;
+        using driver_type = main_classes::stability_continuation<
+            vec_ops_real, file_operations_type, log_t, monitor_type, nonlinear_operator_type, newton_operator_type,
+            newton_preconditioner_type, star_shaped_model::direct_solver, nonlinear_operators::system_operator,
+            parameters_type, eigensolver_type, nonlinear_operator_type, newton_types>;
+        static_assert( driver_type::uses_nmfd_newton, "Star-shaped stability requires NMFD Newton" );
 
         auto  real_space   = std::make_shared<vec_ops_real>( 1 );
         auto &vector_space = *real_space;

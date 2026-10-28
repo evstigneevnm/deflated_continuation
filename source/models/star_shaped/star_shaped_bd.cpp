@@ -182,11 +182,18 @@ int main( int argc, char const *argv[] )
     log.set_verbosity( quiet ? 0 : 1 );
     log_linsolver.set_verbosity( quiet ? 0 : 1 );
 
-    using linear_system_type       = star_shaped_model::linear_system<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t>;
+    using linear_system_type = star_shaped_model::linear_system<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t>;
+    using storage_type       = deflation::solution_storage<vec_ops_real, log_t>;
+    using newton_types =
+        star_shaped_model::newton_types<vec_ops_real, log_t, star_shaped_t, lin_op_t, linear_system_type, storage_type>;
     using deflation_continuation_t = main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, star_shaped_t, lin_op_t, prec_t, star_shaped_model::direct_solver,
-        nonlinear_operators::system_operator, parameters_t, deflation::solution_storage<vec_ops_real, log_t>,
-        continuation::system_operator_continuation, linear_system_type>;
+        nonlinear_operators::system_operator, parameters_t, storage_type, continuation::system_operator_continuation,
+        linear_system_type, newton_types>;
+
+    static_assert( deflation_continuation_t::uses_nmfd_newton, "Star-shaped requires NMFD Newton" );
+    static_assert( newton_types::uses_augmented_linear_solver, "Star-shaped requires complete bordered solves" );
+    std::cout << "Newton solver: NMFD\n";
 
     deflation_continuation_t DC(
         vector_operations, file_operations, &log, &log_linsolver, nonlinear_operator, configuration

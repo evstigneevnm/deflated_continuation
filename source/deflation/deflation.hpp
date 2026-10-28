@@ -14,7 +14,7 @@
 #include <deflation/deflation_operator.h>
 #include <memory>
 #include <type_traits>
-#include <numerical_algos/newton_solvers/newton_solver_extended.h>
+#include <numerical_algos/legacy_newton_declarations.h>
 
 
 namespace deflation

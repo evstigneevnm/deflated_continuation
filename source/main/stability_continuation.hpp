@@ -26,7 +26,7 @@
 #include <containers/bifurcation_diagram.h>
 #include <containers/bifurcation_diagram/diagram_archive.h>
 #include <deflation/solution_storage.h>
-#include <numerical_algos/newton_solvers/newton_solver.h>
+#include <numerical_algos/legacy_newton_declarations.h>
 
 #include <containers/stability_diagram.h>
 #include <main/stability_continuation/solver_bundle.h>
@@ -49,6 +49,11 @@ template <
     class StabilityLinearizationProvider = NonlinearOperations, class NewtonTypes = void>
 class stability_continuation
 {
+    static_assert(
+        !std::is_void_v<NewtonTypes> || numerical_algos::legacy_newton_enabled,
+        "Inject NMFD Newton types; archived Newton is available only in historical builds"
+    );
+
 private:
     typedef typename VectorOperations::scalar_type T;
     typedef typename VectorOperations::vector_type T_vec;

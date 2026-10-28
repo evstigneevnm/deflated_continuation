@@ -29,6 +29,7 @@
 #include <nonlinear_operators/circle/system_operator.h>
 #include <models/circle/circle_linear_solvers.h>
 #include <main/parameters.hpp>
+#include <main/nmfd_newton_types.h>
 #include <main/deflation_continuation.hpp>
 #include <main/stability_continuation.hpp>
 #include <stability/eigensolvers/direct_scalar_eigensolver.h>
@@ -138,19 +139,27 @@ struct linearization_provider
     }
 };
 
+using linear_system_type = nmfd::solvers::sherman_morrison<
+    vector_space, monitor_type, log_type, linear_operator_type, preconditioner_type, nmfd::solvers::bicgstabl>;
+using newton_types = main_classes::nmfd_augmented_newton_types<
+    vector_space, log_type, problem_type, linear_operator_type, linear_system_type,
+    deflation::solution_storage<vector_space, log_type>, preconditioner_type>;
+using fixed_types = main_classes::nmfd_fixed_newton_types<
+    vector_space, log_type, problem_type, linear_operator_type,
+    circle_model::bicgstabl<linear_operator_type, preconditioner_type, vector_space, monitor_type, log_type>>;
 using deflation_workflow = main_classes::deflation_continuation<
     vector_space, file_operations_type, log_type, monitor_type, problem_type, linear_operator_type, preconditioner_type,
     circle_model::bicgstabl, nonlinear_operators::system_operator, parameters_type,
-    deflation::solution_storage<vector_space, log_type>, continuation::system_operator_continuation,
-    nmfd::solvers::sherman_morrison<
-        vector_space, monitor_type, log_type, linear_operator_type, preconditioner_type, nmfd::solvers::bicgstabl>>;
+    deflation::solution_storage<vector_space, log_type>, continuation::system_operator_continuation, linear_system_type,
+    newton_types>;
 using stability_workflow = main_classes::stability_continuation<
     vector_space, file_operations_type, log_type, monitor_type, problem_type, linear_operator_type, preconditioner_type,
-    circle_model::bicgstabl, nonlinear_operators::system_operator, parameters_type, eigensolver>;
+    circle_model::bicgstabl, nonlinear_operators::system_operator, parameters_type, eigensolver, problem_type,
+    fixed_types>;
 using custom_stability_workflow = main_classes::stability_continuation<
     vector_space, file_operations_type, log_type, monitor_type, problem_type, linear_operator_type, preconditioner_type,
-    circle_model::bicgstabl, nonlinear_operators::system_operator, parameters_type, eigensolver,
-    linearization_provider>;
+    circle_model::bicgstabl, nonlinear_operators::system_operator, parameters_type, eigensolver, linearization_provider,
+    fixed_types>;
 
 struct fixture
 {

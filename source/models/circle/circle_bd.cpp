@@ -198,18 +198,14 @@ int main( int argc, char const *argv[] )
     using linear_system_type =
         nmfd::solvers::sherman_morrison<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t, nmfd::solvers::cgs>;
     using storage_type = deflation::solution_storage<vec_ops_real, log_t>;
-#if defined( CIRCLE_VECTOR_BACKEND_VAR_PREC )
-    // NMFD's default convergence strategy still needs a separate multiprecision-math pass.
-    using newton_types = void;
-#else
     using newton_types = main_classes::nmfd_augmented_newton_types<
         vec_ops_real, log_t, circle_t, lin_op_t, linear_system_type, storage_type, prec_t>;
     static_assert( newton_types::uses_augmented_linear_solver, "Circle continuation requires augmented Krylov solves" );
-#endif
     using deflation_continuation_t = main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, circle_t, lin_op_t, prec_t, circle_model::cgs,
         nonlinear_operators::system_operator, parameters_t, storage_type, continuation::system_operator_continuation,
         linear_system_type, newton_types>;
+    static_assert( deflation_continuation_t::uses_nmfd_newton, "Circle requires NMFD Newton" );
 
     std::cout << "Newton solver: " << ( deflation_continuation_t::uses_nmfd_newton ? "NMFD" : "project legacy" )
               << '\n';

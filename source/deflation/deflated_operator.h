@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
+#include <common/scalar_math.h>
 #include <nmfd/detail/vector_wrap.h>
 #include <nonlinear_operators/projected_operator_helpers.h>
 
@@ -99,7 +100,7 @@ public:
           ),
           gradient_work_( *operations_ )
     {
-        if ( !std::isfinite( exclusion_distance_ ) || exclusion_distance_ < scalar_type( 0 ) )
+        if ( !common::scalar_math::isfinite( exclusion_distance_ ) || exclusion_distance_ < scalar_type( 0 ) )
             throw std::invalid_argument( "Deflation exclusion distance must be finite and nonnegative" );
         gradient_work_.init();
         gradient_work_.start_use();
@@ -118,7 +119,7 @@ public:
 
     void set_exclusion_distance( scalar_type distance )
     {
-        if ( !std::isfinite( distance ) || distance < scalar_type( 0 ) )
+        if ( !common::scalar_math::isfinite( distance ) || distance < scalar_type( 0 ) )
             throw std::invalid_argument( "Deflation exclusion distance must be finite and nonnegative" );
         exclusion_distance_ = distance;
     }
@@ -179,12 +180,13 @@ private:
     {
         scalar_type multiplier;
         solutions_->calc_distance( state, multiplier, *gradient_work_ );
-        if ( !std::isfinite( multiplier ) || solutions_->last_minimum_distance() <= exclusion_distance_ )
+        if ( !common::scalar_math::isfinite( multiplier ) ||
+             solutions_->last_minimum_distance() <= exclusion_distance_ )
             return std::numeric_limits<scalar_type>::infinity();
         physical_residual( state, work );
         const scalar_type norm          = operations_->norm_l2( work );
-        const scalar_type deflated_norm = std::abs( multiplier ) * norm;
-        if ( !std::isfinite( norm ) || !std::isfinite( deflated_norm ) )
+        const scalar_type deflated_norm = common::scalar_math::abs( multiplier ) * norm;
+        if ( !common::scalar_math::isfinite( norm ) || !common::scalar_math::isfinite( deflated_norm ) )
             return std::numeric_limits<scalar_type>::infinity();
         if constexpr ( Deflated )
             return std::max( norm, deflated_norm );

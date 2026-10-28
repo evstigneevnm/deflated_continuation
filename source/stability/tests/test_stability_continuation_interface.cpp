@@ -30,6 +30,7 @@
 #include <nonlinear_operators/circle/system_operator.h>
 #include <models/circle/circle_linear_solvers.h>
 #include <main/parameters.hpp>
+#include <main/nmfd_newton_types.h>
 #include <main/stability_continuation.hpp>
 #include <stability/eigensolvers/eigensolver_result.h>
 
@@ -150,12 +151,9 @@ int main()
         vector_operations_type, nonlinear_operator_type, linear_operator_type>;
     using linear_solver_type = circle_model::bicgstabl<
         linear_operator_type, preconditioner_type, vector_operations_type, monitor_type, log_type>;
-    using convergence_type = nonlinear_operators::newton_method::convergence_strategy<
-        vector_operations_type, nonlinear_operator_type, log_type>;
-    using system_operator_type = nonlinear_operators::system_operator<
-        vector_operations_type, nonlinear_operator_type, linear_operator_type, linear_solver_type>;
-    using newton_type = numerical_algos::newton_method::newton_solver<
-        vector_operations_type, nonlinear_operator_type, system_operator_type, convergence_type>;
+    using newton_types = main_classes::nmfd_fixed_newton_types<
+        vector_operations_type, log_type, nonlinear_operator_type, linear_operator_type, linear_solver_type>;
+    using newton_type            = typename newton_types::fixed_correction_type;
     using solution_storage_type  = deflation::solution_storage<vector_operations_type>;
     using curve_helper_type      = container::curve_helper_container<vector_operations_type>;
     using bifurcation_curve_type = container::bifurcation_diagram_curve<
@@ -171,11 +169,11 @@ int main()
     using driver_type            = main_classes::stability_continuation<
                    vector_operations_type, file_operations_type, log_type, monitor_type, nonlinear_operator_type,
                    linear_operator_type, preconditioner_type, circle_model::bicgstabl, nonlinear_operators::system_operator,
-                   parameters_type, adapter_type>;
+                   parameters_type, adapter_type, nonlinear_operator_type, newton_types>;
     using custom_driver_type = main_classes::stability_continuation<
         vector_operations_type, file_operations_type, log_type, monitor_type, nonlinear_operator_type,
         linear_operator_type, preconditioner_type, circle_model::bicgstabl, nonlinear_operators::system_operator,
-        parameters_type, adapter_type, provider_type>;
+        parameters_type, adapter_type, provider_type, newton_types>;
 
     auto  vector_operations_owner = std::make_shared<vector_operations_type>( 1 );
     auto &vector_operations       = *vector_operations_owner;
@@ -230,24 +228,22 @@ int main()
             driver.set_parameters();
         }
 
-        auto              *vector_operations_ptr       = &vector_operations;
-        auto              *log_ptr                     = &log;
-        auto               fixture_linear_operator     = std::make_shared<linear_operator_type>( problem_owner );
-        auto              *fixture_linear_operator_ptr = fixture_linear_operator.get();
-        auto               fixture_preconditioner      = std::make_shared<preconditioner_type>( problem_owner );
-        linear_solver_type fixture_linear_solver(
-            vector_operations_owner, &linear_solver_log, {}, fixture_preconditioner
+        auto fixture_linear_operator = std::make_shared<linear_operator_type>( problem_owner );
+        auto fixture_preconditioner  = std::make_shared<preconditioner_type>( problem_owner );
+        auto fixture_linear_solver   = std::make_shared<linear_solver_type>(
+            vector_operations_owner, &linear_solver_log, linear_solver_type::params(), fixture_preconditioner
         );
-        fixture_linear_solver.set_operator( fixture_linear_operator );
-        auto                *fixture_linear_solver_ptr = &fixture_linear_solver;
-        convergence_type     fixture_convergence( vector_operations_ptr, log_ptr );
-        system_operator_type fixture_system_operator(
-            vector_operations_ptr, fixture_linear_operator_ptr, fixture_linear_solver_ptr
+        fixture_linear_solver->set_operator( fixture_linear_operator );
+        auto fixture_operator = std::make_shared<newton_types::fixed_operator_type>(
+            problem_owner, fixture_linear_operator, real_type( 0 )
         );
-        newton_type fixture_newton( &vector_operations, &fixture_system_operator, &fixture_convergence );
+        auto fixture_newton = newton_types::fixed_method::make(
+            vector_operations_owner, problem_owner, fixture_operator, vector_operations_owner, fixture_linear_solver,
+            &log, std::make_shared<newton_types::projector_type>( problem_owner )
+        );
 
         bifurcation_diagram_type source_diagram(
-            &vector_operations, &file_operations, &log, &nonlinear_operator, &fixture_newton,
+            &vector_operations, &file_operations, &log, &nonlinear_operator, fixture_newton.get(),
             fixture_directory.string(), 1
         );
 
@@ -291,7 +287,7 @@ int main()
         try
         {
             bifurcation_diagram_type relocated_diagram(
-                &vector_operations, &file_operations, &log, &nonlinear_operator, &fixture_newton,
+                &vector_operations, &file_operations, &log, &nonlinear_operator, fixture_newton.get(),
                 relocated_fixture_directory.string(), 1
             );
             const auto relocation_load = container::load_diagram_archive(
@@ -449,7 +445,7 @@ int main()
         require( !filesystem_error, "failed to create terminal-boundary replay fixture" );
         parameters.path_to_project = boundary_fixture_directory.string();
         bifurcation_diagram_type boundary_source_diagram(
-            &vector_operations, &file_operations, &log, &nonlinear_operator, &fixture_newton,
+            &vector_operations, &file_operations, &log, &nonlinear_operator, fixture_newton.get(),
             boundary_fixture_directory.string(), 1
         );
         vector_operations.init_vector( state );

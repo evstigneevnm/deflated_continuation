@@ -152,7 +152,7 @@ still apply. `used_inexact_increment()` records this fallback and resets per sol
 Project fixed corrections expose `nonlinear_operator.newton.allow_inexact_increment`;
 continuation and deflation settings remain unchanged.
 
-Production circle, symmetric/full KS1D, and symmetry-restricted KS2D workflows select
+Production circle, Bratu, star-shaped, symmetric/full KS1D, and symmetry-restricted KS2D workflows select
 `main_classes::nmfd_newton_types` in assembly.
 Fixed, continuation, and deflation convergence strategies are independent template
 choices. Assembly configures them; algorithm classes only invoke corrections and
@@ -168,9 +168,24 @@ current project spaces) and the unscaled arclength constraint. Keep this policy
 separate from pair-space inner products, residual vectors, and bordered Jacobians.
 `parameterized_correction` bridges `(state, parameter)` calls to NMFD's vector-only
 solver, reuses candidate storage, and commits both components only on success.
-It contains no Newton loop. Tangent construction remains separate from the new
-continuation corrector. Other unmigrated PDEs and variable-precision
-circle Newton retain the old construction path until their migration gates pass.
+It contains no Newton loop. Tangent construction remains separate from the
+continuation corrector. Supported circle, Bratu, and star-shaped variable-precision
+workflows also use NMFD; scalar checks, norms, and dense/Schur setup retain the
+original precision through NMFD backend math traits.
+
+Project Newton implementations are archived under
+`source/numerical_algos/legacy/include/numerical_algos/newton_solvers`.
+Only explicitly listed historical targets receive the legacy include root and
+`PROJECT_ENABLE_LEGACY_NEWTON`. Supported assembly injects prepared NMFD solvers;
+it must not silently fall back to archived Newton. Shared framework headers only
+forward-declare historical types unless that build opt-in is present.
+`scripts/check_newton_solver_dependencies.py` checks the active dependency boundary.
+Historical Kolmogorov, ABC, overscreening, old circle/container, and frozen
+timestepper consumers remain archived-interface users, not migrated applications.
+
+The full-KS1D and KS2D symmetry/discovery discrepancies remain open numerical
+validation issues. Completion of the solver-interface migration does not imply
+that those reference diagrams have been reproduced.
 
 Symmetric KS1D also supports HIP with an unnormalized hipFFT R2C adapter.
 Native AMD HIP currently requires ordinary reductions: compensated BLAS1 is not
@@ -386,9 +401,11 @@ paths; do not require scalar elimination for every augmented system.
 Circle selects `main_classes::nmfd_augmented_newton_types` with GMRES.
 Symmetric/full KS1D and symmetry-restricted KS2D select BiCGStab(L).
 Full KS1D retains its independent fixed-damping deflation strategy.
-Bratu uses a direct inverse of the complete assembled bordered matrix, without
-assuming that its state block is invertible. Variable-precision Bratu remains
-on its existing correction path until separately migrated.
+Bratu and star-shaped use direct inverses of their complete assembled bordered
+matrices, without assuming that the state block is invertible. Their shared
+`main_classes::nmfd_direct_newton_types` assembly injects application-owned
+inverses into the ordinary NMFD direct solver. The same path supports their
+variable-precision workflows; star-shaped factors the complete 2x2 system.
 Projected initial-tangent candidates use the full bordered solve, including zero
 scalar borders, before the existing normalization, quality, and chart checks.
 Assembly selects and constructs the native solver and its inverse/preconditioner.
