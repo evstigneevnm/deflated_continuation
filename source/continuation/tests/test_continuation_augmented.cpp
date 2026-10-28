@@ -128,6 +128,37 @@ void test_augmented( continuation::tests::test_report &report )
             linear->monitor().rel_tol() == T( 0 ) && linear->monitor().abs_tol() == tolerance / T( 10 ),
             "Tangent preparation restores correction tolerances"
         );
+        f.set( *f.tangent, T( 1 ), T( 0 ) );
+        for ( T beta : { T( 2 ), T( -2 ) } )
+        {
+            report.require(
+                tangent.solve(
+                    ( *f.state ).first, T( 1 ), ( *f.tangent ).first, T( 0 ), beta, ( *f.action ).first,
+                    ( *f.action ).second[0], tolerance / T( 10 ), 1000
+                ),
+                "Unnormalized zero-border tangent solve"
+            );
+            report.require(
+                std::abs( f.value( *f.action ) - beta ) < tolerance && std::abs( ( *f.action ).second[0] ) < tolerance,
+                "Tangent solve preserves signed normalization RHS"
+            );
+        }
+        f.space->assign( *f.action, *f.direction );
+        report.require(
+            !tangent.solve(
+                ( *f.state ).first, T( 1 ), ( *f.tangent ).first, T( 0 ), T( 1 ), ( *f.action ).first,
+                ( *f.action ).second[0], tolerance / T( 10 ), 0
+            ),
+            "Exhausted raw tangent solve fails"
+        );
+        report.require(
+            f.difference( *f.action, *f.direction ) == T( 0 ), "Raw tangent failure preserves both outputs"
+        );
+        report.require(
+            !linear->preconditioner_bypass_enabled() && linear->monitor().rel_tol() == T( 0 ) &&
+                linear->monitor().abs_tol() == tolerance / T( 10 ),
+            "Raw tangent failure restores recovery and monitor settings"
+        );
 
         f.configure( T( .15 ), T( .08 ) );
         const auto allocations = operations->allocations;

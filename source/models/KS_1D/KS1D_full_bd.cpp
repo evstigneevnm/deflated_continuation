@@ -289,15 +289,22 @@ int main( int argc, char const *argv[] )
 
     using linear_system_t =
         nmfd::solvers::sherman_morrison<vec_ops_real, monitor_t, log_t, lin_op_t, prec_t, nmfd::solvers::bicgstabl>;
+    using corrector_t           = continuation::corrector_operator<vec_ops_real, ks1d_t, lin_op_t>;
+    using continuation_linear_t = continuation::augmented_linear_solver<
+        typename corrector_t::vector_space_type, typename corrector_t::jacobi_operator_type, prec_t, log_t,
+        nmfd::solvers::bicgstabl>;
     using newton_types = main_classes::nmfd_newton_types<
         vec_ops_real, log_t, ks1d_t, lin_op_t, linear_system_t, sol_storage_t, main_classes::detail::newton_convergence,
-        main_classes::detail::continuation_convergence, main_classes::detail::fixed_damping_deflation_convergence>;
+        main_classes::detail::continuation_convergence, main_classes::detail::fixed_damping_deflation_convergence,
+        continuation_linear_t>;
     using deflation_continuation_t = main_classes::deflation_continuation<
         vec_ops_real, files_ops_t, log_t, monitor_t, ks1d_t, lin_op_t, prec_t, ks1d_model::bicgstabl,
         nonlinear_operators::projected_system_operator, parameters_t, sol_storage_t,
         continuation::projected_system_operator_continuation, linear_system_t, newton_types>;
     static_assert( deflation_continuation_t::uses_nmfd_newton, "Full KS1D requires NMFD Newton" );
+    static_assert( newton_types::uses_augmented_linear_solver, "Full KS1D requires full bordered solves" );
     std::cout << "Newton solver: NMFD\n";
+    std::cout << "Continuation linear solver: augmented BiCGStab(L)\n";
 
     deflation_continuation_t DC( vec_ops_R, file_ops, &log, &log_linsolver, KS1D, configuration, sol_storage_with_log );
 

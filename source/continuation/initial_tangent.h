@@ -352,19 +352,22 @@ private:
             beta       = T( -1 );
         }
 
-        const T row_lambda_abs = common::scalar_math::abs( row_lambda );
-        if ( !( row_lambda_abs > T( 0 ) ) )
+        if constexpr ( std::is_void_v<TangentSolver> )
         {
-            log->warning_f(
-                "continuation::initial_tangent: rejected projected bordered tangent candidate %s because the bordered "
-                "row has zero lambda component.",
-                method
-            );
-            return;
+            if ( !( common::scalar_math::abs( row_lambda ) > T( 0 ) ) )
+            {
+                log->warning_f(
+                    "continuation::initial_tangent: rejected projected bordered tangent candidate %s because the "
+                    "bordered "
+                    "row has zero lambda component.",
+                    method
+                );
+                return;
+            }
         }
 
         tangent_candidate_quality quality =
-            solve_projected_bordered_tangent_candidate( nonlin_op, method, row_lambda, beta, candidate_x_s );
+            solve_projected_bordered_tangent_candidate( nonlin_op, x, lambda, method, row_lambda, beta, candidate_x_s );
 
         if ( !quality.valid )
         {
@@ -401,7 +404,8 @@ private:
     }
 
     tangent_candidate_quality solve_projected_bordered_tangent_candidate(
-        NonlinearOperator *nonlin_op, const char *method, const T &row_lambda, const T &beta, T_vec &candidate
+        NonlinearOperator *nonlin_op, const T_vec &x, const T &lambda, const char *method, const T &row_lambda,
+        const T &beta, T_vec &candidate
     )
     {
         tangent_candidate_quality quality;
@@ -423,21 +427,30 @@ private:
         quality.lambda_s = T( 0 );
 
         const T tolerance_local = T( 1.0e-8 ) * vec_ops->get_l2_size();
-        lin_solv->get_linsolver_handle()->monitor().set_temp_tolerance( tolerance_local );
-        lin_solv->get_linsolver_handle()->monitor().set_temp_max_iterations( 10000 );
-        quality.solved =
-            lin_solv->solve( ( *lin_op ), row_x, Jlambda, row_lambda, f, beta, candidate, quality.lambda_s );
+        if constexpr ( !std::is_void_v<TangentSolver> )
+        {
+            quality.solved = tangent_solver_->solve(
+                x, lambda, row_x, row_lambda, beta, candidate, quality.lambda_s, tolerance_local, 10000
+            );
+        }
+        else
+        {
+            lin_solv->get_linsolver_handle()->monitor().set_temp_tolerance( tolerance_local );
+            lin_solv->get_linsolver_handle()->monitor().set_temp_max_iterations( 10000 );
+            quality.solved =
+                lin_solv->solve( ( *lin_op ), row_x, Jlambda, row_lambda, f, beta, candidate, quality.lambda_s );
+            const T   minimum_resid   = lin_solv->get_linsolver_handle()->monitor().resid_norm_out();
+            const int iters_performed = lin_solv->get_linsolver_handle()->monitor().iters_performed();
+            log->info_f(
+                "continuation::initial_tangent: projected bordered tangent solve candidate: row = %s, desired residual "
+                "= "
+                "%le, minimum attained residual = %le with %i iterations.",
+                method, (double)tolerance_local, (double)minimum_resid, iters_performed
+            );
+            lin_solv->get_linsolver_handle()->monitor().restore_max_iterations();
+            lin_solv->get_linsolver_handle()->monitor().restore_tolerance();
+        }
         nonlinear_operators::detail::project_current_tangent( vec_ops, nonlin_op, candidate, candidate );
-
-        const T   minimum_resid   = lin_solv->get_linsolver_handle()->monitor().resid_norm_out();
-        const int iters_performed = lin_solv->get_linsolver_handle()->monitor().iters_performed();
-        log->info_f(
-            "continuation::initial_tangent: projected bordered tangent solve candidate: row = %s, desired residual = "
-            "%le, minimum attained residual = %le with %i iterations.",
-            method, (double)tolerance_local, (double)minimum_resid, iters_performed
-        );
-        lin_solv->get_linsolver_handle()->monitor().restore_max_iterations();
-        lin_solv->get_linsolver_handle()->monitor().restore_tolerance();
 
         if ( !quality.solved )
         {

@@ -47,6 +47,9 @@ def main() -> None:
         result.check_returncode()
         if log_name and "Newton solver: NMFD" not in text:
             raise RuntimeError(f"Full KS1D did not select NMFD Newton: {log_name}")
+        if log_name and Path(str(command[0])).resolve() == args.bd_executable.resolve():
+            if "Continuation linear solver: augmented BiCGStab(L)" not in text:
+                raise RuntimeError(f"Full KS1D did not select full bordered solves: {log_name}")
 
     def snapshot(directory: Path, ignored: tuple[str, ...] = ()) -> dict[str, str]:
         return {str(path.relative_to(directory)): hashlib.sha256(path.read_bytes()).hexdigest()

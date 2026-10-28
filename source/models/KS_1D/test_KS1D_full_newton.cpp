@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 #include <common/gpu_file_operations.h>
@@ -40,13 +41,19 @@ using preconditioner_type = symmetry::linearization::projected_preconditioner<sp
 using monitor_type        = nmfd::solvers::default_monitor<space_type, log_t>;
 using system_type         = nmfd::solvers::sherman_morrison<
             space_type, monitor_type, log_t, jacobian_type, preconditioner_type, nmfd::solvers::bicgstabl>;
-using adapter_type  = symmetry::fourier::real_packed_fourier_slice_1d_adapter<space_type>;
-using actions_type  = symmetry::finite_action_registry<space_type>;
-using quotient_type = symmetry::finite_quotient_adapter<space_type, adapter_type>;
-using storage_type  = deflation::symmetry_solution_storage<space_type, quotient_type, log_t>;
-using types         = main_classes::nmfd_newton_types<
-            space_type, log_t, problem_type, jacobian_type, system_type, storage_type, main_classes::detail::newton_convergence,
-            main_classes::detail::continuation_convergence, main_classes::detail::fixed_damping_deflation_convergence>;
+using adapter_type             = symmetry::fourier::real_packed_fourier_slice_1d_adapter<space_type>;
+using actions_type             = symmetry::finite_action_registry<space_type>;
+using quotient_type            = symmetry::finite_quotient_adapter<space_type, adapter_type>;
+using storage_type             = deflation::symmetry_solution_storage<space_type, quotient_type, log_t>;
+using corrector_type           = continuation::corrector_operator<space_type, problem_type, jacobian_type>;
+using continuation_linear_type = continuation::augmented_linear_solver<
+    corrector_type::vector_space_type, corrector_type::jacobi_operator_type, preconditioner_type, log_t,
+    nmfd::solvers::bicgstabl>;
+using types = main_classes::nmfd_newton_types<
+    space_type, log_t, problem_type, jacobian_type, system_type, storage_type, main_classes::detail::newton_convergence,
+    main_classes::detail::continuation_convergence, main_classes::detail::fixed_damping_deflation_convergence,
+    continuation_linear_type>;
+static_assert( types::uses_augmented_linear_solver, "Full KS1D tests require full bordered solves" );
 
 struct settings
 {
@@ -60,7 +67,7 @@ struct settings
 template <class Solver>
 void configure_linear( Solver *linear )
 {
-    monitor_type::params p;
+    typename std::remove_reference_t<decltype( linear->monitor() )>::params p;
     p.rel_tol       = 1e-11;
     p.abs_tol       = 1e-12;
     p.max_iters_num = 500;
@@ -75,14 +82,14 @@ void configure_linear( Solver *linear )
 // preserve its solution orbit and the prepared chart, not its absolute phase.
 struct fixture
 {
-    std::shared_ptr<space_type>    space    = std::make_shared<space_type>( 126 );
-    std::shared_ptr<problem_type>  problem  = std::make_shared<problem_type>( 2., 4., 128, space );
-    std::shared_ptr<jacobian_type> jacobian = std::make_shared<jacobian_type>( problem );
-    std::shared_ptr<system_type>   system =
-        std::make_shared<system_type>( space, jacobian, std::make_shared<preconditioner_type>( problem ) );
-    std::shared_ptr<adapter_type>               adapter = std::make_shared<adapter_type>( space, 63 );
-    std::shared_ptr<actions_type>               actions = std::make_shared<actions_type>( space );
-    std::shared_ptr<storage_type>               storage;
+    std::shared_ptr<space_type>          space          = std::make_shared<space_type>( 126 );
+    std::shared_ptr<problem_type>        problem        = std::make_shared<problem_type>( 2., 4., 128, space );
+    std::shared_ptr<jacobian_type>       jacobian       = std::make_shared<jacobian_type>( problem );
+    std::shared_ptr<preconditioner_type> preconditioner = std::make_shared<preconditioner_type>( problem );
+    std::shared_ptr<system_type>         system  = std::make_shared<system_type>( space, jacobian, preconditioner );
+    std::shared_ptr<adapter_type>        adapter = std::make_shared<adapter_type>( space, 63 );
+    std::shared_ptr<actions_type>        actions = std::make_shared<actions_type>( space );
+    std::shared_ptr<storage_type>        storage;
     std::shared_ptr<types::fixed_operator_type> fixed_op =
         std::make_shared<types::fixed_operator_type>( problem, jacobian, parameter );
     std::shared_ptr<types::fixed_correction_type> fixed;
@@ -185,18 +192,20 @@ void test_continuation()
     auto   &space  = *f.space;
     real    lambda = parameter;
     require( f.fixed->solve( f.problem.get(), *f.reference, lambda ), "Reference correction failed" );
-    f.problem->set_projected_linearization_point( *f.reference, lambda );
-    f.problem->projected_jacobian_alpha( *f.work );
-    space.scale( -1., *f.work );
-    space.assign_scalar( 0., *f.tangent );
-    require( f.system->solve( *f.jacobian, *f.work, *f.tangent ), "Projected tangent solve failed" );
-    const real tangent_parameter = 1 / std::sqrt( 1 + space.scalar_prod( *f.tangent, *f.tangent ) );
-    space.scale( tangent_parameter, *f.tangent );
+    auto op     = std::make_shared<types::corrector_operator_type>( f.space, f.problem, f.jacobian );
+    auto linear = types::make_bordered( op->space(), f.system, f.preconditioner, nullptr );
+    configure_linear( &linear->krylov_solver() );
+    auto tangent           = types::make_tangent( op, linear );
+    real tangent_parameter = 0;
+    require( tangent->initial( *f.reference, lambda, 1., *f.tangent, tangent_parameter ), "Projected initial tangent" );
+    require(
+        tangent_parameter > 0 && std::abs( space.norm_rank1( *f.tangent, tangent_parameter ) - 1 ) < 1e-10,
+        "Initial tangent orientation and normalization"
+    );
     f.problem->begin_continuation_chart( *f.reference, lambda, *f.tangent, tangent_parameter );
     const auto chart_mode = f.problem->last_slice_data().mode;
-    auto       op         = std::make_shared<types::corrector_operator_type>( f.space, f.problem, f.jacobian );
     auto       correction = types::continuation_method::make(
-        f.space, f.problem, op, op->space(), std::make_shared<types::bordered_type>( f.system ), nullptr,
+        f.space, f.problem, op, op->space(), linear, nullptr,
         std::make_shared<types::corrector_operator_type::trial_projector>( op )
     );
     types::configure_continuation( correction->get_convergence_strategy_handle(), f.parameters );
@@ -214,6 +223,50 @@ void test_continuation()
         ) <= f.parameters.tolerance,
         "Continuation constraint residual"
     );
+    real next_tangent_parameter = 0;
+    require(
+        tangent->apply(
+            *f.state, lambda, *f.tangent, tangent_parameter, *f.direction, next_tangent_parameter, 1e-10, 500
+        ),
+        "Projected tangent update"
+    );
+    f.jacobian->apply( *f.direction, *f.work );
+    f.problem->projected_jacobian_alpha( *f.action );
+    space.add_mul( next_tangent_parameter, *f.action, *f.work );
+    require( space.norm_l2( *f.work ) < 1e-8, "Projected tangent equation residual" );
+    require(
+        space.scalar_prod( *f.tangent, *f.direction ) + tangent_parameter * next_tangent_parameter > 0,
+        "Projected tangent update orientation"
+    );
+
+    // A state-only normalization row is valid even when its parameter block is zero.
+    require(
+        tangent->solve( *f.state, lambda, *f.direction, 0., -2., *f.action, next_tangent_parameter, 1e-10, 500 ),
+        "Zero-border projected tangent solve"
+    );
+    require(
+        std::abs( space.scalar_prod( *f.direction, *f.action ) + 2 ) < 1e-8,
+        "Unnormalized tangent preserves the supplied row RHS"
+    );
+    f.jacobian->apply( *f.action, *f.work );
+    f.problem->projected_jacobian_alpha( *f.plus );
+    space.add_mul( next_tangent_parameter, *f.plus, *f.work );
+    require( space.norm_l2( *f.work ) < 1e-8, "Zero-border tangent equation residual" );
+    space.assign( *f.action, *f.saved );
+    const real saved_parameter = next_tangent_parameter;
+    require(
+        !tangent->solve( *f.state, lambda, *f.direction, 0., 1., *f.action, next_tangent_parameter, 1e-10, 0 ),
+        "Exhausted tangent solve reported convergence"
+    );
+    f.difference( *f.action, *f.saved, 0., "Failed tangent solve committed a state" );
+    require(
+        next_tangent_parameter == saved_parameter && !linear->preconditioner_bypass_enabled(),
+        "Failed tangent solve changed its parameter or recovery mode"
+    );
+    require(
+        linear->monitor().rel_tol() == 1e-11 && linear->monitor().abs_tol() == 1e-12,
+        "Tangent solve did not restore corrector tolerances"
+    );
     f.parameters.newton_max_it = 1;
     types::configure_continuation( correction->get_convergence_strategy_handle(), f.parameters );
     space.assign_mul( .9, *f.reference, *f.state );
@@ -224,6 +277,12 @@ void test_continuation()
     require( lambda == parameter, "Failed corrector committed a parameter" );
     f.problem->restore_continuation_chart( *f.reference, parameter, *f.tangent, tangent_parameter );
     require( f.problem->last_slice_data().mode == chart_mode, "Failed corrector lost continuation chart" );
+    f.parameters.newton_max_it = 40;
+    types::configure_continuation( correction->get_convergence_strategy_handle(), f.parameters );
+    correction->set_tangent_space( *f.reference, parameter, *f.tangent, tangent_parameter, .01, 'S' );
+    space.assign_mul( 1., *f.reference, .01, *f.tangent, *f.state );
+    lambda = parameter + .01 * tangent_parameter;
+    require( correction->solve( f.problem.get(), *f.state, lambda ), "Rebound corrector did not recover" );
 }
 
 void test_deflation()

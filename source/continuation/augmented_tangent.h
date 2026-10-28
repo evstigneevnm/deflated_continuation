@@ -11,7 +11,7 @@
 namespace continuation
 {
 
-// Application formulation for [J F_parameter; row row_parameter] * tangent = [0; 1].
+// Application formulation for [J F_parameter; row row_parameter] * tangent = [0; beta].
 template <class Corrector, class LinearSolver>
 class augmented_tangent
 {
@@ -38,34 +38,28 @@ public:
         vector_type &tangent, scalar_type &tangent_parameter, scalar_type tolerance, int maximum_iterations
     )
     {
-        op_->prepare_tangent( state, parameter, row, row_parameter );
-        solver_->set_operator( op_->get_jacobi_operator() );
-        auto &space = *op_->space();
-        space.assign_scalar( scalar_type( 0 ), *rhs_ );
-        ( *rhs_ ).second[0] = scalar_type( 1 );
-        space.assign_scalar( scalar_type( 0 ), *candidate_ );
-        auto &monitor = solver_->monitor();
-        monitor.set_temp_tolerance( tolerance );
-        monitor.set_temp_max_iterations( maximum_iterations );
-        struct restore_monitor
-        {
-            decltype( monitor ) reference;
-            ~restore_monitor()
-            {
-                reference.restore_max_iterations();
-                reference.restore_tolerance();
-            }
-        } guard{ monitor };
-        const bool solved = numerical_algos::lin_solvers::recovery::solve_with_unpreconditioned_retry(
-            solver_.get(), [this]() { return solver_->solve( *rhs_, *candidate_ ); },
-            [this, &space]() { space.assign_scalar( scalar_type( 0 ), *candidate_ ); }
-        );
+        if ( !solve_system( state, parameter, row, row_parameter, scalar_type( 1 ), tolerance, maximum_iterations ) )
+            return false;
         auto       &result     = *candidate_;
-        const auto &operations = space.first_space();
-        if ( !solved || !normalize_rank1_tangent( &operations, result.first, result.second[0] ) )
+        const auto &operations = op_->space()->first_space();
+        if ( !normalize_rank1_tangent( &operations, result.first, result.second[0] ) )
             return false;
         operations.assign( result.first, tangent );
         tangent_parameter = result.second[0];
+        return true;
+    }
+
+    // Leave normalization to projected candidate selection and its row-residual checks.
+    bool solve(
+        const vector_type &state, scalar_type parameter, const vector_type &row, scalar_type row_parameter,
+        scalar_type rhs_parameter, vector_type &tangent, scalar_type &tangent_parameter, scalar_type tolerance,
+        int maximum_iterations
+    )
+    {
+        if ( !solve_system( state, parameter, row, row_parameter, rhs_parameter, tolerance, maximum_iterations ) )
+            return false;
+        op_->space()->first_space().assign( ( *candidate_ ).first, tangent );
+        tangent_parameter = ( *candidate_ ).second[0];
         return true;
     }
 
@@ -86,6 +80,35 @@ public:
     }
 
 private:
+    bool solve_system(
+        const vector_type &state, scalar_type parameter, const vector_type &row, scalar_type row_parameter,
+        scalar_type rhs_parameter, scalar_type tolerance, int maximum_iterations
+    )
+    {
+        op_->prepare_tangent( state, parameter, row, row_parameter );
+        solver_->set_operator( op_->get_jacobi_operator() );
+        auto &space = *op_->space();
+        space.assign_scalar( scalar_type( 0 ), *rhs_ );
+        ( *rhs_ ).second[0] = rhs_parameter;
+        space.assign_scalar( scalar_type( 0 ), *candidate_ );
+        auto &monitor = solver_->monitor();
+        monitor.set_temp_tolerance( tolerance );
+        monitor.set_temp_max_iterations( maximum_iterations );
+        struct restore_monitor
+        {
+            decltype( monitor ) reference;
+            ~restore_monitor()
+            {
+                reference.restore_max_iterations();
+                reference.restore_tolerance();
+            }
+        } guard{ monitor };
+        return numerical_algos::lin_solvers::recovery::solve_with_unpreconditioned_retry(
+            solver_.get(), [this]() { return solver_->solve( *rhs_, *candidate_ ); },
+            [this, &space]() { space.assign_scalar( scalar_type( 0 ), *candidate_ ); }
+        );
+    }
+
     std::shared_ptr<Corrector>                          op_;
     std::shared_ptr<LinearSolver>                       solver_;
     nmfd::detail::vector_wrap<space_type, false, false> rhs_, candidate_;

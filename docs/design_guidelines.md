@@ -384,7 +384,11 @@ Keep Sherman-Morrison available for explicitly selected elimination and rank-one
 paths; do not require scalar elimination for every augmented system.
 
 Circle selects `main_classes::nmfd_augmented_newton_types` with GMRES; symmetric
-KS1D selects BiCGStab(L). The helper's last template argument selects Krylov.
+and full KS1D select BiCGStab(L). Full KS1D supplies `AugmentedLinear` directly to
+`nmfd_newton_types`, preserving its independent fixed-damping deflation strategy.
+Projected initial-tangent candidates use the full bordered solve, including zero
+scalar borders, before the existing normalization, quality, and chart checks.
+The helper's last template argument selects Krylov.
 Configure algorithm-specific controls through the augmented solver's borrowed
 `krylov_solver()` reference; monitor, basis size, and residual settings belong to
 that native solver. Other workflows retain scalar elimination until migrated.
