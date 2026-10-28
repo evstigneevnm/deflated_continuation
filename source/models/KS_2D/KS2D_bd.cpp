@@ -230,14 +230,16 @@ int main( int argc, char **argv )
 
         using linear_system_type = nmfd::solvers::sherman_morrison<
             vec_ops_real, monitor_type, log_t, linear_operator_type, preconditioner_type, nmfd::solvers::bicgstabl>;
-        using newton_types = main_classes::nmfd_newton_types<
+        using newton_types = main_classes::nmfd_augmented_newton_types<
             vec_ops_real, log_t, nonlinear_operator_type, linear_operator_type, linear_system_type,
-            solution_storage_type>;
+            solution_storage_type, preconditioner_type, nmfd::solvers::bicgstabl>;
         using driver_type = main_classes::deflation_continuation<
             vec_ops_real, file_operations_type, log_t, monitor_type, nonlinear_operator_type, linear_operator_type,
             preconditioner_type, ks2d_model::bicgstabl, nonlinear_operators::system_operator, parameters_type,
             solution_storage_type, continuation::system_operator_continuation, linear_system_type, newton_types>;
         static_assert( driver_type::uses_nmfd_newton, "KS2D requires NMFD Newton" );
+        static_assert( newton_types::uses_augmented_linear_solver, "KS2D requires full bordered solves" );
+        std::cout << "Newton solver: NMFD\nContinuation linear solver: augmented BiCGStab(L)\n";
         driver_type driver(
             vector_operations, file_operations, &log, &linear_solver_log, nonlinear_operator, configuration,
             solution_storage

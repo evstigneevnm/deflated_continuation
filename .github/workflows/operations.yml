@@ -2500,7 +2500,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends build-essential make libfftw3-dev
           fi
-      - name: Verify corrections, orbit exclusion, derivatives, rollback and rebinding
+      - name: Verify bordered correctors and tangents, orbit exclusion, derivatives, rollback and rebinding
         run: |
           export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
           KS2D_BUILD="$BUILD_DIR/ks2d_newton_cpu_omp"

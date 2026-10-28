@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <type_traits>
 
 #include <common/gpu_file_operations.h>
 #include <deflation/symmetry_solution_storage.h>
@@ -44,8 +45,10 @@ using identity_type = deflation::identity_symmetry_adapter<space_type>;
 using aligner_type  = symmetry::fourier::residual_translation_orbit_aligner_2d<space_type>;
 using quotient_type = symmetry::finite_quotient_adapter<space_type, identity_type, aligner_type>;
 using storage_type  = deflation::symmetry_solution_storage<space_type, quotient_type, log_t>;
-using types =
-    main_classes::nmfd_newton_types<space_type, log_t, problem_type, jacobian_type, system_type, storage_type>;
+using types         = main_classes::nmfd_augmented_newton_types<
+            space_type, log_t, problem_type, jacobian_type, system_type, storage_type, preconditioner_type,
+            nmfd::solvers::bicgstabl>;
+static_assert( types::uses_augmented_linear_solver, "KS2D tests require full bordered solves" );
 
 struct settings
 {
@@ -59,7 +62,7 @@ struct settings
 template <class Solver>
 void configure_linear( Solver &solver )
 {
-    monitor_type::params parameters;
+    typename std::remove_reference_t<decltype( solver.monitor() )>::params parameters;
     parameters.rel_tol       = 1e-11;
     parameters.abs_tol       = 1e-12;
     parameters.max_iters_num = 500;
@@ -74,10 +77,11 @@ void configure_linear( Solver &solver )
 // lambda=4.333 has finite spatial symmetries; equivalent copies are one root.
 void test_corrections()
 {
-    auto space    = std::make_shared<space_type>( 70 );
-    auto problem  = std::make_shared<problem_type>( 2., 4., 12, 12, space );
-    auto jacobian = std::make_shared<jacobian_type>( problem );
-    auto system   = std::make_shared<system_type>( space, jacobian, std::make_shared<preconditioner_type>( problem ) );
+    auto space          = std::make_shared<space_type>( 70 );
+    auto problem        = std::make_shared<problem_type>( 2., 4., 12, 12, space );
+    auto jacobian       = std::make_shared<jacobian_type>( problem );
+    auto preconditioner = std::make_shared<preconditioner_type>( problem );
+    auto system         = std::make_shared<system_type>( space, jacobian, preconditioner );
     configure_linear( *system->get_linsolver_handle() );
     configure_linear( *system->get_linsolver_handle_original() );
     buffer_type reference( *space ), state( *space ), tangent( *space ), work( *space ), saved( *space ),
@@ -123,16 +127,21 @@ void test_corrections()
     ordinary->monitor().restore_max_iterations();
     require( fixed->solve( problem.get(), *state, parameter ), "Fixed solve did not recover" );
 
-    problem->set_linearization_point( *reference, parameter );
-    problem->jacobian_alpha( *work );
-    space->scale( -1., *work );
-    space->assign_scalar( 0., *tangent );
-    require( system->solve( *jacobian, *work, *tangent ), "Tangent solve failed" );
-    const real tangent_parameter = 1 / std::sqrt( 1 + space->scalar_prod( *tangent, *tangent ) );
-    space->scale( tangent_parameter, *tangent );
     auto coupled_op = std::make_shared<types::corrector_operator_type>( space, problem, jacobian );
-    auto coupled    = types::continuation_method::make(
-        space, problem, coupled_op, coupled_op->space(), std::make_shared<types::bordered_type>( system ), nullptr,
+    auto linear     = types::make_bordered( coupled_op->space(), system, preconditioner, nullptr );
+    configure_linear( linear->krylov_solver() );
+    auto tangent_solver    = types::make_tangent( coupled_op, linear );
+    real tangent_parameter = 0;
+    require(
+        tangent_solver->initial( *reference, parameter, 1., *tangent, tangent_parameter ),
+        "Initial bordered tangent failed"
+    );
+    require(
+        tangent_parameter > 0 && std::abs( space->norm_rank1( *tangent, tangent_parameter ) - 1 ) < 1e-10,
+        "Initial tangent orientation or normalization"
+    );
+    auto coupled = types::continuation_method::make(
+        space, problem, coupled_op, coupled_op->space(), linear, nullptr,
         std::make_shared<types::corrector_operator_type::trial_projector>( coupled_op )
     );
     types::configure_continuation( coupled->get_convergence_strategy_handle(), parameters );
@@ -146,6 +155,52 @@ void test_corrections()
         *space, *reference, 4.333, *tangent, tangent_parameter, .02, *state, parameter, *work
     );
     require( std::abs( constraint ) <= parameters.tolerance && parameter > 4.333, "Arclength constraint" );
+
+    real next_tangent_parameter = 0;
+    require(
+        tangent_solver->apply(
+            *state, parameter, *tangent, tangent_parameter, *direction, next_tangent_parameter, 1e-10, 500
+        ),
+        "Bordered tangent update failed"
+    );
+    jacobian->apply( *direction, *work );
+    problem->jacobian_alpha( *action );
+    space->add_mul( next_tangent_parameter, *action, *work );
+    require( space->norm_l2( *work ) < 1e-8, "Tangent equation residual" );
+    require(
+        space->scalar_prod( *direction, *tangent ) + next_tangent_parameter * tangent_parameter > 0,
+        "Tangent update changed orientation"
+    );
+
+    // A state-only normalization row has a zero scalar border, not a singular full system.
+    require(
+        tangent_solver->solve( *state, parameter, *direction, 0., -2., *action, next_tangent_parameter, 1e-10, 500 ),
+        "Zero-border tangent solve failed"
+    );
+    require(
+        std::abs( space->scalar_prod( *direction, *action ) + 2 ) < 1e-8,
+        "Raw tangent solve changed the supplied normalization RHS"
+    );
+    jacobian->apply( *action, *work );
+    problem->jacobian_alpha( *plus );
+    space->add_mul( next_tangent_parameter, *plus, *work );
+    require( space->norm_l2( *work ) < 1e-8, "Zero-border tangent equation residual" );
+    space->assign( *action, *saved );
+    const real saved_tangent_parameter = next_tangent_parameter;
+    require(
+        !tangent_solver->solve( *state, parameter, *direction, 0., 1., *action, next_tangent_parameter, 1e-10, 0 ),
+        "Exhausted tangent solve reported convergence"
+    );
+    space->assign_mul( 1., *action, -1., *saved, *work );
+    require(
+        space->norm( *work ) == 0 && next_tangent_parameter == saved_tangent_parameter,
+        "Failed tangent solve changed committed outputs"
+    );
+    require(
+        !linear->preconditioner_bypass_enabled() && linear->monitor().rel_tol() == 1e-11 &&
+            linear->monitor().abs_tol() == 1e-12,
+        "Tangent failure changed recovery or monitor settings"
+    );
     parameters.newton_max_it = 1;
     types::configure_continuation( coupled->get_convergence_strategy_handle(), parameters );
     space->assign_mul( 1.01, *reference, *state );
@@ -155,6 +210,12 @@ void test_corrections()
     space->assign_mul( 1., *state, -1., *saved, *work );
     require( space->norm( *work ) == 0 && parameter == 4.333, "Coupled failure changed committed unknowns" );
     parameters.newton_max_it = 40;
+    types::configure_continuation( coupled->get_convergence_strategy_handle(), parameters );
+    coupled->set_tangent_space( *reference, 4.333, *tangent, tangent_parameter, .01, 'S' );
+    space->assign_mul( 1., *reference, .01, *tangent, *state );
+    parameter = 4.333 + .01 * tangent_parameter;
+    require( coupled->solve( problem.get(), *state, parameter ), "Rebound corrector did not recover" );
+    parameter = 4.333;
 
     auto actions = std::make_shared<actions_type>( space );
     auto workspace =

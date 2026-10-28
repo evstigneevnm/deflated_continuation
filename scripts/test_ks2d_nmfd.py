@@ -60,7 +60,10 @@ def main() -> None:
         "--newton-deflation-weight", 0.5, "--newton-deflation-tolerance", 1e-8,
         "--linear-solver-iterations", 150, "--linear-solver-tolerance", 1e-3,
         "--max-failed-continuations-per-knot", 1)
-    run(args.bd_executable.resolve(), config, "--quiet", *device)
+    output = run(args.bd_executable.resolve(), config, "--quiet", *device, capture=True)
+    if ("Newton solver: NMFD" not in output
+            or "Continuation linear solver: augmented BiCGStab(L)" not in output):
+        raise RuntimeError(f"KS2D did not select full bordered NMFD solves: {output}")
     points = read_rows(project / "0/debug_curve.dat")
     reference = read_rows(fixtures / "nmfd_continuation_reference.dat")
     if len(points) != 18 or len(reference) != 18 or len(list(project.glob("*/debug_curve.dat"))) != 1:

@@ -383,8 +383,9 @@ Use the augmented path for corrector, initial-tangent, and tangent-update solves
 Keep Sherman-Morrison available for explicitly selected elimination and rank-one
 paths; do not require scalar elimination for every augmented system.
 
-Circle selects `main_classes::nmfd_augmented_newton_types` with GMRES; symmetric
-and full KS1D select BiCGStab(L). Full KS1D supplies `AugmentedLinear` directly to
+Circle selects `main_classes::nmfd_augmented_newton_types` with GMRES.
+Symmetric/full KS1D and symmetry-restricted KS2D select BiCGStab(L).
+Full KS1D supplies `AugmentedLinear` directly to
 `nmfd_newton_types`, preserving its independent fixed-damping deflation strategy.
 Projected initial-tangent candidates use the full bordered solve, including zero
 scalar borders, before the existing normalization, quality, and chart checks.
