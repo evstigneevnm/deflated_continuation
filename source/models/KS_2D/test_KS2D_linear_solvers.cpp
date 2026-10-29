@@ -86,7 +86,8 @@ using identity_type = deflation::identity_symmetry_adapter<vector_space>;
 using aligner_type  = symmetry::fourier::residual_translation_orbit_aligner_2d<vector_space>;
 using actions_type  = symmetry::finite_action_registry<vector_space>;
 using quotient_type = symmetry::finite_quotient_adapter<vector_space, identity_type, aligner_type>;
-using storage_type  = deflation::symmetry_solution_storage<vector_space, quotient_type, log_t>;
+using storage_type  = deflation::symmetry_solution_storage<
+     vector_space, quotient_type, log_t, deflation::symmetry_deflation_metric::nearest_orbit>;
 
 struct fallback_types
 {

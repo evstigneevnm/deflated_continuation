@@ -44,10 +44,12 @@ using actions_type  = symmetry::finite_action_registry<space_type>;
 using identity_type = deflation::identity_symmetry_adapter<space_type>;
 using aligner_type  = symmetry::fourier::residual_translation_orbit_aligner_2d<space_type>;
 using quotient_type = symmetry::finite_quotient_adapter<space_type, identity_type, aligner_type>;
-using storage_type  = deflation::symmetry_solution_storage<space_type, quotient_type, log_t>;
-using types         = main_classes::nmfd_augmented_newton_types<
-            space_type, log_t, problem_type, jacobian_type, system_type, storage_type, preconditioner_type,
-            nmfd::solvers::bicgstabl>;
+using storage_type  = deflation::symmetry_solution_storage<
+     space_type, quotient_type, log_t, deflation::symmetry_deflation_metric::nearest_orbit>;
+static_assert( storage_type::deflation_metric == deflation::symmetry_deflation_metric::nearest_orbit );
+using types = main_classes::nmfd_augmented_newton_types<
+    space_type, log_t, problem_type, jacobian_type, system_type, storage_type, preconditioner_type,
+    nmfd::solvers::bicgstabl>;
 static_assert( types::uses_augmented_linear_solver, "KS2D tests require full bordered solves" );
 
 struct settings
@@ -259,6 +261,14 @@ void test_corrections()
     space->assign_mul( 1 / ( 2 * h ), *work, -1 / ( 2 * h ), *plus, *work );
     space->add_mul( -1., *action, 1., *work );
     require( space->norm( *work ) < 2e-7 * space->norm( *action ), "Deflated Jacobian finite difference" );
+
+    // A trial choosing another symmetry representative must not change the prepared rank-one term.
+    actions->apply( 1, *state, *saved );
+    deflated_op->apply( *saved, *work );
+    deflated_op->deflated_residual_norm( *saved, *work );
+    require( deflated_op->get_jacobi_operator()->apply( *direction, *plus ), "Prepared deflated Jacobian failed" );
+    space->add_mul( -1., *action, *plus );
+    require( space->norm( *plus ) == 0., "Orbit trials changed the prepared deflated Jacobian" );
 
     solutions->clear();
     space->assign_scalar( 0., *state );

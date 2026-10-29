@@ -1156,6 +1156,7 @@ test_continuation_%_hip.bin: source/continuation/tests/test_continuation_%.cpp $
 	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_continuation_$*_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $(BUILD_DIR)/$@
 
 DEFLATION_WRAPPER_TEST_HEADERS = source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h source/deflation/solution_storage.h source/deflation/symmetry_solution_storage.h source/deflation/tests/deflation_newton_fixture.h $(FIXED_PARAMETER_NEWTON_HEADERS)
+DEFLATION_WRAPPER_TEST_HEADERS += $(SYMMETRY_FOURIER_HEADERS)
 
 test_nmfd_newton_assembly_cpu.bin: source/main/tests/test_nmfd_newton_assembly.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@

@@ -223,14 +223,23 @@ private:
     VectorOperations                 *vec_ops;
 };
 
-template <class VectorOperations, class SymmetryAdapter = identity_symmetry_adapter<VectorOperations>, class Log = void>
+enum class symmetry_deflation_metric
+{
+    canonical,
+    nearest_orbit
+};
+
+template <
+    class VectorOperations, class SymmetryAdapter = identity_symmetry_adapter<VectorOperations>, class Log = void,
+    symmetry_deflation_metric Metric = symmetry_deflation_metric::canonical>
 class symmetry_solution_storage
 {
 public:
-    using vector_operations_type = VectorOperations;
-    using symmetry_adapter_type  = SymmetryAdapter;
-    using T                      = typename VectorOperations::scalar_type;
-    using T_vec                  = typename VectorOperations::vector_type;
+    using vector_operations_type           = VectorOperations;
+    using symmetry_adapter_type            = SymmetryAdapter;
+    using T                                = typename VectorOperations::scalar_type;
+    using T_vec                            = typename VectorOperations::vector_type;
+    static constexpr auto deflation_metric = Metric;
 
     symmetry_solution_storage(
         VectorOperations *vec_ops_, const unsigned int number_of_solutions, const T norm_weight_, const T P_ = T( 2 ),
@@ -514,16 +523,31 @@ private:
 
     T orbit_distance( const T_vec &reference, const T_vec &source )
     {
+        if constexpr ( Metric == symmetry_deflation_metric::nearest_orbit )
+            return orbit_difference_from_reference( source, reference );
         detail::align_orbit_closest_to_reference_if_available( symmetry_adapter, reference, source, distance_help, 0 );
         vec_ops->assign_mul( T( 1 ), distance_help, T( -1 ), reference, slice_gradient );
         return vec_ops->norm_l2( slice_gradient );
     }
 
+    T orbit_difference_from_reference( const T_vec &x, const T_vec &reference )
+    {
+        // Align the stored root, so the difference and its local gradient live in candidate coordinates.
+        symmetry_adapter->align_orbit_closest_to_reference( x, reference, distance_help );
+        vec_ops->assign_mul( T( 1 ), x, T( -1 ), distance_help, distance_help );
+        return vec_ops->norm_l2( distance_help );
+    }
+
     void calc_distance_norms( const T_vec &x, T_vec &c, const T p )
     {
         require_symmetry_adapter();
-        P = p;
-        detail::stabilize_canonical_if_available( symmetry_adapter, x, x_hat, 0 );
+        P                  = p;
+        const T_vec *state = &x;
+        if constexpr ( Metric == symmetry_deflation_metric::canonical )
+        {
+            detail::stabilize_canonical_if_available( symmetry_adapter, x, x_hat, 0 );
+            state = &x_hat;
+        }
         vec_ops->assign_scalar( T( 0 ), slice_gradient );
 
         unsigned int total_elements = elements_number + 1;
@@ -532,7 +556,11 @@ private:
 
         if ( !ignore_zero_ )
         {
-            add_distance_from_reference( x_hat, x0_hat, total_elements );
+            if ( !add_distance_from_reference( *state, x0_hat, total_elements ) )
+            {
+                vec_ops->assign_scalar( T( 0 ), c );
+                return;
+            }
         }
         else
         {
@@ -548,21 +576,46 @@ private:
 
         for ( unsigned int j = 0; j < elements_number; ++j )
         {
-            add_distance_from_reference( x_hat, container[j].get_ref(), total_elements );
+            if ( !add_distance_from_reference( *state, container[j].get_ref(), total_elements ) )
+            {
+                vec_ops->assign_scalar( T( 0 ), c );
+                return;
+            }
         }
 
-        detail::pullback_canonical_distance_gradient_if_available( symmetry_adapter, x, x_hat, slice_gradient, c, 0 );
+        if constexpr ( Metric == symmetry_deflation_metric::nearest_orbit )
+            vec_ops->assign( slice_gradient, c );
+        else
+            detail::pullback_canonical_distance_gradient_if_available(
+                symmetry_adapter, x, x_hat, slice_gradient, c, 0
+            );
         distance += T( 1 );
     }
 
-    void add_distance_from_reference( const T_vec &x, T_vec &reference, const unsigned int total_elements )
+    bool add_distance_from_reference( const T_vec &x, const T_vec &reference, const unsigned int total_elements )
     {
-        vec_ops->assign_mul( T( 1 ), x, T( -1 ), reference, distance_help );
-        const T norm      = vec_ops->norm_l2( distance_help );
+        T norm;
+        if constexpr ( Metric == symmetry_deflation_metric::nearest_orbit )
+            norm = orbit_difference_from_reference( x, reference );
+        else
+        {
+            vec_ops->assign_mul( T( 1 ), x, T( -1 ), reference, distance_help );
+            norm = vec_ops->norm_l2( distance_help );
+        }
         minimum_distance_ = std::min( minimum_distance_, norm );
+        if constexpr ( Metric == symmetry_deflation_metric::nearest_orbit )
+        {
+            if ( norm == T( 0 ) )
+            {
+                // The multiplier is singular; no finite gradient exists at an excluded orbit.
+                distance = std::numeric_limits<T>::infinity();
+                return false;
+            }
+        }
         distance += distance_contribution( norm, static_cast<T>( total_elements ) );
         const T factor = distance_derivative_factor( norm, static_cast<T>( total_elements ) );
         vec_ops->add_mul( factor / norm_weight, distance_help, T( 1 ), slice_gradient );
+        return true;
     }
 
 private:

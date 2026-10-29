@@ -676,9 +676,12 @@ jobs:
       - name: Verify gradients, RMS and orbit duplicates, dual residual acceptance and frozen contexts
         run: |
           make test_deflation_operator_cpu.bin test_deflation_operator_cpu_omp.bin \
+            test_deflation_orbit_metric_cpu.bin test_deflation_orbit_metric_cpu_omp.bin \
             CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_deflation_operator
           timeout 60s build/newton_deflation_operator/test_deflation_operator_cpu.bin
           OMP_NUM_THREADS=2 timeout 60s build/newton_deflation_operator/test_deflation_operator_cpu_omp.bin
+          timeout 60s build/newton_deflation_operator/test_deflation_orbit_metric_cpu.bin
+          OMP_NUM_THREADS=2 timeout 60s build/newton_deflation_operator/test_deflation_orbit_metric_cpu_omp.bin
 
   project-newton-deflation-cpu:
     name: Project Newton / deflation corrections
@@ -778,9 +781,10 @@ jobs:
             echo "Skipping CUDA deflation operator: nvcc unavailable"
             exit 0
           fi
-          make test_deflation_operator_cuda.bin \
+          make test_deflation_operator_cuda.bin test_deflation_orbit_metric_cuda.bin \
             CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_deflation_cuda
           timeout 120s build/newton_deflation_cuda/test_deflation_operator_cuda.bin
+          timeout 120s build/newton_deflation_cuda/test_deflation_orbit_metric_cuda.bin
 
   project-newton-deflation-cuda:
     name: Project Newton / deflation corrections CUDA
@@ -820,9 +824,11 @@ jobs:
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: |
           make test_deflation_operator_cpu.bin test_deflation_newton_cpu.bin test_newton_residual_norm_cpu.bin \
+            test_deflation_orbit_metric_cpu.bin \
             CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/newton_deflation_sanitizers \
             NEWTON_TEST_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
           timeout 60s build/newton_deflation_sanitizers/test_deflation_operator_cpu.bin
+          timeout 60s build/newton_deflation_sanitizers/test_deflation_orbit_metric_cpu.bin
           timeout 60s build/newton_deflation_sanitizers/test_deflation_newton_cpu.bin
           timeout 60s build/newton_deflation_sanitizers/test_newton_residual_norm_cpu.bin
 

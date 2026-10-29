@@ -86,8 +86,9 @@ int main( int argc, char **argv )
     using residual_translation_aligner_type = symmetry::fourier::residual_translation_orbit_aligner_2d<vec_ops_real>;
     using quotient_adapter_type =
         symmetry::finite_quotient_adapter<vec_ops_real, identity_adapter_type, residual_translation_aligner_type>;
-    using solution_storage_type = deflation::symmetry_solution_storage<vec_ops_real, quotient_adapter_type, log_t>;
-    using parameters_type       = main_classes::parameters<real>;
+    using solution_storage_type = deflation::symmetry_solution_storage<
+        vec_ops_real, quotient_adapter_type, log_t, deflation::symmetry_deflation_metric::nearest_orbit>;
+    using parameters_type = main_classes::parameters<real>;
 
     std::string config_file        = "json_project_files/KS2D_test_sym.json";
     std::string device_selector    = "auto";

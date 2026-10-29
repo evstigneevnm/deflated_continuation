@@ -216,6 +216,12 @@ transition alignment, and archive formats remain unchanged.
 fixed parameter, delegating distances and symmetry pullbacks to solution storage.
 Storage supplies `c=-grad(m)` in the operations' inner product; its norm weight
 must match that pairing (for RMS distance and Euclidean dot product, weight=N).
+Symmetry-aware storage keeps canonical-chart deflation as its compatibility
+default. KS2D selects `symmetry_deflation_metric::nearest_orbit`: align each
+stored root to the candidate and use the same RMS distance for the multiplier,
+its negative gradient, and exclusion. The derivative is local to the selected
+discrete action/support; orbit-selection ties are not assumed smooth. This does
+not change the continuous-chart policy used by full KS1D.
 The existing rank-one solver binding preserves recovery and true-residual checks.
 Select `deflation::deflated_residual_norm` as the default convergence strategy's
 optional `ResidualNorm` policy: accept only when both `||F||` and `||mF||` meet
