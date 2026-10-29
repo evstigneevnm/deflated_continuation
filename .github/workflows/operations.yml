@@ -18,6 +18,32 @@ defaults:
     shell: bash
 
 jobs:
+  scalar-traits-cpu:
+    name: Canonical scalar traits / ${{ matrix.compiler }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential clang libomp-dev libboost-dev
+      - name: Verify scalar contracts and optional-header isolation
+        run: |
+          make -C source/contrib/scfd/test/utils test-scalar-traits test-boost-scalar-traits \
+            CXX='${{ matrix.compiler }}' BUILD_DIR="$GITHUB_WORKSPACE/$BUILD_DIR/scalar_traits_${{ matrix.compiler }}"
+      - name: Verify real and complex vector consumers
+        run: |
+          make -C source/contrib/nmfd-operations test-backend \
+            CXX='${{ matrix.compiler }}' SCFD_ROOT="$SCFD_ROOT" \
+            BUILD_DIR="$GITHUB_WORKSPACE/$BUILD_DIR/scalar_consumers_${{ matrix.compiler }}" OMP_NUM_THREADS=2
+
   operations-dependency-boundaries:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -108,6 +134,7 @@ jobs:
     name: Linear-solver migration / foundation gates
     runs-on: ubuntu-latest
     needs:
+      - scalar-traits-cpu
       - operations-dependency-boundaries
       - nmfd-standalone-cpu
       - nmfd-standalone-mpi
@@ -2848,6 +2875,12 @@ jobs:
           ./"$BUILD_DIR"/scfd_cuda_double/test_scfd_vector_operations_cuda.bin auto
           make scfd_vector_operations_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_cuda_float" REAL_TYPE=float
           ./"$BUILD_DIR"/scfd_cuda_float/test_scfd_vector_operations_cuda.bin auto
+          CUDA_COMPILER="$(command -v nvcc || printf '%s' /usr/local/cuda/bin/nvcc)"
+          make -C source/contrib/scfd/test/utils test-scalar-traits-cuda \
+            NVCC="$CUDA_COMPILER" BUILD_DIR="$GITHUB_WORKSPACE/$BUILD_DIR/scalar_traits_cuda"
+          make -C source/contrib/nmfd-operations "$GITHUB_WORKSPACE/$BUILD_DIR/scalar_consumers_cuda/backend_cuda.bin" \
+            NVCC="$CUDA_COMPILER" SCFD_ROOT="$SCFD_ROOT" BUILD_DIR="$GITHUB_WORKSPACE/$BUILD_DIR/scalar_consumers_cuda"
+          ./"$BUILD_DIR"/scalar_consumers_cuda/backend_cuda.bin
           CUDA_SANITIZER="$(command -v compute-sanitizer || printf '%s' /usr/local/cuda/bin/compute-sanitizer)"
           if [ -x "$CUDA_SANITIZER" ]; then
             for real in double float; do

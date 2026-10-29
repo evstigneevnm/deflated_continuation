@@ -54,7 +54,7 @@ struct scalar_traits
         return x * y;
     }
 
-    static long double norm_sq_term( const T &x )
+    static long double abs_sq( const T &x )
     {
         const long double xr = static_cast<long double>( x );
         return xr * xr;
@@ -92,7 +92,7 @@ struct scalar_traits<std::complex<T>>
         return std::conj( x ) * y;
     }
 
-    static long double norm_sq_term( const std::complex<T> &x )
+    static long double abs_sq( const std::complex<T> &x )
     {
         const long double xr = static_cast<long double>( x.real() );
         const long double xi = static_cast<long double>( x.imag() );
@@ -136,7 +136,7 @@ struct scalar_traits<thrust::complex<T>>
         return thrust::conj( x ) * y;
     }
 
-    static long double norm_sq_term( const thrust::complex<T> &x )
+    static long double abs_sq( const thrust::complex<T> &x )
     {
         const long double xr = static_cast<long double>( x.real() );
         const long double xi = static_cast<long double>( x.imag() );
@@ -643,7 +643,7 @@ long double reference_norm_sq( const std::vector<T> &x )
     long double result = 0.0L;
     for ( const auto &value : x )
     {
-        result += scalar_traits<T>::norm_sq_term( value );
+        result += scalar_traits<T>::abs_sq( value );
     }
     return result;
 }
@@ -1079,13 +1079,13 @@ void run_core_vector_operations_suite(
     const auto rank1_value = make_scalar<scalar_type>( -0.75L, 0.5L );
     check_close_real(
         report, label + " norm_rank1", vec_ops.norm_rank1( x, rank1_value ),
-        std::sqrt( norm_sq + scalar_traits<scalar_type>::norm_sq_term( rank1_value ) ), 16384.0L
+        std::sqrt( norm_sq + scalar_traits<scalar_type>::abs_sq( rank1_value ) ), 16384.0L
     );
     if constexpr ( has_norm_rank1_l2<VecOps>::value )
     {
         check_close_real(
             report, label + " norm_rank1_l2", vec_ops.norm_rank1_l2( x, rank1_value ),
-            std::sqrt( norm_sq + scalar_traits<scalar_type>::norm_sq_term( rank1_value ) ) /
+            std::sqrt( norm_sq + scalar_traits<scalar_type>::abs_sq( rank1_value ) ) /
                 std::sqrt( static_cast<long double>( n ) ),
             16384.0L
         );

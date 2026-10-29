@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include <nmfd/operations/backend/math.h>
+#include <nmfd/operations/backend/random.h>
 #include <scfd/utils/device_tag.h>
 
 namespace discretization
@@ -22,7 +23,6 @@ void fill_low_mode_odd_physical_field_2d(
 {
     using for_each_type = typename Backend::for_each_type;
     using math_type     = ::nmfd::operations::backend::math<Backend, Scalar>;
-    using scalar_traits = ::nmfd::operations::backend::scalar_traits<Backend, Scalar>;
 
     Scalar            *values  = field.data();
     const unsigned int profile = static_cast<unsigned int>( seed_id % 8 );
@@ -75,8 +75,9 @@ void fill_low_mode_odd_physical_field_2d(
                         continue;
                     }
                     const Scalar random_coefficient =
-                        Scalar( 2 ) *
-                            scalar_traits::random_scalar( mode_index++, static_cast<std::size_t>( seed_id ) ) -
+                        Scalar( 2 ) * ::nmfd::operations::backend::random_scalar<Scalar>(
+                                          mode_index++, static_cast<std::size_t>( seed_id )
+                                      ) -
                         Scalar( 1 );
                     const Scalar resonance =
                         Scalar( 1 ) /

@@ -36,7 +36,7 @@ struct distance_transform
     }
     __DEVICE_TAG__ norm_type operator()( const scalar_type &x, const scalar_type &y, const scalar_type &z ) const
     {
-        return traits::norm_sq_term( x + scalar_type( 2 ) * y - z );
+        return traits::abs_sq( x + scalar_type( 2 ) * y - z );
     }
 };
 
@@ -123,7 +123,7 @@ void run_nmfd_vector_space_interface_tests(
         hz[i]        = make_scalar<scalar_type>( k + 1, -k );
         unary        = std::max( unary, -100 + scalar_traits<scalar_type>::asum_term( hx[i] ) );
         binary       = std::max( binary, scalar_traits<scalar_type>::asum_term( hx[i] - two * hy[i] ) );
-        ternary      = std::max( ternary, scalar_traits<scalar_type>::norm_sq_term( hx[i] + two * hy[i] - hz[i] ) );
+        ternary      = std::max( ternary, scalar_traits<scalar_type>::abs_sq( hx[i] + two * hy[i] - hz[i] ) );
     }
     access.write( vec_ops, x, hx );
     access.write( vec_ops, y, hy );

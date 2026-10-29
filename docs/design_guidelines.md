@@ -105,6 +105,13 @@ formulations may bypass time integration.
   Never return pointers into shared temporary host buffers.
 - Keep high-precision BLAS1, random, complex, and finite-number behavior in
   backend implementations. Maintain matching serial/OMP/CUDA/HIP contracts.
+- Scalar semantics live in `scfd::utils::scalar_traits<T>`, not duplicated
+  per backend. `abs_type` is the materialized result type of modulus, not a
+  forced built-in real type. Keep modulus `abs()`, squared modulus `abs_sq()`,
+  BLAS component absolute sums `asum_term()`, and `conj_mul(x,y) = conj(x)*y`
+  distinct. Optional scalar families require explicit traits headers.
+  Preserve compensated arithmetic and existing vector-norm conventions when
+  consolidating traits; `make_abs_copy()` produces moduli.
 - Linear operators expose `apply(input, output)`; adjoint and parameter actions
   are optional. A lightweight adjoint view presents `apply_adjoint()` as `apply()`
   with exchanged spaces.
