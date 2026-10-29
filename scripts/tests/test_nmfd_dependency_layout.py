@@ -69,14 +69,17 @@ class NmfdDependencyLayoutTest(unittest.TestCase):
                     setting = step.get("with", {}).get("submodules")
                     self.assertIn(setting, (None, True))
 
-    def test_dense_solver_jobs_select_module_local_configs(self):
+    def test_module_build_jobs_select_module_local_configs(self):
         workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
-        for name in ("nmfd-dense-solve-cpu", "nmfd-direct-solver-cuda"):
+        for name in ("nmfd-dense-solve-cpu", "nmfd-direct-solver-cuda",
+                     "scalar-traits-cpu", "scfd-vector-operations-cuda"):
             for step in workflow["jobs"][name]["steps"]:
                 commands = step.get("run", "").replace("\\\n", " ")
                 for command in commands.splitlines():
                     words = shlex.split(command)
                     if words[:2] != ["make", "-C"]:
+                        continue
+                    if not words[2].startswith("source/contrib/nmfd-"):
                         continue
                     with self.subTest(job=name, command=command):
                         configs = [word.split("=", 1)[1] for word in words

@@ -41,6 +41,7 @@ jobs:
       - name: Verify real and complex vector consumers
         run: |
           make -C source/contrib/nmfd-operations test-backend \
+            CONFIG_FILE=build_configs/config_cpu.inc \
             CXX='${{ matrix.compiler }}' SCFD_ROOT="$SCFD_ROOT" \
             BUILD_DIR="$GITHUB_WORKSPACE/$BUILD_DIR/scalar_consumers_${{ matrix.compiler }}" OMP_NUM_THREADS=2
 
@@ -2879,6 +2880,7 @@ jobs:
           make -C source/contrib/scfd/test/utils test-scalar-traits-cuda \
             NVCC="$CUDA_COMPILER" BUILD_DIR="$GITHUB_WORKSPACE/$BUILD_DIR/scalar_traits_cuda"
           make -C source/contrib/nmfd-operations "$GITHUB_WORKSPACE/$BUILD_DIR/scalar_consumers_cuda/backend_cuda.bin" \
+            CONFIG_FILE=build_configs/config_cuda.inc \
             NVCC="$CUDA_COMPILER" SCFD_ROOT="$SCFD_ROOT" BUILD_DIR="$GITHUB_WORKSPACE/$BUILD_DIR/scalar_consumers_cuda"
           ./"$BUILD_DIR"/scalar_consumers_cuda/backend_cuda.bin
           CUDA_SANITIZER="$(command -v compute-sanitizer || printf '%s' /usr/local/cuda/bin/compute-sanitizer)"
