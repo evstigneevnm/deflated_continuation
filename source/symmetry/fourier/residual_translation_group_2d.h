@@ -36,12 +36,12 @@ struct residual_translation_character_2d
     std::int64_t numerator_y = 0;
     std::int64_t denominator = 1;
 
-    bool is_identity() const
+    __DEVICE_TAG__ bool is_identity() const
     {
         return numerator_x == 0 && numerator_y == 0;
     }
 
-    bool compatible( const mode_index<2> &mode ) const
+    __DEVICE_TAG__ bool compatible( const mode_index<2> &mode ) const
     {
         return dot_numerator( mode ) % denominator == 0;
     }
@@ -58,7 +58,7 @@ struct residual_translation_character_2d
     }
 
 private:
-    std::int64_t dot_numerator( const mode_index<2> &mode ) const
+    __DEVICE_TAG__ std::int64_t dot_numerator( const mode_index<2> &mode ) const
     {
         return numerator_x * static_cast<std::int64_t>( mode[0] ) + numerator_y * static_cast<std::int64_t>( mode[1] );
     }
@@ -154,6 +154,12 @@ std::vector<active_mode_2d<Real>> collect_active_modes(
             active.push_back( { modes[index], amplitude } );
         }
     }
+    return active;
+}
+
+template <class Real>
+void sort_active_modes( std::vector<active_mode_2d<Real>> &active )
+{
     std::stable_sort( active.begin(), active.end(), []( const auto &left, const auto &right ) {
         const std::int64_t left_norm = static_cast<std::int64_t>( left.mode[0] ) * left.mode[0] +
                                        static_cast<std::int64_t>( left.mode[1] ) * left.mode[1];
@@ -169,7 +175,6 @@ std::vector<active_mode_2d<Real>> collect_active_modes(
         }
         return left.mode[1] < right.mode[1];
     } );
-    return active;
 }
 
 template <class Real>
@@ -416,22 +421,23 @@ std::vector<residual_translation_character_2d> rank_two_characters(
     return result;
 }
 
-} // namespace detail
-
 template <class Real>
-residual_translation_group_result_2d<Real> build_residual_translation_group_2d(
-    const std::vector<mode_index<2>> &modes, const std::vector<Real> &amplitudes,
-    const residual_translation_policy_2d<Real> &policy = {}
-)
+void validate_policy( const residual_translation_policy_2d<Real> &policy )
 {
     if ( policy.absolute_active_tolerance < Real( 0 ) || policy.relative_active_tolerance < Real( 0 ) ||
          policy.basis_search_modes == 0 || policy.maximum_pair_determinant <= 0 )
     {
         throw std::invalid_argument( "residual translation policy is invalid" );
     }
+}
 
-    residual_translation_group_result_2d<Real> result;
-    const auto active = detail::collect_active_modes( modes, amplitudes, policy, result );
+template <class Real>
+residual_translation_group_result_2d<Real> build_group(
+    std::vector<active_mode_2d<Real>> active, const residual_translation_policy_2d<Real> &policy,
+    residual_translation_group_result_2d<Real> result
+)
+{
+    sort_active_modes( active );
     if ( active.empty() )
     {
         result.characters.push_back( { 0, 0, 1 } );
@@ -441,20 +447,63 @@ residual_translation_group_result_2d<Real> build_residual_translation_group_2d(
     bool rank_two = false;
     for ( std::size_t index = 1; index < active.size(); ++index )
     {
-        if ( detail::determinant( active.front().mode, active[index].mode ) != 0 )
+        if ( determinant( active.front().mode, active[index].mode ) != 0 )
         {
             rank_two = true;
             break;
         }
     }
     result.active_rank = rank_two ? 2 : 1;
-    auto characters = rank_two ? detail::rank_two_characters( active, policy ) : detail::rank_one_characters( active );
-    result.characters = detail::factor_half_shifts( characters, active, policy.factor_coordinate_half_shifts );
+    auto characters    = rank_two ? rank_two_characters( active, policy ) : rank_one_characters( active );
+    result.characters  = factor_half_shifts( characters, active, policy.factor_coordinate_half_shifts );
     if ( result.characters.empty() )
     {
         throw std::logic_error( "residual translation quotient has no identity representative" );
     }
     return result;
+}
+
+} // namespace detail
+
+template <class Real>
+residual_translation_group_result_2d<Real> build_residual_translation_group_2d(
+    const std::vector<mode_index<2>> &modes, const std::vector<Real> &amplitudes,
+    const residual_translation_policy_2d<Real> &policy = {}
+)
+{
+    detail::validate_policy( policy );
+    residual_translation_group_result_2d<Real> result;
+    auto active = detail::collect_active_modes( modes, amplitudes, policy, result );
+    return detail::build_group( std::move( active ), policy, std::move( result ) );
+}
+
+// One bit per mode is sufficient for host-side integer lattice construction.
+template <class Real>
+residual_translation_group_result_2d<Real> build_residual_translation_group_2d(
+    const std::vector<mode_index<2>> &modes, const std::vector<std::uint8_t> &active_mask, Real maximum_amplitude,
+    const residual_translation_policy_2d<Real> &policy
+)
+{
+    detail::validate_policy( policy );
+    if ( active_mask.size() != ( modes.size() + 7 ) / 8 || !std::isfinite( maximum_amplitude ) ||
+         maximum_amplitude < Real( 0 ) )
+    {
+        throw std::invalid_argument( "residual translation support metadata is invalid" );
+    }
+    residual_translation_group_result_2d<Real> result;
+    result.maximum_amplitude = maximum_amplitude;
+    result.active_tolerance =
+        std::max( policy.absolute_active_tolerance, policy.relative_active_tolerance * maximum_amplitude );
+    std::vector<detail::active_mode_2d<Real>> active;
+    for ( std::size_t index = 0; index < modes.size(); ++index )
+    {
+        if ( ( active_mask[index / 8] & ( 1u << ( index % 8 ) ) ) != 0 &&
+             ( modes[index][0] != 0 || modes[index][1] != 0 ) )
+        {
+            active.push_back( { modes[index], Real( 0 ) } );
+        }
+    }
+    return detail::build_group( std::move( active ), policy, std::move( result ) );
 }
 
 } // namespace fourier

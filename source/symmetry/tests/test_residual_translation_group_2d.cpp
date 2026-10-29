@@ -134,6 +134,20 @@ int main()
         result.check(
             group.active_tolerance > amplitudes.back(), "roundoff-size incompatible modes do not destroy isotropy"
         );
+        const std::vector<std::uint8_t> active_mask{ 7 };
+        const auto                      from_mask = symmetry::fourier::build_residual_translation_group_2d(
+            modes, active_mask, 2.0, symmetry::fourier::residual_translation_policy_2d<double>{}
+        );
+        bool same = from_mask.active_rank == group.active_rank &&
+                    from_mask.active_tolerance == group.active_tolerance &&
+                    from_mask.characters.size() == group.characters.size();
+        for ( std::size_t i = 0; same && i < group.characters.size(); ++i )
+        {
+            same = from_mask.characters[i].numerator_x == group.characters[i].numerator_x &&
+                   from_mask.characters[i].numerator_y == group.characters[i].numerator_y &&
+                   from_mask.characters[i].denominator == group.characters[i].denominator;
+        }
+        result.check( same, "packed support metadata preserves the amplitude-based lattice" );
     }
 
     {

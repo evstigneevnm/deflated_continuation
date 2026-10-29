@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <exception>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -510,6 +511,63 @@ void run_case(
                     residual_storage.nearest_stabilized_distance( state_epsilon ) < scalar_type( 2.0e-12 ),
                     message( "residual translation orbit distance is backend independent" )
                 );
+
+                // A numerically inactive branch mode may cross the lattice threshold in only one solve.
+                const scalar_type maximum = *std::max_element(
+                    transformed_host.begin(), transformed_host.end(),
+                    []( scalar_type left, scalar_type right ) { return std::abs( left ) < std::abs( right ); }
+                );
+                const scalar_type noise =
+                    scalar_type( 1.5 * 4096 ) * std::numeric_limits<scalar_type>::epsilon() * std::abs( maximum );
+                for ( std::size_t index = 0; index < state_size; ++index )
+                {
+                    if ( ( state_modes[index][0] - state_modes[index][1] ) % 2 != 0 )
+                    {
+                        transformed_host[index] = noise;
+                        break;
+                    }
+                }
+                operations.set( transformed_host.data(), state_epsilon );
+                const scalar_type forward_distance = residual_storage.canonical_distance( seed_a, state_epsilon );
+                const scalar_type reverse_distance = residual_storage.canonical_distance( state_epsilon, seed_a );
+                result.check(
+                    std::max( forward_distance, reverse_distance ) < scalar_type( 1.0e-10 ),
+                    message( "weak-mode noise does not hide a quarter-shift duplicate" )
+                );
+                result.check(
+                    std::abs( forward_distance - reverse_distance ) < scalar_type( 2.0e-12 ),
+                    message( "noisy quotient distance is independent of argument order" )
+                );
+                residual_storage.align_endpoint_geometry(
+                    seed_a, state_epsilon, state_epsilon, direction, alpha_direction
+                );
+                operations.assign_mul( scalar_type( 1 ), direction, scalar_type( -1 ), seed_a, jacobian_direction );
+                result.check(
+                    operations.norm_l2( jacobian_direction ) < scalar_type( 1.0e-10 ),
+                    message( "joint endpoint alignment retains a compatible tangent" )
+                );
+                operations.assign_mul(
+                    scalar_type( 1 ), alpha_direction, scalar_type( -1 ), direction, jacobian_direction
+                );
+                result.check(
+                    operations.norm_l2( jacobian_direction ) < scalar_type( 1.0e-12 ),
+                    message( "endpoint state and tangent use the same transformation" )
+                );
+                for ( bool reverse : { false, true } )
+                {
+                    residual_storage.clear();
+                    residual_storage.push_back( reverse ? state_epsilon : seed_a );
+                    residual_storage.push_back( reverse ? seed_a : state_epsilon );
+                    result.check(
+                        residual_storage.get_size() == 1,
+                        message( "noisy duplicate rejection is independent of insertion order" )
+                    );
+                }
+                operations.assign_mul( scalar_type( 1.01 ), seed_a, direction );
+                residual_storage.push_back( direction );
+                result.check(
+                    residual_storage.get_size() == 2, message( "quotient storage retains nearby distinct states" )
+                );
                 result.check(
                     residual_quotient_adapter.symmetry_definition_fingerprint().find(
                         "fourier_residual_translation_lattice_2d_v1"
@@ -638,12 +696,120 @@ void run_full_square_symmetry_case( report &result )
     );
 }
 
+template <class Backend>
+class no_host_transfer_space : public nmfd::operations::scfd_vector_space<Backend, double>
+{
+public:
+    using base_type   = nmfd::operations::scfd_vector_space<Backend, double>;
+    using vector_type = typename base_type::vector_type;
+    using base_type::base_type;
+    void get( const vector_type &, double * ) const              = delete;
+    void get( const vector_type &, double *, std::size_t ) const = delete;
+    void set( const double *, vector_type & ) const              = delete;
+    void set( const double *, vector_type &, std::size_t ) const = delete;
+};
+
+template <class Backend>
+void run_backend_alignment_case( report &result )
+{
+    using space_type    = no_host_transfer_space<Backend>;
+    using vector_type   = typename space_type::vector_type;
+    using aligner_type  = symmetry::fourier::residual_translation_orbit_aligner_2d<space_type>;
+    using identity_type = deflation::identity_symmetry_adapter<space_type>;
+    using actions_type  = symmetry::finite_action_registry<space_type>;
+    using quotient_type = symmetry::finite_quotient_adapter<space_type, identity_type, aligner_type>;
+    space_type operations( 17 );
+    operations.use_high_precision();
+    nmfd::detail::vector_wrap<space_type, false, false> reference( operations ), source( operations ),
+        aligned( operations ), tangent( operations ), difference( operations );
+    for ( auto *storage : { &reference, &source, &aligned, &tangent, &difference } )
+    {
+        storage->init();
+        storage->start_use();
+    }
+    std::vector<symmetry::fourier::mode_index<2>> modes( 17, { 1, 0 } );
+    modes[0] = { 2, 0 };
+    modes[1] = { 4, 0 };
+    std::vector<double> left( 17, 0. ), right( 17, 0. );
+    left[0]      = 2.;
+    left[1]      = 1.;
+    right[0]     = -2.;
+    right[1]     = 1.;
+    right.back() = 1.5e-8;
+    operations.base_type::set( left.data(), *reference );
+    operations.base_type::set( right.data(), *source );
+    typename aligner_type::policy_type policy;
+    policy.absolute_active_tolerance = 1e-8;
+    aligner_type  aligner( &operations, modes, policy );
+    identity_type identity( &operations );
+    actions_type  actions( &operations );
+    actions.add( "negation", [&]( const vector_type &in, vector_type &out ) {
+        operations.assign_mul( -1., in, out );
+    } );
+    quotient_type quotient( &operations, &identity, &actions, &aligner );
+
+    aligner.align_orbit_closest_to_reference( *reference, *source, *aligned );
+    result.check( operations.last_reduction_used_high_precision(), "inner alignment honors high-precision selection" );
+    operations.set_regular_precision();
+    aligner.align_orbit_closest_to_reference( *reference, *source, *aligned );
+    result.check(
+        !operations.last_reduction_used_high_precision(), "inner alignment honors ordinary precision selection"
+    );
+    operations.use_high_precision();
+    quotient.align_orbit_and_tangent_closest_to_reference( *reference, *source, *source, *aligned, *tangent );
+    operations.assign_mul( 1., *aligned, -1., *reference, *difference );
+    result.check( operations.norm( *difference ) < 1.6e-8, "backend alignment uses no full-state host access" );
+    operations.assign_mul( 1., *aligned, -1., *tangent, *difference );
+    result.check( operations.norm( *difference ) == 0., "backend joint alignment applies one character" );
+    result.check( operations.last_reduction_used_high_precision(), "backend alignment retains high-precision norms" );
+
+    quotient.stabilize_canonical( *source, *aligned );
+    result.check(
+        operations.get_value_at_point( 0, *aligned ) == 2., "backend canonical selection uses no host vectors"
+    );
+    quotient.stabilize_canonical( *aligned, *aligned );
+    result.check(
+        operations.get_value_at_point( 0, *aligned ) == 2., "backend canonical selection is idempotent in place"
+    );
+
+    // Compare against the old host rule, including zeroing, tolerance ties, and the last (partial-byte) mode.
+    symmetry::detail::backend_vector_comparison<space_type> comparison( operations );
+    for ( std::size_t trial = 0; trial < 20; ++trial )
+    {
+        std::fill( left.begin(), left.end(), 0. );
+        std::fill( right.begin(), right.end(), 0. );
+        const auto index = trial % left.size();
+        left[index]      = trial % 2 == 0 ? 3e-12 : -3e-12;
+        right[index]     = trial % 3 == 0 ? -0.75e-12 : 0.75e-12;
+        left.back() += 1.;
+        right.back() += 1.;
+        operations.base_type::set( left.data(), *reference );
+        operations.base_type::set( right.data(), *source );
+        bool expected = false;
+        for ( std::size_t i = 0; i < left.size(); ++i )
+        {
+            const double a = std::abs( left[i] ) <= 1e-12 ? 0. : left[i];
+            const double b = std::abs( right[i] ) <= 1e-12 ? 0. : right[i];
+            if ( std::abs( a - b ) > 1e-12 )
+            {
+                expected = a > b;
+                break;
+            }
+        }
+        result.check(
+            comparison.lexicographically_greater( *reference, *source, 1e-12 ) == expected,
+            "backend canonical comparison preserves host ordering"
+        );
+    }
+}
+
 template <class Backend, class FFTBackend>
 int run( const std::string &backend_name )
 {
     constexpr std::size_t nx = 12;
     constexpr std::size_t ny = 16;
     report                result;
+    run_backend_alignment_case<Backend>( result );
     run_case<Backend, FFTBackend, discretization::fourier::codecs::inversion_odd_field_2d>(
         result, "inversion_odd_rectangular", nx, ny, nx * ny / 2 - 2, true, false, 4
     );

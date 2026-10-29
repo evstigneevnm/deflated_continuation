@@ -14,12 +14,30 @@
 #include <nmfd/detail/vector_wrap.h>
 
 #include <symmetry/finite_action_registry.h>
+#include <symmetry/backend_vector_comparison.h>
 
 namespace symmetry
 {
 
 namespace detail
 {
+
+struct empty_reference_scope
+{
+};
+
+template <class Aligner, class Vector>
+auto prepare_orbit_reference( Aligner *aligner, const Vector &reference, int )
+    -> decltype( aligner->prepare_reference( reference ) )
+{
+    return aligner->prepare_reference( reference );
+}
+
+template <class Aligner, class Vector>
+empty_reference_scope prepare_orbit_reference( Aligner *, const Vector &, long )
+{
+    return {};
+}
 
 template <class Aligner, class VectorOperations, class Vector>
 auto apply_orbit_alignment_to_tangent(
@@ -43,6 +61,27 @@ void apply_orbit_alignment_to_tangent(
 )
 {
     vector_operations->assign( source, destination );
+}
+
+template <class Aligner, class VectorOperations, class Vector>
+auto align_orbit_and_tangent(
+    Aligner *aligner, VectorOperations *, const Vector &reference, const Vector &source, const Vector &tangent,
+    Vector &destination, Vector &tangent_destination, int
+) -> decltype( aligner->align_orbit_and_tangent_closest_to_reference( reference, source, tangent, destination, tangent_destination ), void() )
+{
+    aligner->align_orbit_and_tangent_closest_to_reference(
+        reference, source, tangent, destination, tangent_destination
+    );
+}
+
+template <class Aligner, class VectorOperations, class Vector>
+void align_orbit_and_tangent(
+    Aligner *aligner, VectorOperations *operations, const Vector &reference, const Vector &source,
+    const Vector &tangent, Vector &destination, Vector &tangent_destination, long
+)
+{
+    aligner->align_orbit_closest_to_reference( reference, source, destination );
+    apply_orbit_alignment_to_tangent( aligner, operations, tangent, tangent_destination, 0 );
 }
 
 template <class OrbitAligner>
@@ -92,7 +131,7 @@ public:
           continuous_adapter( continuous_adapter_ ), finite_actions( finite_actions_ ), orbit_aligner( orbit_aligner_ ),
           action_source_storage_( *vec_ops ), candidate_storage_( *vec_ops ), best_storage_( *vec_ops ),
           gradient_storage_( *vec_ops ), action_tangent_storage_( *vec_ops ), candidate_tangent_storage_( *vec_ops ),
-          best_tangent_storage_( *vec_ops ), distance_storage_( *vec_ops )
+          best_tangent_storage_( *vec_ops ), distance_storage_( *vec_ops ), comparison_( *vec_ops )
     {
         if ( continuous_adapter == nullptr )
         {
@@ -206,9 +245,10 @@ public:
     void
     stabilize_closest_to_reference( const vector_type &reference, const vector_type &source, vector_type &destination )
     {
-        bool        have_best     = false;
-        norm_type   best_distance = norm_type{};
-        std::size_t best_index    = 0;
+        const auto  reference_scope = detail::prepare_orbit_reference( orbit_aligner, reference, 0 );
+        bool        have_best       = false;
+        norm_type   best_distance   = norm_type{};
+        std::size_t best_index      = 0;
 
         for ( std::size_t action_index = 0; action_index < finite_actions->size(); ++action_index )
         {
@@ -242,16 +282,18 @@ public:
         vector_type &destination, vector_type &tangent_destination
     )
     {
-        bool        have_best     = false;
-        norm_type   best_distance = norm_type{};
-        std::size_t best_index    = 0;
+        const auto  reference_scope = detail::prepare_orbit_reference( orbit_aligner, reference, 0 );
+        bool        have_best       = false;
+        norm_type   best_distance   = norm_type{};
+        std::size_t best_index      = 0;
 
         for ( std::size_t action_index = 0; action_index < finite_actions->size(); ++action_index )
         {
             finite_actions->apply( action_index, source, action_source );
             finite_actions->apply( action_index, source_tangent, action_tangent );
-            orbit_aligner->align_orbit_closest_to_reference( reference, action_source, candidate );
-            detail::apply_orbit_alignment_to_tangent( orbit_aligner, vec_ops, action_tangent, candidate_tangent, 0 );
+            detail::align_orbit_and_tangent(
+                orbit_aligner, vec_ops, reference, action_source, action_tangent, candidate, candidate_tangent, 0
+            );
             vec_ops->assign_mul( scalar_type( 1 ), candidate, scalar_type( -1 ), reference, distance );
             const norm_type candidate_distance = vec_ops->norm_l2( distance );
             if ( !have_best || candidate_distance < best_distance )
@@ -301,23 +343,18 @@ private:
     std::shared_ptr<orbit_aligner_type>          aligner_owner_;
     std::size_t select_canonical_action( const vector_type &source, vector_type &destination )
     {
-        bool                     have_best = false;
-        std::vector<scalar_type> best_host;
-        std::size_t              best_index = 0;
-        const scalar_type        tolerance  = canonical_zero_tolerance( source );
+        bool              have_best  = false;
+        std::size_t       best_index = 0;
+        const scalar_type tolerance  = comparison_.canonical_tolerance( source );
 
         for ( std::size_t action_index = 0; action_index < finite_actions->size(); ++action_index )
         {
             finite_actions->apply( action_index, source, action_source );
             continuous_adapter->stabilize_canonical( action_source, candidate );
-            auto candidate_host = get_host_state( candidate );
-            zero_small_components( candidate_host, tolerance );
-
-            if ( !have_best || lexicographically_greater( candidate_host, best_host, tolerance ) )
+            if ( !have_best || comparison_.lexicographically_greater( candidate, best, tolerance ) )
             {
                 have_best  = true;
                 best_index = action_index;
-                best_host  = candidate_host;
                 vec_ops->assign( candidate, best );
             }
         }
@@ -325,55 +362,6 @@ private:
         vec_ops->assign( best, destination );
         last_action_index_ = best_index;
         return best_index;
-    }
-
-    std::vector<scalar_type> get_host_state( const vector_type &x ) const
-    {
-        std::vector<scalar_type> host( vec_ops->get_size( x ), scalar_type( 0 ) );
-        vec_ops->get( x, host.data(), host.size() );
-        return host;
-    }
-
-    scalar_type canonical_zero_tolerance( const vector_type &source ) const
-    {
-        const auto  source_host = get_host_state( source );
-        scalar_type scale       = scalar_type( 1 );
-        for ( const auto &value : source_host )
-        {
-            scale = std::max( scale, static_cast<scalar_type>( std::abs( value ) ) );
-        }
-        return scalar_type( 4096 ) * std::numeric_limits<scalar_type>::epsilon() * scale;
-    }
-
-    static void zero_small_components( std::vector<scalar_type> &values, const scalar_type tolerance )
-    {
-        for ( auto &value : values )
-        {
-            if ( std::abs( value ) <= tolerance )
-            {
-                value = scalar_type( 0 );
-            }
-        }
-    }
-
-    static bool lexicographically_greater(
-        const std::vector<scalar_type> &left, const std::vector<scalar_type> &right, const scalar_type tolerance
-    )
-    {
-        const std::size_t n = std::min( left.size(), right.size() );
-        for ( std::size_t i = 0; i < n; ++i )
-        {
-            const scalar_type delta = left[i] - right[i];
-            if ( delta > tolerance )
-            {
-                return true;
-            }
-            if ( delta < -tolerance )
-            {
-                return false;
-            }
-        }
-        return left.size() > right.size();
     }
 
 private:
@@ -384,15 +372,16 @@ private:
     nmfd::detail::vector_wrap<VectorOperations, false, false> action_source_storage_, candidate_storage_, best_storage_,
         gradient_storage_, action_tangent_storage_, candidate_tangent_storage_, best_tangent_storage_,
         distance_storage_;
-    vector_type &action_source      = *action_source_storage_;
-    vector_type &candidate          = *candidate_storage_;
-    vector_type &best               = *best_storage_;
-    vector_type &action_gradient    = *gradient_storage_;
-    vector_type &action_tangent     = *action_tangent_storage_;
-    vector_type &candidate_tangent  = *candidate_tangent_storage_;
-    vector_type &best_tangent       = *best_tangent_storage_;
-    vector_type &distance           = *distance_storage_;
-    std::size_t  last_action_index_ = 0;
+    detail::backend_vector_comparison<VectorOperations> comparison_;
+    vector_type                                        &action_source      = *action_source_storage_;
+    vector_type                                        &candidate          = *candidate_storage_;
+    vector_type                                        &best               = *best_storage_;
+    vector_type                                        &action_gradient    = *gradient_storage_;
+    vector_type                                        &action_tangent     = *action_tangent_storage_;
+    vector_type                                        &candidate_tangent  = *candidate_tangent_storage_;
+    vector_type                                        &best_tangent       = *best_tangent_storage_;
+    vector_type                                        &distance           = *distance_storage_;
+    std::size_t                                         last_action_index_ = 0;
 };
 
 } // namespace symmetry
