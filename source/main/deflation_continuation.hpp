@@ -39,6 +39,7 @@
 #include <containers/symmetry_event_registry.h>
 
 #include <continuation/continuation.hpp>
+#include <continuation/tangent_normalization.h>
 #include <continuation/continuation_analytical.hpp> // inherited from continuation to put a nontrivial analytical solution on the curve, if needed.
 
 #include <deflation/solution_storage.h>
@@ -363,23 +364,11 @@ private:
                 vec_ops->assign( source_tangent, tangent_work );
             }
             vec_ops->assign_mul( T( 1 ), b_work, T( -1 ), reference, diff );
-            const T reference_tangent_norm = vec_ops->norm_l2( reference_tangent );
-            const T source_tangent_norm    = vec_ops->norm_l2( tangent_work );
-            const T reference_extended_sq  = reference_tangent_norm * reference_tangent_norm +
-                                            reference_parameter_tangent * reference_parameter_tangent;
-            const T source_extended_sq =
-                source_tangent_norm * source_tangent_norm + source_parameter_tangent * source_parameter_tangent;
             container::topology::endpoint_geometry_metrics<T> result;
-            result.state_distance = vec_ops->norm_l2( diff );
-            if ( reference_extended_sq > T( 0 ) && source_extended_sq > T( 0 ) )
-            {
-                const T product = vec_ops->scalar_prod( reference_tangent, tangent_work ) +
-                                  reference_parameter_tangent * source_parameter_tangent;
-                result.tangent_line_similarity = std::min<T>(
-                    T( 1 ), common::scalar_math::abs( product ) /
-                                common::scalar_math::sqrt( reference_extended_sq * source_extended_sq )
-                );
-            }
+            result.state_distance          = vec_ops->norm_l2( diff );
+            result.tangent_line_similarity = continuation::rank1_tangent_line_similarity(
+                vec_ops, reference_tangent, reference_parameter_tangent, tangent_work, source_parameter_tangent
+            );
             return result;
         }
 
@@ -570,6 +559,9 @@ public:
         );
         continuate->set_steps( max_S_, ds_0_, ds_max_, initial_direciton_, retry_policy );
         continuate_analytical->set_steps( max_S_, ds_0_, ds_max_, initial_direciton_, retry_policy );
+        continuate_analytical->set_maximum_parameter_step(
+            parameters->deflation_continuation.analytical_max_parameter_step
+        );
 
         const auto progress_policy = deflation_continuation_detail::make_progress_monitor_policy<T>(
             parameters->deflation_continuation.progress_monitor_policy
@@ -1310,6 +1302,9 @@ public:
         };
         callbacks.nearest_known_distance = [this]( T_vec &value, T &distance ) {
             return detail::nearest_stabilized_distance_if_available( sol_storage_def, value, distance );
+        };
+        callbacks.state_distance = [registry_distance_workspace]( const T_vec &stored, const T_vec &candidate ) {
+            return registry_distance_workspace->distance( stored, candidate );
         };
         callbacks.nearest_persistent_rejection =
             [failed_registry]( const T &parameter, const T_vec &value, T &distance, std::uint64_t &id ) {

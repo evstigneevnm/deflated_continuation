@@ -50,6 +50,7 @@ public:
 
     void clear()
     {
+        ++revision_;
         actions.clear();
         definition_fingerprint_.clear();
         definition_fingerprint_explicit_ = false;
@@ -57,6 +58,7 @@ public:
 
     void reset_to_identity()
     {
+        ++revision_;
         actions.clear();
         definition_fingerprint_          = "identity";
         definition_fingerprint_explicit_ = false;
@@ -80,11 +82,17 @@ public:
             pullback = apply;
         }
         actions.push_back( action_entry{ std::move( name ), std::move( apply ), std::move( pullback ) } );
+        ++revision_;
     }
 
     std::size_t size() const
     {
         return actions.size();
+    }
+
+    std::size_t revision() const
+    {
+        return revision_;
     }
 
     void set_definition_fingerprint( std::string fingerprint )
@@ -95,6 +103,7 @@ public:
         }
         definition_fingerprint_          = std::move( fingerprint );
         definition_fingerprint_explicit_ = true;
+        ++revision_;
     }
 
     const std::string &definition_fingerprint() const
@@ -161,6 +170,7 @@ private:
     std::vector<action_entry>         actions;
     std::string                       definition_fingerprint_          = "identity";
     bool                              definition_fingerprint_explicit_ = false;
+    std::size_t                       revision_                        = 0;
 };
 
 } // namespace symmetry

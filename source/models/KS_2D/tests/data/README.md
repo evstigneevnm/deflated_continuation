@@ -34,3 +34,38 @@ with residual below 1e-10. Exhausting the primary iteration budget at zero
 iterations also converges through the existing GMRES fallback. The zero-branch
 transition from 3.9 to 4.1 changes (0, 0) to (2, 0), refined to
 4.0000976562500004 using the unchanged default transition tolerance.
+
+## Focused Reference Discovery
+
+`test_KS2D_reference_discovery_cpu_omp.bin` and
+`test_KS2D_reference_discovery_cuda.bin` accept three arguments:
+`config.json requests.json report.json`. The configuration selects an isolated
+copy of the known-branch project and retains its production numerical settings.
+The test reconstructs all intersections at each requested parameter, then solves
+from radially perturbed reference states using the ordinary NMFD deflation path.
+Example request:
+
+```json
+{
+  "orbit_tolerance": 1e-7,
+  "cases": [
+    {
+      "id": "reference_10",
+      "parameter": 17,
+      "state": "/absolute/path/to/reference/10/1",
+      "perturbations": [0, -1e-4, 1e-4]
+    }
+  ]
+}
+```
+
+A novel-root case must recover the specified orbit from a nonzero perturbation;
+accepting only the exact state is insufficient. Set `"known": true` for an
+existing-root control, with a zero perturbation to check exclusion. Successful
+solves must satisfy physical and deflated tolerances, separation, and unchanged
+parameters. Failed solves must preserve their input states. JSON reports include
+orbit distances and convergence statuses; nonfinite numerical fields serialize
+as `null`. The test exits unsuccessfully if a case fails.
+
+The large archives and local discovery/short-continuation launch scripts are
+not CI fixtures. Keep their inputs, reports, and isolated projects under `build`.

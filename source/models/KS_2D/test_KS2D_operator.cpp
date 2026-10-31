@@ -570,7 +570,7 @@ void run_case(
                 );
                 result.check(
                     residual_quotient_adapter.symmetry_definition_fingerprint().find(
-                        "fourier_residual_translation_lattice_2d_v1"
+                        "fourier_residual_translation_lattice_2d_v2"
                     ) != std::string::npos,
                     message( "residual translation policy enters the archive definition" )
                 );

@@ -650,6 +650,7 @@ struct parameters
         std::vector<T>            deflation_knots;
         bool                      add_analytical_solution_to_diagram;
         std::vector<unsigned int> analytical_solution_branches;
+        T                         analytical_max_parameter_step = T( 0 );
 
         continuation_parameter_bounds_s continuation_parameter_bounds;
         boundary_refinement_policy_s    boundary_refinement_policy;
@@ -678,6 +679,7 @@ struct parameters
             deflation_knots                    = { 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0 };
             add_analytical_solution_to_diagram = false;
             analytical_solution_branches       = {};
+            analytical_max_parameter_step      = T( 0 );
             continuation_parameter_bounds.set_default();
             boundary_refinement_policy.set_default();
             restart_policy.set_default();
@@ -718,6 +720,7 @@ struct parameters
                     std::cout << x << " ";
             }
             std::cout << std::endl;
+            std::cout << "||==analytical_max_parameter_step: " << analytical_max_parameter_step << std::endl;
             std::cout << "||==continuation_parameter_bounds: " << std::endl;
             continuation_parameter_bounds.plot_all();
             std::cout << "||==boundary_refinement_policy: " << std::endl;

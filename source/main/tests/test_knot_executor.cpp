@@ -315,6 +315,46 @@ int main()
         executor_type unchecked( &vector_operations, &unchecked_knots, &log, policy, callbacks );
         require( unchecked.execute().accepted_curves == 1, "Explicitly disabled duplicate checking was required" );
         require( vector_operations.active_vectors == 0, "Disabled duplicate checking leaked scratch" );
+
+        // Without a persistent registry, an equivalent failed seed must still
+        // be rejected before continuation. A nearby distinct root remains usable.
+        fake_knots orbit_knots( { 12. } );
+        attempts                        = 0;
+        unsigned int continuation_calls = 0, orbit_accepts = 0, orbit_discards = 0;
+        callbacks.load_archive           = []() { return false; };
+        callbacks.find_deflated_solution = [&attempts]( const double & ) { return ++attempts <= 3; };
+        callbacks.get_deflated_solution  = [&attempts]( std::vector<double> &value ) {
+            value = attempts == 1 ? std::vector<double>{ 1., 2. }
+                                   : std::vector<double>{ attempts == 2 ? -1. : -1.001, -2. };
+        };
+        callbacks.nearest_known_distance = []( std::vector<double> &, double &distance ) {
+            distance = std::numeric_limits<double>::infinity();
+            return true;
+        };
+        callbacks.state_distance = []( const auto &stored, const auto &candidate ) {
+            require( stored == std::vector<double>{ 1., 2. }, "Session rejection did not pass the stored root first" );
+            return std::min(
+                std::hypot( stored[0] - candidate[0], stored[1] - candidate[1] ),
+                std::hypot( stored[0] + candidate[0], stored[1] + candidate[1] )
+            );
+        };
+        callbacks.nearest_persistent_rejection = {};
+        callbacks.continue_candidate           = [&continuation_calls]( std::vector<double> &, const double & ) {
+            return ++continuation_calls == 1 ? failed_without_progress() : complete_continuation();
+        };
+        callbacks.accept_candidate             = [&orbit_accepts]( const double &, const auto & ) { ++orbit_accepts; };
+        callbacks.discard_candidate            = [&orbit_discards]() { ++orbit_discards; };
+        callbacks.save_archive                 = []() {};
+        policy.check_duplicate_after_deflation = true;
+        policy.max_failed_continuations_per_knot = 3;
+        executor_type orbit_executor( &vector_operations, &orbit_knots, &log, policy, callbacks );
+        const auto    orbit_result = orbit_executor.execute();
+        require( continuation_calls == 2 && attempts == 4, "Equivalent failed root consumed continuation retries" );
+        require( orbit_accepts == 1 && orbit_result.accepted_curves == 1, "Nearby distinct root was not continued" );
+        require(
+            orbit_discards == 1 && orbit_result.discarded_curves == 1, "Repeated rejection was counted as failure"
+        );
+        require( vector_operations.active_vectors == 0, "Orbit rejection leaked cache vectors" );
     }
     catch ( const std::exception &error )
     {

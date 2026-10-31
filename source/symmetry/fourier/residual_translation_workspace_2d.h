@@ -94,10 +94,10 @@ public:
         return mask_host_;
     }
 
-    bool preserves_subspace( const character_type &character, const vector_type &source, norm_type tolerance )
+    norm_type incompatible_norm_sq( const character_type &character, const vector_type &source )
     {
         if ( character.is_identity() )
-            return true;
+            return norm_type( 0 );
         const auto input  = source;
         const auto output = *scratch_;
         const auto modes  = modes_;
@@ -108,9 +108,30 @@ public:
             static_cast<ordinal_type>( size_ )
         );
         for_each_.wait();
+        return operations_.norm_sq( *scratch_ );
+    }
+
+    bool preserves_subspace( const character_type &character, const vector_type &source, norm_type tolerance )
+    {
         // Retained incompatible coefficients differ from exact translation by at most 2|u_k|.
-        return norm_type( 4 ) * operations_.norm_sq( *scratch_ ) <=
+        return norm_type( 4 ) * incompatible_norm_sq( character, source ) <=
                tolerance * tolerance * static_cast<norm_type>( size_ );
+    }
+
+    norm_type discarded_error_bound( const vector_type &source, norm_type threshold )
+    {
+        if ( size_ == 0 )
+            return norm_type( 0 );
+        const auto input  = source;
+        const auto output = *scratch_;
+        for_each_(
+            [=] __DEVICE_TAG__( ordinal_type i ) {
+                output( i ) = traits::abs( input( i ) ) <= threshold ? input( i ) : scalar_type( 0 );
+            },
+            static_cast<ordinal_type>( size_ )
+        );
+        for_each_.wait();
+        return norm_type( 2 ) * std::sqrt( operations_.norm_sq( *scratch_ ) / static_cast<norm_type>( size_ ) );
     }
 
     norm_type

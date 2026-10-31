@@ -1,5 +1,6 @@
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -90,6 +91,54 @@ int main()
             require( vector_operations.active_vectors == 1, "difference workspace retained" );
         }
         require( vector_operations.active_vectors == 0, "all vectors released" );
+
+        // Sign-related states represent the same orbit; the stored state must be
+        // the first callback argument, as in the persistent rejection registry.
+        unsigned int distance_calls = 0;
+        {
+            main_classes::deflation_continuation_detail::rejected_candidate_cache<fake_vector_operations> cache(
+                &vector_operations, [&distance_calls]( const auto &stored, const auto &candidate ) {
+                    ++distance_calls;
+                    require( stored == std::vector<double>{ 1., 2. }, "distance callback argument order" );
+                    return std::min(
+                        std::hypot( stored[0] - candidate[0], stored[1] - candidate[1] ),
+                        std::hypot( stored[0] + candidate[0], stored[1] + candidate[1] )
+                    );
+                }
+            );
+            cache.add( 4., { 1., 2. } );
+            double distance;
+            require( cache.nearest_distance( 4., { -1., -2. }, distance ) && distance == 0., "orbit duplicate" );
+            require(
+                cache.nearest_distance( 4., { -1.001, -2. }, distance ) && distance > 1e-4,
+                "nearby distinct orbit was rejected"
+            );
+            require( !cache.nearest_distance( 5., { -1., -2. }, distance ), "orbit comparison crossed knots" );
+            require( distance_calls == 2, "callback used for a different knot" );
+            cache.clear();
+            require( !cache.nearest_distance( 4., { -1., -2. }, distance ), "clear retained rejected states" );
+        }
+        require( vector_operations.active_vectors == 0, "orbit cache vectors released" );
+
+        for ( const double invalid : { -1., std::numeric_limits<double>::quiet_NaN() } )
+        {
+            main_classes::deflation_continuation_detail::rejected_candidate_cache<fake_vector_operations> cache(
+                &vector_operations, [invalid]( const auto &, const auto & ) { return invalid; }
+            );
+            cache.add( 4., { 1., 2. } );
+            double distance;
+            bool   rejected = false;
+            try
+            {
+                cache.nearest_distance( 4., { -1., -2. }, distance );
+            }
+            catch ( const std::logic_error & )
+            {
+                rejected = true;
+            }
+            require( rejected && cache.size() == 1, "invalid orbit distance silently accepted" );
+        }
+        require( vector_operations.active_vectors == 0, "invalid query released cache vectors" );
     }
     catch ( const std::exception &error )
     {

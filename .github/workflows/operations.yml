@@ -2383,6 +2383,8 @@ jobs:
           ./"$BUILD_DIR"/knot_relocation_controller/test_knot_relocation_controller.bin
           make test_analytical_branch_executor.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/analytical_branch_executor"
           ./"$BUILD_DIR"/analytical_branch_executor/test_analytical_branch_executor.bin
+          make test_continuation_analytical.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/continuation_analytical"
+          ./"$BUILD_DIR"/continuation_analytical/test_continuation_analytical.bin
           make test_knot_executor.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/knot_executor"
           ./"$BUILD_DIR"/knot_executor/test_knot_executor.bin
           make test_continuation_registries.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/continuation_registries"

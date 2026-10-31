@@ -76,12 +76,194 @@ double distance( const test_vector &left, const test_vector &right )
     return std::sqrt( result );
 }
 
+void test_source_orbit_query()
+{
+    vector_operations operations( 16 );
+    using aligner_type = symmetry::fourier::residual_translation_orbit_aligner_2d<vector_operations>;
+    std::vector<symmetry::fourier::mode_index<2>> modes( 16, { 1, 0 } );
+    modes[0] = { 2, 0 };
+    modes[1] = { 4, 0 };
+    aligner_type::policy_type policy;
+    policy.absolute_active_tolerance = 1e-8;
+    aligner_type aligner( &operations, modes, policy );
+    test_vector  root( operations ), query( operations ), aligned( operations );
+    root[0]  = 2.;
+    root[1]  = 1.;
+    query[0] = -2.;
+    query[1] = 1.;
+    for ( double factor : { 1. - 1e-6, 1. + 1e-6, 2. } )
+    {
+        query[3] = 2e-8 * factor;
+        aligner.align_source_orbit_closest_to_reference( query, root, aligned );
+        require(
+            std::abs( distance( query, aligned ) - query[3] ) < 1e-20,
+            "candidate compatibility cutoff hides a fixed source orbit"
+        );
+    }
+    aligner.align_orbit_closest_to_reference( query, root, aligned );
+    require( distance( query, aligned ) > 1., "source query weakened general two-vector alignment" );
+    query[3] = .1;
+    aligner.align_source_orbit_closest_to_reference( query, root, aligned );
+    require(
+        std::abs( distance( query, aligned ) - .1 ) < 1e-14, "a distinct reference changed the admissible source orbit"
+    );
+
+    root[3]  = .1;
+    query[3] = 0.;
+    aligner.align_source_orbit_closest_to_reference( query, root, aligned );
+    require( distance( query, aligned ) > 1., "source query bypassed transformed-source compatibility" );
+    root[3]       = 0.;
+    query[3]      = std::numeric_limits<double>::quiet_NaN();
+    bool rejected = false;
+    try
+    {
+        aligner.align_source_orbit_closest_to_reference( query, root, aligned );
+    }
+    catch ( const std::invalid_argument & )
+    {
+        rejected = true;
+    }
+    require( rejected, "source query accepted a nonfinite reference" );
+    query[3] = 0.;
+    aligner.align_source_orbit_closest_to_reference( query, root, root );
+    require( distance( query, root ) == 0., "in-place source query overwrote its input before selection" );
+}
+
+// Source noise above the pointwise cutoff may still have an admissible RMS defect.
+void test_prepared_source()
+{
+    vector_operations operations( 64 );
+    using aligner_type = symmetry::fourier::residual_translation_orbit_aligner_2d<vector_operations>;
+    std::vector<symmetry::fourier::mode_index<2>> modes( 64, { 1, 1 } );
+    modes[0] = { 2, 0 };
+    modes[1] = { 0, 2 };
+    modes[2] = { 2, 2 };
+    aligner_type::policy_type policy;
+    policy.absolute_active_tolerance = 1e-8;
+    aligner_type aligner( &operations, modes, policy );
+    test_vector  root( operations ), query( operations ), aligned( operations ), uncached( operations );
+    root[0]  = 2.;
+    root[1]  = 1.;
+    root[2]  = .5;
+    query[0] = 2.;
+    query[1] = -1.;
+    query[2] = -.5;
+    for ( double factor : { 1. - 1e-6, 1. + 1e-6, 1.7 } )
+    {
+        root[3]             = factor * policy.absolute_active_tolerance;
+        const auto prepared = aligner.prepare_source_orbit( root );
+        aligner.align_source_orbit_closest_to_reference( query, root, prepared, aligned );
+        aligner.align_source_orbit_closest_to_reference( query, root, uncached );
+        require(
+            std::abs( distance( query, aligned ) - root[3] ) < 1e-20,
+            "stored-source cutoff hid an admissible quarter shift"
+        );
+        require( distance( aligned, uncached ) == 0., "prepared and unprepared source queries differ" );
+        require(
+            prepared.candidate_count() <= policy.maximum_proposal_characters,
+            "source preparation exceeded its configured budget"
+        );
+    }
+    // Check the bounded search against exhaustive validated proposals, including tail aliases.
+    root[3]           = 1.7e-8;
+    const auto cached = aligner.prepare_source_orbit( root );
+    symmetry::fourier::detail::residual_translation_workspace_2d<vector_operations> workspace( operations, modes );
+    auto                                                                            proposal_policy = policy;
+    proposal_policy.absolute_active_tolerance                                                       = 4e-8;
+    proposal_policy.relative_active_tolerance                                                       = 0.;
+    const auto proposals = symmetry::fourier::build_residual_translation_group_2d(
+        modes, workspace.active_mask( root, 4e-8 ), 2., proposal_policy, true
+    );
+    for ( int i = 0; i < 24; ++i )
+    {
+        query[0]    = ( i % 2 ? -2. : 2. ) + .01 * i;
+        query[1]    = ( i % 3 ? -1. : 1. ) - .02 * i;
+        query[2]    = ( i % 5 ? -.5 : .5 );
+        query[3]    = i * 1e-9;
+        double best = std::numeric_limits<double>::infinity();
+        for ( const auto &character : proposals.characters )
+            if ( workspace.preserves_subspace( character, root, 1e-8 ) )
+                best = std::min( best, workspace.distance_squared( character, query, root ) );
+        aligner.align_source_orbit_closest_to_reference( query, root, cached, aligned );
+        require(
+            std::abs( distance( query, aligned ) - std::sqrt( best ) ) < 1e-14,
+            "bounded source search differs from exhaustive selection"
+        );
+        operations.assign_scalar( 42., aligned );
+        const bool improved = aligner.align_source_orbit_closest_to_reference(
+            query, root, cached, aligned, .5 * std::sqrt( best / 64. )
+        );
+        require(
+            !improved && aligned[0] == 42. && aligned[63] == 42., "unsuccessful bounded search modified its destination"
+        );
+    }
+    query[0]                = 2.;
+    query[1]                = -1.;
+    query[2]                = -.5;
+    query[3]                = 0.;
+    root[3]                 = .1;
+    const auto incompatible = aligner.prepare_source_orbit( root );
+    aligner.align_source_orbit_closest_to_reference( query, root, incompatible, aligned );
+    require( distance( query, aligned ) > 1., "prepared source bypassed full-vector compatibility" );
+    root[3]       = 0.;
+    auto prepared = aligner.prepare_source_orbit( root );
+    query[0] += 1e-4;
+    aligner.align_source_orbit_closest_to_reference( query, root, prepared, aligned );
+    require( distance( query, aligned ) > 9e-5, "prepared source merged a nearby distinct root" );
+    query[0] = 2.;
+
+    aligner_type other( &operations, modes, policy );
+    bool         rejected = false;
+    try
+    {
+        other.align_source_orbit_closest_to_reference( query, root, prepared, aligned );
+    }
+    catch ( const std::invalid_argument & )
+    {
+        rejected = true;
+    }
+    require( rejected, "source preparation was accepted by another aligner" );
+
+    policy.maximum_proposal_characters = 4;
+    aligner_type limited( &operations, modes, policy );
+    rejected = false;
+    try
+    {
+        limited.prepare_source_orbit( root );
+    }
+    catch ( const std::runtime_error & )
+    {
+        rejected = true;
+    }
+    require( rejected, "oversized proposal search silently truncated its candidates" );
+
+    // A coarse rank-one support cannot resolve substantial transverse tail energy.
+    modes.assign( 64, { 0, 1 } );
+    modes[0]                           = { 2, 0 };
+    policy.maximum_proposal_characters = 256;
+    aligner_type unresolved( &operations, modes, policy );
+    operations.assign_scalar( 1.1e-8, root );
+    root[0]  = 2.;
+    rejected = false;
+    try
+    {
+        unresolved.prepare_source_orbit( root );
+    }
+    catch ( const std::runtime_error & )
+    {
+        rejected = true;
+    }
+    require( rejected, "unresolved transverse support was treated as a unique orbit" );
+}
+
 } // namespace
 
 int main()
 {
     try
     {
+        test_source_orbit_query();
+        test_prepared_source();
         vector_operations operations( 3 );
         using aligner_type = symmetry::fourier::residual_translation_orbit_aligner_2d<vector_operations>;
         const std::vector<symmetry::fourier::mode_index<2>> modes{ { 2, 0 }, { 4, 0 }, { 6, 0 } };

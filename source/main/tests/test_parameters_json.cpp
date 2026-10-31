@@ -192,6 +192,7 @@ void verify_optional_policy_defaults( const std::string &file_name )
     continuation_json.erase( "progress_monitor_policy" );
     continuation_json.erase( "continuation_parameter_bounds" );
     continuation_json.erase( "boundary_refinement_policy" );
+    continuation_json.erase( "analytical_max_parameter_step" );
     auto &stability_json = json.at( "stability_continuation" );
     stability_json.erase( "correct_stability_transitions_with_newton" );
     stability_json.erase( "recover_failed_transition_classification_with_newton" );
@@ -226,6 +227,7 @@ void verify_optional_policy_defaults( const std::string &file_name )
     );
     require( continuation.corrector_retry_policy.successes_before_growth == 6, "legacy corrector growth fallback" );
     require( !continuation.progress_monitor_policy.enabled, "progress monitor default" );
+    require( continuation.analytical_max_parameter_step == T( 0 ), "analytical knot-only sampling default" );
     const auto &stability = parameters.stability_continuation;
     require( !stability.correct_stability_transitions_with_newton, "secant stability transition refinement default" );
     require(
@@ -506,6 +508,33 @@ void verify_matrix_free_stability_configuration( const std::string &file_name )
 
 }
 
+template <class T>
+void verify_analytical_sampling_configuration( const std::string &file_name )
+{
+    auto  json = main_classes::read_json( file_name );
+    auto &gap  = json.at( "deflation_continuation" )["analytical_max_parameter_step"];
+    for ( const T step : { T( 0 ), T( .25 ) } )
+    {
+        gap                   = step;
+        const auto parameters = json.get<main_classes::parameters<T>>();
+        require( parameters.deflation_continuation.analytical_max_parameter_step == step, "analytical parameter gap" );
+    }
+    for ( const T invalid : { T( -1 ), std::numeric_limits<T>::infinity(), std::numeric_limits<T>::quiet_NaN() } )
+    {
+        gap           = invalid;
+        bool rejected = false;
+        try
+        {
+            (void)json.get<main_classes::parameters<T>>();
+        }
+        catch ( const std::invalid_argument & )
+        {
+            rejected = true;
+        }
+        require( rejected, "invalid analytical parameter gap accepted" );
+    }
+}
+
 int main( int argc, char **argv )
 {
     const std::string file_name = argc > 1 ? argv[1] : "json_project_files/KS1D_test_full.json";
@@ -515,6 +544,8 @@ int main( int argc, char **argv )
         verify_full_configuration<float>( file_name );
         verify_optional_policy_defaults<double>( file_name );
         verify_optional_policy_defaults<float>( file_name );
+        verify_analytical_sampling_configuration<double>( file_name );
+        verify_analytical_sampling_configuration<float>( file_name );
         verify_stability_classifier_overrides<double>( file_name );
         verify_stability_classifier_overrides<float>( file_name );
         verify_matrix_free_stability_configuration<double>( file_name );

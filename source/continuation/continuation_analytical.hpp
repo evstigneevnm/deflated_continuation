@@ -1,28 +1,17 @@
 #ifndef __CONTINUATION_ANALYTICAL_HPP__
 #define __CONTINUATION_ANALYTICAL_HPP__
 
+#include <algorithm>
 #include <functional>
-#include <sstream>
-#include <string>
+#include <stdexcept>
+#include <utility>
+#include <vector>
 
 #include <common/scalar_math.h>
 #include <continuation/continuation.hpp>
 
 namespace continuation
 {
-
-namespace detail
-{
-
-template <class T>
-std::string scalar_to_string( const T &value )
-{
-    std::ostringstream stream;
-    stream << value;
-    return stream.str();
-}
-
-} // namespace detail
 
 template <
     class VectorOperations, class VectorFileOperations, class Log, class NonlinearOperations, class LinearOperator,
@@ -33,322 +22,160 @@ class continuation_analytical : public continuation<
                                     VectorOperations, VectorFileOperations, Log, NonlinearOperations, LinearOperator,
                                     Knots, LinearSolver, Newton, Curve, SystemOperatorContinuation, NewtonTypes>
 {
-private:
-    typedef continuation<
+    using parent_t = continuation<
         VectorOperations, VectorFileOperations, Log, NonlinearOperations, LinearOperator, Knots, LinearSolver, Newton,
-        Curve, SystemOperatorContinuation, NewtonTypes>
-        parent_t;
-
-    typedef typename parent_t::T     T;
-    typedef typename parent_t::T_vec T_vec;
-
-    //  local variables
-    T                                         ds_0   = T( 0 );
-    T                                         ds_max = T( 0 );
-    std::function<bool( const T &, T_vec & )> exact_solution_provider;
-
+        Curve, SystemOperatorContinuation, NewtonTypes>;
+    using T                 = typename parent_t::T;
+    using T_vec             = typename parent_t::T_vec;
+    using endpoint_reason_t = typename parent_t::endpoint_reason_t;
 
 public:
     using parent_t::parent_t;
-    ~continuation_analytical()
-    {
-    }
 
-
-    void set_steps(
-        unsigned int max_S_, T ds_0_, T ds_max_, int initial_direciton_ = -1, T step_ds_m_ = 0.01, T step_ds_p_ = 0.01,
-        unsigned int attempts_0_ = 4
-    )
+    // Zero samples only effective knots and boundaries; arclength settings are independent.
+    void set_maximum_parameter_step( const T step )
     {
-        parent_t::max_S             = max_S_;
-        parent_t::initial_direciton = initial_direciton_;
-        parent_t::predict->set_steps( ds_0_, ds_max_, step_ds_m_, step_ds_p_, attempts_0_ );
-        ds_0   = ds_0_;
-        ds_max = ds_max_;
-    }
-
-    void set_steps(
-        const unsigned int max_S_, const T ds_0_, const T ds_max_, const int initial_direciton_,
-        const corrector_retry_policy<T> &retry_policy
-    )
-    {
-        parent_t::max_S             = max_S_;
-        parent_t::initial_direciton = initial_direciton_;
-        parent_t::predict->set_steps( ds_0_, ds_max_, retry_policy );
-        ds_0   = ds_0_;
-        ds_max = ds_max_;
+        if ( !common::scalar_math::isfinite( step ) || step < T( 0 ) )
+            throw std::invalid_argument( "Analytical maximum parameter step must be finite and nonnegative" );
+        maximum_parameter_step_ = step;
     }
 
     void set_exact_solution_provider( std::function<bool( const T &, T_vec & )> provider )
     {
-        exact_solution_provider = std::move( provider );
+        exact_solution_provider_ = std::move( provider );
     }
 
     void clear_exact_solution_provider()
     {
-        exact_solution_provider = {};
+        exact_solution_provider_ = {};
     }
 
-    bool continuate_curve( Curve *&curve_, const T_vec &x0_, const T &lambda0_ )
+    bool continuate_curve( Curve *&curve, const T_vec &state, const T &parameter )
     {
         parent_t::update_knots();
-        parent_t::bif_diag     = curve_;
+        prepare_parameters( parameter );
+        if ( !parent_t::vec_ops->is_valid_number( state ) )
+            throw std::invalid_argument( "Analytical sampling requires a finite initial state" );
+        parent_t::bif_diag     = curve;
         parent_t::direction    = parent_t::initial_direciton;
         parent_t::fail_flag    = false;
         parent_t::hard_failure = false;
         parent_t::endpoint_state.reset_curve();
-        parent_t::just_interpolated  = false;
-        parent_t::continue_next_step = true;
-
-        //make a copy here? or just use the provided reference
-        //x0 = x0_, lambda0 = lambda0_;
-        parent_t::vec_ops->assign( x0_, parent_t::x0 );
-        parent_t::lambda0      = lambda0_;
-        parent_t::lambda_start = lambda0_;
-        //let's use a copy for start values since we need those to check returning value anyway
-
-        parent_t::vec_ops->assign( x0_, parent_t::x_start );
-
         parent_t::break_semicurve = 0;
+        parent_t::lambda_start    = parameter;
+        parent_t::vec_ops->assign( state, parent_t::x_start );
 
         while ( parent_t::break_semicurve < 2 )
         {
-            parent_t::continue_next_step = true;
-            start_semicurve();
-            parent_t::
-                change_direction(); //if we reached the origin, then this is irrelevant. Else, change direction and do it again
             parent_t::vec_ops->assign( parent_t::x_start, parent_t::x0 );
-            parent_t::lambda0 = parent_t::lambda_start;
-            if ( parent_t::fail_flag )
-            {
-                parent_t::log->info_f(
-                    "continuation_analytical::continuate_curve: previous semicurve returned with fail flag."
-                );
-                parent_t::fail_flag = false;
-            }
+            parent_t::lambda0                           = parameter;
+            parent_t::current_semicurve_points          = 0;
+            parent_t::current_semicurve_endpoint_reason = endpoint_reason_t::none;
+            detail::start_new_curve_segment_if_available( curve );
+            start_semicurve();
+            parent_t::change_direction();
         }
-        parent_t::bif_diag->print_curve();
+        curve->print_curve();
         return !parent_t::hard_failure && !parent_t::endpoint_state.incomplete();
     }
 
 private:
-    bool interpolate_all_knots()
+    T                                         maximum_parameter_step_ = T( 0 );
+    std::vector<T>                            parameters_;
+    std::function<bool( const T &, T_vec & )> exact_solution_provider_;
+
+    void prepare_parameters( const T initial )
     {
-        bool res = false;
-        for ( auto &x : *parent_t::knots )
+        const T minimum = parent_t::lambda_min;
+        const T maximum = parent_t::lambda_max;
+        if ( !common::scalar_math::isfinite( initial ) || !common::scalar_math::isfinite( minimum ) ||
+             !common::scalar_math::isfinite( maximum ) || !( minimum < maximum ) || initial < minimum ||
+             initial > maximum || parent_t::max_S == 0 ||
+             ( parent_t::initial_direciton != -1 && parent_t::initial_direciton != 1 ) )
+            throw std::invalid_argument( "Invalid analytical sampling bounds, initial parameter, direction or limit" );
+
+        parameters_ = { minimum, maximum };
+        for ( const auto requested : *parent_t::knots )
         {
-            const T requested_lambda = x;
-            T       effective_lambda = requested_lambda;
+            T effective = requested;
             if ( parent_t::knot_resolver )
-            {
-                parent_t::knot_resolver( requested_lambda, effective_lambda );
-            }
-
-            if ( ( effective_lambda - parent_t::lambda1 ) * ( effective_lambda - parent_t::lambda0 ) <= T( 0.0 ) )
-            {
-                parent_t::lambda1 = effective_lambda;
-                if ( !evaluate_exact_solution( parent_t::lambda1, parent_t::x1 ) )
-                {
-                    parent_t::continue_next_step = false;
-                    parent_t::break_semicurve++;
-                    return res;
-                }
-                parent_t::just_interpolated = true;
-                res                         = true;
-            }
+                parent_t::knot_resolver( requested, effective );
+            if ( !common::scalar_math::isfinite( effective ) )
+                throw std::invalid_argument( "Analytical sampling requires finite effective knots" );
+            if ( effective >= minimum && effective <= maximum )
+                parameters_.push_back( effective );
         }
-        return res;
+        std::sort( parameters_.begin(), parameters_.end() );
+        parameters_.erase( std::unique( parameters_.begin(), parameters_.end() ), parameters_.end() );
     }
-    void check_interval()
+
+    // Select the nearest mandatory point before adding optional samples inside that interval.
+    T next_parameter( const T current, bool &mandatory ) const
     {
-        bool intersect_min = false;
-        bool intersect_max = false;
+        auto target = std::upper_bound( parameters_.begin(), parameters_.end(), current );
+        if ( parent_t::direction < 0 )
+        {
+            target = std::lower_bound( parameters_.begin(), parameters_.end(), current );
+            --target;
+        }
+        T next = *target;
+        if ( maximum_parameter_step_ > T( 0 ) )
+        {
+            const T proposed = current + T( parent_t::direction ) * maximum_parameter_step_;
+            if ( parent_t::direction > 0 ? proposed < next : proposed > next )
+                next = proposed;
+        }
+        if ( !common::scalar_math::isfinite( next ) || next == current )
+            throw std::runtime_error( "Analytical parameter step makes no finite progress" );
+        mandatory = next == *target;
+        return next;
+    }
 
-        if ( !common::scalar_math::isfinite( parent_t::lambda0 ) )
-        {
-            throw std::runtime_error(
-                "continuation_analytical::check_interval: fatal nonfinite value of lambda0 = " +
-                detail::scalar_to_string( parent_t::lambda0 )
-            );
-        }
-        if ( !common::scalar_math::isfinite( parent_t::lambda1 ) )
-        {
-            throw std::runtime_error(
-                "continuation_analytical::check_interval: fatal nonfinite value of lambda1 = " +
-                detail::scalar_to_string( parent_t::lambda1 )
-            );
-        }
-
-
-        if ( ( parent_t::lambda_min - parent_t::lambda1 ) * ( parent_t::lambda_min - parent_t::lambda0 ) <= T( 0.0 ) )
-        {
-            parent_t::vec_ops->assign( parent_t::x1, parent_t::x1_back );
-            const T converged_lambda = parent_t::lambda1;
-            parent_t::lambda1        = parent_t::lambda_min;
-            if ( !evaluate_exact_solution( parent_t::lambda1, parent_t::x1 ) )
-            {
-                parent_t::vec_ops->assign( parent_t::x1_back, parent_t::x1 );
-                parent_t::lambda1 = converged_lambda;
-                if ( parent_t::preserve_last_converged_boundary_point )
-                {
-                    parent_t::set_pending_endpoint_reason( container::curve_endpoint_reason::boundary_min_approximate );
-                    intersect_min = true;
-                }
-                else
-                {
-                    parent_t::endpoint_state.mark_incomplete();
-                    parent_t::set_pending_endpoint_reason(
-                        container::curve_endpoint_reason::knot_interpolation_failure
-                    );
-                    parent_t::hard_failure = true;
-                    parent_t::break_semicurve++;
-                    parent_t::continue_next_step = false;
-                    return;
-                }
-            }
-            else
-            {
-                parent_t::set_pending_endpoint_reason( container::curve_endpoint_reason::boundary_min );
-                intersect_min = true;
-            }
-        }
-        if ( ( parent_t::lambda_max - parent_t::lambda1 ) * ( parent_t::lambda_max - parent_t::lambda0 ) <= T( 0.0 ) )
-        {
-            parent_t::vec_ops->assign( parent_t::x1, parent_t::x1_back );
-            const T converged_lambda = parent_t::lambda1;
-            parent_t::lambda1        = parent_t::lambda_max;
-            if ( !evaluate_exact_solution( parent_t::lambda1, parent_t::x1 ) )
-            {
-                parent_t::vec_ops->assign( parent_t::x1_back, parent_t::x1 );
-                parent_t::lambda1 = converged_lambda;
-                if ( parent_t::preserve_last_converged_boundary_point )
-                {
-                    parent_t::set_pending_endpoint_reason( container::curve_endpoint_reason::boundary_max_approximate );
-                    intersect_max = true;
-                }
-                else
-                {
-                    parent_t::endpoint_state.mark_incomplete();
-                    parent_t::set_pending_endpoint_reason(
-                        container::curve_endpoint_reason::knot_interpolation_failure
-                    );
-                    parent_t::hard_failure = true;
-                    parent_t::break_semicurve++;
-                    parent_t::continue_next_step = false;
-                    return;
-                }
-            }
-            else
-            {
-                parent_t::set_pending_endpoint_reason( container::curve_endpoint_reason::boundary_max );
-                intersect_max = true;
-            }
-        }
-
-        if ( intersect_min || intersect_max )
-        {
-            if ( intersect_min )
-            {
-                parent_t::log->warning_f(
-                    "continuation_analytical::check_interval: reached lambda_min = %le; stopping semicurve at "
-                    "parameter boundary.",
-                    double( parent_t::lambda_min )
-                );
-            }
-            if ( intersect_max )
-            {
-                parent_t::log->warning_f(
-                    "continuation_analytical::check_interval: reached lambda_max = %le; stopping semicurve at "
-                    "parameter boundary.",
-                    double( parent_t::lambda_max )
-                );
-            }
-            parent_t::break_semicurve++;
-            parent_t::fail_flag          = false;
-            parent_t::continue_next_step = false;
-        }
+    endpoint_reason_t boundary_reason( const T parameter ) const
+    {
+        if ( parameter == parent_t::lambda_min )
+            return endpoint_reason_t::boundary_min;
+        if ( parameter == parent_t::lambda_max )
+            return endpoint_reason_t::boundary_max;
+        return endpoint_reason_t::none;
     }
 
     void start_semicurve()
     {
-
-        parent_t::add_solution_to_curve( parent_t::lambda0, parent_t::x0, true ); //add initial knot, force save data!
-        unsigned int s;
-        for ( s = 0; s < parent_t::max_S; s++ )
+        const T boundary = parent_t::direction < 0 ? parent_t::lambda_min : parent_t::lambda_max;
+        parent_t::endpoint_state.reset_step();
+        parent_t::add_solution_to_curve(
+            parent_t::lambda0, parent_t::x0, true,
+            parent_t::lambda0 == boundary ? boundary_reason( boundary ) : endpoint_reason_t::none
+        );
+        for ( unsigned int step = 0; step < parent_t::max_S && parent_t::lambda0 != boundary; ++step )
         {
-            parent_t::endpoint_state.reset_step();
-            T d_lambda = ds_max;
-            if ( d_lambda <= T( 0 ) || !common::scalar_math::isfinite( d_lambda ) )
+            bool    mandatory;
+            const T next = next_parameter( parent_t::lambda0, mandatory );
+            if ( !evaluate_exact_solution( next, parent_t::x1 ) || !parent_t::vec_ops->is_valid_number( parent_t::x1 ) )
             {
-                d_lambda = ds_0;
-            }
-            if ( d_lambda <= T( 0 ) || !common::scalar_math::isfinite( d_lambda ) )
-            {
-                d_lambda = T( 1 );
-            }
-
-            parent_t::lambda1 = parent_t::lambda0 + parent_t::direction * d_lambda;
-            if ( !evaluate_exact_solution( parent_t::lambda1, parent_t::x1 ) )
-            {
+                parent_t::mark_last_curve_point( endpoint_reason_t::knot_interpolation_failure );
+                parent_t::hard_failure = true;
                 parent_t::log->warning_f(
-                    "continuation_analytical::start_semicurve: analytical branch is not defined at lambda = %le; "
-                    "stopping semicurve.",
-                    double( parent_t::lambda1 )
+                    "continuation_analytical: exact solution unavailable or invalid at lambda = %le.", double( next )
                 );
-                parent_t::continue_next_step = false;
-                parent_t::break_semicurve++;
                 break;
             }
-            // continuation_step->solve(nonlin_op, x0, lambda0, x0_s, lambda0_s, x1, lambda1, x1_s, lambda1_s);
-            // (x0, lambda0)->(x1, lambda1)
-            bool did_knot_interpolation = false;
-            if ( !parent_t::just_interpolated )
-            {
-                check_interval();
-                //check_returning();
-                if ( parent_t::continue_next_step )
-                {
-                    did_knot_interpolation = interpolate_all_knots();
-                }
-                //if fail flag after the interpolation, restore (x1, lambda1)?!
-            }
-            else
-            {
-                parent_t::just_interpolated = false;
-            }
-            //if try blocks passes, THIS is executed:
-            parent_t::add_solution_to_curve(
-                parent_t::lambda1, parent_t::x1, did_knot_interpolation, parent_t::endpoint_state.pending_reason()
-            );
-            parent_t::endpoint_state.reset_step();
-
+            const auto reason = next == boundary              ? boundary_reason( boundary )
+                                : step + 1 == parent_t::max_S ? endpoint_reason_t::max_steps
+                                                              : endpoint_reason_t::none;
+            parent_t::add_solution_to_curve( next, parent_t::x1, mandatory, reason );
             parent_t::vec_ops->assign( parent_t::x1, parent_t::x0 );
-            //parent_t::vec_ops->assign(parent_t::x1_s, parent_t::x0_s);
-            parent_t::lambda0 = parent_t::lambda1;
-            //lambda0_s = lambda1_s;
-            if ( !parent_t::continue_next_step )
-            {
-                break;
-            }
+            parent_t::lambda0 = next;
         }
-        if ( parent_t::continue_next_step )
-        {
-            parent_t::log->warning_f(
-                "continuation_analytical::start_semicurve: reached maximum analytical sampling steps = %i.",
-                parent_t::max_S
-            );
-            parent_t::continue_next_step = false;
-            parent_t::break_semicurve++;
-        }
+        ++parent_t::break_semicurve;
     }
 
-    bool evaluate_exact_solution( const T &lambda, T_vec &x )
+    bool evaluate_exact_solution( const T &parameter, T_vec &state )
     {
-        if ( exact_solution_provider )
-        {
-            return exact_solution_provider( lambda, x );
-        }
-        parent_t::nonlin_op->exact_solution( lambda, x );
+        if ( exact_solution_provider_ )
+            return exact_solution_provider_( parameter, state );
+        parent_t::nonlin_op->exact_solution( parameter, state );
         return true;
     }
 };

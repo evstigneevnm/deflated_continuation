@@ -203,6 +203,8 @@ $(KS2D_NMFD_NEWTON_TARGETS): $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 CIRCLE_MODEL_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
 KS1D_FULL_MODEL_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
 WORKFLOW_OWNERSHIP_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
+WORKFLOW_OWNERSHIP_HEADERS += source/continuation/tangent_normalization.h source/main/deflation_continuation/knot_executor.h source/main/deflation_continuation/rejected_candidate_cache.h
+WORKFLOW_OWNERSHIP_HEADERS += source/continuation/continuation_analytical.hpp $(wildcard source/main/parameters/*.h)
 
 LCUDA = -L$(CUDA_ROOT_PATH)/lib64
 LBOOST = -L$(BOOST_ROOT_PATH)/lib
@@ -310,6 +312,15 @@ test_KS2D_newton_cpu_omp.bin: source/models/KS_2D/test_KS2D_newton.cpp $(KS2D_NE
 test_KS2D_newton_cuda.bin: source/models/KS_2D/test_KS2D_newton.cpp $(KS2D_NEWTON_TEST_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS2D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_NEWTON) -x cu $< -c -o $(BUILD_DIR)/test_KS2D_newton_cuda_main.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS2D_newton_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+KS2D_REFERENCE_DISCOVERY_HEADERS = $(KS2D_NEWTON_TEST_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS) source/main/parameters.hpp $(wildcard source/main/parameters/*.h source/containers/bifurcation_diagram/*.h) source/containers/bifurcation_diagram.h source/containers/bifurcation_diagram_curve.h source/containers/curve_helper_container.h
+
+test_KS2D_reference_discovery_cpu_omp.bin: source/models/KS_2D/tests/test_KS2D_reference_discovery.cpp $(KS2D_REFERENCE_DISCOVERY_HEADERS)
+	$(G++) $(G++FLAGS) -DKS2D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_NEWTON) $(IBOOST) $< $(OPENMP) $(LFFTW) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_KS2D_reference_discovery_cuda.bin: source/models/KS_2D/tests/test_KS2D_reference_discovery.cpp $(KS2D_REFERENCE_DISCOVERY_HEADERS) source/common/cuda_init_scfd.h $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DKS2D_VECTOR_BACKEND_CUDA $(SCALAR_TYPE) $(ICUDA) $(IPROJECT) $(INMFD_NEWTON) $(IBOOST) -x cu $< -c -o $(BUILD_DIR)/test_KS2D_reference_discovery_cuda_main.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_KS2D_reference_discovery_cuda_main.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
 KS2D_bd_cpu_omp: source/models/KS_2D/KS2D_bd.cpp $(KS2D_REFACTORED_HEADERS) $(KS2D_LINEAR_SOLVER_HEADERS) $(WORKFLOW_OWNERSHIP_HEADERS) $(COMMON_FILE_OPS_HEADERS)
 	$(G++) $(G++FLAGS) -DKS2D_VECTOR_BACKEND_OMP $(SCALAR_TYPE) $(IPROJECT) $(INMFD_LINSOLVERS) $(IBOOST) source/models/KS_2D/KS2D_bd.cpp $(OPENMP) $(LFFTW) $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/KS2D_bd_cpu_omp.bin 2>$(RESULTS)
@@ -539,7 +550,7 @@ test_branch_intersection_policy.bin: source/containers/tests/test_branch_interse
 test_symmetry_event_persistence.bin: source/containers/tests/test_symmetry_event_persistence.cpp source/containers/symmetry_event_record.h source/containers/symmetry_event_journal.h source/containers/symmetry_event_registry.h source/symmetry/translation/orbit_type.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_symmetry_event_persistence.cpp -o $(BUILD_DIR)/test_symmetry_event_persistence.bin 2>$(RESULTS)
 
-test_parameters_json.bin: source/main/tests/test_parameters_json.cpp source/main/parameters.hpp
+test_parameters_json.bin: source/main/tests/test_parameters_json.cpp source/main/parameters.hpp $(wildcard source/main/parameters/*.h)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_parameters_json.cpp -o $(BUILD_DIR)/test_parameters_json.bin 2>$(RESULTS)
 
 test_solver_bundle.bin: source/main/tests/test_solver_bundle.cpp source/main/deflation_continuation/solver_bundle.h source/main/stability_continuation/solver_bundle.h $(WORKFLOW_OWNERSHIP_HEADERS)
@@ -584,6 +595,9 @@ test_knot_relocation_controller.bin: source/main/tests/test_knot_relocation_cont
 
 test_analytical_branch_executor.bin: source/main/tests/test_analytical_branch_executor.cpp source/main/deflation_continuation/analytical_branch_executor.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_analytical_branch_executor.cpp -o $(BUILD_DIR)/test_analytical_branch_executor.bin 2>$(RESULTS)
+
+test_continuation_analytical.bin: source/continuation/tests/test_continuation_analytical.cpp source/continuation/continuation_analytical.hpp source/continuation/continuation.hpp $(CONTINUATION_CHART_HEADERS) source/containers/knots.hpp source/numerical_algos/tests/nmfd_cpu_reference_vector_space.h
+	$(G++) $(G++FLAGS) $(IPROJECT) source/continuation/tests/test_continuation_analytical.cpp -o $(BUILD_DIR)/test_continuation_analytical.bin 2>$(RESULTS)
 
 test_knot_executor.bin: source/main/tests/test_knot_executor.cpp source/main/deflation_continuation/knot_executor.h source/main/deflation_continuation/rejected_candidate_cache.h source/containers/knots.hpp
 	$(G++) $(G++FLAGS) $(IPROJECT) source/main/tests/test_knot_executor.cpp -o $(BUILD_DIR)/test_knot_executor.bin 2>$(RESULTS)
@@ -1157,6 +1171,7 @@ test_continuation_%_hip.bin: source/continuation/tests/test_continuation_%.cpp $
 
 DEFLATION_WRAPPER_TEST_HEADERS = source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h source/deflation/solution_storage.h source/deflation/symmetry_solution_storage.h source/deflation/tests/deflation_newton_fixture.h $(FIXED_PARAMETER_NEWTON_HEADERS)
 DEFLATION_WRAPPER_TEST_HEADERS += $(SYMMETRY_FOURIER_HEADERS)
+DEFLATION_WRAPPER_TEST_HEADERS += source/continuation/tangent_normalization.h source/main/deflation_continuation/rejected_candidate_cache.h
 
 test_nmfd_newton_assembly_cpu.bin: source/main/tests/test_nmfd_newton_assembly.cpp $(DEFLATION_WRAPPER_TEST_HEADERS) $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 	$(G++) $(G++FLAGS) $(NEWTON_TEST_FLAGS) $(IPROJECT) $(INMFD_NEWTON) $< -o $(BUILD_DIR)/$@

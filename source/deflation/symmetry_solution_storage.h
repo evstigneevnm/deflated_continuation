@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -107,6 +108,55 @@ void align_orbit_closest_to_reference_if_available(
 )
 {
     stabilize_canonical_if_available( symmetry_adapter, source, destination, 0 );
+}
+
+template <class SymmetryAdapter, class Vector>
+auto align_source_orbit_if_available(
+    SymmetryAdapter *adapter, const Vector &reference, const Vector &source, Vector &destination, int
+) -> decltype( adapter->align_source_orbit_closest_to_reference( reference, source, destination ), void() )
+{
+    adapter->align_source_orbit_closest_to_reference( reference, source, destination );
+}
+
+template <class SymmetryAdapter, class Vector>
+void align_source_orbit_if_available(
+    SymmetryAdapter *adapter, const Vector &reference, const Vector &source, Vector &destination, long
+)
+{
+    align_orbit_closest_to_reference_if_available( adapter, reference, source, destination, 0 );
+}
+
+struct empty_source_preparation
+{
+};
+
+template <class Adapter, class Vector>
+auto prepare_source_orbit( Adapter *adapter, const Vector &source, int )
+    -> decltype( adapter->prepare_source_orbit( source ) )
+{
+    return adapter->prepare_source_orbit( source );
+}
+
+template <class Adapter, class Vector>
+empty_source_preparation prepare_source_orbit( Adapter *, const Vector &, long )
+{
+    return {};
+}
+
+template <class Adapter, class Vector, class Prepared>
+auto align_prepared_source_orbit(
+    Adapter *adapter, const Vector &reference, const Vector &source, Prepared &prepared, Vector &destination, int
+) -> decltype( adapter->align_source_orbit_closest_to_reference( reference, source, prepared, destination ), void() )
+{
+    adapter->align_source_orbit_closest_to_reference( reference, source, prepared, destination );
+}
+
+template <class Adapter, class Vector, class Prepared>
+void align_prepared_source_orbit(
+    Adapter *adapter, const Vector &reference, const Vector &source, Prepared &, Vector &destination, long
+)
+{
+    align_source_orbit_if_available( adapter, reference, source, destination, 0 );
 }
 
 template <class SymmetryAdapter, class Vector>
@@ -235,10 +285,12 @@ template <
 class symmetry_solution_storage
 {
 public:
-    using vector_operations_type           = VectorOperations;
-    using symmetry_adapter_type            = SymmetryAdapter;
-    using T                                = typename VectorOperations::scalar_type;
-    using T_vec                            = typename VectorOperations::vector_type;
+    using vector_operations_type = VectorOperations;
+    using symmetry_adapter_type  = SymmetryAdapter;
+    using T                      = typename VectorOperations::scalar_type;
+    using T_vec                  = typename VectorOperations::vector_type;
+    using prepared_source_type =
+        decltype( detail::prepare_source_orbit( std::declval<SymmetryAdapter *>(), std::declval<const T_vec &>(), 0 ) );
     static constexpr auto deflation_metric = Metric;
 
     symmetry_solution_storage(
@@ -307,6 +359,7 @@ public:
 
     void set_symmetry_adapter( SymmetryAdapter *symmetry_adapter_ )
     {
+        invalidate_prepared_sources();
         if ( symmetry_adapter_ != adapter_owner_.get() )
             adapter_owner_.reset();
         symmetry_adapter = symmetry_adapter_;
@@ -314,6 +367,7 @@ public:
 
     void set_symmetry_adapter( std::shared_ptr<SymmetryAdapter> adapter )
     {
+        invalidate_prepared_sources();
         adapter_owner_   = std::move( adapter );
         symmetry_adapter = adapter_owner_.get();
     }
@@ -348,6 +402,7 @@ public:
     void set_known_solution( const T_vec &x0_p )
     {
         require_symmetry_adapter();
+        base_preparation_.reset();
         detail::stabilize_canonical_if_available( symmetry_adapter, x0_p, x0_hat, 0 );
         ignore_zero_ = false;
     }
@@ -362,7 +417,8 @@ public:
         require_symmetry_adapter();
         for ( const auto &stored : container )
         {
-            if ( orbit_distance( stored.get_ref(), vect ) <= static_cast<T>( duplicate_tolerance() ) )
+            if ( orbit_distance( stored.get_ref(), vect, &stored.preparation() ) <=
+                 static_cast<T>( duplicate_tolerance() ) )
             {
                 ++duplicates_skipped_since_clear_;
                 detail::log_symmetry_solution_storage_message(
@@ -373,13 +429,17 @@ public:
         }
 
         detail::stabilize_canonical_if_available( symmetry_adapter, vect, x_hat, 0 );
-        container.emplace_back( vec_ops, x_hat, log );
+        std::optional<prepared_source_type> prepared;
+        if constexpr ( Metric == symmetry_deflation_metric::nearest_orbit )
+            prepared.emplace( detail::prepare_source_orbit( symmetry_adapter, x_hat, 0 ) );
+        container.emplace_back( vec_ops, x_hat, std::move( prepared ), log );
         elements_number++;
     }
 
     void clear()
     {
         container.clear();
+        base_preparation_.reset();
         elements_number                 = 0;
         duplicates_skipped_since_clear_ = 0;
     }
@@ -397,10 +457,11 @@ public:
     double nearest_stabilized_distance( const T_vec &vect )
     {
         require_symmetry_adapter();
-        T nearest = ignore_zero_ ? std::numeric_limits<T>::infinity() : orbit_distance( x0_hat, vect );
+        T nearest =
+            ignore_zero_ ? std::numeric_limits<T>::infinity() : orbit_distance( x0_hat, vect, &base_preparation_ );
         for ( const auto &stored : container )
         {
-            nearest = std::min( nearest, orbit_distance( stored.get_ref(), vect ) );
+            nearest = std::min( nearest, orbit_distance( stored.get_ref(), vect, &stored.preparation() ) );
         }
         return static_cast<double>( nearest );
     }
@@ -463,8 +524,11 @@ private:
     class internal_container
     {
     public:
-        internal_container( VectorOperations *vec_ops_, const T_vec &vec_, Log *log_ = nullptr )
-            : log( log_ ), storage_( *vec_ops_ )
+        internal_container(
+            VectorOperations *vec_ops_, const T_vec &vec_, std::optional<prepared_source_type> prepared,
+            Log *log_ = nullptr
+        )
+            : log( log_ ), storage_( *vec_ops_ ), preparation_( std::move( prepared ) )
         {
             storage_.init();
             storage_.start_use();
@@ -498,10 +562,23 @@ private:
             return *storage_;
         }
 
+        std::optional<prepared_source_type> &preparation() const
+        {
+            return preparation_;
+        }
+
     private:
         Log                                                      *log = nullptr;
         nmfd::detail::vector_wrap<VectorOperations, false, false> storage_;
+        mutable std::optional<prepared_source_type>               preparation_;
     };
+
+    void invalidate_prepared_sources()
+    {
+        base_preparation_.reset();
+        for ( const auto &stored : container )
+            stored.preparation().reset();
+    }
 
     void require_symmetry_adapter() const
     {
@@ -521,19 +598,30 @@ private:
         return P / ( std::pow( norm, P + T( 2 ) ) * total_elements );
     }
 
-    T orbit_distance( const T_vec &reference, const T_vec &source )
+    T orbit_distance(
+        const T_vec &reference, const T_vec &source, std::optional<prepared_source_type> *prepared = nullptr
+    )
     {
         if constexpr ( Metric == symmetry_deflation_metric::nearest_orbit )
-            return orbit_difference_from_reference( source, reference );
+            return orbit_difference_from_reference( source, reference, prepared );
         detail::align_orbit_closest_to_reference_if_available( symmetry_adapter, reference, source, distance_help, 0 );
         vec_ops->assign_mul( T( 1 ), distance_help, T( -1 ), reference, slice_gradient );
         return vec_ops->norm_l2( slice_gradient );
     }
 
-    T orbit_difference_from_reference( const T_vec &x, const T_vec &reference )
+    T orbit_difference_from_reference(
+        const T_vec &x, const T_vec &reference, std::optional<prepared_source_type> *prepared = nullptr
+    )
     {
         // Align the stored root, so the difference and its local gradient live in candidate coordinates.
-        symmetry_adapter->align_orbit_closest_to_reference( x, reference, distance_help );
+        if ( prepared )
+        {
+            if ( !*prepared )
+                prepared->emplace( detail::prepare_source_orbit( symmetry_adapter, reference, 0 ) );
+            detail::align_prepared_source_orbit( symmetry_adapter, x, reference, **prepared, distance_help, 0 );
+        }
+        else
+            detail::align_source_orbit_if_available( symmetry_adapter, x, reference, distance_help, 0 );
         vec_ops->assign_mul( T( 1 ), x, T( -1 ), distance_help, distance_help );
         return vec_ops->norm_l2( distance_help );
     }
@@ -556,7 +644,7 @@ private:
 
         if ( !ignore_zero_ )
         {
-            if ( !add_distance_from_reference( *state, x0_hat, total_elements ) )
+            if ( !add_distance_from_reference( *state, x0_hat, total_elements, &base_preparation_ ) )
             {
                 vec_ops->assign_scalar( T( 0 ), c );
                 return;
@@ -576,7 +664,9 @@ private:
 
         for ( unsigned int j = 0; j < elements_number; ++j )
         {
-            if ( !add_distance_from_reference( *state, container[j].get_ref(), total_elements ) )
+            if ( !add_distance_from_reference(
+                     *state, container[j].get_ref(), total_elements, &container[j].preparation()
+                 ) )
             {
                 vec_ops->assign_scalar( T( 0 ), c );
                 return;
@@ -592,11 +682,14 @@ private:
         distance += T( 1 );
     }
 
-    bool add_distance_from_reference( const T_vec &x, const T_vec &reference, const unsigned int total_elements )
+    bool add_distance_from_reference(
+        const T_vec &x, const T_vec &reference, const unsigned int total_elements,
+        std::optional<prepared_source_type> *prepared = nullptr
+    )
     {
         T norm;
         if constexpr ( Metric == symmetry_deflation_metric::nearest_orbit )
-            norm = orbit_difference_from_reference( x, reference );
+            norm = orbit_difference_from_reference( x, reference, prepared );
         else
         {
             vec_ops->assign_mul( T( 1 ), x, T( -1 ), reference, distance_help );
@@ -635,11 +728,12 @@ private:
     T                                                         distance                        = T( 1 );
     nmfd::detail::vector_wrap<VectorOperations, false, false> distance_storage_, gradient_storage_, state_storage_,
         zero_storage_;
-    T_vec                          &distance_help  = *distance_storage_;
-    T_vec                          &slice_gradient = *gradient_storage_;
-    T_vec                          &x_hat          = *state_storage_;
-    T_vec                          &x0_hat         = *zero_storage_;
-    std::vector<internal_container> container;
+    T_vec                              &distance_help  = *distance_storage_;
+    T_vec                              &slice_gradient = *gradient_storage_;
+    T_vec                              &x_hat          = *state_storage_;
+    T_vec                              &x0_hat         = *zero_storage_;
+    std::vector<internal_container>     container;
+    std::optional<prepared_source_type> base_preparation_;
 };
 
 } // namespace deflation

@@ -227,8 +227,7 @@ void test_corrections()
         std::make_shared<aligner_type>( space, problem->state_modes() )
     );
     // RMS distance paired with a Euclidean dot product requires weight N.
-    auto solutions = std::make_shared<storage_type>( space, 2, real( space->get_vector_size() ), 2., quotient, 1e-8 );
-    solutions->push_back( *reference );
+    auto solutions   = std::make_shared<storage_type>( space, 2, real( space->get_vector_size() ), 2., quotient, 1e-8 );
     auto deflated_op = std::make_shared<types::deflated_operator_type>(
         space, problem, jacobian, solutions, parameter, 100 * parameters.tolerance
     );
@@ -237,6 +236,22 @@ void test_corrections()
         std::make_shared<types::deflated_operator_type::trial_projector>( problem )
     );
     types::configure_deflation( deflated->get_convergence_strategy_handle(), parameters );
+    // With only the implicit zero root deflated, both perturbations must recover
+    // the nonzero reference orbit rather than merely accept an exact fixture.
+    for ( real perturbation : { real( -1e-3 ), real( 1e-3 ) } )
+    {
+        space->assign_mul( 1 + perturbation, *reference, *state );
+        require( deflated->solve( problem.get(), *state, parameter ), "Perturbed deflation recovery failed" );
+        require(
+            deflated_op->deflated_residual_norm( *state, *work ) <= parameters.tolerance,
+            "Recovered root fails deflated convergence"
+        );
+        require(
+            parameter == 4.333 && solutions->canonical_distance( *reference, *state ) < 1e-7,
+            "Deflation recovery changed the parameter or reference orbit"
+        );
+    }
+    solutions->push_back( *reference );
     for ( std::size_t i = 0; i < actions->size(); ++i )
     {
         actions->apply( i, *reference, *state );

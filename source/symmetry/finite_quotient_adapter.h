@@ -39,6 +39,55 @@ empty_reference_scope prepare_orbit_reference( Aligner *, const Vector &, long )
     return {};
 }
 
+template <class Aligner, class Vector>
+auto prepare_orbit_source( Aligner *aligner, const Vector &source, int )
+    -> decltype( aligner->prepare_source_orbit( source ) )
+{
+    return aligner->prepare_source_orbit( source );
+}
+
+template <class Aligner, class Vector>
+empty_reference_scope prepare_orbit_source( Aligner *, const Vector &, long )
+{
+    return {};
+}
+
+template <class Aligner, class Vector>
+auto align_source_orbit( Aligner *aligner, const Vector &reference, const Vector &source, Vector &destination, int )
+    -> decltype( aligner->align_source_orbit_closest_to_reference( reference, source, destination ), void() )
+{
+    aligner->align_source_orbit_closest_to_reference( reference, source, destination );
+}
+
+template <class Aligner, class Vector>
+void align_source_orbit( Aligner *aligner, const Vector &reference, const Vector &source, Vector &destination, long )
+{
+    aligner->align_orbit_closest_to_reference( reference, source, destination );
+}
+
+template <class Aligner, class Vector, class Prepared, class Norm>
+auto align_prepared_orbit_source(
+    Aligner *aligner, const Vector &reference, const Vector &source, const Prepared &prepared, Vector &destination,
+    Norm maximum_distance, int
+)
+    -> decltype( aligner->align_source_orbit_closest_to_reference(
+        reference, source, prepared, destination, maximum_distance
+    ) )
+{
+    return aligner->align_source_orbit_closest_to_reference(
+        reference, source, prepared, destination, maximum_distance
+    );
+}
+
+template <class Aligner, class Vector, class Prepared, class Norm>
+bool align_prepared_orbit_source(
+    Aligner *aligner, const Vector &reference, const Vector &source, const Prepared &, Vector &destination, Norm, long
+)
+{
+    align_source_orbit( aligner, reference, source, destination, 0 );
+    return true;
+}
+
 template <class Aligner, class VectorOperations, class Vector>
 auto apply_orbit_alignment_to_tangent(
     Aligner *aligner, VectorOperations *, const Vector &source, Vector &destination, int
@@ -110,6 +159,17 @@ public:
     using scalar_type                 = typename VectorOperations::scalar_type;
     using norm_type                   = typename VectorOperations::norm_type;
     using vector_type                 = typename VectorOperations::vector_type;
+
+    class prepared_source_type
+    {
+        friend class finite_quotient_adapter;
+        using action_type                       = decltype( detail::prepare_orbit_source(
+            std::declval<orbit_aligner_type *>(), std::declval<const vector_type &>(), 0
+        ) );
+        const finite_quotient_adapter *owner    = nullptr;
+        std::size_t                    revision = 0;
+        std::vector<action_type>       actions;
+    };
 
     template <
         class Aligner                                                                             = orbit_aligner_type,
@@ -245,29 +305,8 @@ public:
     void
     stabilize_closest_to_reference( const vector_type &reference, const vector_type &source, vector_type &destination )
     {
-        const auto  reference_scope = detail::prepare_orbit_reference( orbit_aligner, reference, 0 );
-        bool        have_best       = false;
-        norm_type   best_distance   = norm_type{};
-        std::size_t best_index      = 0;
-
-        for ( std::size_t action_index = 0; action_index < finite_actions->size(); ++action_index )
-        {
-            finite_actions->apply( action_index, source, action_source );
-            orbit_aligner->align_orbit_closest_to_reference( reference, action_source, candidate );
-            vec_ops->assign_mul( scalar_type( 1 ), candidate, scalar_type( -1 ), reference, distance );
-            const norm_type candidate_distance = vec_ops->norm_l2( distance );
-
-            if ( !have_best || candidate_distance < best_distance )
-            {
-                have_best     = true;
-                best_distance = candidate_distance;
-                best_index    = action_index;
-                vec_ops->assign( candidate, best );
-            }
-        }
-
-        vec_ops->assign( best, destination );
-        last_action_index_ = best_index;
+        const auto reference_scope = detail::prepare_orbit_reference( orbit_aligner, reference, 0 );
+        align_closest<false>( reference, source, destination );
     }
 
     void align_orbit_closest_to_reference(
@@ -275,6 +314,40 @@ public:
     )
     {
         stabilize_closest_to_reference( reference, source, destination );
+    }
+
+    void align_source_orbit_closest_to_reference(
+        const vector_type &reference, const vector_type &source, vector_type &destination
+    )
+    {
+        align_closest<true>( reference, source, destination );
+    }
+
+    prepared_source_type prepare_source_orbit( const vector_type &source )
+    {
+        if ( finite_actions->size() == 0 )
+            throw std::logic_error( "finite quotient adapter has no finite actions" );
+        prepared_source_type prepared;
+        prepared.owner    = this;
+        prepared.revision = finite_actions->revision();
+        prepared.actions.reserve( finite_actions->size() );
+        for ( std::size_t i = 0; i < finite_actions->size(); ++i )
+        {
+            finite_actions->apply( i, source, action_source );
+            prepared.actions.push_back( detail::prepare_orbit_source( orbit_aligner, action_source, 0 ) );
+        }
+        return prepared;
+    }
+
+    // The caller owns the immutable source and invalidates preparation when replacing it.
+    void align_source_orbit_closest_to_reference(
+        const vector_type &reference, const vector_type &source, prepared_source_type &prepared,
+        vector_type &destination
+    )
+    {
+        if ( prepared.owner != this || prepared.revision != finite_actions->revision() )
+            prepared = prepare_source_orbit( source );
+        align_closest<true>( reference, source, destination, &prepared );
     }
 
     void align_orbit_and_tangent_closest_to_reference(
@@ -337,6 +410,49 @@ public:
     }
 
 private:
+    template <bool SourceOnly>
+    void align_closest(
+        const vector_type &reference, const vector_type &source, vector_type &destination,
+        const prepared_source_type *prepared = nullptr
+    )
+    {
+        bool        have_best     = false;
+        norm_type   best_distance = norm_type{};
+        std::size_t best_index    = 0;
+        for ( std::size_t action_index = 0; action_index < finite_actions->size(); ++action_index )
+        {
+            finite_actions->apply( action_index, source, action_source );
+            if constexpr ( SourceOnly )
+            {
+                if ( prepared )
+                {
+                    if ( !detail::align_prepared_orbit_source(
+                             orbit_aligner, reference, action_source, prepared->actions[action_index], candidate,
+                             have_best ? best_distance : std::numeric_limits<norm_type>::infinity(), 0
+                         ) )
+                        continue;
+                }
+                else
+                    detail::align_source_orbit( orbit_aligner, reference, action_source, candidate, 0 );
+            }
+            else
+                orbit_aligner->align_orbit_closest_to_reference( reference, action_source, candidate );
+            vec_ops->assign_mul( scalar_type( 1 ), candidate, scalar_type( -1 ), reference, distance );
+            const norm_type candidate_distance = vec_ops->norm_l2( distance );
+            if ( !have_best || candidate_distance < best_distance )
+            {
+                have_best     = true;
+                best_distance = candidate_distance;
+                best_index    = action_index;
+                vec_ops->assign( candidate, best );
+            }
+        }
+        if ( !have_best )
+            throw std::logic_error( "finite quotient adapter found no source representative" );
+        vec_ops->assign( best, destination );
+        last_action_index_ = best_index;
+    }
+
     std::shared_ptr<VectorOperations>            operations_owner_;
     std::shared_ptr<ContinuousAdapter>           continuous_owner_;
     std::shared_ptr<finite_action_registry_type> actions_owner_;

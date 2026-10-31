@@ -194,6 +194,14 @@ The full-KS1D and KS2D symmetry/discovery discrepancies remain open numerical
 validation issues. Completion of the solver-interface migration does not imply
 that those reference diagrams have been reproduced.
 
+Analytical branches sample exact states at effective knots and parameter bounds
+in traversal order, independently of numerical-continuation arclength steps.
+`deflation_continuation.analytical_max_parameter_step` optionally bounds the gap
+between analytical samples; zero (the default) selects knots and boundaries only.
+Do not evaluate outside the configured parameter interval or connect the two
+semicurves across a parameter reset. Unavailable/nonfinite exact samples and
+exhausted sampling budgets must report incomplete curves, not successful coverage.
+
 Symmetric KS1D also supports HIP with an unnormalized hipFFT R2C adapter.
 Native AMD HIP currently requires ordinary reductions: compensated BLAS1 is not
 implemented there. Unsupported high-precision requests must fail explicitly;
@@ -222,6 +230,26 @@ stored root to the candidate and use the same RMS distance for the multiplier,
 its negative gradient, and exclusion. The derivative is local to the selected
 discrete action/support; orbit-selection ties are not assumed smooth. This does
 not change the continuous-chart policy used by full KS1D.
+The stored-root query uses `align_source_orbit_closest_to_reference`: admissible
+translations and their error bounds depend only on the transformed stored root,
+not on the support or amplitude of the untransformed candidate. Noise crossing
+a candidate support/compatibility cutoff must not remove a stored orbit image.
+General state/tangent alignment retains its separate two-vector compatibility
+contract; this one-sided deflation query does not weaken its checks.
+Stored-root translation proposals include an RMS-aware support: coefficients
+above `tau*sqrt(N)/2` impose mandatory compatibility constraints. Validate every
+proposal against the original full-vector bound `4*sum(incompatible abs_sq) <= N*tau^2`;
+do not discard coefficients or increase the acceptance tolerance. Bound proposal
+enumeration and report unresolved support or exhausted preparation budgets explicitly.
+Keep validated characters and error bounds with each immutable stored root and
+finite action. Reuse them for multiplier and exclusion queries; invalidate on root
+replacement, adapter rebinding, or action-registry revision. Never cache by vector
+address. General state/tangent alignment remains independently validated.
+Distance selection may prune only with conservative bounds, retaining exhaustive
+selection and tie-breaking semantics. Keep vector work on the selected backend:
+preparation transfers compact support masks, not Fourier vectors. No transformed
+root copies are retained. The residual-translation fingerprint is versioned when
+its orbit definition changes; existing archives require explicit revalidation.
 The existing rank-one solver binding preserves recovery and true-residual checks.
 Select `deflation::deflated_residual_norm` as the default convergence strategy's
 optional `ResidualNorm` policy: accept only when both `||F||` and `||mF||` meet
@@ -235,6 +263,10 @@ Keep solution storage and physical parameters unchanged during each solve.
 After solving, check novelty against all corrected intersections at the same
 effective parameter. Ordinary storage uses RMS distance; symmetry-aware storage
 uses orbit distance. An enabled duplicate check must not silently be skipped.
+Session and persistent failed-candidate rejection use the same state-distance
+callback, with the stored state as the first argument. Plain callers may retain
+ordinary vector distance. Endpoint tangent-line similarity uses the augmented
+Euclidean pairing and `norm_rank1`, not RMS residual norms.
 Use existing knot relocation when intersection correction fails at a singular
 parameter; do not hard-code model-specific bifurcation values in generic code.
 

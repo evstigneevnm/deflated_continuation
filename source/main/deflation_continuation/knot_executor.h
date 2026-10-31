@@ -57,6 +57,7 @@ struct knot_executor_callbacks
     std::function<void( Vector & )>                                                  get_deflated_solution;
     std::function<void( Vector & )>                                                  stabilize;
     std::function<bool( Vector &, Scalar & )>                                        nearest_known_distance;
+    std::function<Scalar( const Vector &, const Vector & )>                          state_distance;
     std::function<bool( const Scalar &, const Vector &, Scalar &, std::uint64_t & )> nearest_persistent_rejection;
     std::function<void( std::uint64_t )>                                             mark_persistent_rejection_seen;
     std::function<
@@ -98,7 +99,7 @@ public:
             callbacks_.build_analytical_branches( archive_exists );
         }
 
-        rejected_candidate_cache<VectorOperations> rejected_candidates( vector_operations_ );
+        rejected_candidate_cache<VectorOperations> rejected_candidates( vector_operations_, callbacks_.state_distance );
         scalar_type                                rejected_cache_parameter     = scalar_type( 0 );
         bool                                       rejected_cache_active        = false;
         unsigned int                               failed_continuations_at_knot = 0;

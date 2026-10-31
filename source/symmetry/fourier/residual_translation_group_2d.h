@@ -28,6 +28,7 @@ struct residual_translation_policy_2d
     std::size_t  basis_search_modes            = 64;
     std::int64_t maximum_pair_determinant      = 4096;
     bool         factor_coordinate_half_shifts = true;
+    std::size_t  maximum_proposal_characters   = 256;
 };
 
 struct residual_translation_character_2d
@@ -314,7 +315,8 @@ std::vector<residual_translation_character_2d> rank_one_characters( const std::v
 
 template <class Real>
 std::vector<residual_translation_character_2d> rank_two_characters(
-    const std::vector<active_mode_2d<Real>> &active, const residual_translation_policy_2d<Real> &policy
+    const std::vector<active_mode_2d<Real>> &active, const residual_translation_policy_2d<Real> &policy,
+    bool proposals = false
 )
 {
     const std::size_t search_count = std::min( active.size(), std::max<std::size_t>( policy.basis_search_modes, 1 ) );
@@ -353,6 +355,9 @@ std::vector<residual_translation_character_2d> rank_two_characters(
     {
         throw std::runtime_error( "residual translation lattice determinant exceeds the configured limit" );
     }
+    // There are 4*|det| rational representatives before signature equivalence.
+    if ( proposals && static_cast<std::uint64_t>( determinant_magnitude ) > policy.maximum_proposal_characters / 4 )
+        throw std::runtime_error( "residual translation proposal budget exceeded" );
     const std::int64_t                              signed_scale = best_determinant < 0 ? -1 : 1;
     const std::int64_t                              modulus      = 2 * determinant_magnitude;
     std::set<std::pair<std::int64_t, std::int64_t>> numerators;
@@ -391,7 +396,7 @@ std::vector<residual_translation_character_2d> rank_two_characters(
         const auto duplicate = std::find_if( unique.begin(), unique.end(), [&signs]( const auto &value ) {
             return value.signs == signs;
         } );
-        if ( duplicate == unique.end() )
+        if ( proposals || duplicate == unique.end() )
         {
             unique.push_back( { character, std::move( signs ) } );
         }
@@ -425,7 +430,9 @@ template <class Real>
 void validate_policy( const residual_translation_policy_2d<Real> &policy )
 {
     if ( policy.absolute_active_tolerance < Real( 0 ) || policy.relative_active_tolerance < Real( 0 ) ||
-         policy.basis_search_modes == 0 || policy.maximum_pair_determinant <= 0 )
+         !std::isfinite( policy.absolute_active_tolerance ) || !std::isfinite( policy.relative_active_tolerance ) ||
+         policy.basis_search_modes == 0 || policy.maximum_pair_determinant <= 0 ||
+         policy.maximum_proposal_characters < 4 )
     {
         throw std::invalid_argument( "residual translation policy is invalid" );
     }
@@ -434,7 +441,7 @@ void validate_policy( const residual_translation_policy_2d<Real> &policy )
 template <class Real>
 residual_translation_group_result_2d<Real> build_group(
     std::vector<active_mode_2d<Real>> active, const residual_translation_policy_2d<Real> &policy,
-    residual_translation_group_result_2d<Real> result
+    residual_translation_group_result_2d<Real> result, bool proposals = false
 )
 {
     sort_active_modes( active );
@@ -454,8 +461,8 @@ residual_translation_group_result_2d<Real> build_group(
         }
     }
     result.active_rank = rank_two ? 2 : 1;
-    auto characters    = rank_two ? rank_two_characters( active, policy ) : rank_one_characters( active );
-    result.characters  = factor_half_shifts( characters, active, policy.factor_coordinate_half_shifts );
+    auto characters    = rank_two ? rank_two_characters( active, policy, proposals ) : rank_one_characters( active );
+    result.characters  = factor_half_shifts( characters, active, !proposals && policy.factor_coordinate_half_shifts );
     if ( result.characters.empty() )
     {
         throw std::logic_error( "residual translation quotient has no identity representative" );
@@ -481,7 +488,7 @@ residual_translation_group_result_2d<Real> build_residual_translation_group_2d(
 template <class Real>
 residual_translation_group_result_2d<Real> build_residual_translation_group_2d(
     const std::vector<mode_index<2>> &modes, const std::vector<std::uint8_t> &active_mask, Real maximum_amplitude,
-    const residual_translation_policy_2d<Real> &policy
+    const residual_translation_policy_2d<Real> &policy, bool proposals = false
 )
 {
     detail::validate_policy( policy );
@@ -503,7 +510,7 @@ residual_translation_group_result_2d<Real> build_residual_translation_group_2d(
             active.push_back( { modes[index], Real( 0 ) } );
         }
     }
-    return detail::build_group( std::move( active ), policy, std::move( result ) );
+    return detail::build_group( std::move( active ), policy, std::move( result ), proposals );
 }
 
 } // namespace fourier

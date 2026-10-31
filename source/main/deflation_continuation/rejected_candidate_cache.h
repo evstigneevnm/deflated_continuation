@@ -3,7 +3,9 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <limits>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -16,10 +18,12 @@ template <class VectorOperations>
 class rejected_candidate_cache
 {
 public:
-    using scalar_type = typename VectorOperations::scalar_type;
-    using vector_type = typename VectorOperations::vector_type;
+    using scalar_type       = typename VectorOperations::scalar_type;
+    using vector_type       = typename VectorOperations::vector_type;
+    using distance_function = std::function<scalar_type( const vector_type &, const vector_type & )>;
 
-    explicit rejected_candidate_cache( VectorOperations *vector_operations ) : vector_operations_( vector_operations )
+    explicit rejected_candidate_cache( VectorOperations *vector_operations, distance_function distance = {} )
+        : vector_operations_( vector_operations ), distance_( std::move( distance ) )
     {
         vector_operations_->init_vector( difference_ );
         vector_operations_->start_use_vector( difference_ );
@@ -66,10 +70,18 @@ public:
             {
                 continue;
             }
-            vector_operations_->assign_mul(
-                scalar_type( 1 ), value, scalar_type( -1 ), rejected_vectors_[index], difference_
-            );
-            const scalar_type current_distance = vector_operations_->norm_l2( difference_ );
+            scalar_type current_distance;
+            if ( distance_ )
+                current_distance = distance_( rejected_vectors_[index], value );
+            else
+            {
+                vector_operations_->assign_mul(
+                    scalar_type( 1 ), value, scalar_type( -1 ), rejected_vectors_[index], difference_
+                );
+                current_distance = vector_operations_->norm_l2( difference_ );
+            }
+            if ( !( current_distance >= scalar_type( 0 ) ) )
+                throw std::logic_error( "Rejected-candidate distance must be nonnegative and not NaN" );
             if ( current_distance < distance )
             {
                 distance = current_distance;
@@ -98,6 +110,7 @@ private:
     }
 
     VectorOperations        *vector_operations_;
+    distance_function        distance_;
     std::vector<vector_type> rejected_vectors_;
     std::vector<scalar_type> parameter_values_;
     vector_type              difference_;

@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include <common/scalar_math.h>
 #include <contrib/json/nlohmann/json.hpp>
 #include <main/parameters/parameter_types.h>
 
@@ -514,7 +515,11 @@ void parse_deflation_continuation(
     params.skip_files                         = json.at( "skip_file_output" ).template get<unsigned int>();
     params.deflation_knots                    = json.at( "deflation_knots" ).template get<std::vector<T>>();
     params.add_analytical_solution_to_diagram = json.value( "add_analytical_solution_to_diagram", false );
-    params.analytical_solution_branches = json.value( "analytical_solution_branches", std::vector<unsigned int>() );
+    params.analytical_solution_branches  = json.value( "analytical_solution_branches", std::vector<unsigned int>() );
+    params.analytical_max_parameter_step = json.value( "analytical_max_parameter_step", T( 0 ) );
+    if ( !common::scalar_math::isfinite( params.analytical_max_parameter_step ) ||
+         params.analytical_max_parameter_step < T( 0 ) )
+        throw std::invalid_argument( "analytical_max_parameter_step must be finite and nonnegative" );
 
     parse_continuation_parameter_bounds<T>(
         json.value( "continuation_parameter_bounds", nlohmann::json::object() ), params.continuation_parameter_bounds
