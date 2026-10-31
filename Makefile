@@ -160,6 +160,8 @@ NMFD_GMRES_HEADERS = source/contrib/nmfd-linsolvers/include/nmfd/solvers/gmres.h
 NMFD_GMRES_BASELINE_HEADERS = source/numerical_algos/tests/nmfd_cpu_reference_vector_space.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_advection.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_diffusion.h source/contrib/nmfd-linsolvers/test/solvers/linear_operator_elliptic.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_advection.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_diffusion.h source/contrib/nmfd-linsolvers/test/solvers/preconditioner_elliptic.h source/contrib/nmfd-linsolvers/test/solvers/residual_regularization_test.h
 COMPLEX_TRAITS_HEADERS = $(NMFD_BACKEND_HEADERS) $(SCALAR_TRAITS_HEADERS)
 CONTINUATION_SYMMETRY_HEADERS = source/symmetry/translation/orbit_type.h source/symmetry/continuation/continuation_chart_state.h source/symmetry/continuation/geometry_traits.h source/symmetry/continuation/identity_continuation_chart.h source/symmetry/continuation/isotropy_transition.h source/symmetry/continuation/local_representative_policy.h
+CONTINUATION_SYMMETRY_HEADERS += source/symmetry/translation/integer_lattice.h source/symmetry/stabilizer_description.h source/symmetry/continuation/isotropy_transition_detector.h
+SYMMETRY_EVENT_HEADERS = source/containers/symmetry_event_record.h source/containers/symmetry_event_codec.h source/containers/symmetry_event_journal.h source/containers/symmetry_event_registry.h $(CONTINUATION_SYMMETRY_HEADERS)
 CONTINUATION_CHART_HEADERS = source/continuation/chart_helpers.h source/continuation/predictor_chart_validation.h source/continuation/predictor_chart_probe.h source/continuation/predictor_chart_diagnostics.h source/continuation/corrector_retry_policy.h source/continuation/progress_monitor.h source/continuation/continuation_step_state.h source/continuation/continuation_endpoint_state.h source/continuation/observational_knot_sample.h source/continuation/pending_branch_event.h source/continuation/initial_tangent_candidates.h source/continuation/initial_tangent_chart_validator.h source/continuation/initial_tangent_secant_builder.h source/continuation/semicurve_tangent_cache.h source/continuation/tangent_normalization.h $(CONTINUATION_SYMMETRY_HEADERS)
 CONTINUATION_CHART_HEADERS += source/continuation/arclength_constraint.h
 SYMMETRY_LINEARIZATION_HEADERS = source/symmetry/linearization/projected_linear_operator.h source/symmetry/linearization/projected_stability_linear_operator.h source/symmetry/linearization/projected_preconditioner.h source/symmetry/linearization/projected_affine_inverse_provider.h source/symmetry/linearization/projected_linearization_provider.h source/symmetry/linearization/projected_stability_gauge.h
@@ -168,6 +170,7 @@ SYMMETRY_FOURIER_HEADERS = $(CONTINUATION_SYMMETRY_HEADERS) source/symmetry/four
 DEFLATION_SYMMETRY_HEADERS = source/deflation/symmetry_solution_storage.h $(SYMMETRY_FOURIER_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 SYMMETRY_CORE_HEADERS += source/symmetry/backend_vector_comparison.h
 SYMMETRY_FOURIER_HEADERS += source/symmetry/fourier/residual_translation_workspace_2d.h
+SYMMETRY_FOURIER_HEADERS += source/symmetry/fourier/translation_isotropy_geometry.h source/symmetry/finite_isotropy_geometry.h
 FFT_FACADE_HEADERS = source/external_libraries/fft_facade.h source/external_libraries/fft_facade_fftw.h source/external_libraries/fft_facade_cufft.h source/external_libraries/fftw_wrap.h source/external_libraries/cufft_wrap.h
 FFT_FACADE_HEADERS += source/external_libraries/fft_facade_hipfft.h
 RESIDUAL_DECOMPOSITION_TEST_HEADER = source/nonlinear_operators/tests/linear_nonlinear_decomposition_test.h
@@ -176,6 +179,7 @@ FOURIER_DISCRETIZATION_HEADERS = source/discretization/common/structured_extent.
 KS2D_REFACTORED_HEADERS = source/models/KS_2D/KS2D_backend_typedefs.h source/nonlinear_operators/detail/linear_nonlinear_terms.h source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/kuramoto_sivashinskiy_2d.h source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/linear_operator_KS_2D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/preconditioner_KS_2D.h source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/system_operator.h source/nonlinear_operators/Kuramoto_Sivashinskiy_2D/convergence_strategy.h source/symmetry/generated_finite_group.h source/symmetry/finite_group_manifest.h source/symmetry/fourier/periodic_affine_element_2d.h source/symmetry/fourier/periodic_affine_action_2d.h source/symmetry/fourier/residual_translation_group_2d.h source/symmetry/fourier/residual_translation_orbit_aligner_2d.h source/symmetry/finite_action_registry.h source/symmetry/finite_quotient_adapter.h source/containers/bifurcation_diagram/symmetry_archive_audit.h source/deflation/symmetry_solution_storage.h $(FOURIER_DISCRETIZATION_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(FFT_FACADE_HEADERS)
 VISUALIZATION_HEADERS = source/visualization/bd_curve_file_reader.h source/visualization/physical_solution_writer.h source/visualization/structured_physical_solution_writer.h source/visualization/io/numpy_array_writer.h source/visualization/bd_prepare_visualization.hpp
 KS2D_REFACTORED_HEADERS += source/symmetry/backend_vector_comparison.h source/symmetry/fourier/residual_translation_workspace_2d.h
+KS2D_REFACTORED_HEADERS += $(CONTINUATION_SYMMETRY_HEADERS) source/symmetry/fourier/translation_isotropy_geometry.h
 CIRCLE_MODEL_HEADERS = source/models/circle/circle_backend_typedefs.h source/models/circle/circle_linear_solvers.h $(wildcard source/contrib/nmfd-linsolvers/include/nmfd/solvers/*.h source/contrib/nmfd-linsolvers/include/nmfd/solvers/detail/*.h) source/nonlinear_operators/circle/circle.h source/nonlinear_operators/circle/convergence_strategy.h source/nonlinear_operators/circle/linear_operator_circle.h source/nonlinear_operators/circle/preconditioner_circle.h source/nonlinear_operators/circle/system_operator.h $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 CIRCLE_STABILITY_HEADERS = $(CIRCLE_MODEL_HEADERS) source/stability/eigensolvers/direct_scalar_eigensolver.h source/stability/eigensolvers/transformations/scaled_real_operator.h
 NMFD_NEWTON_ASSEMBLY_HEADERS = source/main/nmfd_newton_types.h source/numerical_algos/parameterized_correction.h source/numerical_algos/recovering_linear_solver.h source/nonlinear_operators/fixed_parameter_operator.h source/nonlinear_operators/projected_operator_helpers.h source/continuation/corrector_operator.h source/continuation/bordered_linear_solver.h source/continuation/arclength_constraint.h source/deflation/deflated_operator.h source/deflation/rank_one_linear_solver.h source/deflation/solution_storage.h $(wildcard source/contrib/nmfd-newton/include/nmfd/solvers/*.h)
@@ -203,6 +207,7 @@ $(KS2D_NMFD_NEWTON_TARGETS): $(NMFD_NEWTON_ASSEMBLY_HEADERS)
 CIRCLE_MODEL_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
 KS1D_FULL_MODEL_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
 WORKFLOW_OWNERSHIP_HEADERS += $(LINEAR_SOLVE_RECOVERY_HEADER)
+WORKFLOW_OWNERSHIP_HEADERS += $(SYMMETRY_EVENT_HEADERS)
 WORKFLOW_OWNERSHIP_HEADERS += source/continuation/tangent_normalization.h source/main/deflation_continuation/knot_executor.h source/main/deflation_continuation/rejected_candidate_cache.h
 WORKFLOW_OWNERSHIP_HEADERS += source/continuation/continuation_analytical.hpp $(wildcard source/main/parameters/*.h)
 
@@ -547,7 +552,7 @@ test_observational_knot_sample.bin: source/continuation/tests/test_observational
 test_branch_intersection_policy.bin: source/containers/tests/test_branch_intersection_policy.cpp source/containers/branch_intersection.h
 	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_branch_intersection_policy.cpp -o $(BUILD_DIR)/test_branch_intersection_policy.bin 2>$(RESULTS)
 
-test_symmetry_event_persistence.bin: source/containers/tests/test_symmetry_event_persistence.cpp source/containers/symmetry_event_record.h source/containers/symmetry_event_journal.h source/containers/symmetry_event_registry.h source/symmetry/translation/orbit_type.h
+test_symmetry_event_persistence.bin: source/containers/tests/test_symmetry_event_persistence.cpp $(SYMMETRY_EVENT_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_symmetry_event_persistence.cpp -o $(BUILD_DIR)/test_symmetry_event_persistence.bin 2>$(RESULTS)
 
 test_parameters_json.bin: source/main/tests/test_parameters_json.cpp source/main/parameters.hpp $(wildcard source/main/parameters/*.h)
@@ -632,7 +637,7 @@ test_diagram_archive.bin: source/containers/tests/test_diagram_archive.cpp sourc
 test_stability_diagram_archive.bin: source/containers/tests/test_stability_diagram_archive.cpp source/containers/stability_diagram.h source/containers/bifurcation_diagram/diagram_archive.h
 	$(G++) $(G++FLAGS) $(IPROJECT) $(IBOOST) source/containers/tests/test_stability_diagram_archive.cpp $(LBOOST) $(LIBBOOST) -o $(BUILD_DIR)/test_stability_diagram_archive.bin 2>$(RESULTS)
 
-test_symmetry_event_registry_sync.bin: source/containers/tests/test_symmetry_event_registry_sync.cpp source/containers/bifurcation_diagram/symmetry_event_registry_sync.h source/containers/symmetry_event_registry.h source/containers/symmetry_event_record.h
+test_symmetry_event_registry_sync.bin: source/containers/tests/test_symmetry_event_registry_sync.cpp source/containers/bifurcation_diagram/symmetry_event_registry_sync.h $(SYMMETRY_EVENT_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/containers/tests/test_symmetry_event_registry_sync.cpp -o $(BUILD_DIR)/test_symmetry_event_registry_sync.bin 2>$(RESULTS)
 
 test_fourier_mode_primitives.bin: source/symmetry/tests/test_fourier_mode_primitives.cpp $(SYMMETRY_FOURIER_HEADERS)
@@ -649,6 +654,20 @@ test_real_packed_fourier_canonical_adapter.bin: source/symmetry/tests/test_real_
 
 test_fourier_isotropy_transition.bin: source/symmetry/tests/test_fourier_isotropy_transition.cpp $(SYMMETRY_FOURIER_HEADERS) $(SCFD_SERIAL_VECTOR_OPS_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_isotropy_transition.cpp $(OPENMP) -o $(BUILD_DIR)/test_fourier_isotropy_transition.bin 2>$(RESULTS)
+
+test_translation_isotropy_cpu.bin: source/symmetry/tests/test_translation_isotropy.cpp $(SYMMETRY_FOURIER_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) $(IPROJECT) $< $(OPENMP) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_translation_isotropy_omp.bin: source/symmetry/tests/test_translation_isotropy.cpp $(SYMMETRY_FOURIER_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+	$(G++) $(G++FLAGS) -DTEST_ISOTROPY_OMP $(IPROJECT) $< $(OPENMP) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_translation_isotropy_cuda.bin: source/symmetry/tests/test_translation_isotropy.cpp $(SYMMETRY_FOURIER_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_ISOTROPY_CUDA $(ICUDA) $(IPROJECT) -x cu -c $< -o $(BUILD_DIR)/test_translation_isotropy_cuda.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_translation_isotropy_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS2) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
+
+test_translation_isotropy_hip.bin: source/symmetry/tests/test_translation_isotropy.cpp $(SYMMETRY_FOURIER_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
+	$(HIPCC) $(HIPFLAGS) -DTEST_ISOTROPY_HIP $(IPROJECT) -c $< -o $(BUILD_DIR)/test_translation_isotropy_hip.o 2>$(RESULTS)
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_translation_isotropy_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
 test_fourier_slice_differential_1d.bin: source/symmetry/tests/test_fourier_slice_differential_1d.cpp $(SYMMETRY_FOURIER_HEADERS)
 	$(G++) $(G++FLAGS) $(IPROJECT) source/symmetry/tests/test_fourier_slice_differential_1d.cpp -o $(BUILD_DIR)/test_fourier_slice_differential_1d.bin 2>$(RESULTS)

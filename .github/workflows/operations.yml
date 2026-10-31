@@ -2444,6 +2444,9 @@ jobs:
           ./"$BUILD_DIR"/real_packed_fourier_canonical_adapter/test_real_packed_fourier_canonical_adapter.bin
           make test_fourier_isotropy_transition.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fourier_isotropy_transition"
           ./"$BUILD_DIR"/fourier_isotropy_transition/test_fourier_isotropy_transition.bin
+          make test_translation_isotropy_cpu.bin test_translation_isotropy_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/translation_isotropy"
+          ./"$BUILD_DIR"/translation_isotropy/test_translation_isotropy_cpu.bin
+          OMP_NUM_THREADS=2 ./"$BUILD_DIR"/translation_isotropy/test_translation_isotropy_omp.bin
           make test_fourier_slice_differential_1d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fourier_slice_differential_1d"
           ./"$BUILD_DIR"/fourier_slice_differential_1d/test_fourier_slice_differential_1d.bin
           make test_frozen_fourier_chart_1d.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/frozen_fourier_chart_1d"
@@ -2935,6 +2938,8 @@ jobs:
           ./"$BUILD_DIR"/scfd_hip_double/test_scfd_vector_operations_hip.bin auto
           make scfd_vector_operations_hip.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scfd_hip_float" REAL_TYPE=float HIPCC="$HIPCC_BIN"
           ./"$BUILD_DIR"/scfd_hip_float/test_scfd_vector_operations_hip.bin auto
+          make test_translation_isotropy_hip.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/translation_isotropy_hip" HIPCC="$HIPCC_BIN"
+          ./"$BUILD_DIR"/translation_isotropy_hip/test_translation_isotropy_hip.bin
 
   fft-facade-cuda:
     needs: [scfd-vector-operations-cuda]
@@ -2988,6 +2993,8 @@ jobs:
           ./"$KS2D_BUILD"/test_fourier_translation_cuda.bin
           make test_KS2D_operator_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
           ./"$KS2D_BUILD"/test_KS2D_operator_cuda.bin
+          make test_translation_isotropy_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
+          ./"$KS2D_BUILD"/test_translation_isotropy_cuda.bin
           make test_KS2D_linear_solvers_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double
           ./"$KS2D_BUILD"/test_KS2D_linear_solvers_cuda.bin
           make test_numpy_array_writer.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS2D_BUILD" REAL_TYPE=double

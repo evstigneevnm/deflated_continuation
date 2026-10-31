@@ -30,6 +30,8 @@
 #include <scfd/utils/device_tag.h>
 #include <symmetry/fourier/periodic_affine_action_2d.h>
 #include <symmetry/generated_finite_group.h>
+#include <symmetry/continuation/isotropy_transition_detector.h>
+#include <symmetry/fourier/translation_isotropy_geometry.h>
 
 namespace nonlinear_operators
 {
@@ -71,6 +73,7 @@ public:
     using copy_type                    = typename vector_operations_type::copy_type;
     using finite_symmetry_element_type = symmetry::fourier::periodic_affine_element_2d;
     using finite_symmetry_group_type   = symmetry::generated_finite_group<finite_symmetry_element_type>;
+    using isotropy_geometry_type       = symmetry::fourier::translation_isotropy_geometry<vector_operations_type, 2>;
 
     kuramoto_sivashinskiy_2d(
         const scalar_type a, const scalar_type b, const std::size_t nx, const std::size_t ny,
@@ -144,6 +147,28 @@ public:
     const auto &state_modes() const
     {
         return codec_.state_modes();
+    }
+
+    template <
+        class Codec = state_codec_type,
+        std::enable_if_t<
+            std::is_same<
+                Codec,
+                discretization::fourier::codecs::inversion_odd_field_2d<vector_operations_type, complex_type>>::value,
+            int> = 0>
+    symmetry::continuation::isotropy_transition_result<scalar_type> detect_continuation_isotropy_transition(
+        const vector_type &previous, const vector_type &candidate,
+        const symmetry::continuation::isotropy_transition_policy<scalar_type> &policy
+    )
+    {
+        policy.validate();
+        if ( !policy.enabled )
+            return {};
+        if ( !isotropy_geometry_ )
+            isotropy_geometry_ = std::make_unique<isotropy_geometry_type>(
+                *vector_operations_, codec_.state_modes(), "ks2d_ambient_translation_torus_2d"
+            );
+        return symmetry::continuation::detect_isotropy_transition( *isotropy_geometry_, previous, candidate, policy );
     }
 
     finite_symmetry_group_type finite_symmetry_group() const
@@ -624,6 +649,7 @@ private:
     mutable transform_type                  transform_;
     wavevector_table_type                   wavevectors_;
     mutable state_codec_type                codec_;
+    std::unique_ptr<isotropy_geometry_type> isotropy_geometry_;
     mutable product_type                    product_;
     scalar_type                             a_;
     scalar_type                             b_;

@@ -804,11 +804,58 @@ void run_backend_alignment_case( report &result )
 }
 
 template <class Backend, class FFTBackend>
+void run_isotropy_guard_case( report &result )
+{
+    using space_type   = nmfd::operations::scfd_vector_space<Backend, double>;
+    using problem_type = nonlinear_operators::kuramoto_sivashinskiy_2d<space_type, FFTBackend>;
+    constexpr std::size_t                               extent = 12;
+    space_type                                          operations( extent * extent / 2 - 2 );
+    problem_type                                        problem( 2., 4., extent, extent, &operations );
+    nmfd::detail::vector_wrap<space_type, false, false> previous( operations ), candidate( operations );
+    previous.init();
+    previous.start_use();
+    candidate.init();
+    candidate.start_use();
+
+    // The diagonal C3 subgroup fixes modes kx + ky = 0 modulo 3.
+    // Removing a transverse Fourier coefficient mimics the observed branch meeting.
+    const auto         &modes = problem.state_modes();
+    std::vector<double> before( modes.size() ), after( modes.size() );
+    for ( std::size_t i = 0; i < modes.size(); ++i )
+    {
+        if ( ( modes[i][0] + modes[i][1] ) % 3 == 0 )
+            after[i] = 1. / ( i + 1 );
+        before[i] = after[i];
+        if ( modes[i][0] == 1 && modes[i][1] == 0 )
+            before[i] = 0.02;
+    }
+    operations.set( before.data(), *previous );
+    operations.set( after.data(), *candidate );
+    symmetry::continuation::isotropy_transition_policy<double> policy;
+    const auto disabled = problem.detect_continuation_isotropy_transition( *previous, *candidate, policy );
+    result.check( !disabled.detected, "KS2D isotropy guard is opt-in" );
+    policy.enabled        = true;
+    const auto transition = problem.detect_continuation_isotropy_transition( *previous, *candidate, policy );
+    result.check( transition.supported && transition.detected, "KS2D detects diagonal C3 branch meeting" );
+    result.check(
+        transition.previous_order == 1 && transition.candidate_order == 3, "KS2D uses embedded diagonal subgroup"
+    );
+    result.check( transition.candidate_orbit_type.active_rank == 2, "KS2D C3 event retains full translation rank" );
+    result.check(
+        transition.candidate_stabilizer.lattice_basis == std::vector<std::int64_t>{ 1, 2, 0, 3 },
+        "KS2D event records the actual stabilizer embedding"
+    );
+    const auto repeated = problem.detect_continuation_isotropy_transition( *candidate, *candidate, policy );
+    result.check( !repeated.detected, "KS2D unchanged subgroup does not create repeated events" );
+}
+
+template <class Backend, class FFTBackend>
 int run( const std::string &backend_name )
 {
     constexpr std::size_t nx = 12;
     constexpr std::size_t ny = 16;
     report                result;
+    run_isotropy_guard_case<Backend, FFTBackend>( result );
     run_backend_alignment_case<Backend>( result );
     run_case<Backend, FFTBackend, discretization::fourier::codecs::inversion_odd_field_2d>(
         result, "inversion_odd_rectangular", nx, ny, nx * ny / 2 - 2, true, false, 4

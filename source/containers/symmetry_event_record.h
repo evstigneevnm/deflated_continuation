@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include <symmetry/translation/orbit_type.h>
+#include <symmetry/stabilizer_description.h>
 
 namespace container
 {
@@ -23,6 +24,8 @@ struct symmetry_event_record
     std::size_t                       candidate_order  = 1;
     symmetry::translation::orbit_type previous_orbit_type;
     symmetry::translation::orbit_type candidate_orbit_type;
+    symmetry::stabilizer_description  previous_stabilizer;
+    symmetry::stabilizer_description  candidate_stabilizer;
     T                                 previous_transverse_ratio  = T( 0 );
     T                                 candidate_transverse_ratio = T( 0 );
     unsigned int                      refinements                = 0;

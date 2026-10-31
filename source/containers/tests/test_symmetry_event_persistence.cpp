@@ -172,6 +172,60 @@ void test_registry_preserves_general_orbit_types( const std::filesystem::path &d
     );
 }
 
+void test_stabilizer_embeddings_and_journal_versions( const std::filesystem::path &directory )
+{
+    auto first                 = make_record( 1, 10, 28.1, 3 );
+    first.previous_orbit_type  = make_two_translation_orbit( 2, 0, { 1, 1 } );
+    first.candidate_orbit_type = make_two_translation_orbit( 2, 0, { 1, 3 } );
+    first.previous_stabilizer  = { "translation_lattice", "torus_2d", 2, { 1, 0, 0, 1 }, {} };
+    first.candidate_stabilizer = { "translation_lattice", "torus_2d", 2, { 1, 2, 0, 3 }, {} };
+    container::symmetry_event_journal<real> journal( directory / "multidimensional_events.dat" );
+    journal.stage( first );
+    require_true( journal.commit() && journal.load(), "multidimensional event journal round trip" );
+    require_true(
+        journal.all().front().candidate_orbit_type == first.candidate_orbit_type,
+        "journal preserves dimension and finite invariants"
+    );
+    require_true(
+        journal.all().front().candidate_stabilizer == first.candidate_stabilizer, "journal preserves subgroup embedding"
+    );
+    auto different                               = first;
+    different.curve_number                       = 2;
+    different.candidate_stabilizer.lattice_basis = { 1, 1, 0, 3 };
+    container::symmetry_event_registry<real> registry( directory / "embedded_events.json" );
+    registry.rebuild( { first, different }, 1e-3, 1e-3, []( const auto &, const auto & ) { return 0.; } );
+    require_true( registry.all().size() == 2, "different embeddings with identical orbit invariants remain separate" );
+    require_true( registry.save() && registry.load(), "embedded registry round trip" );
+    require_true(
+        registry.all()[0].state_reference.candidate_stabilizer == first.candidate_stabilizer,
+        "registry incident preserves embedding"
+    );
+    const auto old_path = directory / "version2_events.dat";
+    {
+        std::ofstream stream( old_path );
+        stream << "# symmetry_events_version 2\n10 28.1 1 11 1 1 1 3 1e-3 1e-12 2\n";
+    }
+    container::symmetry_event_journal<real> legacy( old_path );
+    require_true( legacy.load() && legacy.all().front().candidate_order == 3, "version 2 journal remains readable" );
+    require_true( legacy.all().front().candidate_stabilizer.empty(), "legacy unknown embedding is not invented" );
+    {
+        std::ofstream stream( old_path );
+        stream << "# symmetry_events_version 999\n";
+    }
+    require_true( !legacy.load() && legacy.all().empty(), "unknown journal versions fail even without records" );
+    const auto finite                = make_record( 3, 20, 29., 2 );
+    auto       finite_copy           = finite;
+    finite_copy.previous_stabilizer  = { "finite_actions", "reflection_group", 0, {}, { 0 } };
+    finite_copy.candidate_stabilizer = { "finite_actions", "reflection_group", 0, {}, { 0, 2 } };
+    container::symmetry_event_journal<real> finite_journal( directory / "finite_events.dat" );
+    finite_journal.stage( finite_copy );
+    require_true(
+        finite_journal.commit() && finite_journal.load() &&
+            finite_journal.all().front().candidate_stabilizer == finite_copy.candidate_stabilizer,
+        "finite action metadata round trip"
+    );
+}
+
 } // namespace
 
 int main()
@@ -186,6 +240,7 @@ int main()
     test_legacy_event_file_is_read( directory );
     test_registry_links_incident_endpoints( directory );
     test_registry_preserves_general_orbit_types( directory );
+    test_stabilizer_embeddings_and_journal_versions( directory );
 
     std::filesystem::remove_all( directory, cleanup_error );
     std::cout << "Checks: " << checks << ", failures: " << failures << std::endl;

@@ -16,6 +16,7 @@
 #include <contrib/json/nlohmann/json.hpp>
 
 #include <containers/symmetry_event_record.h>
+#include <containers/symmetry_event_codec.h>
 
 namespace container
 {
@@ -34,6 +35,8 @@ public:
         T                                 lambda_max = T( 0 );
         symmetry::translation::orbit_type previous_orbit_type;
         symmetry::translation::orbit_type candidate_orbit_type;
+        symmetry::stabilizer_description  previous_stabilizer;
+        symmetry::stabilizer_description  candidate_stabilizer;
         record_type                       state_reference;
         std::vector<record_type>          incidents;
     };
@@ -64,6 +67,8 @@ public:
             {
                 if ( event.previous_orbit_type != record.previous_orbit_type ||
                      event.candidate_orbit_type != record.candidate_orbit_type ||
+                     event.previous_stabilizer != record.previous_stabilizer ||
+                     event.candidate_stabilizer != record.candidate_stabilizer ||
                      scalar_abs( event.lambda - record.lambda ) > lambda_tolerance )
                 {
                     continue;
@@ -89,6 +94,8 @@ public:
                 event.lambda_max           = record.lambda;
                 event.previous_orbit_type  = record.previous_orbit_type;
                 event.candidate_orbit_type = record.candidate_orbit_type;
+                event.previous_stabilizer  = record.previous_stabilizer;
+                event.candidate_stabilizer = record.candidate_stabilizer;
                 event.state_reference      = record;
                 event.incidents.push_back( record );
                 events.push_back( std::move( event ) );
@@ -111,7 +118,7 @@ public:
             return false;
         }
         nlohmann::json root;
-        root["version"] = 2;
+        root["version"] = 3;
         root["events"]  = nlohmann::json::array();
         for ( const auto &event : events )
         {
@@ -122,6 +129,8 @@ public:
             encoded["lambda_max"]           = static_cast<double>( event.lambda_max );
             encoded["previous_orbit_type"]  = encode_orbit_type( event.previous_orbit_type );
             encoded["candidate_orbit_type"] = encode_orbit_type( event.candidate_orbit_type );
+            encoded["previous_stabilizer"]  = detail::encode_stabilizer( event.previous_stabilizer );
+            encoded["candidate_stabilizer"] = detail::encode_stabilizer( event.candidate_stabilizer );
             encoded["state_reference"]      = encode_record( event.state_reference );
             encoded["incidents"]            = nlohmann::json::array();
             for ( const auto &incident : event.incidents )
@@ -180,6 +189,10 @@ public:
                     decode_orbit_type( encoded.value( "previous_orbit_type", nlohmann::json::object() ) );
                 event.candidate_orbit_type =
                     decode_orbit_type( encoded.value( "candidate_orbit_type", nlohmann::json::object() ) );
+                event.previous_stabilizer =
+                    detail::decode_stabilizer( encoded.value( "previous_stabilizer", nlohmann::json::object() ) );
+                event.candidate_stabilizer =
+                    detail::decode_stabilizer( encoded.value( "candidate_stabilizer", nlohmann::json::object() ) );
                 event.state_reference = decode_record( encoded.value( "state_reference", nlohmann::json::object() ) );
                 for ( const auto &incident : encoded.value( "incidents", nlohmann::json::array() ) )
                 {
@@ -219,76 +232,22 @@ private:
 
     static nlohmann::json encode_orbit_type( const symmetry::translation::orbit_type &orbit )
     {
-        return {
-            { "group_dimension", orbit.group_dimension },
-            { "active_rank", orbit.active_rank },
-            { "continuous_isotropy_dimension", orbit.continuous_isotropy_dimension },
-            { "finite_invariants", orbit.finite_invariants }
-        };
+        return detail::encode_symmetry_orbit( orbit );
     }
 
     static symmetry::translation::orbit_type decode_orbit_type( const nlohmann::json &encoded )
     {
-        symmetry::translation::orbit_type orbit;
-        orbit.group_dimension               = encoded.value( "group_dimension", std::size_t( 0 ) );
-        orbit.active_rank                   = encoded.value( "active_rank", std::size_t( 0 ) );
-        orbit.continuous_isotropy_dimension = encoded.value( "continuous_isotropy_dimension", std::size_t( 0 ) );
-        orbit.finite_invariants             = encoded.value( "finite_invariants", std::vector<std::uint64_t>{} );
-        return orbit;
+        return detail::decode_symmetry_orbit( encoded );
     }
 
     static nlohmann::json encode_record( const record_type &record )
     {
-        return {
-            { "curve_number", record.curve_number },
-            { "point_index", record.point_index },
-            { "lambda", static_cast<double>( record.lambda ) },
-            { "vector_available", record.vector_available },
-            { "vector_file_id", record.vector_file_id },
-            { "segment_id", record.segment_id },
-            { "semicurve_id", record.semicurve_id },
-            { "previous_order", record.previous_order },
-            { "candidate_order", record.candidate_order },
-            { "previous_orbit_type", encode_orbit_type( record.previous_orbit_type ) },
-            { "candidate_orbit_type", encode_orbit_type( record.candidate_orbit_type ) },
-            { "previous_transverse_ratio", static_cast<double>( record.previous_transverse_ratio ) },
-            { "candidate_transverse_ratio", static_cast<double>( record.candidate_transverse_ratio ) },
-            { "refinements", record.refinements }
-        };
+        return detail::encode_symmetry_record( record );
     }
 
     static record_type decode_record( const nlohmann::json &encoded )
     {
-        record_type record;
-        record.curve_number     = encoded.value( "curve_number", -1 );
-        record.point_index      = encoded.value( "point_index", std::uint64_t( 0 ) );
-        record.lambda           = static_cast<T>( encoded.value( "lambda", 0.0 ) );
-        record.vector_available = encoded.value( "vector_available", false );
-        record.vector_file_id   = encoded.value( "vector_file_id", std::uint64_t( 0 ) );
-        record.segment_id       = encoded.value( "segment_id", std::uint64_t( 0 ) );
-        record.semicurve_id     = encoded.value( "semicurve_id", std::uint64_t( 0 ) );
-        record.previous_order   = encoded.value( "previous_order", std::size_t( 1 ) );
-        record.candidate_order  = encoded.value( "candidate_order", std::size_t( 1 ) );
-        if ( encoded.contains( "previous_orbit_type" ) )
-        {
-            record.previous_orbit_type = decode_orbit_type( encoded["previous_orbit_type"] );
-        }
-        else
-        {
-            record.previous_orbit_type = symmetry::translation::orbit_type::cyclic_1d( record.previous_order );
-        }
-        if ( encoded.contains( "candidate_orbit_type" ) )
-        {
-            record.candidate_orbit_type = decode_orbit_type( encoded["candidate_orbit_type"] );
-        }
-        else
-        {
-            record.candidate_orbit_type = symmetry::translation::orbit_type::cyclic_1d( record.candidate_order );
-        }
-        record.previous_transverse_ratio  = static_cast<T>( encoded.value( "previous_transverse_ratio", 0.0 ) );
-        record.candidate_transverse_ratio = static_cast<T>( encoded.value( "candidate_transverse_ratio", 0.0 ) );
-        record.refinements                = encoded.value( "refinements", 0u );
-        return record;
+        return detail::decode_symmetry_record<T>( encoded );
     }
 };
 

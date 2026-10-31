@@ -22,6 +22,8 @@
 #include <symmetry/fourier/real_packed_fourier_slice_1d_policy.h>
 #include <symmetry/continuation/continuation_chart_state.h>
 #include <symmetry/continuation/isotropy_transition.h>
+#include <symmetry/continuation/isotropy_transition_detector.h>
+#include <symmetry/fourier/translation_isotropy_geometry.h>
 #include <symmetry/continuation/local_representative_policy.h>
 
 namespace symmetry
@@ -67,9 +69,7 @@ public:
           gradient_spectrum( positive_modes_ + 1, complex_type( 0 ) ),
           work_gradient_spectrum( positive_modes_ + 1, complex_type( 0 ) ),
           source_gradient_spectrum( positive_modes_ + 1, complex_type( 0 ) ),
-          continuation_tangent_spectrum( positive_modes_ + 1, complex_type( 0 ) ),
-          isotropy_previous_spectrum( positive_modes_ + 1, complex_type( 0 ) ),
-          isotropy_candidate_spectrum( positive_modes_ + 1, complex_type( 0 ) )
+          continuation_tangent_spectrum( positive_modes_ + 1, complex_type( 0 ) )
     {
         if ( vec_ops == nullptr )
         {
@@ -831,28 +831,19 @@ public:
             return result;
         }
 
-        vector_to_spectrum( previous, isotropy_previous_spectrum );
-        vector_to_spectrum( candidate, isotropy_candidate_spectrum );
-        result.previous_order =
-            approximate_fourier_isotropy_order_1d( isotropy_previous_spectrum, policy.relative_mode_tolerance );
-        result.candidate_order =
-            approximate_fourier_isotropy_order_1d( isotropy_candidate_spectrum, policy.relative_mode_tolerance );
-        result.transition_order     = result.candidate_order;
-        result.previous_orbit_type  = symmetry::translation::orbit_type::cyclic_1d( result.previous_order );
-        result.candidate_orbit_type = symmetry::translation::orbit_type::cyclic_1d( result.candidate_order );
-
-        if ( !symmetry::continuation::is_stabilizer_increase( result.previous_order, result.candidate_order, policy ) )
+        if ( !isotropy_geometry_ )
         {
-            return result;
+            std::vector<isotropy_coefficient<1>> coefficients;
+            coefficients.reserve( positive_modes_ );
+            for ( std::size_t mode = 1; mode <= positive_modes_; ++mode )
+                coefficients.push_back(
+                    { mode_index<1>{ static_cast<int>( mode ) }, 2 * ( mode - 1 ), 2 * ( mode - 1 ) + 1 }
+                );
+            isotropy_geometry_ = std::make_unique<translation_isotropy_geometry<VectorOperations, 1>>(
+                *vec_ops, coefficients, "fourier_translation_torus_1d", isotropy_support_scale::state_norm
+            );
         }
-
-        result.previous_transverse_ratio =
-            relative_fourier_transverse_norm_1d( isotropy_previous_spectrum, result.transition_order );
-        result.candidate_transverse_ratio =
-            relative_fourier_transverse_norm_1d( isotropy_candidate_spectrum, result.transition_order );
-        result.detected = result.previous_transverse_ratio > policy.relative_mode_tolerance &&
-                          result.candidate_transverse_ratio <= policy.relative_mode_tolerance;
-        return result;
+        return symmetry::continuation::detect_isotropy_transition( *isotropy_geometry_, previous, candidate, policy );
     }
 
 private:
@@ -1263,8 +1254,7 @@ private:
     std::vector<complex_type>                work_gradient_spectrum;
     std::vector<complex_type>                source_gradient_spectrum;
     std::vector<complex_type>                continuation_tangent_spectrum;
-    std::vector<complex_type>                isotropy_previous_spectrum;
-    std::vector<complex_type>                isotropy_candidate_spectrum;
+    std::unique_ptr<translation_isotropy_geometry<VectorOperations, 1>> isotropy_geometry_;
 };
 
 } // namespace fourier

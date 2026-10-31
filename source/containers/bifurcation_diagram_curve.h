@@ -581,6 +581,8 @@ public:
         event.candidate_order            = source.candidate_order;
         event.previous_orbit_type        = source.previous_orbit_type;
         event.candidate_orbit_type       = source.candidate_orbit_type;
+        event.previous_stabilizer        = source.previous_stabilizer;
+        event.candidate_stabilizer       = source.candidate_stabilizer;
         event.previous_transverse_ratio  = source.previous_transverse_ratio;
         event.candidate_transverse_ratio = source.candidate_transverse_ratio;
         event.refinements                = source.refinements;

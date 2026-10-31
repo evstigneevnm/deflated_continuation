@@ -6,6 +6,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <nmfd/detail/vector_wrap.h>
 #include <type_traits>
 #include <common/scalar_math.h>
 #include <continuation/chart_helpers.h>
@@ -56,7 +57,7 @@ public:
         char continuation_type_ = 'S'
     )
         : vec_ops( vec_ops_ ), log( log_ ), sys_op( sys_op_ ), newton_extended( newton_extended_ ), newton( newton_ ),
-          predictor( predictor_ ), continuation_type( continuation_type_ ),
+          predictor( predictor_ ), isotropy_event_storage_( *vec_ops_ ), continuation_type( continuation_type_ ),
           convergence_newton_extended( convergence_newton_extended_ )
     {
         vec_ops->init_vector( x_p );
@@ -65,20 +66,10 @@ public:
         vec_ops->start_use_vector( x1_l );
         vec_ops->init_vector( dx10 );
         vec_ops->start_use_vector( dx10 );
-        if constexpr ( chart::has_isotropy_transition<NonlinearOperator, T_vec, T>::value )
-        {
-            vec_ops->init_vector( x_isotropy_event );
-            vec_ops->start_use_vector( x_isotropy_event );
-        }
     }
 
     ~advance_solution()
     {
-        if constexpr ( chart::has_isotropy_transition<NonlinearOperator, T_vec, T>::value )
-        {
-            vec_ops->stop_use_vector( x_isotropy_event );
-            vec_ops->free_vector( x_isotropy_event );
-        }
         vec_ops->stop_use_vector( dx10 );
         vec_ops->free_vector( dx10 );
         vec_ops->stop_use_vector( x1_l );
@@ -114,6 +105,12 @@ public:
     void set_isotropy_transition_policy( const symmetry::continuation::isotropy_transition_policy<T> &policy )
     {
         policy.validate();
+        if constexpr ( chart::has_isotropy_transition<NonlinearOperator, T_vec, T>::value )
+            if ( policy.enabled )
+            {
+                isotropy_event_storage_.init();
+                isotropy_event_storage_.start_use();
+            }
         isotropy_policy = policy;
     }
 
@@ -343,7 +340,8 @@ public:
                     if ( isotropy_policy.verbose )
                     {
                         log->warning_f(
-                            "continuation::advance_solution: corrected trial increases isotropy C_%lu -> C_%lu; "
+                            "continuation::advance_solution: corrected trial increases isotropy (finite orders %lu -> "
+                            "%lu); "
                             "transverse ratio changed from %le to %le at lambda = %le, dS = %le.",
                             static_cast<unsigned long>( transition.previous_order ),
                             static_cast<unsigned long>( transition.candidate_order ),
@@ -623,20 +621,22 @@ private:
     {
     }
 
-    VectorOperations                                     *vec_ops;
-    SystemOperator                                       *sys_op;
-    NewtonMethodExtended                                 *newton_extended;
-    NewtonMethod                                         *newton;
-    Predictoror                                          *predictor;
-    ConvergenceNewtonExtended                            *convergence_newton_extended;
-    T_vec                                                 x_p, x1_l, dx10, x_isotropy_event;
-    Loggin                                               *log;
-    char                                                  continuation_type;
-    predictor_chart_policy<T>                             chart_policy;
-    symmetry::continuation::isotropy_transition_policy<T> isotropy_policy;
-    symmetry::continuation::isotropy_transition_result<T> last_isotropy_transition_;
-    continuation_step_attempt_state<T>                    last_attempt_state_;
-    bool                                                  verbose = true;
+    VectorOperations                                         *vec_ops;
+    SystemOperator                                           *sys_op;
+    NewtonMethodExtended                                     *newton_extended;
+    NewtonMethod                                             *newton;
+    Predictoror                                              *predictor;
+    ConvergenceNewtonExtended                                *convergence_newton_extended;
+    T_vec                                                     x_p, x1_l, dx10;
+    nmfd::detail::vector_wrap<VectorOperations, false, false> isotropy_event_storage_;
+    T_vec                                                    &x_isotropy_event = *isotropy_event_storage_;
+    Loggin                                                   *log;
+    char                                                      continuation_type;
+    predictor_chart_policy<T>                                 chart_policy;
+    symmetry::continuation::isotropy_transition_policy<T>     isotropy_policy;
+    symmetry::continuation::isotropy_transition_result<T>     last_isotropy_transition_;
+    continuation_step_attempt_state<T>                        last_attempt_state_;
+    bool                                                      verbose = true;
 };
 
 

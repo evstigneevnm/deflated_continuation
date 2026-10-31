@@ -1227,7 +1227,7 @@ private:
                     {
                         const auto &event = continuation_step->last_isotropy_transition();
                         log->warning_f(
-                            "continuation::start_semicurve: stopping at an isotropy transition C_%lu -> C_%lu at "
+                            "continuation::start_semicurve: stopping at an isotropy transition (finite orders %lu -> %lu) at "
                             "lambda = %le after %u refinements; transverse ratio changed from %le to %le.",
                             static_cast<unsigned long>( event.previous_order ),
                             static_cast<unsigned long>( event.candidate_order ), double( lambda1 ), event.refinements,

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include <containers/symmetry_event_record.h>
+#include <containers/symmetry_event_codec.h>
 
 namespace container
 {
@@ -66,17 +67,11 @@ public:
         {
             return false;
         }
-        stream << "# symmetry_events_version 2\n";
-        stream << "# point_index lambda vector_available vector_file_id segment_id semicurve_id "
-               << "previous_order candidate_order previous_transverse_ratio candidate_transverse_ratio "
-               << "refinements\n";
+        stream << "# symmetry_events_version 3\n";
+        stream << "# JSON event records preserve orbit dimensions and subgroup embeddings\n";
         for ( const auto &record : records )
         {
-            stream << record.point_index << " " << std::setprecision( 16 ) << record.lambda << " "
-                   << ( record.vector_available ? 1 : 0 ) << " " << record.vector_file_id << " " << record.segment_id
-                   << " " << record.semicurve_id << " " << record.previous_order << " " << record.candidate_order << " "
-                   << std::setprecision( 16 ) << record.previous_transverse_ratio << " "
-                   << record.candidate_transverse_ratio << " " << record.refinements << "\n";
+            stream << detail::encode_symmetry_record( record ).dump() << '\n';
         }
         stream.close();
         if ( !stream )
@@ -123,12 +118,34 @@ public:
                 header >> label;
                 if ( label == "symmetry_events_version" )
                 {
-                    header >> version;
+                    if ( !( header >> version ) || version == 0 || version > 3 )
+                    {
+                        records.clear();
+                        return false;
+                    }
                 }
                 continue;
             }
 
-            record_type        record;
+            record_type record;
+            if ( version == 3 )
+            {
+                try
+                {
+                    records.push_back( detail::decode_symmetry_record<T>( nlohmann::json::parse( line ) ) );
+                }
+                catch ( const std::exception & )
+                {
+                    records.clear();
+                    return false;
+                }
+                continue;
+            }
+            if ( version > 3 || version == 0 )
+            {
+                records.clear();
+                return false;
+            }
             std::istringstream values( line );
             if ( version >= 2 )
             {

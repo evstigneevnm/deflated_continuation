@@ -802,6 +802,35 @@ and residual slice copies are distinct. Differentiate moving projections fully.
 Use identity geometry for ordinary problems; retain valid finite actions for
 already reduced problems. Split evolution terms must preserve equivariance.
 
+Continuation isotropy guards are opt-in. A representation-specific geometry
+classifies states and measures transverse components; the shared detector tests
+proper stabilizer inclusion, not merely an increase in group order. Translation
+geometry uses fixed-dimensional integer lattices (one through three dimensions);
+finite geometry uses a declared, closed action group (at most 64 elements).
+Zero states are classified but do not trigger these transition guards. Record
+continuous isotropy through rank, not a fictitious finite order.
+
+The problem declares admissible symmetry characters/actions and a stable group
+fingerprint, accounting for forcing, boundaries, discretization, and all fields.
+Do not assume an unforced translation torus for another application. KS2D's
+inversion-odd embedding uses ambient physical translations to classify isotropy;
+this does not make arbitrary translations valid actions on its reduced states.
+Other representations opt in through their own geometry adapters.
+
+Classification and transverse norms remain on the selected backend. Require
+O(N) work, or O(mN) for a fixed finite group of size m: no active-mode sorting,
+subgroup enumeration growing with N, or vector-sized device-to-host transfers
+(including compressed masks). Transfer only bounded-size summaries. Static
+layout metadata may be uploaded once; reuse backend workspaces and preserve
+the configured norm/reduction precision. Concurrent trajectories need separate
+workspaces; do not cache classifications by vector address.
+
+Persist the subgroup embedding alongside its orbit-type summary. Equal orders
+or invariant factors do not imply the same embedded subgroup. Read historical
+order-only events without inventing missing embeddings; matching them against
+new typed events requires explicit revalidation. Lattice arithmetic is checked:
+unsupported integer ranges fail explicitly rather than produce a false event.
+
 ## MPI And Backends
 
 Keep MPI types/calls behind SCFD communication abstractions. Vector operations
