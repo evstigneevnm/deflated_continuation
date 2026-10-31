@@ -61,6 +61,7 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p test_nmfd_standalone.py
           python3 -m unittest discover -s scripts/tests -p test_timestepper_extraction.py
           python3 -m unittest discover -s scripts/tests -p test_ks1d_reference.py
+          python3 -m unittest discover -s scripts/tests -p test_write_ks1d_ci_config.py
           python3 scripts/check_operations_dependencies.py
           python3 scripts/check_linear_solver_dependencies.py
           python3 scripts/check_newton_solver_dependencies.py
@@ -3174,7 +3175,7 @@ jobs:
           make KS1D_operator_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_operator_cpu_omp.bin
           make KS1D_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
-          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --base-config json_project_files/KS1D_test_sym.json --clean-project --steps 6 --step-size 0.02 --max-step-size 0.03
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --base-config json_project_files/KS1D_test_sym.json --clean-project --steps 32 --step-size 0.02 --max-step-size 0.03 --analytical-max-parameter-step 0.1
           timeout 120s ./"$KS1D_BUILD"/KS1D_bd_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
           make KS1D_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
@@ -3335,7 +3336,7 @@ jobs:
           make KS1D_stability_scan_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_stability_scan_cpu_omp.bin
           make KS1D_full_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
-          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --base-config json_project_files/KS1D_test_full.json --clean-project --steps 6 --step-size 0.02 --max-step-size 0.03
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --base-config json_project_files/KS1D_test_full.json --clean-project --steps 32 --step-size 0.02 --max-step-size 0.03 --analytical-max-parameter-step 0.1
           timeout 120s ./"$KS1D_BUILD"/KS1D_full_bd_cpu_omp.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project_full" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
           make KS1D_full_stability_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
@@ -3711,7 +3712,7 @@ jobs:
           make KS1D_stability_scan_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_stability_scan_cuda.bin auto
           make KS1D_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
-          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --base-config json_project_files/KS1D_test_sym.json --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --base-config json_project_files/KS1D_test_sym.json --clean-project --steps 32 --step-size 0.02 --max-step-size 0.03 --analytical-max-parameter-step 0.1
           timeout 120s ./"$KS1D_BUILD"/KS1D_bd_cuda.bin "$KS1D_BUILD/ks1d_ci.json" --quiet auto
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
           make KS1D_stability_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
@@ -3719,7 +3720,7 @@ jobs:
           python3 scripts/validate_stability_diagram.py "$KS1D_BUILD/project" --expected-curves 1 --min-points 10 --require-complete --expected-point-type stable --expected-unstable-real 0 --expected-unstable-complex-pairs 0
           python3 scripts/test_ks1d_symmetric_nmfd.py --bd-executable "$KS1D_BUILD/KS1D_bd_cuda.bin" --stability-executable "$KS1D_BUILD/KS1D_stability_cuda.bin" --work-dir "$KS1D_BUILD/nonzero_replay" --device auto
           make KS1D_full_bd_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
-          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --base-config json_project_files/KS1D_test_full.json --clean-project --steps 12 --step-size 0.02 --max-step-size 0.03
+          python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_full_ci.json" "$KS1D_BUILD/project_full" --base-config json_project_files/KS1D_test_full.json --clean-project --steps 32 --step-size 0.02 --max-step-size 0.03 --analytical-max-parameter-step 0.1
           timeout 120s ./"$KS1D_BUILD"/KS1D_full_bd_cuda.bin "$KS1D_BUILD/ks1d_full_ci.json" --quiet auto
           python3 scripts/validate_ks1d_zero_branch.py "$KS1D_BUILD/project_full" --min-points 10 --expected-curves 1 --max-reduced-norm 1e-9 --min-lambda-span 0.2
           make KS1D_full_stability_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double

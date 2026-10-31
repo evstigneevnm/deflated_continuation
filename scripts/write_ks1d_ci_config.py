@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import shutil
 from pathlib import Path
 
@@ -26,6 +27,17 @@ def _is_safe_to_clean(path: Path, cwd: Path) -> bool:
 
 
 def write_config(args: argparse.Namespace) -> None:
+    if (
+        not all(math.isfinite(knot) for knot in args.knots)
+        or len(set(args.knots)) < 2
+    ):
+        raise ValueError("CI knots must contain at least two distinct finite parameters")
+    if (
+        not math.isfinite(args.analytical_max_parameter_step)
+        or args.analytical_max_parameter_step < 0.0
+    ):
+        raise ValueError("analytical maximum parameter step must be finite and nonnegative")
+
     base_config = Path(args.base_config)
     output_config = Path(args.output_config)
     project_dir = Path(args.project_dir)
@@ -51,11 +63,18 @@ def write_config(args: argparse.Namespace) -> None:
     continuation["maximum_continuation_steps"] = args.steps
     continuation["step_size"] = args.step_size
     continuation["max_step_size"] = args.max_step_size
+    continuation["analytical_max_parameter_step"] = args.analytical_max_parameter_step
     continuation["deflation_attempts"] = args.deflation_attempts
     continuation["continuation_fail_attempts"] = args.continuation_fail_attempts
     continuation["initial_direciton"] = args.initial_direction
     continuation["skip_file_output"] = 1
     continuation["deflation_knots"] = args.knots
+    continuation["continuation_parameter_bounds"] = {
+        "enabled": True,
+        "minimum": min(args.knots),
+        "maximum": max(args.knots),
+        "resolve_with_knot_registry": True,
+    }
     continuation["add_analytical_solution_to_diagram"] = True
     continuation.setdefault("analytical_solution_branches", [])
     restart_policy = continuation.setdefault("restart_policy", {})
@@ -115,6 +134,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=50)
     parser.add_argument("--step-size", type=float, default=0.02)
     parser.add_argument("--max-step-size", type=float, default=0.03)
+    parser.add_argument(
+        "--analytical-max-parameter-step",
+        type=float,
+        default=0.1,
+        help="Maximum analytical parameter gap, independent of arclength; 0 samples only knots and boundaries.",
+    )
     parser.add_argument("--deflation-attempts", type=int, default=0)
     parser.add_argument("--continuation-fail-attempts", type=int, default=8)
     parser.add_argument("--initial-direction", type=int, default=-1)
