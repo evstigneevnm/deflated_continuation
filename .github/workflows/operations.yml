@@ -254,6 +254,7 @@ jobs:
       - timestepper-explicit-rossler-cpu
       - timestepper-explicit-vdp-cpu
       - timestepper-fsal-cuda
+      - timestepper-implicit-adaptive-cuda
       - timestepper-implicit-dirk-cuda
       - timestepper-implicit-lifecycle-cuda
       - timestepper-implicit-lorenz-cuda
@@ -1324,7 +1325,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify analytical order and generic DIRK tables on serial CPU and OMP
+      - name: Verify DIRK order, balanced scaling and steady limits on serial CPU and OMP
         run: |
           make -j2 test_implicit_dirk_cpu.bin test_implicit_dirk_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_dirk"
           for backend in cpu cpu_omp; do
@@ -1339,7 +1340,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify analytical order and generic DIRK tables when CUDA is available
+      - name: Verify DIRK order, balanced scaling and steady limits when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
             echo "Skipping implicit CUDA test: no usable GPU"
@@ -1352,15 +1353,51 @@ jobs:
           make test_implicit_dirk_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_dirk_cuda"
           timeout 300s ./"$BUILD_DIR"/implicit_dirk_cuda/test_implicit_dirk_cuda.bin
 
-  timestepper-implicit-mass-dae-cpu:
-    needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
+  timestepper-implicit-adaptive-cpu:
+    needs: [timestepper-implicit-dirk-cpu, timestepper-scipy-adaptation-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify nontrivial mass and coupled DAEs on serial CPU and OMP
+      - name: Verify embedded DIRK adaptation, recovery and storage on serial CPU and OMP
+        run: |
+          make -j2 test_implicit_adaptive_cpu.bin test_implicit_adaptive_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_adaptive"
+          for backend in cpu cpu_omp; do
+            OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/implicit_adaptive/"test_implicit_adaptive_${backend}.bin"
+          done
+
+  timestepper-implicit-adaptive-cuda:
+    needs: [timestepper-implicit-adaptive-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify embedded DIRK adaptation when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping implicit CUDA test: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping implicit CUDA test: nvcc unavailable"
+            exit 0
+          fi
+          make test_implicit_adaptive_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_adaptive_cuda"
+          timeout 300s ./"$BUILD_DIR"/implicit_adaptive_cuda/test_implicit_adaptive_cuda.bin
+
+  timestepper-implicit-mass-dae-cpu:
+    needs: [timestepper-implicit-adaptive-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify fixed and adaptive mass and DAEs with MATLAB and SciPy on serial CPU and OMP
         run: |
           make -j2 test_implicit_mass_dae_cpu.bin test_implicit_mass_dae_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_mass_dae"
           for backend in cpu cpu_omp; do
@@ -1375,7 +1412,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify nontrivial mass and coupled DAEs when CUDA is available
+      - name: Verify fixed and adaptive mass and DAEs with MATLAB and SciPy when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
             echo "Skipping implicit CUDA test: no usable GPU"
@@ -1425,14 +1462,14 @@ jobs:
           timeout 300s ./"$BUILD_DIR"/implicit_lifecycle_cuda/test_implicit_lifecycle_cuda.bin
 
   timestepper-implicit-lorenz-cpu:
-    needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
+    needs: [timestepper-implicit-adaptive-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify Lorenz implicit integration on serial CPU and OMP
+      - name: Verify strict Newton Lorenz stages and fixed/adaptive trajectories on serial CPU and OMP
         run: |
           make -j2 test_implicit_lorenz_cpu.bin test_implicit_lorenz_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_lorenz"
           for backend in cpu cpu_omp; do
@@ -1447,7 +1484,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify Lorenz implicit integration when CUDA is available
+      - name: Verify strict Newton Lorenz stages and fixed/adaptive trajectories when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
             echo "Skipping implicit CUDA test: no usable GPU"
@@ -1461,14 +1498,14 @@ jobs:
           timeout 300s ./"$BUILD_DIR"/implicit_lorenz_cuda/test_implicit_lorenz_cuda.bin
 
   timestepper-implicit-rossler-cpu:
-    needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
+    needs: [timestepper-implicit-adaptive-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify Rossler implicit integration on serial CPU and OMP
+      - name: Verify fixed and MATLAB/SciPy adaptive Rossler on serial CPU and OMP
         run: |
           make -j2 test_implicit_rossler_cpu.bin test_implicit_rossler_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_rossler"
           for backend in cpu cpu_omp; do
@@ -1483,7 +1520,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify Rossler implicit integration when CUDA is available
+      - name: Verify fixed and MATLAB/SciPy adaptive Rossler when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
             echo "Skipping implicit CUDA test: no usable GPU"
@@ -1497,14 +1534,14 @@ jobs:
           timeout 300s ./"$BUILD_DIR"/implicit_rossler_cuda/test_implicit_rossler_cuda.bin
 
   timestepper-implicit-vdp-cpu:
-    needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
+    needs: [timestepper-implicit-adaptive-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify regular and stiff Van der Pol on serial CPU and OMP
+      - name: Verify fixed and MATLAB/SciPy adaptive regular and stiff Van der Pol on serial CPU and OMP
         run: |
           make -j2 test_implicit_vdp_cpu.bin test_implicit_vdp_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_vdp"
           for backend in cpu cpu_omp; do
@@ -1519,7 +1556,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify regular and stiff Van der Pol when CUDA is available
+      - name: Verify fixed and MATLAB/SciPy adaptive regular and stiff Van der Pol when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
             echo "Skipping implicit CUDA test: no usable GPU"
@@ -1606,7 +1643,7 @@ jobs:
           timeout 300s ./"$BUILD_DIR"/implicit_nonautonomous_cuda/test_implicit_nonautonomous_cuda.bin
 
   timestepper-implicit-sanitizers-cpu:
-    needs: [timestepper-implicit-dirk-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu]
+    needs: [timestepper-implicit-dirk-cpu, timestepper-implicit-adaptive-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu, timestepper-implicit-lorenz-cpu, timestepper-implicit-rossler-cpu, timestepper-implicit-vdp-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -1618,8 +1655,8 @@ jobs:
           submodules: true
       - name: Check implicit stage storage and rollback with sanitizers
         run: |
-          make -j2 test_implicit_dirk_cpu.bin test_implicit_mass_dae_cpu.bin test_implicit_lifecycle_cpu.bin test_implicit_nonautonomous_cpu.bin test_explicit_nonautonomous_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-          for test in dirk mass_dae lifecycle nonautonomous; do
+          make -j2 test_implicit_dirk_cpu.bin test_implicit_adaptive_cpu.bin test_implicit_mass_dae_cpu.bin test_implicit_lifecycle_cpu.bin test_implicit_nonautonomous_cpu.bin test_explicit_nonautonomous_cpu.bin test_implicit_lorenz_cpu.bin test_implicit_rossler_cpu.bin test_implicit_vdp_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          for test in dirk adaptive mass_dae lifecycle nonautonomous lorenz rossler vdp; do
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
           OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/test_explicit_nonautonomous_cpu.bin

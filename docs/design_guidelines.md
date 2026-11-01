@@ -517,6 +517,19 @@ G(u) = alpha*M(t,u,p)*(u-u_prev) - f_I(t,u,p) - r,
 
 Here `f_I` is the full RHS for fully implicit stages, or the implicit part for IMEX, and `G` is formulated with the following methods:
 
+The displayed residual is canonical; a problem may directly evaluate a fixed
+row-scaled equivalent with an identically scaled Jacobian. For balanced
+differential rows, choose a positive reference time `tau_ref`, set
+`s=max(abs(alpha),1/tau_ref)`, `a=alpha/s`, `b=1/s`, and evaluate
+`a*M(t,u,p)*(u-u_prev)-b*(f_I(t,u,p)+r)` directly. Freeze `a` and `b` inside
+`set_affine_shift()` for the whole nonlinear solve, including backtracking.
+This avoids artificial coefficient growth for small and large stage steps.
+The reference time is a problem scale, not a threshold in arbitrary physical units.
+Algebraic constraints retain their own unscaled equations and tolerances; the
+problem supplies the appropriate partition, never a generic mass-diagonal heuristic.
+Globalization progress must use the original physical residual and constraints,
+because scaled stage norms at different shifts are not directly comparable.
+
 ```cpp
 class problem //minimum problem class methods for implicit method. Only one `apply` method either with (in, out)
 {
@@ -536,11 +549,15 @@ class problem //minimum problem class methods for implicit method. Only one `app
 };
 ```
 
-In minimal configuration jacobian should work as:
+For the unscaled canonical residual, the Jacobian acts as:
 
 ```math
 DG(u)[v] = alpha*M(u)*v + alpha*(D_u M(u)[v])*(u-u_prev) - D_u f_I(u)[v].
 ```
+
+For balanced differential rows, it is
+`a*(M(u)*v + (D_u M(u)[v])*(u-u_prev)) - b*D_u f_I(u)[v]`.
+Constraint Jacobian rows remain unscaled, consistently with their residuals.
 
 and implement:
 
@@ -684,7 +701,16 @@ The solver is bound once; stage calls use `solve(stage_state)`. Problem buffers
 must not alias caller states or solver scratch. No mass inverse is required.
 DAE initial data and externally modified endpoints must be consistent; use a
 method suitable for the formulation (initial DAE tests use stiff accuracy).
-Embedded adaptation, zero-diagonal stages, and implicit dense output are deferred.
+Embedded DIRK pairs support the existing MATLAB/SciPy error controllers. Their
+state error is `h*sum((b_i-bhat_i)*k_i)` and the controller exponent is the
+embedded order plus one, independently of the primary order. Allocate the error
+buffer only for a configured error-requiring controller and an embedded table;
+retain the endpoint rate only if the estimator needs it. Constant-step storage
+is unchanged. Error-free custom controllers may retain five-argument `assess()`.
+Failed/nonfinite stages bypass assessment and enter bounded rejection; only
+successful candidates can be committed. No estimator is invented for IE/IM.
+Zero-diagonal stages and implicit dense output remain deferred. Generic embedded
+control does not certify algebraic accuracy or method suitability for every DAE.
 
 The status of a single step is given as the following structure:
 

@@ -102,9 +102,40 @@ class TimestepperExtractionTest(unittest.TestCase):
         header = (MODULE / "include/nmfd/time_steppers/runge_kutta/implicit_time_step.h").read_text()
         self.assertNotIn("#include <nmfd/solvers/", header)
         workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
-        for test in ("dirk", "mass-dae", "lifecycle", "lorenz", "rossler", "vdp", "nonautonomous"):
+        for test in ("dirk", "adaptive", "mass-dae", "lifecycle", "lorenz", "rossler", "vdp", "nonautonomous"):
             for backend in ("cpu", "cuda"):
                 self.assertIn(f"timestepper-implicit-{test}-{backend}", workflow["jobs"])
+
+    def test_adaptive_dirk_is_built_standalone_and_required_by_ci(self):
+        output = self.make(MODULE, "test_implicit_adaptive_cpu.bin", "BUILD_DIR=build/adaptive_probe")
+        self.assertIn("tests/test_implicit_adaptive.cpp", output)
+        workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
+        jobs = workflow["jobs"]
+        self.assertIn("timestepper-implicit-adaptive-cuda", jobs["all-tests-passed"]["needs"])
+        self.assertIn("timestepper-implicit-adaptive-cpu", jobs["timestepper-implicit-adaptive-cuda"]["needs"])
+        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
+        self.assertIn("timestepper-implicit-adaptive-cpu", sanitizer["needs"])
+        commands = "\n".join(step.get("run", "") for step in sanitizer["steps"])
+        self.assertIn("test_implicit_adaptive_cpu.bin", commands)
+        self.assertIn("for test in dirk adaptive mass_dae lifecycle nonautonomous", commands)
+
+    def test_adaptive_system_matrix_runs_on_all_supported_test_backends(self):
+        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
+        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
+        sanitizer_commands = "\n".join(step.get("run", "") for step in sanitizer["steps"])
+        for system in ("lorenz", "rossler", "vdp", "mass-dae"):
+            cpu_job = f"timestepper-implicit-{system}-cpu"
+            self.assertIn("timestepper-implicit-adaptive-cpu", jobs[cpu_job]["needs"])
+            self.assertIn(cpu_job, sanitizer["needs"])
+            target = "test_implicit_" + system.replace("-", "_")
+            self.assertIn(target + "_cpu.bin", sanitizer_commands)
+            for backend in ("cpu", "cuda"):
+                steps = jobs[f"timestepper-implicit-{system}-{backend}"]["steps"]
+                commands = "\n".join(step.get("run", "") for step in steps)
+                self.assertIn(target + f"_{backend}.bin", commands)
+            cpu_commands = "\n".join(step.get("run", "") for step in jobs[cpu_job]["steps"])
+            self.assertIn(target + "_cpu_omp.bin", cpu_commands)
+        self.assertIn("nonautonomous lorenz rossler vdp; do", sanitizer_commands)
 
     def test_nonautonomous_matrix_preserves_explicit_independence(self):
         workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
