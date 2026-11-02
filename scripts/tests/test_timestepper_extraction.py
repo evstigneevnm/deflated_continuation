@@ -137,6 +137,34 @@ class TimestepperExtractionTest(unittest.TestCase):
             self.assertIn(target + "_cpu_omp.bin", cpu_commands)
         self.assertIn("nonautonomous lorenz rossler vdp; do", sanitizer_commands)
 
+    def test_globalization_is_standalone_and_required_by_ci(self):
+        tests = ("globalization", "nonnormal_steady_state", "lorenz_steady_state",
+                 "rossler_steady_state", "vdp_steady_state")
+        test_loop = "for test in " + " ".join(tests) + "; do"
+        for directory in (ROOT, MODULE):
+            for test in tests:
+                output = self.make(directory, f"test_implicit_{test}_cpu_omp.bin",
+                                   "BUILD_DIR=build/globalization_probe")
+                self.assertIn(f"tests/test_implicit_{test}.cpp", output)
+        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
+        self.assertIn("timestepper-implicit-globalization-cuda", jobs["all-tests-passed"]["needs"])
+        for backend in ("cpu", "cuda"):
+            commands = "\n".join(step.get("run", "") for step in
+                                 jobs[f"timestepper-implicit-globalization-{backend}"]["steps"])
+            self.assertIn(test_loop, commands)
+            self.assertIn("test_implicit_${test}_" + backend + ".bin", commands)
+            if backend == "cpu":
+                self.assertIn("test_implicit_${test}_cpu_omp.bin", commands)
+                self.assertIn("for backend in cpu cpu_omp; do", commands)
+                self.assertIn("test_implicit_${test}_${backend}.bin", commands)
+        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
+        self.assertIn("timestepper-implicit-globalization-cpu", sanitizer["needs"])
+        commands = "\n".join(step.get("run", "") for step in sanitizer["steps"])
+        self.assertIn(test_loop, commands)
+        self.assertIn("test_implicit_${test}_cpu.bin", commands)
+        for test in tests:
+            self.assertIn(f"test_implicit_{test}_cpu.bin", commands)
+
     def test_filter_adaptation_is_standalone_and_gates_implicit_tests(self):
         for directory in (ROOT, MODULE):
             output = self.make(directory, "test_explicit_filter_adaptation_cpu_omp.bin",

@@ -766,6 +766,35 @@ not enter history. Modified endpoints, time discontinuities, direction/order
 changes, and reset invalidate it. Only scalar history is retained; vector work
 stays on the selected backend. This controller does not implement globalization.
 
+`time_step_adaptation_globalization<VectorOperations, MeritMeasure>` controls
+forward pseudo-time relaxation toward a steady equation, not physical-time
+accuracy or Newton's internal globalization. Retain the supplied merit functor
+through shared ownership; `MeritMeasure::operator()(state)` returns a nonnegative
+physical steady-residual measure, never the shift-scaled stage residual. Freeze
+physical time and formulation parameters in the problem/merit assembly; pseudo
+time is not a substitute for physical time in non-autonomous equations.
+Accept finite, admissible, successfully solved candidates by default, even when
+merit temporarily grows. Merit guides the next step, not a mandatory Lyapunov
+test. `maximum_merit_growth=0` disables growth rejection; a finite value at least
+one enables an optional guard (one requires monotone merit). Propose
+`h*(merit_old/merit_new)^residual_power`, bounded by configured factors and step
+limits. Numerical failures, nonfinite trial merits, and an enabled merit-growth
+guard trigger bounded shrinking; reaching the minimum step reports failure.
+Only committed unchanged endpoints promote the cached merit. Modified endpoints,
+time discontinuities, initialization and reset invalidate it; independent state or
+merit-definition changes require reset. The controller stores only scalars and
+introduces no vector-sized transfers or workspaces; the supplied merit performs
+its backend reductions. Stop at an equilibrium through external management, not
+by confusing a large pseudo-step or an accepted stage solve with convergence.
+Ordinary error-controlled integration remains the choice for physically accurate
+transients. Compare pseudo-time and physical-time equilibrium residuals separately
+from their trajectories or settling times. Include stable nonnormal transients
+with growing residuals when validating pseudo-time acceptance.
+For unstable equilibria, validate sufficiently large pseudo-step choices and
+independent state errors; small physical residuals alone may hide ill-conditioning.
+Such controlled root searches do not establish physical stability or convergence
+from arbitrary initial states.
+
 ```cpp
 namespace nmfd
 {

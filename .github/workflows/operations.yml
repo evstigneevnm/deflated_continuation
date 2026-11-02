@@ -258,6 +258,7 @@ jobs:
       - timestepper-filter-adaptation-cuda
       - timestepper-implicit-adaptive-cuda
       - timestepper-implicit-dirk-cuda
+      - timestepper-implicit-globalization-cuda
       - timestepper-implicit-lifecycle-cuda
       - timestepper-implicit-lorenz-cuda
       - timestepper-implicit-mass-dae-cuda
@@ -1391,6 +1392,46 @@ jobs:
           make test_implicit_adaptive_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_adaptive_cuda"
           timeout 300s ./"$BUILD_DIR"/implicit_adaptive_cuda/test_implicit_adaptive_cuda.bin
 
+  timestepper-implicit-globalization-cpu:
+    needs: [timestepper-implicit-dirk-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify pseudo-time merit control, equilibria and rollback on serial CPU and OMP
+        run: |
+          for test in globalization nonnormal_steady_state lorenz_steady_state rossler_steady_state vdp_steady_state; do
+            make -j2 "test_implicit_${test}_cpu.bin" "test_implicit_${test}_cpu_omp.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_globalization"
+            for backend in cpu cpu_omp; do
+              OMP_NUM_THREADS=2 timeout 120s ./"$BUILD_DIR"/implicit_globalization/"test_implicit_${test}_${backend}.bin"
+            done
+          done
+
+  timestepper-implicit-globalization-cuda:
+    needs: [timestepper-implicit-globalization-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify pseudo-time globalization when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping implicit CUDA test: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping implicit CUDA test: nvcc unavailable"
+            exit 0
+          fi
+          for test in globalization nonnormal_steady_state lorenz_steady_state rossler_steady_state vdp_steady_state; do
+            make "test_implicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_globalization_cuda"
+            timeout 300s ./"$BUILD_DIR"/implicit_globalization_cuda/"test_implicit_${test}_cuda.bin"
+          done
+
   timestepper-implicit-mass-dae-cpu:
     needs: [timestepper-implicit-adaptive-cpu]
     runs-on: ubuntu-latest
@@ -1645,7 +1686,7 @@ jobs:
           timeout 300s ./"$BUILD_DIR"/implicit_nonautonomous_cuda/test_implicit_nonautonomous_cuda.bin
 
   timestepper-implicit-sanitizers-cpu:
-    needs: [timestepper-implicit-dirk-cpu, timestepper-implicit-adaptive-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu, timestepper-implicit-lorenz-cpu, timestepper-implicit-rossler-cpu, timestepper-implicit-vdp-cpu]
+    needs: [timestepper-implicit-dirk-cpu, timestepper-implicit-adaptive-cpu, timestepper-implicit-globalization-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu, timestepper-implicit-lorenz-cpu, timestepper-implicit-rossler-cpu, timestepper-implicit-vdp-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -1657,8 +1698,11 @@ jobs:
           submodules: true
       - name: Check implicit stage storage and rollback with sanitizers
         run: |
-          make -j2 test_implicit_dirk_cpu.bin test_implicit_adaptive_cpu.bin test_implicit_mass_dae_cpu.bin test_implicit_lifecycle_cpu.bin test_implicit_nonautonomous_cpu.bin test_explicit_nonautonomous_cpu.bin test_explicit_filter_adaptation_cpu.bin test_implicit_lorenz_cpu.bin test_implicit_rossler_cpu.bin test_implicit_vdp_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          make -j2 test_implicit_dirk_cpu.bin test_implicit_adaptive_cpu.bin test_implicit_globalization_cpu.bin test_implicit_nonnormal_steady_state_cpu.bin test_implicit_lorenz_steady_state_cpu.bin test_implicit_rossler_steady_state_cpu.bin test_implicit_vdp_steady_state_cpu.bin test_implicit_mass_dae_cpu.bin test_implicit_lifecycle_cpu.bin test_implicit_nonautonomous_cpu.bin test_explicit_nonautonomous_cpu.bin test_explicit_filter_adaptation_cpu.bin test_implicit_lorenz_cpu.bin test_implicit_rossler_cpu.bin test_implicit_vdp_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
           for test in dirk adaptive mass_dae lifecycle nonautonomous lorenz rossler vdp; do
+            OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
+          done
+          for test in globalization nonnormal_steady_state lorenz_steady_state rossler_steady_state vdp_steady_state; do
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
           OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/test_explicit_nonautonomous_cpu.bin
