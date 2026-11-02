@@ -137,6 +137,24 @@ class TimestepperExtractionTest(unittest.TestCase):
             self.assertIn(target + "_cpu_omp.bin", cpu_commands)
         self.assertIn("nonautonomous lorenz rossler vdp; do", sanitizer_commands)
 
+    def test_filter_adaptation_is_standalone_and_gates_implicit_tests(self):
+        for directory in (ROOT, MODULE):
+            output = self.make(directory, "test_explicit_filter_adaptation_cpu_omp.bin",
+                               "BUILD_DIR=build/filter_probe")
+            self.assertIn("tests/test_explicit_filter_adaptation.cpp", output)
+            self.assertNotIn("nmfd-newton/include", output)
+            self.assertNotIn("nmfd-linsolvers/include", output)
+        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
+        self.assertIn("timestepper-filter-adaptation-cpu", jobs["timestepper-implicit-adaptive-cpu"]["needs"])
+        self.assertIn("timestepper-filter-adaptation-cuda", jobs["all-tests-passed"]["needs"])
+        for backend in ("cpu", "cuda"):
+            commands = "\n".join(step.get("run", "") for step in jobs[f"timestepper-filter-adaptation-{backend}"]["steps"])
+            self.assertIn(f"test_explicit_filter_adaptation_{backend}.bin", commands)
+            if backend == "cpu":
+                self.assertIn("test_explicit_filter_adaptation_cpu_omp.bin", commands)
+        sanitizer = "\n".join(step.get("run", "") for step in jobs["timestepper-implicit-sanitizers-cpu"]["steps"])
+        self.assertIn("test_explicit_filter_adaptation_cpu.bin", sanitizer)
+
     def test_nonautonomous_matrix_preserves_explicit_independence(self):
         workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
         for mode in ("explicit", "implicit"):
@@ -149,6 +167,17 @@ class TimestepperExtractionTest(unittest.TestCase):
                 self.assertNotIn("nmfd-linsolvers/include", output)
             for backend in ("cpu", "cuda"):
                 self.assertIn(f"timestepper-{mode}-nonautonomous-{backend}", workflow["jobs"])
+
+    def test_visual_benchmark_runner_is_standalone_and_tested_in_ci(self):
+        for backend in ("cpu", "cpu_omp", "cuda"):
+            output = self.make(MODULE, f"ode_benchmarks_{backend}.bin", "BUILD_DIR=build/benchmark_probe")
+            self.assertIn("tests/ode_benchmarks.cpp", output)
+            self.assertIn("-MMD -MP -MF", output)
+            self.assertIn("nmfd-newton/include", output)
+            self.assertIn("nmfd-linsolvers/include", output)
+        workflow = (ROOT / ".github/workflows/operations.yml").read_text()
+        self.assertIn("python3 source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py", workflow)
+        self.assertIn('"$PYTHON" source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py', workflow)
 
 
 if __name__ == "__main__":

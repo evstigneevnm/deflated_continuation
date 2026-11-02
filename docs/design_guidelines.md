@@ -701,7 +701,7 @@ The solver is bound once; stage calls use `solve(stage_state)`. Problem buffers
 must not alias caller states or solver scratch. No mass inverse is required.
 DAE initial data and externally modified endpoints must be consistent; use a
 method suitable for the formulation (initial DAE tests use stiff accuracy).
-Embedded DIRK pairs support the existing MATLAB/SciPy error controllers. Their
+Embedded DIRK pairs support the MATLAB/SciPy and digital-filter error controllers. Their
 state error is `h*sum((b_i-bhat_i)*k_i)` and the controller exponent is the
 embedded order plus one, independently of the primary order. Allocate the error
 buffer only for a configured error-requiring controller and an embedded table;
@@ -755,7 +755,16 @@ including any lower-order fallback. External managers may borrow the step method
 to obtain its pending view; the integrator and problem need no extra callbacks.
 
 The `time_step_adaptation` methods will select a particular time step size depending on the local parameters/errors, possible globalization etc.
-the general class name is as follows: `time_step_adaptation_{*}`, where `{*}` describes the underlying mechanism in time step adaptation. For example `time_step_adaptation_matlab`, `time_step_adaptation_regulation`, `time_step_adaptation_globalization`, `time_step_adaptation_constant_step` etc.
+The general class name is `time_step_adaptation_{*}`, where `{*}` describes the underlying mechanism in time step adaptation. For example `time_step_adaptation_matlab`, `time_step_adaptation_regulation`, `time_step_adaptation_globalization`, `time_step_adaptation_constant_step` etc.
+
+`time_step_adaptation_filter` offers I, H211, PC, PID, H312, PPID, and H321
+presets through `params::controller`. It uses additive RMS state errors and the
+estimator's scaling exponent, with bounded I startup/retry control. Filter history
+contains actual attempted steps and errors only after `update(accepted,...)`;
+assessment alone must not commit it. Rejected trials and numerical failures do
+not enter history. Modified endpoints, time discontinuities, direction/order
+changes, and reset invalidate it. Only scalar history is retained; vector work
+stays on the selected backend. This controller does not implement globalization.
 
 ```cpp
 namespace nmfd

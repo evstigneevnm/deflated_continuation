@@ -60,6 +60,7 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p test_newton_solver_dependencies.py
           python3 -m unittest discover -s scripts/tests -p test_nmfd_standalone.py
           python3 -m unittest discover -s scripts/tests -p test_timestepper_extraction.py
+          python3 source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py
           python3 -m unittest discover -s scripts/tests -p test_ks1d_reference.py
           python3 -m unittest discover -s scripts/tests -p test_write_ks1d_ci_config.py
           python3 scripts/check_operations_dependencies.py
@@ -254,6 +255,7 @@ jobs:
       - timestepper-explicit-rossler-cpu
       - timestepper-explicit-vdp-cpu
       - timestepper-fsal-cuda
+      - timestepper-filter-adaptation-cuda
       - timestepper-implicit-adaptive-cuda
       - timestepper-implicit-dirk-cuda
       - timestepper-implicit-lifecycle-cuda
@@ -1354,7 +1356,7 @@ jobs:
           timeout 300s ./"$BUILD_DIR"/implicit_dirk_cuda/test_implicit_dirk_cuda.bin
 
   timestepper-implicit-adaptive-cpu:
-    needs: [timestepper-implicit-dirk-cpu, timestepper-scipy-adaptation-cpu]
+    needs: [timestepper-implicit-dirk-cpu, timestepper-scipy-adaptation-cpu, timestepper-filter-adaptation-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -1655,11 +1657,12 @@ jobs:
           submodules: true
       - name: Check implicit stage storage and rollback with sanitizers
         run: |
-          make -j2 test_implicit_dirk_cpu.bin test_implicit_adaptive_cpu.bin test_implicit_mass_dae_cpu.bin test_implicit_lifecycle_cpu.bin test_implicit_nonautonomous_cpu.bin test_explicit_nonautonomous_cpu.bin test_implicit_lorenz_cpu.bin test_implicit_rossler_cpu.bin test_implicit_vdp_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          make -j2 test_implicit_dirk_cpu.bin test_implicit_adaptive_cpu.bin test_implicit_mass_dae_cpu.bin test_implicit_lifecycle_cpu.bin test_implicit_nonautonomous_cpu.bin test_explicit_nonautonomous_cpu.bin test_explicit_filter_adaptation_cpu.bin test_implicit_lorenz_cpu.bin test_implicit_rossler_cpu.bin test_implicit_vdp_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
           for test in dirk adaptive mass_dae lifecycle nonautonomous lorenz rossler vdp; do
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
           OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/test_explicit_nonautonomous_cpu.bin
+          OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/test_explicit_filter_adaptation_cpu.bin
 
   timestepper-tables-explicit-cpu:
     runs-on: ubuntu-latest
@@ -1841,6 +1844,44 @@ jobs:
           make test_transform_reduce_sum_cuda.bin test_explicit_scipy_adaptation_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scipy_adaptation_cuda" REAL_TYPE=double
           ./"$BUILD_DIR"/scipy_adaptation_cuda/test_transform_reduce_sum_cuda.bin
           ./"$BUILD_DIR"/scipy_adaptation_cuda/test_explicit_scipy_adaptation_cuda.bin
+
+  timestepper-filter-adaptation-cpu:
+    needs: [timestepper-tables-explicit-cpu, scfd-transform-reduction-cpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare hosted CPU compiler
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
+          fi
+      - name: Verify filter recurrences, committed history and explicit RK on serial and OMP
+        run: |
+          make test_explicit_filter_adaptation_cpu.bin test_explicit_filter_adaptation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/filter_adaptation"
+          OMP_NUM_THREADS=8 timeout 90s ./"$BUILD_DIR"/filter_adaptation/test_explicit_filter_adaptation_cpu.bin
+          OMP_NUM_THREADS=8 timeout 90s ./"$BUILD_DIR"/filter_adaptation/test_explicit_filter_adaptation_cpu_omp.bin
+
+  timestepper-filter-adaptation-cuda:
+    needs: [timestepper-filter-adaptation-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify filter adaptation when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping filter CUDA tests: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping filter CUDA tests: nvcc unavailable"
+            exit 0
+          fi
+          make test_explicit_filter_adaptation_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/filter_adaptation_cuda"
+          timeout 300s ./"$BUILD_DIR"/filter_adaptation_cuda/test_explicit_filter_adaptation_cuda.bin
 
   timestepper-dop853-fixed-cpu:
     needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
@@ -2036,6 +2077,7 @@ jobs:
           fi
           export MPLCONFIGDIR="$SIMULATION_BUILD/matplotlib"
           "$PYTHON" source/contrib/nmfd-timesteppers/tests/test_compare_explicit_lorenz_simulation.py
+          "$PYTHON" source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py
           make test_explicit_lorenz_simulation_cpu.bin test_explicit_lorenz_simulation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$SIMULATION_BUILD"
           for backend in cpu cpu_omp; do
             for method in RK45 RK23 DOP853; do
