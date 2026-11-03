@@ -531,13 +531,13 @@ Globalization progress must use the original physical residual and constraints,
 because scaled stage norms at different shifts are not directly comparable.
 
 ```cpp
-class problem //minimum problem class methods for implicit method. Only one `apply` method either with (in, out)
+class problem //minimum problem class methods for implicit method. `apply` evaluates only the residual.
 {
   // ...  
   void set_affine_shift(scalar_type alpha); // implements `alpha` affine shift in the residual.
   void apply(const vector_type& in, vector_type& out); // returns the whole residual G(u) as `problem.apply(in, out);` as a mapping `in|-G->out`.
   // void set_previous_state(u_prev); //sets `u_prev` for the calculation of the residual.
-  bool apply(const vector_type& state,  vector_type& rate, evaluation_mode::rate); //OPTIONAL!
+  bool evaluate_rate(const vector_type& state, vector_type& rate); // OPTIONAL: physical, consistent derivative.
   vector_type& previous_state(); // fills the previous state vector `u_prev`
   const vector_type& previous_state() const;
   // void set_known_rhs(r); // sets the known `r` vector that can be substituted for the BDF.
@@ -711,14 +711,15 @@ is unchanged. Error-free custom controllers may retain five-argument `assess()`.
 Failed/nonfinite stages bypass assessment and enter bounded rejection; only
 successful candidates can be committed. No estimator is invented for IE/IM.
 For a zero diagonal, the stage state is the known reference. Required rates use
-the optional `bool Problem::apply(state, rate, evaluation_mode::rate)` overload,
-with no default third argument; existing two-argument residual calls are unchanged.
+the optional `bool Problem::evaluate_rate(state, rate)` method;
+existing two-argument residual `apply()` calls are unchanged.
 Use the current `set_time()` value, ignore affine-shift data, and leave the state,
-stage buffers and prepared linearization unchanged. Return the physical derivative
+stage buffers and prepared linearization unchanged. Write the physical derivative
 solving `M(t,state)*rate=f(t,state)`, not the raw RHS or a scaled residual. The
 problem owns any mass solve and its reusable backend workspace; the stepper neither
 constructs an inverse nor moves vector-sized data to the host. Numerical rate
-failures follow bounded stage rejection; backend/configuration exceptions propagate.
+failures return `false` and follow bounded stage rejection; `true` indicates success.
+Nonfinite rates are rejected separately; backend/configuration exceptions propagate.
 Reject unavailable required rate support during construction. Dummy stages whose
 rates are unused by later stages, the endpoint and the selected estimator need no
 provider. Do not cache rates across rejected attempts or modified endpoints.
