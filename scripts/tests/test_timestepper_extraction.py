@@ -165,6 +165,31 @@ class TimestepperExtractionTest(unittest.TestCase):
         for test in tests:
             self.assertIn(f"test_implicit_{test}_cpu.bin", commands)
 
+    def test_esdirk_rate_matrix_is_standalone_and_required_by_ci(self):
+        tests = ("esdirk", "esdirk_adaptive", "esdirk_mass_dae")
+        test_loop = "for test in " + " ".join(tests) + "; do"
+        for directory in (ROOT, MODULE):
+            for test in tests:
+                output = self.make(directory, f"test_implicit_{test}_cpu_omp.bin",
+                                   "BUILD_DIR=build/esdirk_probe")
+                self.assertIn(f"tests/test_implicit_{test}.cpp", output)
+        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
+        self.assertIn("timestepper-implicit-esdirk-cuda", jobs["all-tests-passed"]["needs"])
+        for backend in ("cpu", "cuda"):
+            commands = "\n".join(step.get("run", "") for step in
+                                 jobs[f"timestepper-implicit-esdirk-{backend}"]["steps"])
+            self.assertIn(test_loop, commands)
+            self.assertIn("test_implicit_${test}_" + backend + ".bin", commands)
+            if backend == "cpu":
+                self.assertIn("test_implicit_${test}_cpu_omp.bin", commands)
+                self.assertIn("test_implicit_${test}_${backend}.bin", commands)
+        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
+        self.assertIn("timestepper-implicit-esdirk-cpu", sanitizer["needs"])
+        commands = "\n".join(step.get("run", "") for step in sanitizer["steps"])
+        self.assertIn(test_loop, commands)
+        for test in tests:
+            self.assertIn(f"test_implicit_{test}_cpu.bin", commands)
+
     def test_filter_adaptation_is_standalone_and_gates_implicit_tests(self):
         for directory in (ROOT, MODULE):
             output = self.make(directory, "test_explicit_filter_adaptation_cpu_omp.bin",

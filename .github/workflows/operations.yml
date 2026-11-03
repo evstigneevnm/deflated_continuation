@@ -258,6 +258,7 @@ jobs:
       - timestepper-filter-adaptation-cuda
       - timestepper-implicit-adaptive-cuda
       - timestepper-implicit-dirk-cuda
+      - timestepper-implicit-esdirk-cuda
       - timestepper-implicit-globalization-cuda
       - timestepper-implicit-lifecycle-cuda
       - timestepper-implicit-lorenz-cuda
@@ -1392,6 +1393,46 @@ jobs:
           make test_implicit_adaptive_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_adaptive_cuda"
           timeout 300s ./"$BUILD_DIR"/implicit_adaptive_cuda/test_implicit_adaptive_cuda.bin
 
+  timestepper-implicit-esdirk-cpu:
+    needs: [timestepper-implicit-dirk-cpu, timestepper-implicit-adaptive-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify CN and ESDIRK rates, orders, adaptation and mass/DAE handling
+        run: |
+          for test in esdirk esdirk_adaptive esdirk_mass_dae; do
+            make -j2 "test_implicit_${test}_cpu.bin" "test_implicit_${test}_cpu_omp.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_esdirk"
+            for backend in cpu cpu_omp; do
+              OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/implicit_esdirk/"test_implicit_${test}_${backend}.bin"
+            done
+          done
+
+  timestepper-implicit-esdirk-cuda:
+    needs: [timestepper-implicit-esdirk-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify CN and ESDIRK when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping ESDIRK CUDA tests: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping ESDIRK CUDA tests: nvcc unavailable"
+            exit 0
+          fi
+          for test in esdirk esdirk_adaptive esdirk_mass_dae; do
+            make "test_implicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_esdirk_cuda"
+            timeout 300s ./"$BUILD_DIR"/implicit_esdirk_cuda/"test_implicit_${test}_cuda.bin"
+          done
+
   timestepper-implicit-globalization-cpu:
     needs: [timestepper-implicit-dirk-cpu]
     runs-on: ubuntu-latest
@@ -1686,7 +1727,7 @@ jobs:
           timeout 300s ./"$BUILD_DIR"/implicit_nonautonomous_cuda/test_implicit_nonautonomous_cuda.bin
 
   timestepper-implicit-sanitizers-cpu:
-    needs: [timestepper-implicit-dirk-cpu, timestepper-implicit-adaptive-cpu, timestepper-implicit-globalization-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu, timestepper-implicit-lorenz-cpu, timestepper-implicit-rossler-cpu, timestepper-implicit-vdp-cpu]
+    needs: [timestepper-implicit-dirk-cpu, timestepper-implicit-adaptive-cpu, timestepper-implicit-esdirk-cpu, timestepper-implicit-globalization-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu, timestepper-implicit-lorenz-cpu, timestepper-implicit-rossler-cpu, timestepper-implicit-vdp-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -1703,6 +1744,10 @@ jobs:
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
           for test in globalization nonnormal_steady_state lorenz_steady_state rossler_steady_state vdp_steady_state; do
+            OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
+          done
+          make -j2 test_implicit_esdirk_cpu.bin test_implicit_esdirk_adaptive_cpu.bin test_implicit_esdirk_mass_dae_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          for test in esdirk esdirk_adaptive esdirk_mass_dae; do
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
           OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/test_explicit_nonautonomous_cpu.bin

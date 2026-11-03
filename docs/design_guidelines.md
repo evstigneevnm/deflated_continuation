@@ -537,6 +537,7 @@ class problem //minimum problem class methods for implicit method. Only one `app
   void set_affine_shift(scalar_type alpha); // implements `alpha` affine shift in the residual.
   void apply(const vector_type& in, vector_type& out); // returns the whole residual G(u) as `problem.apply(in, out);` as a mapping `in|-G->out`.
   // void set_previous_state(u_prev); //sets `u_prev` for the calculation of the residual.
+  bool apply(const vector_type& state,  vector_type& rate, evaluation_mode::rate); //OPTIONAL!
   vector_type& previous_state(); // fills the previous state vector `u_prev`
   const vector_type& previous_state() const;
   // void set_known_rhs(r); // sets the known `r` vector that can be substituted for the BDF.
@@ -694,9 +695,9 @@ public:
 
 Support explicit RK, (S)DIRK, Rosenbrock/W, BDF, and IMEX with method-specific engines. IRK and exponential RK are to be supported layer.
 
-The current implicit RK engine supports nonzero-diagonal DIRK/SDIRK tables with
+The current implicit RK engine supports lower-triangular DIRK/SDIRK/ESDIRK tables with
 an injected nonlinear solver. At stage i, `previous_state()` holds the RK reference
-`u_n+h*sum(a_ij*k_j)`, `known_rhs()` is zero, and `alpha=1/(h*a_ii)`.
+`u_n+h*sum(a_ij*k_j)` and `known_rhs()` is zero. Nonzero diagonals use `alpha=1/(h*a_ii)`.
 The solver is bound once; stage calls use `solve(stage_state)`. Problem buffers
 must not alias caller states or solver scratch. No mass inverse is required.
 DAE initial data and externally modified endpoints must be consistent; use a
@@ -709,8 +710,22 @@ retain the endpoint rate only if the estimator needs it. Constant-step storage
 is unchanged. Error-free custom controllers may retain five-argument `assess()`.
 Failed/nonfinite stages bypass assessment and enter bounded rejection; only
 successful candidates can be committed. No estimator is invented for IE/IM.
-Zero-diagonal stages and implicit dense output remain deferred. Generic embedded
+For a zero diagonal, the stage state is the known reference. Required rates use
+the optional `bool Problem::apply(state, rate, evaluation_mode::rate)` overload,
+with no default third argument; existing two-argument residual calls are unchanged.
+Use the current `set_time()` value, ignore affine-shift data, and leave the state,
+stage buffers and prepared linearization unchanged. Return the physical derivative
+solving `M(t,state)*rate=f(t,state)`, not the raw RHS or a scaled residual. The
+problem owns any mass solve and its reusable backend workspace; the stepper neither
+constructs an inverse nor moves vector-sized data to the host. Numerical rate
+failures follow bounded stage rejection; backend/configuration exceptions propagate.
+Reject unavailable required rate support during construction. Dummy stages whose
+rates are unused by later stages, the endpoint and the selected estimator need no
+provider. Do not cache rates across rejected attempts or modified endpoints.
+DAE rate reconstruction must include the formulation's differentiated constraints;
+never infer algebraic derivatives or invert a singular mass matrix. Generic embedded
 control does not certify algebraic accuracy or method suitability for every DAE.
+Implicit dense output, IMEX execution and explicit-engine rate dispatch remain deferred.
 
 The status of a single step is given as the following structure:
 
