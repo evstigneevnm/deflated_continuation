@@ -190,6 +190,32 @@ class TimestepperExtractionTest(unittest.TestCase):
         for test in tests:
             self.assertIn(f"test_implicit_{test}_cpu.bin", commands)
 
+    def test_implicit_dense_matrix_is_standalone_and_required_by_ci(self):
+        tests = ("dense_output", "dense_lifecycle", "dense_mass_dae")
+        for directory in (ROOT, MODULE):
+            for test in tests:
+                output = self.make(directory, f"test_implicit_{test}_cpu_omp.bin",
+                                   "BUILD_DIR=build/implicit_dense_probe")
+                self.assertIn(f"tests/test_implicit_{test}.cpp", output)
+        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
+        self.assertIn("timestepper-implicit-dense-cuda", jobs["all-tests-passed"]["needs"])
+        self.assertIn("timestepper-implicit-dense-cpu", jobs["timestepper-implicit-dense-cuda"]["needs"])
+        test_loop = "for test in " + " ".join(tests) + "; do"
+        for backend in ("cpu", "cuda"):
+            commands = "\n".join(step.get("run", "") for step in
+                                 jobs[f"timestepper-implicit-dense-{backend}"]["steps"])
+            self.assertIn(test_loop, commands)
+            self.assertIn("test_implicit_${test}_" + backend + ".bin", commands)
+            if backend == "cpu":
+                self.assertIn("test_implicit_${test}_cpu_omp.bin", commands)
+                self.assertIn("test_implicit_${test}_${backend}.bin", commands)
+        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
+        self.assertIn("timestepper-implicit-dense-cpu", sanitizer["needs"])
+        commands = "\n".join(step.get("run", "") for step in sanitizer["steps"])
+        self.assertIn(test_loop, commands)
+        for test in tests:
+            self.assertIn(f"test_implicit_{test}_cpu.bin", commands)
+
     def test_filter_adaptation_is_standalone_and_gates_implicit_tests(self):
         for directory in (ROOT, MODULE):
             output = self.make(directory, "test_explicit_filter_adaptation_cpu_omp.bin",

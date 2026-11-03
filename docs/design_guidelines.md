@@ -726,7 +726,7 @@ provider. Do not cache rates across rejected attempts or modified endpoints.
 DAE rate reconstruction must include the formulation's differentiated constraints;
 never infer algebraic derivatives or invert a singular mass matrix. Generic embedded
 control does not certify algebraic accuracy or method suitability for every DAE.
-Implicit dense output, IMEX execution and explicit-engine rate dispatch remain deferred.
+IMEX execution and explicit-engine rate dispatch remain deferred.
 
 The status of a single step is given as the following structure:
 
@@ -769,6 +769,31 @@ storage and extra RHS evaluations. RK extension coefficients belong to the table
 evaluation belongs to the step method. Report the actual interpolation order,
 including any lower-order fallback. External managers may borrow the step method
 to obtain its pending view; the integrator and problem need no extra callbacks.
+
+`implicit_time_step<VectorOperations, Problem, TimeStepAdaptation, NonlinearSolver,
+DenseOutput=false>` retains existing four-argument uses. When enabled, it requires
+table-provided continuous-extension coefficients and exposes the same borrowed
+`continuous_integration` view as explicit RK. IE has linear order-one output;
+CN, SDIRK2(1)2 and ESDIRK2(1)3 have order-two quadratic extensions. IM uses a
+quadratic extension with an additional initial consistent rate. SDIRK3(1)3 uses an
+order-three endpoint Hermite extension with an additional initial consistent rate;
+ARK324L2SA reuses its explicit first stage for the same order-three extension.
+Additional derivatives use `Problem::evaluate_rate()` only after
+error acceptance; false/nonfinite results enter bounded rejection before publishing
+the candidate. Restore the prepared stage time, preserve its buffers/Jacobian, and
+snapshot the initial state before publishing even for in-place stepping.
+Store all extension rates plus one initial-state snapshot on the selected backend.
+Sampling allocates no vectors, invokes no problem methods, and transfers no
+vector-sized data to the host. Disabling dense output retains the original vector
+and rate-evaluation budgets. `dense_output_order()` reports zero when disabled.
+Embedded estimates control the step endpoint, not a separate interpolation error.
+
+A DAE dense view is a raw interpolant, not a certification of constraint consistency
+or algebraic interpolation order. The application/external manager must reconstruct
+constraints at the returned sample time before using a sample as a constrained
+event state or committing it. Reconstruction must preserve its own formulation,
+gauge and required accuracy; failures must not be committed. This adds no mandatory
+problem callback and does not assume that a singular mass can be inverted.
 
 The `time_step_adaptation` methods will select a particular time step size depending on the local parameters/errors, possible globalization etc.
 The general class name is `time_step_adaptation_{*}`, where `{*}` describes the underlying mechanism in time step adaptation. For example `time_step_adaptation_matlab`, `time_step_adaptation_regulation`, `time_step_adaptation_globalization`, `time_step_adaptation_constant_step` etc.
