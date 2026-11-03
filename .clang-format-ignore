@@ -1,5 +1,6 @@
 source/contrib/**
 source/time_stepper/legacy/**
+source/periodic_orbit/legacy/**
 build/**
 data/**
 dat_files/**

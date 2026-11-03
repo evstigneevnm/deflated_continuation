@@ -952,6 +952,16 @@ logging/checkpoints must be rank-aware.
 
 ## Events, Poincare Sections, And Orbits
 
+The original periodic-orbit implementation and tests are frozen under
+`source/periodic_orbit/legacy/include/periodic_orbit`. Its separate include root
+is enabled only for historical Make targets; new code must not resolve archived
+headers implicitly. Archiving does not complete the periodic-orbit migration or
+certify historical examples against current dependencies.
+
+Event/section management, flow maps, and single/multiple shooting belong to the
+project's `source/periodic_orbit`, not `nmfd-timesteppers`. They consume its existing
+dense-output, external-management, and transactional finalization contracts.
+
 Time integration uses generic events and never depends on `periodic_orbit`.
 A section supplies `h(t,state)`, crossing orientation/arming, and optional
 derivatives. A separate locator brackets and refines intersections.

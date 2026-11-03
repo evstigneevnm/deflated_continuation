@@ -134,6 +134,16 @@ $(LEGACY_LINEAR_SOLVER_TARGETS): $(wildcard $(LEGACY_LINSOLVERS)/*.h $(LEGACY_LI
 LEGACY_NEWTON_HEADERS = $(wildcard source/numerical_algos/legacy/include/numerical_algos/newton_solvers/*.h)
 $(LEGACY_LINEAR_SOLVER_TARGETS): private IPROJECT += -DPROJECT_ENABLE_LEGACY_NEWTON
 $(LEGACY_LINEAR_SOLVER_TARGETS): $(LEGACY_NEWTON_HEADERS)
+LEGACY_PERIODIC_ORBIT_INCLUDE = source/periodic_orbit/legacy/include
+LEGACY_PERIODIC_ORBIT_TESTS = $(LEGACY_PERIODIC_ORBIT_INCLUDE)/periodic_orbit/tests
+LEGACY_PERIODIC_ORBIT_TARGETS = test_rossler_to_section test_glued_nonlinear_operator \
+  test_glued_poincare_map_linear_operator test_rossler_periodic_orbit_cpu \
+  test_lorentz_periodic_orbit_cpu test_rossler_periodic_continuate_cpu \
+  test_rossler_periodic_orbit_gpu test_lorentz_time_stepping \
+  abc_flow_perodic_orbit_stabilization Kolmogorov_3D_perodic_orbit_stabilization
+# Keep archived includes ahead of future replacements, and private to historical targets.
+$(LEGACY_PERIODIC_ORBIT_TARGETS): private IPROJECT := -I $(LEGACY_PERIODIC_ORBIT_INCLUDE) $(IPROJECT)
+$(LEGACY_PERIODIC_ORBIT_TARGETS): $(wildcard $(LEGACY_PERIODIC_ORBIT_INCLUDE)/periodic_orbit/*.h $(LEGACY_PERIODIC_ORBIT_INCLUDE)/periodic_orbit/detail/*.h $(LEGACY_PERIODIC_ORBIT_TESTS)/*.h $(LEGACY_PERIODIC_ORBIT_TESTS)/*.cuh)
 IBOOST = -I$(BOOST_ROOT_PATH)/include
 HIGH_PRECISION_BLAS1_CUDA_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_type.h $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl.cuh $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_functions.cuh $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_impl_shmem.cuh
 HIGH_PRECISION_BLAS1_HIP_HEADERS = $(COMMON_NMFD_OPERATIONS)/nmfd/operations/blas1/high_precision/hip/gpu_reduction_ogita.h
@@ -1368,30 +1378,30 @@ test_rossler_time_stepping:
 
 test_lorentz_time_stepping:
 	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/time_stepper/legacy/tests/lorentz.cpp $(OPENMP) -o $(BUILD_DIR)/test_lorentz.bin 2>$(RESULTS)
-# test periodic orbits:
+# Archived periodic-orbit examples; these targets do not select the new implementation.
 test_rossler_to_section:
-	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_to_section.cpp $(OPENMP) -o $(BUILD_DIR)/test_rossler_to_section.bin 2>$(RESULTS)
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) $(LEGACY_PERIODIC_ORBIT_TESTS)/rossler_to_section.cpp $(OPENMP) -o $(BUILD_DIR)/test_rossler_to_section.bin 2>$(RESULTS)
 
 test_glued_nonlinear_operator:
-	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/glued_nonlinear_operator_and_jacobian.cpp $(OPENMP) -o $(BUILD_DIR)/test_glued_nonlinear_operator_and_jacobian.bin 2>$(RESULTS)
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) $(LEGACY_PERIODIC_ORBIT_TESTS)/glued_nonlinear_operator_and_jacobian.cpp $(OPENMP) -o $(BUILD_DIR)/test_glued_nonlinear_operator_and_jacobian.bin 2>$(RESULTS)
 
 test_glued_poincare_map_linear_operator:
-	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/glued_poincare_map_linear_operator.cpp $(OPENMP) -o $(BUILD_DIR)/test_glued_poincare_map_linear_operator.bin 2>$(RESULTS)
+	$(G++) $(G++FLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) $(LEGACY_PERIODIC_ORBIT_TESTS)/glued_poincare_map_linear_operator.cpp $(OPENMP) -o $(BUILD_DIR)/test_glued_poincare_map_linear_operator.bin 2>$(RESULTS)
 
 test_rossler_periodic_orbit_cpu:
-	$(G++)  $(G++FLAGS)  $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_periodic_cpu.cpp $(OPENMP) -o $(BUILD_DIR)/test_rossler_periodic_cpu.bin 2>$(RESULTS)
+	$(G++)  $(G++FLAGS)  $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) $(LEGACY_PERIODIC_ORBIT_TESTS)/rossler_periodic_cpu.cpp $(OPENMP) -o $(BUILD_DIR)/test_rossler_periodic_cpu.bin 2>$(RESULTS)
 
 
 test_lorentz_periodic_orbit_cpu:
-	$(G++)  $(G++FLAGS)  $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/lorentz_periodic_cpu.cpp $(OPENMP) -o $(BUILD_DIR)/test_lorentz_periodic_cpu.bin 2>$(RESULTS)
+	$(G++)  $(G++FLAGS)  $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) $(LEGACY_PERIODIC_ORBIT_TESTS)/lorentz_periodic_cpu.cpp $(OPENMP) -o $(BUILD_DIR)/test_lorentz_periodic_cpu.bin 2>$(RESULTS)
 
 test_rossler_periodic_continuate_cpu:
-	$(G++)  $(G++FLAGS)  $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) $(IBOOST) source/periodic_orbit/tests/rossler_periodic_continuate_cpu.cpp $(OPENMP) $(LBOOST) -o $(BUILD_DIR)/rossler_periodic_continuate_cpu.bin 2>$(RESULTS)
+	$(G++)  $(G++FLAGS)  $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) $(IBOOST) $(LEGACY_PERIODIC_ORBIT_TESTS)/rossler_periodic_continuate_cpu.cpp $(OPENMP) $(LBOOST) -o $(BUILD_DIR)/rossler_periodic_continuate_cpu.bin 2>$(RESULTS)
 
 
 test_rossler_periodic_orbit_gpu:
-	$(NVCC) $(NVCCFLAGS) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_operator_ker.cu -c -o $(BUILD_DIR)/rossler_operator_kernels.o 2>$(RESULTS)
-	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) source/periodic_orbit/tests/rossler_periodic_gpu.cpp $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o $(BUILD_DIR)/rossler_operator_kernels.o -o $(BUILD_DIR)/test_rossler_periodic_gpu.bin $(LCUDA) $(LIBS3) $(LLAPACK) 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(IPROJECT) $(ICUDA) $(LEGACY_PERIODIC_ORBIT_TESTS)/rossler_operator_ker.cu -c -o $(BUILD_DIR)/rossler_operator_kernels.o 2>$(RESULTS)
+	$(NVCC) $(NVCCFLAGS) $(SCALAR_TYPE) $(IPROJECT) $(ICUDA) $(LEGACY_PERIODIC_ORBIT_TESTS)/rossler_periodic_gpu.cpp $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(BUILD_DIR)/gpu_vector_operations_kernels.o $(BUILD_DIR)/gpu_matrix_vector_operations_kernels.o $(BUILD_DIR)/rossler_operator_kernels.o -o $(BUILD_DIR)/test_rossler_periodic_gpu.bin $(LCUDA) $(LIBS3) $(LLAPACK) 2>$(RESULTS)
 
 # make all common kernels
 ker: gpu_matrix_vector_operations_ker gpu_vector_operations_ker gpu_reduction_ogita_ker abc_flow_ker Kolmogorov_3D_ker Taylor_Green_ker
