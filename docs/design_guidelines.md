@@ -1006,8 +1006,31 @@ by measured transverse speed, preventing a different cycle count from validating
 the same closing state. Placement uses a bounded scalar schedule and `O(MN)` selected backend storage for fixed
 neighbor budget. Event work is `O(N)` per bounded sample/refinement; no dense
 basis, monodromy matrix, or vector-sized host transfer is introduced. Only scalar
-diagnostics/reductions reach the host. Runtime section-coordinate storage,
-matching equations, prepared derivatives, and orbit solving are later stages.
+diagnostics/reductions reach the host. Matching equations, prepared derivatives,
+and orbit solving remain subsequent stages.
+
+Real Euclidean affine sections now have `affine_chart` coordinate workspaces.
+`lift`/`restrict` convert between `N-1` coordinates and physical states;
+`lift_increment`/`restrict_increment` provide their linear actions. A stable
+Householder reflection represents the tangent plane without an `N` by `N-1`
+basis. Restricting an off-section state orthogonally projects it; workflows must
+still verify physical section residuals. Each chart owns backend-local scratch
+and retains its section and spaces. Do not share mutable charts/operations across
+concurrent consumers. The default transport supports flat local SCFD arrays;
+other layouts may inject transport operations. Custom metrics, complex real
+coordinate charts, distributed charts, and constrained DAE coordinates need
+separately validated chart policies, not an implicit host fallback.
+
+Use canonical `nmfd::operations::glued_vector_space<CoordinateSpace>` for runtime
+section counts. Construct it once from the coordinate space and layout size;
+`comp(i)` accesses one section's coordinate vector. Existing fixed-count glued
+spaces remain supported. Keep the count and charts fixed during a nonlinear
+solve; rebuild their workspaces only outside it. Block metadata is `O(M)` on the
+host, while coordinate/state storage and algebra stay on the selected backend
+in `O(MN)`. Charts use `O(N)` work/storage per section and transfer only scalar
+reductions. The current cyclic-coordinate Newton test validates this solver
+boundary; it is not yet an orbit-matching implementation. Prepared flow-map
+derivatives and seeded KS1D PO/RPO application gates remain subsequent work.
 
 Use method-specific dense output (`evaluate`, optionally `evaluate_derivative`);
 otherwise use bracketed substeps. Interpolation is not an exact trajectory.

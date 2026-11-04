@@ -1499,7 +1499,7 @@ jobs:
         run: |
           export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE
           make check_periodic_orbit_headers_cpu CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc G++='${{ matrix.compiler }}'
-          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target; do
+          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target section_coordinates coordinate_solvers; do
             make -j2 "test_periodic_orbit_${test}_cpu.bin" "test_periodic_orbit_${test}_cpu_omp.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/sections_cpu" G++='${{ matrix.compiler }}'
             for backend in cpu cpu_omp; do
               timeout 180s "$BUILD_DIR/sections_cpu/test_periodic_orbit_${test}_${backend}.bin"
@@ -1520,7 +1520,7 @@ jobs:
       - name: Verify section ownership, bounds and failure cleanup
         run: |
           export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE
-          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target; do
+          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target section_coordinates coordinate_solvers; do
             make -j2 "test_periodic_orbit_${test}_cpu.bin" "test_periodic_orbit_${test}_cpu_omp.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/sections_sanitizers" TARGET_GCC='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer'
             for backend in cpu cpu_omp; do
               timeout 180s "$BUILD_DIR/sections_sanitizers/test_periodic_orbit_${test}_${backend}.bin"
@@ -1541,7 +1541,7 @@ jobs:
             echo "Skipping CUDA sections: compiler or usable GPU unavailable"
             exit 0
           fi
-          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target; do
+          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target section_coordinates coordinate_solvers; do
             make "test_periodic_orbit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/sections_cuda"
             timeout 300s "$BUILD_DIR/sections_cuda/test_periodic_orbit_${test}_cuda.bin"
           done
@@ -1575,7 +1575,7 @@ jobs:
             fi
             HIP_TARGET="${HIP_ARCH_LIST:-native}"
           fi
-          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target; do
+          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target section_coordinates coordinate_solvers; do
             make "test_periodic_orbit_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/sections_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
             timeout 300s "$BUILD_DIR/sections_hip/test_periodic_orbit_${test}_hip.bin"
           done

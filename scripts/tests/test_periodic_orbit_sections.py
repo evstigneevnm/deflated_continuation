@@ -9,6 +9,7 @@ MODERN = ROOT / "source/periodic_orbit"
 SYSTEMS = (
     "section_geometry", "event_locator", "poincare_harmonic", "poincare_implicit",
     "poincare_dae", "section_map_lifecycle", "section_layout_variable_speed", "section_rpo_target",
+    "section_coordinates", "coordinate_solvers",
 )
 
 
@@ -16,12 +17,14 @@ class PeriodicSectionContractTest(unittest.TestCase):
     def test_backend_local_public_headers(self):
         headers = [path for path in MODERN.rglob("*.h")
                    if "legacy" not in path.parts and "tests" not in path.parts]
-        self.assertEqual(len(headers), 7)
+        self.assertEqual(len(headers), 9)
         for path in headers:
             with self.subTest(header=path.name):
                 text = path.read_text()
                 self.assertNotRegex(text, r"->(?:view|get|set|get_value_at_point|set_value_at_point)\s*\(")
-                self.assertNotRegex(text, r"cudaMemcpy|hipMemcpy|copy_to_host|copy_from_host|raw_ptr")
+                self.assertNotRegex(text, r"cudaMemcpy|hipMemcpy|copy_to_host|copy_from_host")
+                if path.name != "scfd_chart_transport.h":
+                    self.assertNotIn("raw_ptr", text)
                 self.assertNotIn("nmfd/solvers", text)
                 self.assertNotIn("legacy/", text)
 

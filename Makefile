@@ -1284,9 +1284,11 @@ TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tes
 TIME_STEPPER_VECTOR_WRAP_HEADER = $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 TIME_STEPPER_IMPLICIT_TEST_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/implicit_*.h $(NMFD_TIMESTEPPERS_ROOT)/tests/nonautonomous_test_problems.h)
 
-PERIODIC_SECTION_HEADERS = $(wildcard source/periodic_orbit/*.h source/periodic_orbit/events/*.h source/periodic_orbit/sections/*.h source/periodic_orbit/tests/*.h)
+PERIODIC_SECTION_HEADERS = $(wildcard source/periodic_orbit/*.h source/periodic_orbit/events/*.h source/periodic_orbit/sections/*.h source/periodic_orbit/sections/detail/*.h source/periodic_orbit/tests/*.h)
 PERIODIC_SECTION_DEPS = $(PERIODIC_SECTION_HEADERS) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS)
 test_periodic_orbit_poincare_implicit_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+test_periodic_orbit_coordinate_solvers_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+test_periodic_orbit_coordinate_solvers_cpu.bin test_periodic_orbit_coordinate_solvers_cpu_omp.bin test_periodic_orbit_coordinate_solvers_cuda.bin test_periodic_orbit_coordinate_solvers_hip.bin: $(NEWTON_TEST_HEADERS)
 test_periodic_orbit_poincare_implicit_cpu.bin test_periodic_orbit_poincare_implicit_cpu_omp.bin test_periodic_orbit_poincare_implicit_cuda.bin test_periodic_orbit_poincare_implicit_hip.bin: $(NEWTON_TEST_HEADERS)
 
 test_periodic_orbit_%_cpu.bin: source/periodic_orbit/tests/test_%.cpp $(PERIODIC_SECTION_DEPS)
