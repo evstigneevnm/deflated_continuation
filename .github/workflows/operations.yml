@@ -59,6 +59,7 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p test_linear_solver_dependencies.py
           python3 -m unittest discover -s scripts/tests -p test_newton_solver_dependencies.py
           python3 -m unittest discover -s scripts/tests -p test_periodic_orbit_archive.py
+          python3 -m unittest discover -s scripts/tests -p test_periodic_orbit_sections.py
           python3 -m unittest discover -s scripts/tests -p test_nmfd_standalone.py
           python3 -m unittest discover -s scripts/tests -p test_timestepper_extraction.py
           python3 source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py
@@ -241,6 +242,9 @@ jobs:
       - project-newton-deflation-fixed-damping-cuda
       - project-newton-deflation-operator-cuda
       - project-newton-fixed-parameter-cuda
+      - periodic-orbit-sections-cuda
+      - periodic-orbit-sections-hip
+      - periodic-orbit-sections-sanitizers
       - star-shaped-bd-cuda
       - star-shaped-bd-hip
       - timestepper-dense-output-cuda
@@ -1473,6 +1477,107 @@ jobs:
           for test in dense_output dense_lifecycle dense_mass_dae; do
             make "test_implicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_dense_cuda"
             timeout 300s ./"$BUILD_DIR"/implicit_dense_cuda/"test_implicit_${test}_cuda.bin"
+          done
+
+  periodic-orbit-sections-cpu:
+    name: Section geometry, flights and layouts / ${{ matrix.compiler }}
+    needs: [operations-dependency-boundaries, timestepper-implicit-dense-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare Clang OpenMP
+        if: matrix.compiler == 'clang++'
+        run: sudo apt-get update && sudo apt-get install -y clang libomp-dev
+      - name: Verify public headers and all section systems on CPU and OpenMP
+        run: |
+          export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE
+          make check_periodic_orbit_headers_cpu CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc G++='${{ matrix.compiler }}'
+          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target; do
+            make -j2 "test_periodic_orbit_${test}_cpu.bin" "test_periodic_orbit_${test}_cpu_omp.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/sections_cpu" G++='${{ matrix.compiler }}'
+            for backend in cpu cpu_omp; do
+              timeout 180s "$BUILD_DIR/sections_cpu/test_periodic_orbit_${test}_${backend}.bin"
+            done
+          done
+
+  periodic-orbit-sections-sanitizers:
+    needs: periodic-orbit-sections-cpu
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify section ownership, bounds and failure cleanup
+        run: |
+          export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE
+          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target; do
+            make -j2 "test_periodic_orbit_${test}_cpu.bin" "test_periodic_orbit_${test}_cpu_omp.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/sections_sanitizers" TARGET_GCC='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer'
+            for backend in cpu cpu_omp; do
+              timeout 180s "$BUILD_DIR/sections_sanitizers/test_periodic_orbit_${test}_${backend}.bin"
+            done
+          done
+
+  periodic-orbit-sections-cuda:
+    needs: [periodic-orbit-sections-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify backend-local section work when CUDA is available
+        run: |
+          if ! nvidia-smi -L >/dev/null 2>&1 || { ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; }; then
+            echo "Skipping CUDA sections: compiler or usable GPU unavailable"
+            exit 0
+          fi
+          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target; do
+            make "test_periodic_orbit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/sections_cuda"
+            timeout 300s "$BUILD_DIR/sections_cuda/test_periodic_orbit_${test}_cuda.bin"
+          done
+
+  periodic-orbit-sections-hip:
+    needs: [periodic-orbit-sections-cpu, scfd-vector-operations-hip]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify backend-local section work when HIP is available
+        run: |
+          HIPCC_BIN="$(command -v "${HIPCC:-hipcc}" || true)"
+          if [ -z "$HIPCC_BIN" ]; then
+            echo "Skipping HIP sections: hipcc unavailable"
+            exit 0
+          fi
+          HIP_ROOT="${ROCM_PATH:-$(dirname "$(dirname "$HIPCC_BIN")")}"
+          if "$HIPCC_BIN" --version | grep -qi nvcc; then
+            if ! nvidia-smi -L >/dev/null 2>&1; then
+              echo "Skipping HIP sections: no usable NVIDIA GPU"
+              exit 0
+            fi
+            HIP_TARGET="${HIP_ARCH_LIST:-75}"
+          else
+            if ! "$HIP_ROOT/bin/rocm-smi" >/dev/null 2>&1; then
+              echo "Skipping HIP sections: no usable AMD GPU"
+              exit 0
+            fi
+            HIP_TARGET="${HIP_ARCH_LIST:-native}"
+          fi
+          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target; do
+            make "test_periodic_orbit_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/sections_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
+            timeout 300s "$BUILD_DIR/sections_hip/test_periodic_orbit_${test}_hip.bin"
           done
 
   timestepper-implicit-globalization-cpu:

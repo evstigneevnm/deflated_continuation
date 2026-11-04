@@ -966,6 +966,49 @@ Time integration uses generic events and never depends on `periodic_orbit`.
 A section supplies `h(t,state)`, crossing orientation/arming, and optional
 derivatives. A separate locator brackets and refines intersections.
 
+The supported first-stage implementation uses immutable `affine_section`
+geometry and per-map `evaluation_workspace` scratch. `bind(work)` returns an
+evaluator exposing `value(time,state)` and `state_derivative(time,state,v)`;
+the evaluator retains geometry but borrows the workspace. The metric is
+application-supplied (Euclidean by default). Form state differences before
+dot products. Custom metrics must preserve the positive real inner-product
+contract, including any communicator reductions or physical component weights.
+
+`event_locator::locate(dense,bracket,event,policy,event_state)` uses bounded,
+bracketed dense-output refinement. `section_manager` implements the unchanged
+external-manager contract: `reset(request)`, `set_time_interval(start,end)`,
+`apply(in,candidate)` and `get_status()`. Its bool means endpoint modification,
+not success. Orientation refers to increasing physical time, including backward
+flights. Initial-on-section states normally leave and return; reporting the
+initial event is explicit. Only the designated target is scanned. Finite
+subdivision cannot guarantee detection of all oscillatory crossings or grazing
+contacts; positive crossing-speed validation requires a supplied physical rate
+provider exposing `evaluate(time,state,rate)`.
+
+`section_map::evaluate(in,request,out)` publishes output only after a successful
+flight, supports aliasing, and resets arming between calls. Limits, failed
+reconstruction/rates, and invalid samples leave output unchanged. Expected
+event failures terminate the flight; configuration and callback exceptions
+propagate after abandoning pending stepper caches. State policies supply
+`validate_initial(time,state)` and `reconstruct(time,state)`. Bind physical
+parameters outside flights. Callbacks must not mutate the stepper's prepared
+problem context; separate maps need independent steppers and mutable workspace.
+
+`automatic_layout::build(initial,pilot_request,placement_params)` observes scalar
+accepted-step times, then deterministically replays without clipping steps to
+sample bounded neighbors of accepted-step quantiles. Rates and transverse planes
+are prepared afterward, and every designated flight (including closure) must
+validate before an immutable ordered layout is published. A pilot must be near
+recurrence; an arbitrary transient is not a periodic orbit. A supplied transformed
+closing plane supports relative-orbit layouts without estimating drift. Arrival
+times are checked using event tolerance plus the spatial allowance divided
+by measured transverse speed, preventing a different cycle count from validating
+the same closing state. Placement uses a bounded scalar schedule and `O(MN)` selected backend storage for fixed
+neighbor budget. Event work is `O(N)` per bounded sample/refinement; no dense
+basis, monodromy matrix, or vector-sized host transfer is introduced. Only scalar
+diagnostics/reductions reach the host. Runtime section-coordinate storage,
+matching equations, prepared derivatives, and orbit solving are later stages.
+
 Use method-specific dense output (`evaluate`, optionally `evaluate_derivative`);
 otherwise use bracketed substeps. Interpolation is not an exact trajectory.
 For DAEs, reconstruct consistent state/rate through problem-owned operations or
