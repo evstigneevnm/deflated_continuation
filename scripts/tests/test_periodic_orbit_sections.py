@@ -9,7 +9,8 @@ MODERN = ROOT / "source/periodic_orbit"
 SYSTEMS = (
     "section_geometry", "event_locator", "poincare_harmonic", "poincare_implicit",
     "poincare_dae", "section_map_lifecycle", "section_layout_variable_speed", "section_rpo_target",
-    "section_coordinates", "coordinate_solvers",
+    "section_coordinates", "coordinate_solvers", "multiple_section_matching",
+    "prepared_section_derivatives", "multiple_section_newton",
 )
 
 
@@ -17,7 +18,7 @@ class PeriodicSectionContractTest(unittest.TestCase):
     def test_backend_local_public_headers(self):
         headers = [path for path in MODERN.rglob("*.h")
                    if "legacy" not in path.parts and "tests" not in path.parts]
-        self.assertEqual(len(headers), 9)
+        self.assertEqual(len(headers), 13)
         for path in headers:
             with self.subTest(header=path.name):
                 text = path.read_text()

@@ -1006,8 +1006,8 @@ by measured transverse speed, preventing a different cycle count from validating
 the same closing state. Placement uses a bounded scalar schedule and `O(MN)` selected backend storage for fixed
 neighbor budget. Event work is `O(N)` per bounded sample/refinement; no dense
 basis, monodromy matrix, or vector-sized host transfer is introduced. Only scalar
-diagnostics/reductions reach the host. Matching equations, prepared derivatives,
-and orbit solving remain subsequent stages.
+diagnostics/reductions reach the host. Matching and prepared derivatives are
+described below.
 
 Real Euclidean affine sections now have `affine_chart` coordinate workspaces.
 `lift`/`restrict` convert between `N-1` coordinates and physical states;
@@ -1028,9 +1028,76 @@ spaces remain supported. Keep the count and charts fixed during a nonlinear
 solve; rebuild their workspaces only outside it. Block metadata is `O(M)` on the
 host, while coordinate/state storage and algebra stay on the selected backend
 in `O(MN)`. Charts use `O(N)` work/storage per section and transfer only scalar
-reductions. The current cyclic-coordinate Newton test validates this solver
-boundary; it is not yet an orbit-matching implementation. Prepared flow-map
-derivatives and seeded KS1D PO/RPO application gates remain subsequent work.
+reductions. Cyclic-coordinate and analytical-orbit Newton tests validate this
+solver boundary. Seeded KS1D PO/RPO application gates remain subsequent work.
+
+`multiple_section_residual` now composes real section flights into cyclic
+coordinate residuals `Q_next(P_i(L_i(z_i))) - z_next`, including a single-section
+return map. It retains immutable layout geometry and independent segment
+maps/charts. A preallocated backend residual is published only after all flights,
+finite-state checks and physical section checks succeed; input/output aliasing is
+supported. Reports contain scalar segment diagnostics, physical matching gaps
+and the sum of flight times. `evaluate` returns a borrowed report valid until the
+next call; `apply` throws `matching_evaluation_error` on an expected flight
+failure. Callback/configuration exceptions propagate. Workflow assembly must
+catch failed attempts and keep committed states separate from solver scratch.
+No no-op Jacobian or approximate derivative is advertised by this residual.
+
+This first matching implementation covers autonomous POs in fixed transverse
+charts with identity closure. Transformed closing targets are explicitly rejected
+until a relative-closure policy is implemented. Non-autonomous equations require
+an appropriate extended phase formulation; independent pilot start times do not
+automatically define periodic matching for forced systems. Near-grazing flights
+are rejected, rather than silently projecting inaccurate arrivals onto a plane.
+Matching algebra/storage is `O(MN)` beyond the flight integrator's own cost; no
+vector-sized host transfer or dense orbit Jacobian is introduced.
+
+`multiple_section_problem` adds the standard nonlinear `apply`,
+`set_linearization_point` and `get_jacobi_operator` interface to this residual.
+The current prepared derivative supports identity-state explicit RK flights with
+native polynomial dense output, not implicit stages, Hermite fallback, DAE
+reconstruction, or relative closure. Assembly supplies an independent physical
+rate/Jv provider with immutable parameters:
+
+```cpp
+bool evaluate(T time, const vector_type& state, vector_type& rate) const;
+bool apply_jacobian(T time, const vector_type& state,
+                    const vector_type& direction, vector_type& image) const;
+```
+
+`recording_stepper` observes existing step/finalize boundaries without changing
+the timestepper interface. Each prepared flight retains one backend initial
+state and a bounded scalar accepted-step schedule. A shared serial replay
+workspace differentiates the same RK stages and dense polynomial on that frozen
+mesh; it never differentiates adaptation decisions or reruns a controller per
+Krylov direction. At a fixed plane the derivative is
+`DP*v = W*v - q*(n.W*v)/(n.q)`, with `q` the time derivative of the numerical
+dense polynomial, not an independently evaluated endpoint RHS. Small `n.q` is a
+reported grazing failure. Chart actions compose the cyclic matching Jacobian.
+No finite differences are used for production Jv.
+
+Preparation publishes a new shared Jacobian only after every flight and replay
+check succeeds. Trial residuals cannot overwrite prepared states/schedules;
+extracted Jacobians retain dependencies after rebinding. Failed Jv leaves its
+output and published flight-time increments unchanged. The provider must not
+change model parameters during a prepared solve. Scratch is serial, not shared
+between concurrent evaluations. Replay takes `O(S*s*N)` work for `S` accepted
+steps and fixed stage count `s`; storage is `O(MN+sN)` plus bounded scalar
+schedules, not a stored backend trajectory or dense monodromy matrix. All
+vector-sized work stays on the selected backend.
+
+The project-owned `source/periodic_orbit/tests/run_all.sh` builds analytical-cycle
+matching and seeded Newton benchmarks, validates independent refined integration, and produces
+plots under `build/periodic_orbit_benchmarks`. `-B` forces build/assembly only;
+`--plot-only` revalidates an existing run. Make dependencies and a compiler-option
+stamp control incremental builds; timestamped run directories preserve previous
+results. Scalar observables are exported deliberately for plotting, outside the
+matching evaluator. `analytic_cycle` reports `matching_only`;
+`analytic_cycle_newton` reports `periodic_newton`, uses injected NMFD
+Newton/GMRES, exports convergence history, and checks the corrected cycle with
+independent half/quarter-step integrations. Neither claims general orbit
+discovery. Rossler/Lorenz correction is the next benchmark checkpoint. No
+timestepper or canonical solver modifications are required by this boundary.
 
 Use method-specific dense output (`evaluate`, optionally `evaluate_derivative`);
 otherwise use bracketed substeps. Interpolation is not an exact trajectory.

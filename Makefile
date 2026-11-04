@@ -1284,10 +1284,12 @@ TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tes
 TIME_STEPPER_VECTOR_WRAP_HEADER = $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 TIME_STEPPER_IMPLICIT_TEST_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/implicit_*.h $(NMFD_TIMESTEPPERS_ROOT)/tests/nonautonomous_test_problems.h)
 
-PERIODIC_SECTION_HEADERS = $(wildcard source/periodic_orbit/*.h source/periodic_orbit/events/*.h source/periodic_orbit/sections/*.h source/periodic_orbit/sections/detail/*.h source/periodic_orbit/tests/*.h)
+PERIODIC_SECTION_HEADERS = $(wildcard source/periodic_orbit/*.h source/periodic_orbit/events/*.h source/periodic_orbit/sections/*.h source/periodic_orbit/sections/detail/*.h source/periodic_orbit/matching/*.h source/periodic_orbit/flows/*.h source/periodic_orbit/tests/*.h)
 PERIODIC_SECTION_DEPS = $(PERIODIC_SECTION_HEADERS) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS)
 test_periodic_orbit_poincare_implicit_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_coordinate_solvers_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+test_periodic_orbit_multiple_section_newton_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+test_periodic_orbit_multiple_section_newton_cpu.bin test_periodic_orbit_multiple_section_newton_cpu_omp.bin test_periodic_orbit_multiple_section_newton_cuda.bin test_periodic_orbit_multiple_section_newton_hip.bin: $(NEWTON_TEST_HEADERS)
 test_periodic_orbit_coordinate_solvers_cpu.bin test_periodic_orbit_coordinate_solvers_cpu_omp.bin test_periodic_orbit_coordinate_solvers_cuda.bin test_periodic_orbit_coordinate_solvers_hip.bin: $(NEWTON_TEST_HEADERS)
 test_periodic_orbit_poincare_implicit_cpu.bin test_periodic_orbit_poincare_implicit_cpu_omp.bin test_periodic_orbit_poincare_implicit_cuda.bin test_periodic_orbit_poincare_implicit_hip.bin: $(NEWTON_TEST_HEADERS)
 
@@ -1310,6 +1312,30 @@ check_periodic_orbit_headers_cpu:
 	@set -e; for header in $$(find source/periodic_orbit -path '*/legacy' -prune -o -path '*/tests' -prune -o -name '*.h' -print); do \
 	  printf '#include <%s>\n' "$${header#source/}" | $(G++) $(G++FLAGS) -I source $(ITIME_STEPPER) -x c++ -fsyntax-only -; \
 	done
+
+PERIODIC_BENCHMARK_OPTIONS ?=
+PERIODIC_BENCHMARK_TARGETS = $(foreach system,analytic_cycle analytic_cycle_newton,$(foreach backend,cpu cpu_omp cuda hip,periodic_orbit_benchmark_$(system)_$(backend).bin))
+PERIODIC_BENCHMARK_DEPS = $(PERIODIC_SECTION_DEPS) $(wildcard source/periodic_orbit/tests/benchmarks/*.h) Makefile $(CONFIG_FILE) $(PERIODIC_BENCHMARK_OPTIONS)
+$(addprefix $(BUILD_DIR)/,$(filter periodic_orbit_benchmark_analytic_cycle_newton_%,$(PERIODIC_BENCHMARK_TARGETS))): PERIODIC_BENCHMARK_FLAGS = $(INMFD_NEWTON)
+$(addprefix $(BUILD_DIR)/,$(filter periodic_orbit_benchmark_analytic_cycle_newton_%,$(PERIODIC_BENCHMARK_TARGETS))): $(NEWTON_TEST_HEADERS)
+.PHONY: $(PERIODIC_BENCHMARK_TARGETS)
+$(PERIODIC_BENCHMARK_TARGETS): %: $(BUILD_DIR)/%
+
+$(BUILD_DIR)/periodic_orbit_benchmark_%_cpu.bin: source/periodic_orbit/tests/benchmarks/%.cpp $(PERIODIC_BENCHMARK_DEPS) | $(BUILD_STAMP)
+	$(G++) $(G++FLAGS) -I source $(ITIME_STEPPER) $(PERIODIC_BENCHMARK_FLAGS) -MMD -MP -MF $@.d -MT $@ $< $(OPENMP) -o $@
+
+$(BUILD_DIR)/periodic_orbit_benchmark_%_cpu_omp.bin: source/periodic_orbit/tests/benchmarks/%.cpp $(PERIODIC_BENCHMARK_DEPS) | $(BUILD_STAMP)
+	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP -I source $(ITIME_STEPPER) $(PERIODIC_BENCHMARK_FLAGS) -MMD -MP -MF $@.d -MT $@ $< $(OPENMP) -o $@
+
+$(BUILD_DIR)/periodic_orbit_benchmark_%_cuda.bin: source/periodic_orbit/tests/benchmarks/%.cpp $(PERIODIC_BENCHMARK_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o | $(BUILD_STAMP)
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA -I source $(ITIME_STEPPER) $(PERIODIC_BENCHMARK_FLAGS) $(ICUDA) -MMD -MP -MF $@.d -MT $@ -x cu $< -c -o $@.o
+	$(NVCC) $(NVCCFLAGS) $@.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $@
+
+$(BUILD_DIR)/periodic_orbit_benchmark_%_hip.bin: source/periodic_orbit/tests/benchmarks/%.cpp $(PERIODIC_BENCHMARK_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o | $(BUILD_STAMP)
+	$(HIPCC) $(HIPFLAGS) -DTEST_VECTOR_BACKEND_HIP -I source $(ITIME_STEPPER) $(PERIODIC_BENCHMARK_FLAGS) -MMD -MP -MF $@.d -MT $@ -c $< -o $@.o
+	$(HIPCC) $(HIPFLAGS) $@.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $@
+
+-include $(wildcard $(BUILD_DIR)/periodic_orbit_benchmark_*.bin.d)
 
 test_implicit_%_cpu.bin: $(NMFD_TIMESTEPPERS_ROOT)/tests/test_implicit_%.cpp $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_IMPLICIT_TEST_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS) $(NEWTON_TEST_HEADERS)
 	$(G++) $(G++FLAGS) $(ITIME_STEPPER) $(INMFD_NEWTON) $< $(OPENMP) -o $(BUILD_DIR)/$@
