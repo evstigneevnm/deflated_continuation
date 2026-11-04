@@ -10,16 +10,46 @@ namespace ode_orbit_tests
 using namespace section_tests;
 using chart = periodic_orbit::affine_chart<operations>;
 
+template <std::size_t N>
+struct profile_kernel
+{
+    double             *out;
+    double              values[N];
+    __DEVICE_TAG__ void operator()( std::ptrdiff_t i ) const
+    {
+        out[i] = values[i % N];
+    }
+};
+
+// Small model constants travel as kernel arguments, never as vector transfers.
+template <std::size_t N>
+void fill_profile( X &out, const std::array<double, N> &values )
+{
+    profile_kernel<N> kernel{ out.raw_ptr(), {} };
+    for ( std::size_t i = 0; i < N; ++i )
+        kernel.values[i] = values[i];
+    backend::for_each_type{}( kernel, out.size() );
+}
+
+template <class Model>
+std::string coordinate_name( std::size_t i )
+{
+    if constexpr ( Model::seed.size() == 3 )
+        return std::array<const char *, 3>{ "x", "y", "z" }[i];
+    return "x" + std::to_string( i + 1 );
+}
+
 template <class Model>
 struct fixture
 {
+    static constexpr std::size_t dimension = Model::seed.size();
     using map           = periodic_orbit::recorded_section_map<operations, step<Model>, plane, rate_provider<Model>>;
     using orbit_problem = periodic_orbit::multiple_section_problem<operations, operations, map, tangent_rate<Model>>;
     using residual_type = typename orbit_problem::residual_type;
     using blocks        = typename orbit_problem::space_type;
-    std::shared_ptr<operations>                                physical    = std::make_shared<operations>( 3 );
-    std::shared_ptr<operations>                                coordinates = std::make_shared<operations>( 2 );
-    std::shared_ptr<blocks>                                    space;
+    std::shared_ptr<operations> physical    = std::make_shared<operations>( dimension );
+    std::shared_ptr<operations> coordinates = std::make_shared<operations>( dimension - 1 );
+    std::shared_ptr<blocks>     space;
     std::shared_ptr<const typename orbit_problem::layout_type> layout;
     std::shared_ptr<tangent_rate<Model>>                       rate = std::make_shared<tangent_rate<Model>>();
     std::shared_ptr<orbit_problem>                             problem;
@@ -32,7 +62,7 @@ struct fixture
           method( std::move( scheme ) )
     {
         auto initial = buffer( physical );
-        fill( *physical, *initial, Model::seed[0], Model::seed[1], Model::seed[2], 3 );
+        fill_profile( *initial, Model::seed );
         periodic_orbit::automatic_layout<operations, step<Model>, rate_provider<Model>> builder(
             physical, make_stepper( dt ), std::make_shared<rate_provider<Model>>(),
             std::make_shared<policy>( physical ),
@@ -81,7 +111,13 @@ struct fixture
     void perturb( double amplitude, typename blocks::vector_type &out ) const
     {
         for ( std::size_t i = 0; i < layout->size(); ++i )
-            fill( *coordinates, out.comp( i ), amplitude * ( i + 1 ) / layout->size(), -.5 * amplitude );
+        {
+            std::array<double, dimension - 1> values{};
+            values[0] = amplitude * ( i + 1 ) / layout->size();
+            for ( std::size_t j = 1; j < values.size(); ++j )
+                values[j] = amplitude * ( j % 2 ? -1 : 1 ) / ( j + 1 );
+            fill_profile( out.comp( i ), values );
+        }
     }
     double closure( const typename blocks::vector_type &state, double period, double h ) const
     {

@@ -189,9 +189,9 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
                         runner.validate_case(path, config)
 
     def test_ode_defaults_preserve_system_and_method_scales(self):
-        args = runner.arguments(["--systems", "rossler_periodic", "lorenz_periodic", "--methods", "RK45", "DOP853", "--sections", "1"])
+        args = runner.arguments(["--systems", *runner.ODE_CASES, "--methods", "RK45", "DOP853", "--sections", "1"])
         configs = runner.configurations(args)
-        self.assertEqual([c["step"] for c in configs], [.01, .04, .002, .01])
+        self.assertEqual([c["step"] for c in configs], [.01, .04, .002, .01, .002, .01])
         self.assertTrue(all(c["newton_tolerance"] == 1e-10 for c in configs))
         self.assertEqual(runner.stage(configs), "periodic_newton")
         args.step = .001
@@ -199,9 +199,18 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("numpy"), "Numerical export validation requires NumPy")
     def test_ode_exports_distinguish_section_and_tangent_residuals(self):
+        self.check_ode_exports("rossler_periodic")
+
+    @unittest.skipUnless(importlib.util.find_spec("numpy"), "Numerical export validation requires NumPy")
+    def test_five_dimensional_exports_validate_every_component(self):
+        self.check_ode_exports("vaidyanathan_periodic")
+
+    def check_ode_exports(self, system):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
-            config = runner.configurations(runner.arguments(["--system", "rossler_periodic", "--sections", "1"]))[0]
+            config = runner.configurations(runner.arguments(["--system", system, "--sections", "1"]))[0]
+            labels = runner.state_axes(config)
+            dimension = len(labels)
             period = runner.ODE_CASES[config["system"]]["period"]
             def part(gap):
                 return dict(succeeded=True, period=period, segments=[dict(flight_time=period, steps=20,
@@ -211,18 +220,24 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
                 initial_norm=.02, corrected_norm=0, refined_norm=0, matching_host_bytes=0,
                 closure_errors=[0, 0], history=[.02, 0], parameters=runner.ODE_CASES[config["system"]]["parameters"],
                 reference_period=period, rate_norm=2, excursion=2)
-            columns="section,time,cx,cy,cz,nx,ny,nz,x,y,z,arrival_x,arrival_y,arrival_z,target_x,target_y,target_z,flight_time,steps,gap".split(",")
+            columns = ["section", "time"] + [prefix+a for prefix in ("c", "n", "", "arrival_", "target_") for a in labels]
+            columns += ["flight_time", "steps", "gap"]
+            center = [1] + [0]*(dimension-1)
+            normal = [0, 1] + [0]*(dimension-2)
+            arrival = [1, 4e-10] + [0]*(dimension-2)
             for filename, perturbation in (("initial_sections.csv", .02), ("corrected_sections.csv", 0)):
                 with (path / filename).open("w") as stream:
                     writer=csv.writer(stream); writer.writerow(columns)
-                    writer.writerow([0, config["start_time"], 1,0,0, 0,1,0, 1+perturbation,0,0,
-                                     1,4e-10,0, 1+perturbation,0,0, period,20,math.hypot(perturbation,4e-10)])
+                    state = [1+perturbation] + [0]*(dimension-1)
+                    writer.writerow([0, config["start_time"], *center, *normal, *state,
+                                     *arrival, *state, period,20,math.hypot(perturbation,4e-10)])
             for filename in ("trajectory.csv", "refined_trajectory.csv"):
                 with (path / filename).open("w") as stream:
-                    writer=csv.writer(stream); writer.writerow(["time", "x", "y", "z"])
+                    writer=csv.writer(stream); writer.writerow(["time", *labels])
                     for i in range(401):
                         theta=2*math.pi*i/400
-                        writer.writerow([config["start_time"]+period*i/400, math.cos(theta), math.sin(theta), 0])
+                        state = [math.cos(theta), math.sin(theta)] + [.2*(j+1)*math.sin(theta) for j in range(dimension-2)]
+                        writer.writerow([config["start_time"]+period*i/400, *state])
             (path / "newton_history.csv").write_text("iteration,residual\n0,0.02\n1,0\n")
             (path / "report.json").write_text(json.dumps(report))
             self.assertTrue(runner.validate_case(path, config)["passed"])
@@ -231,6 +246,17 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
                 (path / "report.json").write_text(json.dumps(dict(report, **{key:value})))
                 with self.subTest(key=key), self.assertRaises(ValueError):
                     runner.validate_case(path, config)
+            (path / "report.json").write_text(json.dumps(report))
+            trajectory_path = path / "refined_trajectory.csv"
+            with trajectory_path.open() as stream:
+                rows = list(csv.DictReader(stream))
+            rows[-1][labels[-1]] = "0.01"
+            with trajectory_path.open("w") as stream:
+                writer = csv.DictWriter(stream, fieldnames=["time", *labels])
+                writer.writeheader()
+                writer.writerows(rows)
+            with self.assertRaises(ValueError):
+                runner.validate_case(path, config)
 
 
 if __name__ == "__main__":

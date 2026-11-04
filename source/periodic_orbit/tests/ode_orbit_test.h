@@ -50,11 +50,14 @@ template <class Model>
 void test_system()
 {
     // A pointwise Jv check guards equations independently of orbit matching.
-    auto ops   = std::make_shared<operations>( 3 );
+    auto ops   = std::make_shared<operations>( Model::seed.size() );
     auto state = buffer( ops ), v = buffer( ops ), plus = buffer( ops ), minus = buffer( ops ), image = buffer( ops ),
          positive_rate = buffer( ops ), negative_rate = buffer( ops );
-    fill( *ops, *state, Model::seed[0], Model::seed[1], Model::seed[2], 3 );
-    fill( *ops, *v, .2, -.3, .4, 3 );
+    fill_profile( *state, Model::seed );
+    std::array<double, Model::seed.size()> direction{};
+    for ( std::size_t i = 0; i < direction.size(); ++i )
+        direction[i] = ( i % 2 ? -1 : 1 ) * ( .2 + .1 * i );
+    fill_profile( *v, direction );
     tangent_rate<Model> rate;
     rate.apply_jacobian( .37, *state, *v, *image );
     ops->assign_lin_comb( 1, *state, 1e-5, *v, *plus );

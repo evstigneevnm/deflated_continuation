@@ -1098,10 +1098,15 @@ Newton/GMRES, exports convergence history, and checks the corrected cycle with
 independent half/quarter-step integrations. Neither claims general orbit
 discovery. The separate `rossler_periodic` and `lorenz_periodic` benchmark sources
 exercise the same matrix-free machinery in three dimensions with independently
-computed reference seeds/periods. Lorenz retains the historical cubic damping,
+computed reference seeds/periods. `vaidyanathan_periodic` exercises the same
+path with five state components and four coordinates per section. Its unstable
+cycle is refined from a chaotic-trajectory recurrence, not an equilibrium.
+Exports, refined closure and trajectory comparison include all five components;
+three-dimensional plots are projections, not a reduced dynamical model.
+Lorenz retains the historical cubic damping,
 explicitly recorded in every report. Its initial phase is chosen to avoid a plane
 with two increasing crossings per orbit; itinerary checks are not bypassed.
-Both systems check true coordinate residuals, physical section defects, refined
+All systems check true coordinate residuals, physical section defects, refined
 closure, half/quarter-step dense samples at identical times, and non-equilibrium
 excursions. Plot exports are scalar observables only. The section normal defect
 is not the reduced-coordinate Newton residual; verify both rather than asserting

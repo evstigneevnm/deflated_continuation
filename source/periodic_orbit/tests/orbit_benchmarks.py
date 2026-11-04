@@ -18,6 +18,9 @@ ODE_CASES = {
                              parameters=dict(a=.1, b=.1, c=6)),
     "lorenz_periodic": dict(period=1.6443075739726336, steps={"RK45": .002, "DOP853": .01},
                             parameters=dict(sigma=10, rho=28, beta=8/3, epsilon=.0055, delta=0)),
+    "vaidyanathan_periodic": dict(period=2.4064400379694417, steps={"RK45": .002, "DOP853": .01},
+                                  axes=("x1", "x2", "x3", "x4", "x5"),
+                                  parameters=dict(a=10, b=8/3, c=28, p=1.3, q=2.5)),
 }
 BUILD_ENVIRONMENT = (
     "PATH", "G++", "GCC_ROOT_PATH", "TARGET_GCC", "CPPSTD", "NVCC", "CUDA_ROOT_PATH",
@@ -126,6 +129,10 @@ def stage(configs):
     return next(iter(stages)) if len(stages) == 1 else "mixed"
 
 
+def state_axes(config):
+    return ODE_CASES[config["system"]].get("axes", tuple("xyz")) if config["system"] in ODE_CASES else tuple("xy")
+
+
 def section_samples(directory, filename, config, part):
     import numpy as np
     samples = np.genfromtxt(directory / filename, delimiter=",", names=True, ndmin=1)
@@ -134,7 +141,7 @@ def section_samples(directory, filename, config, part):
         raise ValueError("Incomplete section export")
     if not all(np.isfinite(samples[key]).all() for key in samples.dtype.names):
         raise ValueError("Nonfinite section export")
-    axes = "xyz" if config["system"] in ODE_CASES else "xy"
+    axes = state_axes(config)
     def values(prefix):
         return np.column_stack([samples[prefix + axis] for axis in axes])
     state, center, normal, arrival, target = (values(p) for p in ("", "c", "n", "arrival_", "target_"))
@@ -223,7 +230,7 @@ def validate_newton_case(directory, config):
         samples = section_samples(directory, filename, config, report[name])
         if not ode and name == "corrected" and np.max(np.abs(np.hypot(samples["x"], samples["y"]) - 1)) >= tolerance:
             raise ValueError("Corrected sections disagree with isolated cycle")
-        axes = "xyz" if ode else "xy"
+        axes = state_axes(config)
         gap = np.column_stack([samples["arrival_" + a] - samples["target_" + a] for a in axes])
         normal = np.roll(np.column_stack([samples["n" + a] for a in axes]), -1, axis=0)
         if not np.allclose(np.linalg.norm(normal, axis=1), 1, rtol=1e-12, atol=1e-12):
@@ -252,7 +259,7 @@ def validate_newton_case(directory, config):
                 report["reference_period"] != reference_period or not math.isfinite(report["rate_norm"]) or
                 report["rate_norm"] <= 1 or not math.isfinite(report["excursion"]) or report["excursion"] <= 1):
             raise ValueError("ODE parameter/reference or non-equilibrium check failed")
-        states = [np.column_stack([t[axis] for axis in "xyz"]) for t in trajectories]
+        states = [np.column_stack([t[axis] for axis in state_axes(config)]) for t in trajectories]
         if (any(len(t) != 401 for t in trajectories) or
                 not np.array_equal(trajectories[0]["time"], trajectories[1]["time"]) or
                 np.max(np.linalg.norm(states[0] - states[1], axis=1)) >= tolerance):
@@ -282,16 +289,17 @@ def plot_newton_case(directory, config):
     solved = np.genfromtxt(directory / "corrected_sections.csv", delimiter=",", names=True, ndmin=1)
     figure = plt.figure(figsize=(8, 6))
     ode = config["system"] in ODE_CASES
+    labels = state_axes(config)
     if ode:
         ax = figure.add_subplot(111, projection="3d")
         reference = np.genfromtxt(directory / "refined_trajectory.csv", delimiter=",", names=True, ndmin=1)
         guess = np.genfromtxt(directory / "initial_trajectory.csv", delimiter=",", names=True, ndmin=1)
-        ax.plot(guess["x"], guess["y"], guess["z"], color="#be493e", alpha=.5, label="Initial-state trajectory")
-        ax.plot(reference["x"], reference["y"], reference["z"], "--", color="0.5", label="Quarter-step verification")
-        ax.plot(trajectory["x"], trajectory["y"], trajectory["z"], color="#147a78", label="Corrected orbit")
-        ax.scatter(initial["x"], initial["y"], initial["z"], marker="x", color="#be493e", label="Initial section states")
-        ax.scatter(solved["x"], solved["y"], solved["z"], color="#284c98", label="Corrected section states")
-        ax.set(zlabel="z")
+        ax.plot(*(guess[a] for a in labels[:3]), color="#be493e", alpha=.5, label="Initial-state trajectory")
+        ax.plot(*(reference[a] for a in labels[:3]), "--", color="0.5", label="Quarter-step verification")
+        ax.plot(*(trajectory[a] for a in labels[:3]), color="#147a78", label="Corrected orbit")
+        ax.scatter(*(initial[a] for a in labels[:3]), marker="x", color="#be493e", label="Initial section states")
+        ax.scatter(*(solved[a] for a in labels[:3]), color="#284c98", label="Corrected section states")
+        ax.set(zlabel=labels[2])
     else:
         ax = figure.add_subplot(111)
         theta = np.linspace(0, 2 * np.pi, 500)
@@ -301,16 +309,24 @@ def plot_newton_case(directory, config):
         ax.scatter(solved["x"], solved["y"], color="#284c98", label="Corrected section states")
         ax.set(aspect="equal")
     title = "Lorenz (cubic damping)" if config["system"] == "lorenz_periodic" else config["system"].replace("_", " ")
-    ax.set(xlabel="x", ylabel="y", title=f"{title}: {config['method']}, M={config['sections']}, T={report['corrected']['period']:.8f}")
+    ax.set(xlabel=labels[0], ylabel=labels[1], title=f"{title}: {config['method']}, M={config['sections']}, T={report['corrected']['period']:.8f}")
     ax.legend(fontsize="small")
     figure.savefig(directory / "phase.png", dpi=150, bbox_inches="tight",
                    bbox_extra_artists=(ax.zaxis.label,) if ode else None)
     plt.close(figure)
+    if len(labels) > 3:
+        figure, panels = plt.subplots(2, 2, figsize=(11, 7), constrained_layout=True)
+        for panel, axis in zip(panels.flat, labels[1:]):
+            panel.plot(guess[labels[0]], guess[axis], color="#be493e", alpha=.5, label="Initial-state trajectory")
+            panel.plot(trajectory[labels[0]], trajectory[axis], color="#147a78", label="Corrected orbit")
+            panel.scatter(solved[labels[0]], solved[axis], color="#284c98", label="Corrected section states")
+            panel.set(xlabel=labels[0], ylabel=axis)
+            panel.legend(fontsize="small")
+        figure.savefig(directory / "projections.png", dpi=150, bbox_inches="tight")
+        plt.close(figure)
     figure, axes = plt.subplots(2, 2, figsize=(11, 7), constrained_layout=True)
-    axes[0, 0].plot(trajectory["time"], trajectory["x"], label="x")
-    axes[0, 0].plot(trajectory["time"], trajectory["y"], label="y")
-    if ode:
-        axes[0, 0].plot(trajectory["time"], trajectory["z"], label="z")
+    for label in labels:
+        axes[0, 0].plot(trajectory["time"], trajectory[label], label=label)
     axes[0, 0].set(xlabel="Time", title="Independent one-period trajectory")
     axes[0, 0].legend()
     axes[0, 1].semilogy(np.maximum(report["history"], 1e-17), "o-", color="#147a78")

@@ -5,7 +5,9 @@ unit-circle orbit and non-orbit perturbations (`stage: matching_only`).
 `analytic_cycle_newton` corrects perturbed section states using NMFD Newton/GMRES
 and a prepared matrix-free derivative (`stage: periodic_newton`).
 `rossler_periodic` and `lorenz_periodic` add three-dimensional seeded corrections
-with the same solver and derivative path. These are not general orbit-discovery
+with the same solver and derivative path. `vaidyanathan_periodic` extends that
+path to a five-dimensional unstable cycle in the local chaotic formulation.
+These are not general orbit-discovery
 algorithms. Each system's equations, parameters and seed provenance are documented
 in its separate `*_periodic_problem.h` file.
 
@@ -17,6 +19,7 @@ bash source/periodic_orbit/tests/run_all.sh -B
 bash source/periodic_orbit/tests/run_all.sh --backend cpu_omp --threads 2 --methods RK45 DOP853
 bash source/periodic_orbit/tests/run_all.sh --system analytic_cycle_newton --methods RK45 DOP853
 bash source/periodic_orbit/tests/run_all.sh --systems rossler_periodic lorenz_periodic --methods RK45 DOP853
+bash source/periodic_orbit/tests/run_all.sh --system vaidyanathan_periodic --methods RK45 DOP853
 bash source/periodic_orbit/tests/run_all.sh --plot-only build/periodic_orbit_benchmarks/runs/RUN_DIRECTORY
 ```
 
@@ -43,6 +46,15 @@ placed at a phase whose flow-normal plane has one increasing return per orbit;
 the original shooting phase's plane had two. An independent variational solve
 gives a nontrivial unstable multiplier about `5.39008` for this short orbit.
 
+The five-dimensional Vaidyanathan case uses the equations from the local
+`PO_tests` model: `x'=10*(y-x)+w+v`, `y'=28*x-x*z-y`,
+`z'=x*y-(8/3)*z`, `w'=-x*z+1.3*w`, `v'=2.5*x`.
+Its reference period is `2.4064400379694417`; phase-constrained DOP853 shooting
+refines a chaotic-trajectory recurrence, with independently verified closure
+below `2.1e-13`. Unstable Floquet multipliers include
+`0.795584 +/- 1.975593i` and `1.009622`. The reference phase has a single
+increasing flow-normal return. The origin is not an acceptable orbit result.
+
 Default fixed steps, overridden by `--step`, are:
 
 | System | RK45 | DOP853 |
@@ -50,6 +62,7 @@ Default fixed steps, overridden by `--step`, are:
 | Analytical cycle | 0.08 | 0.08 |
 | Rossler | 0.01 | 0.04 |
 | Cubic-damped Lorenz | 0.002 | 0.01 |
+| Vaidyanathan (5D) | 0.002 | 0.01 |
 
 ODE reports validate reference periods, true reduced-coordinate residuals,
 physical section defects, and independent half/quarter-step closure. Trajectories
@@ -59,6 +72,13 @@ nonzero physical rate and a nontrivial excursion reject equilibrium collapse.
 Plots include the initial/corrected 3D trajectories, section states, time traces,
 Newton convergence, matching gaps and segment work. The normal section defect
 and tangent-coordinate gap are checked separately, not equated.
+For the five-dimensional case, CSV exports and validation include every state
+component (`x1` through `x5`); `phase.png` shows the first three and
+`projections.png` adds the remaining coordinate projections. Time traces show
+all five. The small-system GMRES basis follows the matching dimension, capped
+at 64 vectors; neither Newton tolerances nor canonical solver interfaces change.
+GPU regression jobs allow this larger case up to 600 seconds for the overhead
+of many small stage-kernel launches; the existing cases retain their budgets.
 
 Build products and assembled case configurations go into
 `build/periodic_orbit_benchmarks/bin` and `cases`. Each invocation creates a new
@@ -81,6 +101,6 @@ bash source/periodic_orbit/tests/run_all.sh --backend hip \
 ```
 
 Device runtime/library paths must already be configured. Core matching and chart
-tests forbid vector-sized host copies. Benchmark plotting explicitly exports two or three
+tests forbid vector-sized host copies. Benchmark plotting explicitly exports scalar
 scalar coordinates; this I/O is outside residual evaluation. No legacy headers,
 project Newton implementation, or canonical solver modifications are used here.

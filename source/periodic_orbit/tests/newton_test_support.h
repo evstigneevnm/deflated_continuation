@@ -1,6 +1,7 @@
 #ifndef PERIODIC_ORBIT_NEWTON_TEST_SUPPORT_H
 #define PERIODIC_ORBIT_NEWTON_TEST_SUPPORT_H
 
+#include <algorithm>
 #include <nmfd/solvers/gmres.h>
 #include <nmfd/solvers/monitor_krylov.h>
 #include <nmfd/solvers/newton_iteration.h>
@@ -28,8 +29,8 @@ auto make_newton(
 {
     using types = newton_types<Space, Problem>;
     typename types::linear::params lp;
-    lp.basis_size                              = 16;
-    lp.batch_size                              = 1;
+    lp.basis_size = static_cast<unsigned>( std::min<std::size_t>( 64, std::max<std::size_t>( 16, space->size() ) ) );
+    lp.batch_size = 1;
     lp.monitor.abs_tol                         = 1e-13;
     lp.monitor.rel_tol                         = 1e-10;
     auto                                linear = std::make_shared<typename types::linear>( space, nullptr, lp );

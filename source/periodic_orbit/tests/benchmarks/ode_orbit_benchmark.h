@@ -39,8 +39,8 @@ inline json describe( const periodic_orbit::matching_report<double> &report )
     };
 }
 
-// Sample identical physical times through borrowed dense views. Only three
-// scalar plotting observables leave the backend; no trajectory vectors are kept.
+// Sample identical physical times through borrowed dense views. Only scalar
+// plotting observables leave the backend; no trajectory vectors are kept.
 template <class Model>
 class trajectory_writer
 {
@@ -54,7 +54,7 @@ class trajectory_writer
     void                         write( double time, const X &x )
     {
         stream_ << time;
-        for ( std::size_t i = 0; i < 3; ++i )
+        for ( std::size_t i = 0; i < Model::seed.size(); ++i )
             stream_ << ',' << ops_->get_value_at_point( i, x );
         stream_ << '\n';
         ops_->assign_lin_comb( 1, x, -1, *initial_, *sample_ );
@@ -109,7 +109,10 @@ double write_trajectory(
 {
     std::ofstream out( path );
     out.exceptions( std::ios::badbit | std::ios::failbit );
-    out << std::setprecision( 17 ) << "time,x,y,z\n";
+    out << std::setprecision( 17 ) << "time";
+    for ( std::size_t i = 0; i < Model::seed.size(); ++i )
+        out << ',' << coordinate_name<Model>( i );
+    out << '\n';
     auto step        = f.make_stepper( dt );
     auto observer    = std::make_shared<trajectory_writer<Model>>( f.physical, step, out, f.start, period, initial );
     using integrator = nmfd::time_steppers::integration::time_integrator<
@@ -133,8 +136,11 @@ void write_sections(
     std::ofstream out( path );
     out.exceptions( std::ios::badbit | std::ios::failbit );
     out << std::setprecision( 17 );
-    out << "section,time,cx,cy,cz,nx,ny,nz,x,y,z,arrival_x,arrival_y,arrival_z,target_x,target_y,target_z,flight_time,"
-           "steps,gap\n";
+    out << "section,time";
+    for ( const auto *prefix : { "c", "n", "", "arrival_", "target_" } )
+        for ( std::size_t i = 0; i < Model::seed.size(); ++i )
+            out << ',' << prefix << coordinate_name<Model>( i );
+    out << ",flight_time,steps,gap\n";
     auto       initial = buffer( f.physical ), arrival = buffer( f.physical ), target = buffer( f.physical );
     const auto segments = f.make_segments( f.dt );
     for ( std::size_t i = 0; i < f.layout->size(); ++i )
@@ -155,7 +161,7 @@ void write_sections(
         for ( const auto *x : std::array<const X *, 5>{
                   &node.section->center(), &node.section->normal(), &*initial, &*arrival, &*target
               } )
-            for ( std::size_t j = 0; j < 3; ++j )
+            for ( std::size_t j = 0; j < Model::seed.size(); ++j )
                 out << ',' << f.physical->get_value_at_point( j, *x );
         f.physical->add_lin_comb( -1, *arrival, *target );
         out << ',' << flight.flight_time << ',' << flight.steps << ',' << f.physical->norm( *target ) << '\n';
