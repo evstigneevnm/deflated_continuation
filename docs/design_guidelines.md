@@ -1096,8 +1096,20 @@ matching evaluator. `analytic_cycle` reports `matching_only`;
 `analytic_cycle_newton` reports `periodic_newton`, uses injected NMFD
 Newton/GMRES, exports convergence history, and checks the corrected cycle with
 independent half/quarter-step integrations. Neither claims general orbit
-discovery. Rossler/Lorenz correction is the next benchmark checkpoint. No
-timestepper or canonical solver modifications are required by this boundary.
+discovery. The separate `rossler_periodic` and `lorenz_periodic` benchmark sources
+exercise the same matrix-free machinery in three dimensions with independently
+computed reference seeds/periods. Lorenz retains the historical cubic damping,
+explicitly recorded in every report. Its initial phase is chosen to avoid a plane
+with two increasing crossings per orbit; itinerary checks are not bypassed.
+Both systems check true coordinate residuals, physical section defects, refined
+closure, half/quarter-step dense samples at identical times, and non-equilibrium
+excursions. Plot exports are scalar observables only. The section normal defect
+is not the reduced-coordinate Newton residual; verify both rather than asserting
+that their norms are identical. These are seeded correction benchmarks, not
+general discovery or long-time chaotic shadowing claims. No timestepper or
+canonical solver modifications are required by this boundary. The next major
+checkpoint returns to completing `nmfd-timesteppers`; implicit/DAE tangent support
+still requires differentiated stage solves and consistency/chart policies.
 
 Use method-specific dense output (`evaluate`, optionally `evaluate_derivative`);
 otherwise use bracketed substeps. Interpolation is not an exact trajectory.

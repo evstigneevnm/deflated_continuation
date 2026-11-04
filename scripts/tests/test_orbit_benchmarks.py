@@ -31,6 +31,8 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
                         ["--make-option", "BUILD_DIR=x"], ["--make-option", "-n"], ["--newton-max-iterations", "0"]):
             with self.subTest(options=options), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 runner.arguments(options)
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            runner.arguments(["--start", "1e20"])
 
     def test_build_stamp_is_stable_and_tracks_options(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -168,14 +170,66 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
             self.assertEqual(set(executables), set(args.systems))
             self.assertIn("periodic_orbit_benchmark_analytic_cycle_newton_cpu.bin", make.call_args.args[0])
 
-    def test_newton_report_cannot_be_confused_with_matching_only(self):
-        config = runner.configurations(runner.arguments(["--system", "analytic_cycle_newton", "--sections", "1"]))[0]
+    def test_invalid_reports_rejected_without_scientific_packages(self):
+        configs = runner.configurations(runner.arguments([
+            "--systems", "analytic_cycle", "analytic_cycle_newton", *runner.ODE_CASES, "--sections", "1"]))
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+                "sys.modules", {"numpy": None, "scipy": None, "matplotlib": None}):
+            path = Path(directory)
+            for config in configs:
+                newton_format = "periodic_orbit.ode_newton.v1" if config["system"] in runner.ODE_CASES else "periodic_orbit.newton.v1"
+                reports = ({"format": "periodic_orbit.matching.v1"},
+                           dict(format=newton_format, stage="periodic_newton", orbit_corrected=False))
+                if config["system"] == "analytic_cycle":
+                    reports = ({"format": "periodic_orbit.newton.v1"},
+                               dict(format="periodic_orbit.matching.v1", stage="matching_only", orbit_corrected=True))
+                for report in reports:
+                    (path / "report.json").write_text(json.dumps(report))
+                    with self.subTest(system=config["system"], report=report), self.assertRaises(ValueError):
+                        runner.validate_case(path, config)
+
+    def test_ode_defaults_preserve_system_and_method_scales(self):
+        args = runner.arguments(["--systems", "rossler_periodic", "lorenz_periodic", "--methods", "RK45", "DOP853", "--sections", "1"])
+        configs = runner.configurations(args)
+        self.assertEqual([c["step"] for c in configs], [.01, .04, .002, .01])
+        self.assertTrue(all(c["newton_tolerance"] == 1e-10 for c in configs))
+        self.assertEqual(runner.stage(configs), "periodic_newton")
+        args.step = .001
+        self.assertTrue(all(c["step"] == .001 for c in runner.configurations(args)))
+
+    @unittest.skipUnless(importlib.util.find_spec("numpy"), "Numerical export validation requires NumPy")
+    def test_ode_exports_distinguish_section_and_tangent_residuals(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
-            for report in ({"format": "periodic_orbit.matching.v1"},
-                           dict(format="periodic_orbit.newton.v1", stage="periodic_newton", orbit_corrected=False)):
-                (path / "report.json").write_text(json.dumps(report))
-                with self.assertRaises(ValueError):
+            config = runner.configurations(runner.arguments(["--system", "rossler_periodic", "--sections", "1"]))[0]
+            period = runner.ODE_CASES[config["system"]]["period"]
+            def part(gap):
+                return dict(succeeded=True, period=period, segments=[dict(flight_time=period, steps=20,
+                    crossing_speed=1, gap_norm=gap, section_value=4e-10)])
+            report = dict(format="periodic_orbit.ode_newton.v1", stage="periodic_newton", orbit_corrected=True,
+                configuration=config, passed=True, result_status=0, initial=part(.02), corrected=part(4e-10), refined=part(4e-10),
+                initial_norm=.02, corrected_norm=0, refined_norm=0, matching_host_bytes=0,
+                closure_errors=[0, 0], history=[.02, 0], parameters=runner.ODE_CASES[config["system"]]["parameters"],
+                reference_period=period, rate_norm=2, excursion=2)
+            columns="section,time,cx,cy,cz,nx,ny,nz,x,y,z,arrival_x,arrival_y,arrival_z,target_x,target_y,target_z,flight_time,steps,gap".split(",")
+            for filename, perturbation in (("initial_sections.csv", .02), ("corrected_sections.csv", 0)):
+                with (path / filename).open("w") as stream:
+                    writer=csv.writer(stream); writer.writerow(columns)
+                    writer.writerow([0, config["start_time"], 1,0,0, 0,1,0, 1+perturbation,0,0,
+                                     1,4e-10,0, 1+perturbation,0,0, period,20,math.hypot(perturbation,4e-10)])
+            for filename in ("trajectory.csv", "refined_trajectory.csv"):
+                with (path / filename).open("w") as stream:
+                    writer=csv.writer(stream); writer.writerow(["time", "x", "y", "z"])
+                    for i in range(401):
+                        theta=2*math.pi*i/400
+                        writer.writerow([config["start_time"]+period*i/400, math.cos(theta), math.sin(theta), 0])
+            (path / "newton_history.csv").write_text("iteration,residual\n0,0.02\n1,0\n")
+            (path / "report.json").write_text(json.dumps(report))
+            self.assertTrue(runner.validate_case(path, config)["passed"])
+            for key, value in (("parameters", {}), ("reference_period", period+1), ("rate_norm", 0),
+                               ("excursion", 0), ("closure_errors", [1e-7, 0])):
+                (path / "report.json").write_text(json.dumps(dict(report, **{key:value})))
+                with self.subTest(key=key), self.assertRaises(ValueError):
                     runner.validate_case(path, config)
 
 

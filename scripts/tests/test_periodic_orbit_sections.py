@@ -11,6 +11,7 @@ SYSTEMS = (
     "poincare_dae", "section_map_lifecycle", "section_layout_variable_speed", "section_rpo_target",
     "section_coordinates", "coordinate_solvers", "multiple_section_matching",
     "prepared_section_derivatives", "multiple_section_newton",
+    "rossler_periodic", "lorenz_periodic",
 )
 
 

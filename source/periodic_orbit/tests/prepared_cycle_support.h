@@ -2,22 +2,11 @@
 #define PERIODIC_ORBIT_PREPARED_CYCLE_SUPPORT_H
 
 #include "analytic_cycle_support.h"
+#include "variational_test_support.h"
 #include <periodic_orbit/matching/multiple_section_problem.h>
 
 namespace cycle_tests
 {
-template <class Model>
-struct jacobian_kernel
-{
-    Model               model;
-    double              time;
-    const double       *state, *direction;
-    double             *out;
-    __DEVICE_TAG__ void operator()( std::ptrdiff_t i ) const
-    {
-        out[i] = model.jacobian( i, state, direction, time );
-    }
-};
 
 struct differentiable_cycle : analytic_cycle
 {
@@ -30,31 +19,6 @@ struct differentiable_cycle : analytic_cycle
     }
 };
 
-template <class Model>
-struct tangent_rate
-{
-    Model               model{};
-    bool                fail_rate = false, fail_jacobian = false;
-    mutable std::size_t rate_calls = 0, tangent_calls = 0;
-    bool                evaluate( double time, const X &in, X &out ) const
-    {
-        ++rate_calls;
-        if ( fail_rate )
-            return false;
-        backend::for_each_type{}( rhs_kernel<Model>{ in.raw_ptr(), out.raw_ptr(), time, model }, out.size() );
-        return true;
-    }
-    bool apply_jacobian( double time, const X &state, const X &v, X &out ) const
-    {
-        ++tangent_calls;
-        if ( fail_jacobian )
-            return false;
-        backend::for_each_type{}(
-            jacobian_kernel<Model>{ model, time, state.raw_ptr(), v.raw_ptr(), out.raw_ptr() }, out.size()
-        );
-        return true;
-    }
-};
 using cycle_rate = tangent_rate<differentiable_cycle>;
 using recorded_map =
     periodic_orbit::recorded_section_map<operations, step<analytic_cycle>, plane, rate_provider<analytic_cycle>>;

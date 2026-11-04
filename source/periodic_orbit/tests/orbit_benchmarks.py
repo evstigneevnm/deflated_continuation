@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, independently validate and plot analytical section matching/correction."""
+"""Build, independently validate and plot seeded periodic-orbit correction."""
 
 import argparse
 from datetime import datetime, timezone
@@ -13,6 +13,12 @@ import time
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
+ODE_CASES = {
+    "rossler_periodic": dict(period=6.0309863678295104, steps={"RK45": .01, "DOP853": .04},
+                             parameters=dict(a=.1, b=.1, c=6)),
+    "lorenz_periodic": dict(period=1.6443075739726336, steps={"RK45": .002, "DOP853": .01},
+                            parameters=dict(sigma=10, rho=28, beta=8/3, epsilon=.0055, delta=0)),
+}
 BUILD_ENVIRONMENT = (
     "PATH", "G++", "GCC_ROOT_PATH", "TARGET_GCC", "CPPSTD", "NVCC", "CUDA_ROOT_PATH",
     "CUDA_ARCH_LIST", "TARGET_NVCC", "HIPCC", "HIPFLAGS", "HIP_ROOT_PATH", "HIP_PATH",
@@ -33,11 +39,11 @@ def arguments(argv=None):
     mode.add_argument("-B", dest="build_only", action="store_true", help="Force build and assembly only")
     mode.add_argument("--plot-only", type=Path, help="Revalidate and plot an existing run, without building")
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build/periodic_orbit_benchmarks")
-    parser.add_argument("--systems", "--system", nargs="+", choices=("analytic_cycle", "analytic_cycle_newton"), default=["analytic_cycle"])
+    parser.add_argument("--systems", "--system", nargs="+", choices=("analytic_cycle", "analytic_cycle_newton", *ODE_CASES), default=["analytic_cycle"])
     parser.add_argument("--sections", nargs="+", type=int, default=[1, 2, 4, 8])
     parser.add_argument("--methods", nargs="+", choices=("RK45", "DOP853"), default=["DOP853"])
     parser.add_argument("--backend", choices=("cpu", "cpu_omp", "cuda", "hip"), default="cpu")
-    parser.add_argument("--step", type=positive, default=.08)
+    parser.add_argument("--step", type=positive, help="Override the system/method-specific default step")
     parser.add_argument("--start", type=float, default=.37)
     parser.add_argument("--perturbation", type=positive, default=.02)
     parser.add_argument("--matching-tolerance", type=positive, default=1e-6)
@@ -49,7 +55,7 @@ def arguments(argv=None):
     parser.add_argument("--config-file", type=Path, default=ROOT / "build_configs/config_github_ubuntu_cpu.inc")
     parser.add_argument("--make-option", action="append", default=[], metavar="KEY=VALUE")
     args = parser.parse_args(argv)
-    if (not math.isfinite(args.start) or args.start + args.step == args.start or
+    if (not math.isfinite(args.start) or (args.step is not None and args.start + args.step == args.start) or
             args.perturbation > .1 or args.max_steps < 1 or args.threads < 1 or args.newton_max_iterations < 1 or
             any(n < 1 or n > 64 for n in args.sections)):
         parser.error("Invalid start, section count, perturbation or execution budget")
@@ -62,16 +68,19 @@ def arguments(argv=None):
     args.sections = list(dict.fromkeys(args.sections))
     args.methods = list(dict.fromkeys(args.methods))
     args.systems = list(dict.fromkeys(args.systems))
+    if any(args.start + c["step"] == args.start for c in configurations(args)):
+        parser.error("The chosen step cannot advance the starting time")
     return args
 
 
 def configurations(args):
     configs = [dict(system=system, backend=args.backend, method=method, sections=count,
-                 step=args.step, start_time=args.start, perturbation=args.perturbation,
+                 step=args.step or (ODE_CASES[system]["steps"][method] if system in ODE_CASES else .08),
+                 start_time=args.start, perturbation=args.perturbation,
                  matching_tolerance=args.matching_tolerance, maximum_steps=args.max_steps)
             for system in args.systems for method in args.methods for count in args.sections]
     for config in configs:
-        if config["system"] == "analytic_cycle_newton":
+        if config["system"] != "analytic_cycle":
             config.update(newton_tolerance=args.newton_tolerance, newton_max_iterations=args.newton_max_iterations)
     return configs
 
@@ -113,7 +122,7 @@ def case_name(config):
 
 
 def stage(configs):
-    stages = {"periodic_newton" if c["system"] == "analytic_cycle_newton" else "matching_only" for c in configs}
+    stages = {"matching_only" if c["system"] == "analytic_cycle" else "periodic_newton" for c in configs}
     return next(iter(stages)) if len(stages) == 1 else "mixed"
 
 
@@ -125,12 +134,14 @@ def section_samples(directory, filename, config, part):
         raise ValueError("Incomplete section export")
     if not all(np.isfinite(samples[key]).all() for key in samples.dtype.names):
         raise ValueError("Nonfinite section export")
-    gap = np.hypot(samples["arrival_x"] - samples["target_x"], samples["arrival_y"] - samples["target_y"])
-    normal_error = samples["nx"] * (samples["x"] - samples["cx"]) + samples["ny"] * (samples["y"] - samples["cy"])
-    arrival_error = (np.roll(samples["nx"], -1) * (samples["arrival_x"] - np.roll(samples["cx"], -1)) +
-                     np.roll(samples["ny"], -1) * (samples["arrival_y"] - np.roll(samples["cy"], -1)))
-    target_error = np.hypot(samples["target_x"] - np.roll(samples["x"], -1),
-                            samples["target_y"] - np.roll(samples["y"], -1))
+    axes = "xyz" if config["system"] in ODE_CASES else "xy"
+    def values(prefix):
+        return np.column_stack([samples[prefix + axis] for axis in axes])
+    state, center, normal, arrival, target = (values(p) for p in ("", "c", "n", "arrival_", "target_"))
+    gap = np.linalg.norm(arrival - target, axis=1)
+    normal_error = np.sum(normal * (state - center), axis=1)
+    arrival_error = np.sum(np.roll(normal, -1, axis=0) * (arrival - np.roll(center, -1, axis=0)), axis=1)
+    target_error = np.linalg.norm(target - np.roll(state, -1, axis=0), axis=1)
     if (np.max(np.abs(gap - samples["gap"])) > 1e-10 or np.max(np.abs(normal_error)) > 1e-8 or
             np.max(np.abs(arrival_error)) > 1e-8 or np.max(target_error) > 1e-10 or
             not np.allclose(samples["flight_time"], [s["flight_time"] for s in part["segments"]], atol=1e-12, rtol=1e-12) or
@@ -141,13 +152,13 @@ def section_samples(directory, filename, config, part):
 
 
 def validate_case(directory, config):
-    if config["system"] == "analytic_cycle_newton":
+    if config["system"] != "analytic_cycle":
         return validate_newton_case(directory, config)
-    import numpy as np
     report = json.loads((directory / "report.json").read_text())
     if (report.get("format") != "periodic_orbit.matching.v1" or report.get("stage") != "matching_only" or
             report.get("orbit_corrected") is not False or report.get("configuration") != config or report["passed"] is not True):
         raise ValueError("Missing, inconsistent or failed matching report")
+    import numpy as np
     tolerance, count = config["matching_tolerance"], config["sections"]
     for name in ("baseline", "refined", "perturbed"):
         part = report[name]
@@ -181,12 +192,15 @@ def validate_case(directory, config):
 
 
 def validate_newton_case(directory, config):
-    import numpy as np
     report = json.loads((directory / "report.json").read_text())
-    if (report.get("format") != "periodic_orbit.newton.v1" or report.get("stage") != "periodic_newton" or
+    ode = config["system"] in ODE_CASES
+    expected_format = "periodic_orbit.ode_newton.v1" if ode else "periodic_orbit.newton.v1"
+    reference_period = ODE_CASES[config["system"]]["period"] if ode else 2 * math.pi
+    if (report.get("format") != expected_format or report.get("stage") != "periodic_newton" or
             report.get("orbit_corrected") is not True or report.get("configuration") != config or
             report["passed"] is not True or report["result_status"] != 0):
         raise ValueError("Missing, inconsistent or failed Newton report")
+    import numpy as np
     tolerance = config["matching_tolerance"]
     for name in ("initial", "corrected", "refined"):
         part = report[name]
@@ -202,24 +216,51 @@ def validate_newton_case(directory, config):
     if (report["matching_host_bytes"] != 0 or not report["initial_norm"] > config["perturbation"] * .01 or
             not 0 <= report["corrected_norm"] <= config["newton_tolerance"] or
             not 0 <= report["refined_norm"] < tolerance or
-            any(not abs(report[name]["period"] - 2 * math.pi) < tolerance for name in ("corrected", "refined")) or
+            any(not abs(report[name]["period"] - reference_period) < tolerance for name in ("corrected", "refined")) or
             len(report["closure_errors"]) != 2 or any(not 0 <= e < tolerance for e in report["closure_errors"])):
         raise ValueError("Correction, refinement, closure or transfer check failed")
     for filename, name in (("initial_sections.csv", "initial"), ("corrected_sections.csv", "corrected")):
         samples = section_samples(directory, filename, config, report[name])
-        if name == "corrected" and np.max(np.abs(np.hypot(samples["x"], samples["y"]) - 1)) >= tolerance:
+        if not ode and name == "corrected" and np.max(np.abs(np.hypot(samples["x"], samples["y"]) - 1)) >= tolerance:
             raise ValueError("Corrected sections disagree with isolated cycle")
-        if not math.isclose(np.linalg.norm(samples["gap"]), report[name + "_norm"], rel_tol=1e-6, abs_tol=1e-10):
-            raise ValueError("Reported norm disagrees with exported physical gaps")
+        axes = "xyz" if ode else "xy"
+        gap = np.column_stack([samples["arrival_" + a] - samples["target_" + a] for a in axes])
+        normal = np.roll(np.column_stack([samples["n" + a] for a in axes]), -1, axis=0)
+        if not np.allclose(np.linalg.norm(normal, axis=1), 1, rtol=1e-12, atol=1e-12):
+            raise ValueError("Section normals are not normalized")
+        # Newton uses reduced coordinates. The separate physical section check
+        # bounds the normal defect; do not confuse that defect with tangent gaps.
+        projected = gap - normal * np.sum(normal * gap, axis=1)[:, None]
+        if not math.isclose(np.linalg.norm(projected), report[name + "_norm"], rel_tol=1e-6, abs_tol=1e-10):
+            raise ValueError("Reported norm disagrees with exported section-coordinate gaps")
+    trajectories = []
     for filename in ("trajectory.csv", "refined_trajectory.csv"):
         trajectory = np.genfromtxt(directory / filename, delimiter=",", names=True, ndmin=1)
         t = trajectory["time"]
         if (len(t) < 2 or not np.all(np.diff(t) > 0) or t[0] != config["start_time"] or
                 t[-1] != config["start_time"] + report["corrected"]["period"]):
             raise ValueError("Independent trajectory is incomplete")
-        error = np.hypot(trajectory["x"] - np.cos(t - t[0]), trajectory["y"] - np.sin(t - t[0]))
-        if not np.isfinite(error).all() or np.max(error) >= tolerance:
-            raise ValueError("Independent trajectory disagrees with analytical cycle")
+        if not all(np.isfinite(trajectory[key]).all() for key in trajectory.dtype.names):
+            raise ValueError("Nonfinite independent trajectory")
+        if not ode:
+            error = np.hypot(trajectory["x"] - np.cos(t - t[0]), trajectory["y"] - np.sin(t - t[0]))
+            if np.max(error) >= tolerance:
+                raise ValueError("Independent trajectory disagrees with analytical cycle")
+        trajectories.append(trajectory)
+    if ode:
+        if (report["parameters"] != ODE_CASES[config["system"]]["parameters"] or
+                report["reference_period"] != reference_period or not math.isfinite(report["rate_norm"]) or
+                report["rate_norm"] <= 1 or not math.isfinite(report["excursion"]) or report["excursion"] <= 1):
+            raise ValueError("ODE parameter/reference or non-equilibrium check failed")
+        states = [np.column_stack([t[axis] for axis in "xyz"]) for t in trajectories]
+        if (any(len(t) != 401 for t in trajectories) or
+                not np.array_equal(trajectories[0]["time"], trajectories[1]["time"]) or
+                np.max(np.linalg.norm(states[0] - states[1], axis=1)) >= tolerance):
+            raise ValueError("Independent half/quarter-step trajectories disagree")
+        for i, state in enumerate(states):
+            closure = np.linalg.norm(state[-1] - state[0])
+            if not math.isclose(closure, report["closure_errors"][i], rel_tol=1e-6, abs_tol=1e-10):
+                raise ValueError("Exported trajectory disagrees with reported closure")
     history = np.genfromtxt(directory / "newton_history.csv", delimiter=",", names=True, ndmin=1)
     norms = np.array(report["history"])
     if (len(norms) < 2 or not np.isfinite(norms).all() or np.any(norms < 0) or
@@ -239,19 +280,37 @@ def plot_newton_case(directory, config):
     trajectory = np.genfromtxt(directory / "trajectory.csv", delimiter=",", names=True, ndmin=1)
     initial = np.genfromtxt(directory / "initial_sections.csv", delimiter=",", names=True, ndmin=1)
     solved = np.genfromtxt(directory / "corrected_sections.csv", delimiter=",", names=True, ndmin=1)
-    figure, ax = plt.subplots(figsize=(7, 6))
-    theta = np.linspace(0, 2 * np.pi, 500)
-    ax.plot(np.cos(theta), np.sin(theta), "--", color="0.6", label="Exact cycle")
-    ax.plot(trajectory["x"], trajectory["y"], color="#147a78", label="Corrected, independently integrated")
-    ax.scatter(initial["x"], initial["y"], marker="x", color="#be493e", label="Initial section states")
-    ax.scatter(solved["x"], solved["y"], color="#284c98", label="Corrected section states")
-    ax.set(xlabel="x", ylabel="y", aspect="equal", title=f"Newton correction: {config['method']}, M={config['sections']}")
+    figure = plt.figure(figsize=(8, 6))
+    ode = config["system"] in ODE_CASES
+    if ode:
+        ax = figure.add_subplot(111, projection="3d")
+        reference = np.genfromtxt(directory / "refined_trajectory.csv", delimiter=",", names=True, ndmin=1)
+        guess = np.genfromtxt(directory / "initial_trajectory.csv", delimiter=",", names=True, ndmin=1)
+        ax.plot(guess["x"], guess["y"], guess["z"], color="#be493e", alpha=.5, label="Initial-state trajectory")
+        ax.plot(reference["x"], reference["y"], reference["z"], "--", color="0.5", label="Quarter-step verification")
+        ax.plot(trajectory["x"], trajectory["y"], trajectory["z"], color="#147a78", label="Corrected orbit")
+        ax.scatter(initial["x"], initial["y"], initial["z"], marker="x", color="#be493e", label="Initial section states")
+        ax.scatter(solved["x"], solved["y"], solved["z"], color="#284c98", label="Corrected section states")
+        ax.set(zlabel="z")
+    else:
+        ax = figure.add_subplot(111)
+        theta = np.linspace(0, 2 * np.pi, 500)
+        ax.plot(np.cos(theta), np.sin(theta), "--", color="0.6", label="Exact cycle")
+        ax.plot(trajectory["x"], trajectory["y"], color="#147a78", label="Corrected, independently integrated")
+        ax.scatter(initial["x"], initial["y"], marker="x", color="#be493e", label="Initial section states")
+        ax.scatter(solved["x"], solved["y"], color="#284c98", label="Corrected section states")
+        ax.set(aspect="equal")
+    title = "Lorenz (cubic damping)" if config["system"] == "lorenz_periodic" else config["system"].replace("_", " ")
+    ax.set(xlabel="x", ylabel="y", title=f"{title}: {config['method']}, M={config['sections']}, T={report['corrected']['period']:.8f}")
     ax.legend(fontsize="small")
-    figure.savefig(directory / "phase.png", dpi=150, bbox_inches="tight")
+    figure.savefig(directory / "phase.png", dpi=150, bbox_inches="tight",
+                   bbox_extra_artists=(ax.zaxis.label,) if ode else None)
     plt.close(figure)
     figure, axes = plt.subplots(2, 2, figsize=(11, 7), constrained_layout=True)
     axes[0, 0].plot(trajectory["time"], trajectory["x"], label="x")
     axes[0, 0].plot(trajectory["time"], trajectory["y"], label="y")
+    if ode:
+        axes[0, 0].plot(trajectory["time"], trajectory["z"], label="z")
     axes[0, 0].set(xlabel="Time", title="Independent one-period trajectory")
     axes[0, 0].legend()
     axes[0, 1].semilogy(np.maximum(report["history"], 1e-17), "o-", color="#147a78")
@@ -268,7 +327,7 @@ def plot_newton_case(directory, config):
 
 
 def plot_case(directory, config):
-    if config["system"] == "analytic_cycle_newton":
+    if config["system"] != "analytic_cycle":
         return plot_newton_case(directory, config)
     import numpy as np
     import matplotlib

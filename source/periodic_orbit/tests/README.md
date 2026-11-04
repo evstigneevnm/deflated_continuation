@@ -3,8 +3,11 @@
 `analytic_cycle` validates multiple-section matching of a known isolated
 unit-circle orbit and non-orbit perturbations (`stage: matching_only`).
 `analytic_cycle_newton` corrects perturbed section states using NMFD Newton/GMRES
-and a prepared matrix-free derivative (`stage: periodic_newton`). Neither claims
-general periodic-orbit discovery. Rossler/Lorenz correction follows separately.
+and a prepared matrix-free derivative (`stage: periodic_newton`).
+`rossler_periodic` and `lorenz_periodic` add three-dimensional seeded corrections
+with the same solver and derivative path. These are not general orbit-discovery
+algorithms. Each system's equations, parameters and seed provenance are documented
+in its separate `*_periodic_problem.h` file.
 
 From the project root:
 
@@ -13,10 +16,12 @@ bash source/periodic_orbit/tests/run_all.sh
 bash source/periodic_orbit/tests/run_all.sh -B
 bash source/periodic_orbit/tests/run_all.sh --backend cpu_omp --threads 2 --methods RK45 DOP853
 bash source/periodic_orbit/tests/run_all.sh --system analytic_cycle_newton --methods RK45 DOP853
+bash source/periodic_orbit/tests/run_all.sh --systems rossler_periodic lorenz_periodic --methods RK45 DOP853
 bash source/periodic_orbit/tests/run_all.sh --plot-only build/periodic_orbit_benchmarks/runs/RUN_DIRECTORY
 ```
 
-Default section counts are 1, 2, 4, 8; the default dense-output method is DOP853.
+The default system remains `analytic_cycle`. Default section counts are 1, 2, 4,
+8; the default dense-output method is DOP853.
 Use `--sections`, `--step`, `--start`, `--perturbation`, `--matching-tolerance`,
 `--max-steps` and `--timeout` to configure a run. The problem description and
 exact radial evolution are in `analytic_cycle_support.h`. The section layout is
@@ -29,6 +34,31 @@ Prepared derivatives replay frozen explicit RK stages and differentiate their
 dense section crossing. Implicit/DAE tangents and relative closure are not
 silently inferred. Core tests include non-autonomous stage times, adaptive mesh
 recording, linearity, finite differences, rollback and retained-Jacobian lifetime.
+
+The Rossler case uses `a=b=0.1, c=6`, with reference period
+`6.0309863678295104`. The Lorenz case retains the historical cubic damping:
+`sigma=10, rho=28, beta=8/3, epsilon=0.0055, delta=0`, with reference period
+`1.6443075739726336`. It is not the undamped textbook system. The Lorenz seed is
+placed at a phase whose flow-normal plane has one increasing return per orbit;
+the original shooting phase's plane had two. An independent variational solve
+gives a nontrivial unstable multiplier about `5.39008` for this short orbit.
+
+Default fixed steps, overridden by `--step`, are:
+
+| System | RK45 | DOP853 |
+| --- | --- | --- |
+| Analytical cycle | 0.08 | 0.08 |
+| Rossler | 0.01 | 0.04 |
+| Cubic-damped Lorenz | 0.002 | 0.01 |
+
+ODE reports validate reference periods, true reduced-coordinate residuals,
+physical section defects, and independent half/quarter-step closure. Trajectories
+are sampled at the same 401 physical times through dense views; their difference
+is checked without requiring long-time shadowing of an unstable orbit. A finite
+nonzero physical rate and a nontrivial excursion reject equilibrium collapse.
+Plots include the initial/corrected 3D trajectories, section states, time traces,
+Newton convergence, matching gaps and segment work. The normal section defect
+and tangent-coordinate gap are checked separately, not equated.
 
 Build products and assembled case configurations go into
 `build/periodic_orbit_benchmarks/bin` and `cases`. Each invocation creates a new
@@ -51,6 +81,6 @@ bash source/periodic_orbit/tests/run_all.sh --backend hip \
 ```
 
 Device runtime/library paths must already be configured. Core matching and chart
-tests forbid vector-sized host copies. Benchmark plotting explicitly exports two
+tests forbid vector-sized host copies. Benchmark plotting explicitly exports two or three
 scalar coordinates; this I/O is outside residual evaluation. No legacy headers,
 project Newton implementation, or canonical solver modifications are used here.
