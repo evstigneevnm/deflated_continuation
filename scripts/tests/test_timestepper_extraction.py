@@ -216,6 +216,28 @@ class TimestepperExtractionTest(unittest.TestCase):
         for test in tests:
             self.assertIn(f"test_implicit_{test}_cpu.bin", commands)
 
+    def test_imex_execution_is_built_standalone_and_required_by_ci(self):
+        tests = ("imex", "imex_mass", "imex_lifecycle", "imex_backend")
+        for directory in (ROOT, MODULE):
+            for test in tests:
+                output = self.make(directory, f"test_implicit_{test}_cpu_omp.bin",
+                                   "BUILD_DIR=build/imex_probe")
+                self.assertIn(f"tests/test_implicit_{test}.cpp", output)
+        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
+        self.assertIn("timestepper-imex-cuda", jobs["all-tests-passed"]["needs"])
+        self.assertIn("timestepper-imex-hip", jobs["all-tests-passed"]["needs"])
+        self.assertEqual(jobs["timestepper-imex-cpu"]["strategy"]["matrix"]["compiler"], ["g++", "clang++"])
+        self.assertIn("timestepper-imex-cpu", jobs["timestepper-imex-cuda"]["needs"])
+        test_loop = "for test in " + " ".join(tests) + "; do"
+        for backend in ("cpu", "cuda", "hip"):
+            commands = "\n".join(step.get("run", "") for step in jobs[f"timestepper-imex-{backend}"]["steps"])
+            self.assertIn(test_loop, commands)
+            if backend == "cpu":
+                self.assertIn("test_implicit_${test}_cpu_omp.bin", commands)
+        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
+        self.assertIn("timestepper-imex-cpu", sanitizer["needs"])
+        self.assertIn(test_loop, "\n".join(step.get("run", "") for step in sanitizer["steps"]))
+
     def test_filter_adaptation_is_standalone_and_gates_implicit_tests(self):
         for directory in (ROOT, MODULE):
             output = self.make(directory, "test_explicit_filter_adaptation_cpu_omp.bin",

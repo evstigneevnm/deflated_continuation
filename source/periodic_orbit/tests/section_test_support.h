@@ -137,14 +137,15 @@ struct problem
     {
         time = t;
     }
-    void apply( const X &in, X &out )
+    bool evaluate_rate( const X &in, X &out )
     {
         if ( invalid )
         {
             ops->assign_scalar( std::numeric_limits<double>::infinity(), out );
-            return;
+            return true;
         }
         backend::for_each_type{}( rhs_kernel<Model>{ in.raw_ptr(), out.raw_ptr(), time, model }, out.size() );
+        return true;
     }
 };
 // An independent provider avoids changing the timestepper's prepared problem context.

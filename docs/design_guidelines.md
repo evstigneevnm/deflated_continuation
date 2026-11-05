@@ -500,10 +500,10 @@ with `M(t,u,p)` is a mass matrix, `udot` is the rate change of vector `u`, `M^{-
 so for explicit method, `G` formulated with the following methods:
 
 ```cpp
-class problem //minimum problem class methods for explicit method. Only one `apply` method  with (in, out)
+class problem // minimum explicit rate provider
 {
   // ...
-  void apply(in, out); // returns `M^{-1} f_E(t,u_stage,p)` as a mapping `in|-G->out` 
+  bool evaluate_rate(const vector_type& state, vector_type& rate); // solves M*rate=f_E
   void set_time(t_in); // this for non-autonomous problems, not used for autonomous
   // ...
 };
@@ -517,14 +517,14 @@ G(u) = alpha*M(t,u,p)*(u-u_prev) - f_I(t,u,p) - r,
 
 Here `f_I` is the full RHS for fully implicit stages, or the implicit part for IMEX, and `G` is formulated with the following methods:
 
-The displayed residual is canonical; a problem may directly evaluate a fixed
-row-scaled equivalent with an identically scaled Jacobian. For balanced
-differential rows, choose a positive reference time `tau_ref`, set
-`s=max(abs(alpha),1/tau_ref)`, `a=alpha/s`, `b=1/s`, and evaluate
-`a*M(t,u,p)*(u-u_prev)-b*(f_I(t,u,p)+r)` directly. Freeze `a` and `b` inside
-`set_affine_shift()` for the whole nonlinear solve, including backtracking.
+The displayed residual is canonical. The implicit stepper passes balanced
+coefficients through `set_affine_shift(a,b)`: `s=max(abs(alpha),1/reference_time)`,
+`a=alpha/s`, `b=1/s`. Its `params::reference_time` defaults to one for nondimensional
+problems. Evaluate `a*M(t,u,p)*(u-u_prev)-b*(f_I(t,u,p)+r)` directly and use the
+same coefficients in the Jacobian. The problem retains them unchanged throughout
+the nonlinear solve, including backtracking; it must not renormalize them.
 This avoids artificial coefficient growth for small and large stage steps.
-The reference time is a problem scale, not a threshold in arbitrary physical units.
+The reference time is a configured problem scale, not a threshold in arbitrary physical units.
 Algebraic constraints retain their own unscaled equations and tolerances; the
 problem supplies the appropriate partition, never a generic mass-diagonal heuristic.
 Globalization progress must use the original physical residual and constraints,
@@ -534,10 +534,10 @@ because scaled stage norms at different shifts are not directly comparable.
 class problem //minimum problem class methods for implicit method. `apply` evaluates only the residual.
 {
   // ...  
-  void set_affine_shift(scalar_type alpha); // implements `alpha` affine shift in the residual.
+  void set_affine_shift(scalar_type a, scalar_type b); // freezes the supplied coefficients
   void apply(const vector_type& in, vector_type& out); // returns the whole residual G(u) as `problem.apply(in, out);` as a mapping `in|-G->out`.
   // void set_previous_state(u_prev); //sets `u_prev` for the calculation of the residual.
-  bool evaluate_rate(const vector_type& state, vector_type& rate); // OPTIONAL: physical, consistent derivative.
+  bool evaluate_rate(const vector_type& state, vector_type& rate); // physical, consistent derivative.
   vector_type& previous_state(); // fills the previous state vector `u_prev`
   const vector_type& previous_state() const;
   // void set_known_rhs(r); // sets the known `r` vector that can be substituted for the BDF.
@@ -560,7 +560,31 @@ For balanced differential rows, it is
 `a*(M(u)*v + (D_u M(u)[v])*(u-u_prev)) - b*D_u f_I(u)[v]`.
 Constraint Jacobian rows remain unscaled, consistently with their residuals.
 
-and implement:
+Explicit stepping, including dense output, always uses `evaluate_rate()`. A successful
+call returns `true` and writes the physical derivative; `false` requests bounded
+rejection without committing the candidate. The problem owns any mass solve.
+`apply()` is exclusively a residual evaluation, never selected by setting a zero shift.
+
+IMEX assembly supplies a cached `std::shared_ptr<imex_operator_type> get_imex_operator()`.
+The `runge_kutta::imex_operator<ExplicitOperator,ImplicitOperator>` bundle retains
+`explicit_part` and `implicit_part` as shared handles. The explicit part supplies
+`evaluate_rate()` for `M*k_E=f_E`; the implicit part supplies the stage interface
+above and, when required, `evaluate_rate()` for `M*k_I=f_I`. Neither rate includes
+the other partition or `known_rhs()`. Both use the same model/mass convention.
+Share model data, not a back-pointer to the owning bundle/application. Cache these
+handles during assembly, not per stage.
+
+`runge_kutta::imex_time_step` executes fixed-step IMEX tables with the same
+integrator/controller lifecycle. Its stage reference contains both partitions'
+previous rate sums; `known_rhs()` remains zero. Newton solves only the shifted
+implicit equation. Recover nonzero-diagonal implicit rates from stage displacements;
+evaluate only consumed explicit and zero-diagonal implicit rates. Reuse the final
+stage only when both tableaux are stiffly accurate. Keep vector workspace on the
+selected backend and retain no trajectory history. The shared bundle is acquired
+once, and the solver is bound once. Error-requiring controllers and dense output
+remain unavailable until validated combined estimates/extensions are implemented.
+
+The Jacobian exposes:
 
 ``` cpp
 jacobian.apply(in, out);
@@ -726,7 +750,7 @@ provider. Do not cache rates across rejected attempts or modified endpoints.
 DAE rate reconstruction must include the formulation's differentiated constraints;
 never infer algebraic derivatives or invert a singular mass matrix. Generic embedded
 control does not certify algebraic accuracy or method suitability for every DAE.
-IMEX execution and explicit-engine rate dispatch remain deferred.
+The fixed-step IMEX engine uses this same rate contract for each partition.
 
 The status of a single step is given as the following structure:
 

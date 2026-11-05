@@ -35,11 +35,10 @@ struct quadratic_stage
     {
         time = t;
     }
-    void set_affine_shift( double alpha )
+    void set_affine_shift( double mass, double force )
     {
-        const double scale = std::max( 1., std::abs( alpha ) );
-        a                  = alpha / scale;
-        b                  = 1 / scale;
+        a = mass;
+        b = force;
     }
     X &previous_state()
     {
