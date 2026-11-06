@@ -35,7 +35,7 @@ class TimestepperExtractionTest(unittest.TestCase):
         self.assertEqual(config[section]["url"],
                          "https://github.com/evstigneevnm/NMFD-timesteppers.git")
         self.assertTrue((MODULE / "include/nmfd/time_steppers/runge_kutta/explicit_time_step.h").is_file())
-        for directory in ("detail", "integration", "runge_kutta", "tests"):
+        for directory in ("detail", "integration", "runge_kutta", "bdf", "tests"):
             self.assertFalse(list((ROOT / "source/time_stepper" / directory).glob("*.h")))
             self.assertFalse(list((ROOT / "source/time_stepper" / directory).glob("*.cpp")))
             self.assertFalse(list((ROOT / "source/time_stepper" / directory).glob("*.py")))
@@ -105,6 +105,34 @@ class TimestepperExtractionTest(unittest.TestCase):
         for test in ("dirk", "adaptive", "mass-dae", "lifecycle", "lorenz", "rossler", "vdp", "nonautonomous"):
             for backend in ("cpu", "cuda"):
                 self.assertIn(f"timestepper-implicit-{test}-{backend}", workflow["jobs"])
+
+    def test_bdf_history_engine_is_standalone_and_required_by_ci(self):
+        tests = ("bdf", "bdf_lifecycle", "bdf_mass_dae", "bdf_backend")
+        for directory in (ROOT, MODULE):
+            for test in tests:
+                output = self.make(directory, f"test_implicit_{test}_cpu.bin", "BUILD_DIR=build/bdf_probe")
+                self.assertIn(f"tests/test_implicit_{test}.cpp", output)
+        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
+        self.assertEqual(jobs["timestepper-bdf-cpu"]["strategy"]["matrix"]["compiler"], ["g++", "clang++"])
+        for backend in ("cuda", "hip"):
+            self.assertIn(f"timestepper-bdf-{backend}", jobs["all-tests-passed"]["needs"])
+            self.assertIn("timestepper-bdf-cpu", jobs[f"timestepper-bdf-{backend}"]["needs"])
+        loop = "for test in " + " ".join(tests) + "; do"
+        for backend in ("cpu", "cuda", "hip"):
+            commands = "\n".join(step.get("run", "") for step in jobs[f"timestepper-bdf-{backend}"]["steps"])
+            self.assertIn(loop, commands)
+            self.assertIn("test_implicit_${test}_" + backend + ".bin", commands)
+        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
+        self.assertIn("timestepper-bdf-cpu", sanitizer["needs"])
+        self.assertIn(loop, "\n".join(step.get("run", "") for step in sanitizer["steps"]))
+        visual = "\n".join(step.get("run", "") for step in jobs["timestepper-lorenz-simulation-python-cpu"]["steps"])
+        self.assertIn("--methods BDF1 BDF2 --controllers constant", visual)
+        for directory in (ROOT, MODULE):
+            output = self.make(directory, "test_implicit_bdf_cpu.bin", "BUILD_DIR=build/bdf_probe",
+                               "-p")
+            target = "test_implicit_bdf_cpu.bin" if directory == ROOT else "build/bdf_probe/test_implicit_bdf_cpu.bin"
+            dependencies = next(line for line in output.splitlines() if line.startswith(target + ":"))
+            self.assertIn("include/nmfd/time_steppers/bdf/implicit_time_step.h", dependencies)
 
     def test_adaptive_dirk_is_built_standalone_and_required_by_ci(self):
         output = self.make(MODULE, "test_implicit_adaptive_cpu.bin", "BUILD_DIR=build/adaptive_probe")

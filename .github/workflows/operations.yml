@@ -266,6 +266,8 @@ jobs:
       - timestepper-explicit-vdp-cpu
       - timestepper-fsal-cuda
       - timestepper-filter-adaptation-cuda
+      - timestepper-bdf-cuda
+      - timestepper-bdf-hip
       - timestepper-implicit-adaptive-cuda
       - timestepper-implicit-dense-cuda
       - timestepper-implicit-dirk-cuda
@@ -1377,6 +1379,92 @@ jobs:
           make test_implicit_dirk_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_dirk_cuda"
           timeout 300s ./"$BUILD_DIR"/implicit_dirk_cuda/test_implicit_dirk_cuda.bin
 
+  timestepper-bdf-cpu:
+    needs: [timestepper-implicit-dirk-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare Clang OpenMP runtime
+        if: matrix.compiler == 'clang++'
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            sudo apt-get update
+            sudo apt-get install -y libomp-dev
+          fi
+      - name: Verify BDF orders, committed history, mass and transfer guards
+        run: |
+          make check_timestepper_headers_cpu "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend; do
+            make -j2 "test_implicit_${test}_cpu.bin" "test_implicit_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/bdf"
+            for backend in cpu cpu_omp; do
+              OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/bdf/"test_implicit_${test}_${backend}.bin"
+            done
+          done
+
+  timestepper-bdf-cuda:
+    needs: [timestepper-bdf-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify BDF when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping BDF CUDA tests: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping BDF CUDA tests: nvcc unavailable"
+            exit 0
+          fi
+          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend; do
+            make "test_implicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/bdf_cuda"
+            timeout 300s ./"$BUILD_DIR"/bdf_cuda/"test_implicit_${test}_cuda.bin"
+          done
+
+  timestepper-bdf-hip:
+    needs: [timestepper-bdf-cpu, scfd-vector-operations-hip]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify BDF when HIP is available
+        run: |
+          HIPCC_BIN="$(command -v "${HIPCC:-hipcc}" || true)"
+          if [ -z "$HIPCC_BIN" ]; then
+            echo "Skipping BDF HIP tests: hipcc unavailable"
+            exit 0
+          fi
+          HIP_ROOT="${ROCM_PATH:-$(dirname "$(dirname "$HIPCC_BIN")")}"
+          if "$HIPCC_BIN" --version | grep -qi nvcc; then
+            if ! nvidia-smi -L >/dev/null 2>&1; then
+              echo "Skipping BDF HIP tests: no usable NVIDIA GPU"
+              exit 0
+            fi
+            HIP_TARGET="${HIP_ARCH_LIST:-75}"
+          else
+            if ! "$HIP_ROOT/bin/rocm-smi" >/dev/null 2>&1; then
+              echo "Skipping BDF HIP tests: no usable AMD GPU"
+              exit 0
+            fi
+            HIP_TARGET="${HIP_ARCH_LIST:-native}"
+          fi
+          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend; do
+            make "test_implicit_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/bdf_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
+            timeout 300s ./"$BUILD_DIR"/bdf_hip/"test_implicit_${test}_hip.bin"
+          done
+
   timestepper-implicit-adaptive-cpu:
     needs: [timestepper-implicit-dirk-cpu, timestepper-scipy-adaptation-cpu, timestepper-filter-adaptation-cpu]
     runs-on: ubuntu-latest
@@ -2011,7 +2099,7 @@ jobs:
           timeout 300s ./"$BUILD_DIR"/implicit_nonautonomous_cuda/test_implicit_nonautonomous_cuda.bin
 
   timestepper-implicit-sanitizers-cpu:
-    needs: [timestepper-implicit-dirk-cpu, timestepper-implicit-adaptive-cpu, timestepper-implicit-esdirk-cpu, timestepper-imex-cpu, timestepper-implicit-dense-cpu, timestepper-implicit-globalization-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu, timestepper-implicit-lorenz-cpu, timestepper-implicit-rossler-cpu, timestepper-implicit-vdp-cpu]
+    needs: [timestepper-implicit-dirk-cpu, timestepper-bdf-cpu, timestepper-implicit-adaptive-cpu, timestepper-implicit-esdirk-cpu, timestepper-imex-cpu, timestepper-implicit-dense-cpu, timestepper-implicit-globalization-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu, timestepper-implicit-lorenz-cpu, timestepper-implicit-rossler-cpu, timestepper-implicit-vdp-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -2040,6 +2128,10 @@ jobs:
           done
           make -j2 test_implicit_dense_output_cpu.bin test_implicit_dense_lifecycle_cpu.bin test_implicit_dense_mass_dae_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
           for test in dense_output dense_lifecycle dense_mass_dae; do
+            OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
+          done
+          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend; do
+            make "test_implicit_${test}_cpu.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
           OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/test_explicit_nonautonomous_cpu.bin
@@ -2467,6 +2559,9 @@ jobs:
             --build-dir "$SIMULATION_BUILD/imex_benchmarks" --system coupled_mass \
             --end 0.1 --step 0.001 --methods IMEX_EULER IMEX_HEUN_TR2 IMEX_ARS222 IMEX_ARS233 \
             --controllers constant
+          PYTHON="$PYTHON" bash source/contrib/nmfd-timesteppers/tests/run_all.sh \
+            --build-dir "$SIMULATION_BUILD/imex_benchmarks" \
+            --end 0.4 --step 0.0002 --methods BDF1 BDF2 --controllers constant
           make test_explicit_lorenz_simulation_cpu.bin test_explicit_lorenz_simulation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$SIMULATION_BUILD"
           for backend in cpu cpu_omp; do
             for method in RK45 RK23 DOP853; do

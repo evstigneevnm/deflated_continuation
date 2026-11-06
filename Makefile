@@ -1279,7 +1279,7 @@ test_nmfd_dense_%_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_dense.cpp
 	$(NVCC) $(NVCCFLAGS) --extended-lambda $(NEWTON_TEST_FLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) -DPLATFORM_CUDA -x cu $< -c -o $(BUILD_DIR)/test_nmfd_dense_$*_cuda_main.o
 	$(NVCC) $(NVCCFLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) $(BUILD_DIR)/test_nmfd_dense_$*_cuda_main.o $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LCUDA) -lcublas -lcusolver -o $(BUILD_DIR)/$@
 
-TIME_STEPPER_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/include/nmfd/time_steppers/runge_kutta/*.h $(NMFD_TIMESTEPPERS_ROOT)/include/nmfd/time_steppers/integration/*.h $(NMFD_TIMESTEPPERS_ROOT)/include/nmfd/time_steppers/detail/*.h)
+TIME_STEPPER_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/include/nmfd/time_steppers/*/*.h)
 TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/explicit_*_problem.h $(NMFD_TIMESTEPPERS_ROOT)/tests/nonautonomous_test_problems.h)
 TIME_STEPPER_VECTOR_WRAP_HEADER = $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 TIME_STEPPER_IMPLICIT_TEST_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/implicit_*.h $(NMFD_TIMESTEPPERS_ROOT)/tests/nonautonomous_test_problems.h)

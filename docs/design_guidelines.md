@@ -478,7 +478,7 @@ with public includes under `nmfd/time_steppers/` and APIs in `nmfd::time_stepper
 The module uses flat NMFD-operations/SCFD dependencies during development; explicit
 integration must not require nonlinear or linear solver headers. Parent CI owns
 the validation jobs until standalone module CI and dependency pins are introduced.
-The APIs have `runge_kutta`, `integration`, and `detail` subnamespaces.
+The APIs have `runge_kutta`, `bdf`, `integration`, and `detail` subnamespaces.
 Unmigrated legacy steppers remain in
 `::time_steppers`; new code must use the NMFD namespace. Simple examples for the timesteppers should be incapsulated in a single file and should contain minimum methods required without generating spagetti code or overcomplecated structures.
 
@@ -598,6 +598,23 @@ view has the same lifetime, endpoint-copy and backend-storage rules as DIRK dens
 output. No per-sample allocations, problem calls or vector-sized host transfers
 are permitted. Other IMEX methods require explicitly validated combined extensions;
 general singular-mass DAE dense output is not inferred.
+
+`bdf::implicit_time_step` implements fixed `BDF1`/`BDF2` with the same problem,
+solver injection and apply/finalize lifecycle. BDF1 sets `previous_state()=u_n`,
+`alpha=1/h`; equal-step BDF2 sets `previous_state()=(4*u_n-u_{n-1})/3`,
+`alpha=3/(2*h)`. Both use balanced affine coefficients and zero `known_rhs()`.
+History consists only of accepted states: backward Euler starts BDF2; an unchanged
+full commit promotes history, while modified/shortened endpoints and resets restart
+at BDF1. Changed actual steps or direction use BDF1 until an equal-step pair is
+available. Roundoff-only final clipping must not cause a false restart.
+Failed solves, rejected candidates and failed/rejected commits never advance
+history. A discontinuous time change resets history/controller state; callers must
+reset after independent state/model changes. Retain the current input before
+publishing an in-place candidate. BDF1 owns one workspace vector and BDF2 three,
+all backend-resident and reusable. No rate callback, mass inverse, dense output or
+error estimator is introduced. Error-requiring controllers report unavailable
+estimation. Adaptive BDF1-5 will use modified divided differences in a later stage;
+this must not change the problem or integrator interfaces.
 
 The Jacobian exposes:
 
