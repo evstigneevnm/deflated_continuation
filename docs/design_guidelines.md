@@ -587,7 +587,17 @@ Combine signed state defects before taking norms. Error workspace and embedding-
 rates are allocated only for error-requiring configurations; numerical failures
 bypass assessment and never update committed controller history. Separate partition
 embeddings are not sufficient: custom tables explicitly declare the validated
-combined embedding order. Dense output still requires a combined continuous extension.
+combined embedding order. `IMEX_ARK324L2SA` additionally supplies an opt-in
+order-three combined endpoint-Hermite extension, not a partition interpolant.
+It uses total initial and actual-endpoint rates; both endpoint partition rates
+are evaluated only after error acceptance, with mass solves remaining problem-owned.
+Reuse retired stage buffers for these total rates and add only an initial-state
+snapshot. Restore prepared partition times; preserve their buffers/Jacobian.
+Failed dense preparation rejects before publication/commit. The existing borrowed
+view has the same lifetime, endpoint-copy and backend-storage rules as DIRK dense
+output. No per-sample allocations, problem calls or vector-sized host transfers
+are permitted. Other IMEX methods require explicitly validated combined extensions;
+general singular-mass DAE dense output is not inferred.
 
 The Jacobian exposes:
 

@@ -1465,7 +1465,7 @@ jobs:
       - name: Verify fixed/adaptive IMEX orders, mass solves and transactional failures
         run: |
           make check_timestepper_headers_cpu "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
-          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks; do
+          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks imex_dense_output imex_dense_lifecycle; do
             make -j2 "test_implicit_${test}_cpu.bin" "test_implicit_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/imex"
             for backend in cpu cpu_omp; do
               OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/imex/"test_implicit_${test}_${backend}.bin"
@@ -1490,7 +1490,7 @@ jobs:
             echo "Skipping IMEX CUDA tests: nvcc unavailable"
             exit 0
           fi
-          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks; do
+          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks imex_dense_output imex_dense_lifecycle; do
             make "test_implicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/imex_cuda"
             timeout 300s ./"$BUILD_DIR"/imex_cuda/"test_implicit_${test}_cuda.bin"
           done
@@ -1524,7 +1524,7 @@ jobs:
             fi
             HIP_TARGET="${HIP_ARCH_LIST:-native}"
           fi
-          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks; do
+          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks imex_dense_output imex_dense_lifecycle; do
             make "test_implicit_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/imex_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
             timeout 300s ./"$BUILD_DIR"/imex_hip/"test_implicit_${test}_hip.bin"
           done
@@ -2024,7 +2024,7 @@ jobs:
           for test in esdirk esdirk_adaptive esdirk_mass_dae; do
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
-          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks; do
+          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks imex_dense_output imex_dense_lifecycle; do
             make "test_implicit_${test}_cpu.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
@@ -2452,7 +2452,7 @@ jobs:
           PYTHON="$PYTHON" bash source/contrib/nmfd-timesteppers/tests/run_all.sh \
             --build-dir "$SIMULATION_BUILD/imex_benchmarks" \
             --systems lorenz rossler vdp vdp_stiff coupled_mass state_mass time_mass time_coefficient stiff_tracking \
-            --end 0.4 --methods IMEX_ARK324L2SA --controllers scipy
+            --end 0.4 --methods IMEX_ARK324L2SA --controllers scipy --sample-step 0.017
           PYTHON="$PYTHON" bash source/contrib/nmfd-timesteppers/tests/run_all.sh \
             --build-dir "$SIMULATION_BUILD/imex_benchmarks" --system coupled_mass \
             --end 0.1 --step 0.001 --methods IMEX_EULER IMEX_HEUN_TR2 IMEX_ARS222 IMEX_ARS233 \
