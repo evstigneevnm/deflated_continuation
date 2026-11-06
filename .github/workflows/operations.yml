@@ -1401,7 +1401,7 @@ jobs:
       - name: Verify BDF orders, committed history, mass and transfer guards
         run: |
           make check_timestepper_headers_cpu "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
-          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend; do
+          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend bdf_adaptive bdf_adaptive_lifecycle bdf_adaptive_mass_dae bdf_orders bdf_variable_order bdf_stability; do
             make -j2 "test_implicit_${test}_cpu.bin" "test_implicit_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/bdf"
             for backend in cpu cpu_omp; do
               OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/bdf/"test_implicit_${test}_${backend}.bin"
@@ -1426,7 +1426,7 @@ jobs:
             echo "Skipping BDF CUDA tests: nvcc unavailable"
             exit 0
           fi
-          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend; do
+          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend bdf_adaptive bdf_adaptive_lifecycle bdf_adaptive_mass_dae bdf_orders bdf_variable_order bdf_stability; do
             make "test_implicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/bdf_cuda"
             timeout 300s ./"$BUILD_DIR"/bdf_cuda/"test_implicit_${test}_cuda.bin"
           done
@@ -1460,7 +1460,7 @@ jobs:
             fi
             HIP_TARGET="${HIP_ARCH_LIST:-native}"
           fi
-          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend; do
+          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend bdf_adaptive bdf_adaptive_lifecycle bdf_adaptive_mass_dae bdf_orders bdf_variable_order bdf_stability; do
             make "test_implicit_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/bdf_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
             timeout 300s ./"$BUILD_DIR"/bdf_hip/"test_implicit_${test}_hip.bin"
           done
@@ -2130,7 +2130,7 @@ jobs:
           for test in dense_output dense_lifecycle dense_mass_dae; do
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
-          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend; do
+          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend bdf_adaptive bdf_adaptive_lifecycle bdf_adaptive_mass_dae bdf_orders bdf_variable_order bdf_stability; do
             make "test_implicit_${test}_cpu.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
@@ -2562,6 +2562,12 @@ jobs:
           PYTHON="$PYTHON" bash source/contrib/nmfd-timesteppers/tests/run_all.sh \
             --build-dir "$SIMULATION_BUILD/imex_benchmarks" \
             --end 0.4 --step 0.0002 --methods BDF1 BDF2 --controllers constant
+          PYTHON="$PYTHON" bash source/contrib/nmfd-timesteppers/tests/run_all.sh \
+            --build-dir "$SIMULATION_BUILD/imex_benchmarks" \
+            --end 0.4 --methods BDF1 BDF2 --controllers matlab scipy PID --rtol 1e-6 --atol 1e-8
+          PYTHON="$PYTHON" bash source/contrib/nmfd-timesteppers/tests/run_all.sh \
+            --build-dir "$SIMULATION_BUILD/imex_benchmarks" \
+            --end 0.4 --methods BDF --bdf-max-order 5 --controllers matlab scipy PID --rtol 1e-7 --atol 1e-9
           make test_explicit_lorenz_simulation_cpu.bin test_explicit_lorenz_simulation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$SIMULATION_BUILD"
           for backend in cpu cpu_omp; do
             for method in RK45 RK23 DOP853; do

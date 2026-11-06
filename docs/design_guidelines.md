@@ -599,7 +599,7 @@ output. No per-sample allocations, problem calls or vector-sized host transfers
 are permitted. Other IMEX methods require explicitly validated combined extensions;
 general singular-mass DAE dense output is not inferred.
 
-`bdf::implicit_time_step` implements fixed `BDF1`/`BDF2` with the same problem,
+`bdf::implicit_time_step` implements `BDF1`/`BDF2` with the same problem,
 solver injection and apply/finalize lifecycle. BDF1 sets `previous_state()=u_n`,
 `alpha=1/h`; equal-step BDF2 sets `previous_state()=(4*u_n-u_{n-1})/3`,
 `alpha=3/(2*h)`. Both use balanced affine coefficients and zero `known_rhs()`.
@@ -611,10 +611,45 @@ Failed solves, rejected candidates and failed/rejected commits never advance
 history. A discontinuous time change resets history/controller state; callers must
 reset after independent state/model changes. Retain the current input before
 publishing an in-place candidate. BDF1 owns one workspace vector and BDF2 three,
-all backend-resident and reusable. No rate callback, mass inverse, dense output or
-error estimator is introduced. Error-requiring controllers report unavailable
-estimation. Adaptive BDF1-5 will use modified divided differences in a later stage;
-this must not change the problem or integrator interfaces.
+all backend-resident and reusable. These fixed-mode rules remain the default.
+
+`params.adaptive=true` enables variable-grid BDF1/BDF2 with scaled committed
+divided differences. For `r=h/h_previous`, BDF2 uses
+`alpha=(1+2*r)/((1+r)*h)` and
+`previous_state()=u_n+r*r/(1+2*r)*(u_n-u_{n-1})`.
+Bound ratios to `[minimum_step_ratio,maximum_step_ratio]`, default `[0.2,2]`,
+with maximum growth at most 2. Cap growth; restart on extreme shrinkage,
+direction reversal or modified endpoints. Never advance history during a trial.
+Error-requiring controllers use backward-Euler step doubling at startup, then
+candidate-corrected polynomial-defect estimates in state units. Commit the full
+startup step, not an extrapolated solution. Estimated BDF2 starts after two
+accepted intervals; pass local-error exponents 2/3 to existing controllers.
+Retain four/five backend vectors for adaptive BDF1/BDF2 with estimation, without
+per-step allocation or vector-sized host transfers. No problem/integrator
+interface change, rate callback or mass inverse is required. Algebraic constraints
+remain independently enforced; tested DAE cases do not imply arbitrary DAE error
+control. Dense output remains a separate stage.
+
+Automatic order selection is opt-in: `method="BDF"`, `adaptive=true`,
+`maximum_order=1..5` (default cap five). It requires an error-requiring controller;
+the existing named BDF1/BDF2 modes remain unchanged. Generalize coefficients on
+the actual grid and retain bounded scaled divided differences, not trajectories.
+Only clean commits may raise order, after at least `max(3,q+1)` such steps at the
+current order and with sufficient history. Two failed trials lower the retry
+order; four fall back to one. Commit the policy only with an unchanged full step.
+Reset it with modified endpoints, direction/history restarts and discontinuities.
+Assess only the actual candidate once; do not mutate the controller to compare
+hypothetical neighboring orders. The supplied error exponent is `q+1`.
+Start Newton from the committed state rather than an extrapolated predictor that
+may satisfy a residual-only stopping test with an inaccurate algebraic multiplier.
+Keep state/error accuracy and formulation-dependent nonlinear tolerances distinct.
+Cap automatic growth at 1.2; use order at most two if recent adjacent grid ratios
+leave `[0.8,1.2]`. This conservative policy is neither an optimal order selector
+nor a general stability-limit detector: orders 3-5 are not A-stable. Test stiff
+decay/tracking and weakly damped modes explicitly. Formal high-order convergence
+must be tested separately from cold-start errors; complete trajectories must also
+pass tolerance refinement. Retain O(qN) backend storage/work with no per-step
+allocation or vector-sized transfers; cap five uses nine workspace vectors.
 
 The Jacobian exposes:
 

@@ -107,7 +107,8 @@ class TimestepperExtractionTest(unittest.TestCase):
                 self.assertIn(f"timestepper-implicit-{test}-{backend}", workflow["jobs"])
 
     def test_bdf_history_engine_is_standalone_and_required_by_ci(self):
-        tests = ("bdf", "bdf_lifecycle", "bdf_mass_dae", "bdf_backend")
+        tests = ("bdf", "bdf_lifecycle", "bdf_mass_dae", "bdf_backend", "bdf_adaptive",
+                 "bdf_adaptive_lifecycle", "bdf_adaptive_mass_dae", "bdf_orders", "bdf_variable_order", "bdf_stability")
         for directory in (ROOT, MODULE):
             for test in tests:
                 output = self.make(directory, f"test_implicit_{test}_cpu.bin", "BUILD_DIR=build/bdf_probe")
@@ -127,6 +128,8 @@ class TimestepperExtractionTest(unittest.TestCase):
         self.assertIn(loop, "\n".join(step.get("run", "") for step in sanitizer["steps"]))
         visual = "\n".join(step.get("run", "") for step in jobs["timestepper-lorenz-simulation-python-cpu"]["steps"])
         self.assertIn("--methods BDF1 BDF2 --controllers constant", visual)
+        self.assertIn("--methods BDF1 BDF2 --controllers matlab scipy PID", visual)
+        self.assertIn("--methods BDF --bdf-max-order 5", visual)
         for directory in (ROOT, MODULE):
             output = self.make(directory, "test_implicit_bdf_cpu.bin", "BUILD_DIR=build/bdf_probe",
                                "-p")
