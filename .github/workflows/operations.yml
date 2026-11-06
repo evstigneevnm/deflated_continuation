@@ -1462,10 +1462,10 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y libomp-dev
           fi
-      - name: Verify fixed IMEX orders, mass solves and transactional failures
+      - name: Verify fixed/adaptive IMEX orders, mass solves and transactional failures
         run: |
           make check_timestepper_headers_cpu "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
-          for test in imex imex_mass imex_lifecycle imex_backend; do
+          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks; do
             make -j2 "test_implicit_${test}_cpu.bin" "test_implicit_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/imex"
             for backend in cpu cpu_omp; do
               OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/imex/"test_implicit_${test}_${backend}.bin"
@@ -1480,7 +1480,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify fixed IMEX when CUDA is available
+      - name: Verify fixed/adaptive IMEX when CUDA is available
         run: |
           if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
             echo "Skipping IMEX CUDA tests: no usable GPU"
@@ -1490,7 +1490,7 @@ jobs:
             echo "Skipping IMEX CUDA tests: nvcc unavailable"
             exit 0
           fi
-          for test in imex imex_mass imex_lifecycle imex_backend; do
+          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks; do
             make "test_implicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/imex_cuda"
             timeout 300s ./"$BUILD_DIR"/imex_cuda/"test_implicit_${test}_cuda.bin"
           done
@@ -1503,7 +1503,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify fixed IMEX when HIP is available
+      - name: Verify fixed/adaptive IMEX when HIP is available
         run: |
           HIPCC_BIN="$(command -v "${HIPCC:-hipcc}" || true)"
           if [ -z "$HIPCC_BIN" ]; then
@@ -1524,7 +1524,7 @@ jobs:
             fi
             HIP_TARGET="${HIP_ARCH_LIST:-native}"
           fi
-          for test in imex imex_mass imex_lifecycle imex_backend; do
+          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks; do
             make "test_implicit_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/imex_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
             timeout 300s ./"$BUILD_DIR"/imex_hip/"test_implicit_${test}_hip.bin"
           done
@@ -2024,7 +2024,7 @@ jobs:
           for test in esdirk esdirk_adaptive esdirk_mass_dae; do
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
-          for test in imex imex_mass imex_lifecycle imex_backend; do
+          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks; do
             make "test_implicit_${test}_cpu.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
@@ -2449,6 +2449,14 @@ jobs:
           export MPLCONFIGDIR="$SIMULATION_BUILD/matplotlib"
           "$PYTHON" source/contrib/nmfd-timesteppers/tests/test_compare_explicit_lorenz_simulation.py
           "$PYTHON" source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py
+          PYTHON="$PYTHON" bash source/contrib/nmfd-timesteppers/tests/run_all.sh \
+            --build-dir "$SIMULATION_BUILD/imex_benchmarks" \
+            --systems lorenz rossler vdp vdp_stiff coupled_mass state_mass time_mass time_coefficient stiff_tracking \
+            --end 0.4 --methods IMEX_ARK324L2SA --controllers scipy
+          PYTHON="$PYTHON" bash source/contrib/nmfd-timesteppers/tests/run_all.sh \
+            --build-dir "$SIMULATION_BUILD/imex_benchmarks" --system coupled_mass \
+            --end 0.1 --step 0.001 --methods IMEX_EULER IMEX_HEUN_TR2 IMEX_ARS222 IMEX_ARS233 \
+            --controllers constant
           make test_explicit_lorenz_simulation_cpu.bin test_explicit_lorenz_simulation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$SIMULATION_BUILD"
           for backend in cpu cpu_omp; do
             for method in RK45 RK23 DOP853; do
@@ -2471,6 +2479,7 @@ jobs:
             ${{ env.BUILD_DIR }}/lorenz_simulation/*.dat
             ${{ env.BUILD_DIR }}/lorenz_simulation/*.json
             ${{ env.BUILD_DIR }}/lorenz_simulation/*.png
+            ${{ env.BUILD_DIR }}/lorenz_simulation/imex_benchmarks/
 
   timestepper-rk4-simulation-python-cpu:
     needs: [timestepper-tables-explicit-cpu, timestepper-explicit-rk-cpu]

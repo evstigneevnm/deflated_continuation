@@ -217,7 +217,7 @@ class TimestepperExtractionTest(unittest.TestCase):
             self.assertIn(f"test_implicit_{test}_cpu.bin", commands)
 
     def test_imex_execution_is_built_standalone_and_required_by_ci(self):
-        tests = ("imex", "imex_mass", "imex_lifecycle", "imex_backend")
+        tests = ("imex", "imex_adaptive", "imex_mass", "imex_lifecycle", "imex_backend", "imex_benchmarks")
         for directory in (ROOT, MODULE):
             for test in tests:
                 output = self.make(directory, f"test_implicit_{test}_cpu_omp.bin",

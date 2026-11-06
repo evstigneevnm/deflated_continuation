@@ -574,15 +574,20 @@ the other partition or `known_rhs()`. Both use the same model/mass convention.
 Share model data, not a back-pointer to the owning bundle/application. Cache these
 handles during assembly, not per stage.
 
-`runge_kutta::imex_time_step` executes fixed-step IMEX tables with the same
+`runge_kutta::imex_time_step` executes fixed/adaptive IMEX tables with the same
 integrator/controller lifecycle. Its stage reference contains both partitions'
 previous rate sums; `known_rhs()` remains zero. Newton solves only the shifted
 implicit equation. Recover nonzero-diagonal implicit rates from stage displacements;
 evaluate only consumed explicit and zero-diagonal implicit rates. Reuse the final
 stage only when both tableaux are stiffly accurate. Keep vector workspace on the
 selected backend and retain no trajectory history. The shared bundle is acquired
-once, and the solver is bound once. Error-requiring controllers and dense output
-remain unavailable until validated combined estimates/extensions are implemented.
+once, and the solver is bound once. `IMEX_ARK324L2SA` supplies a validated combined
+3(2) estimate, `h*sum((bE-bhatE)*kE+(bI-bhatI)*kI)`, with controller exponent three.
+Combine signed state defects before taking norms. Error workspace and embedding-only
+rates are allocated only for error-requiring configurations; numerical failures
+bypass assessment and never update committed controller history. Separate partition
+embeddings are not sufficient: custom tables explicitly declare the validated
+combined embedding order. Dense output still requires a combined continuous extension.
 
 The Jacobian exposes:
 
