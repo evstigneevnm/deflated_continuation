@@ -106,7 +106,7 @@ jobs:
 
   nmfd-standalone-mpi:
     name: Pinned MPI / ${{ matrix.library }} / ${{ matrix.ranks }} ranks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -118,19 +118,22 @@ jobs:
         with:
           submodules: true
       - name: Prepare hosted MPI runtime
+        timeout-minutes: 8
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends build-essential make openmpi-bin libopenmpi-dev
+            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 \
+              install -y --no-install-recommends build-essential make openmpi-bin libopenmpi-dev
           fi
       - name: Verify standalone distributed spaces and original CH programs
+        id: validation
         env:
           MPIEXEC_FLAGS: --oversubscribe
         run: |
           python3 scripts/validate_nmfd_standalone.py \
             --library '${{ matrix.library }}' --suite mpi --mpi-ranks '${{ matrix.ranks }}'
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && (steps.validation.outcome == 'success' || steps.validation.outcome == 'failure')
         with:
           name: standalone-mpi-${{ matrix.library }}-${{ matrix.ranks }}
           path: build/nmfd_standalone/*/report.json
@@ -940,7 +943,7 @@ jobs:
 
   nmfd-cahn-hilliard-mpi:
     name: Original Cahn-Hilliard / MPI / ${{ matrix.ranks }} ranks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -950,7 +953,14 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - run: sudo apt-get update && sudo apt-get install -y openmpi-bin libopenmpi-dev
+      - name: Prepare hosted MPI runtime
+        timeout-minutes: 8
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 \
+              install -y --no-install-recommends build-essential make openmpi-bin libopenmpi-dev
+          fi
       - name: Verify distributed spaces, halo exchange, GMRES and multigrid
         run: |
           make -C source/contrib/nmfd-operations -j2 test-rect-mpi \

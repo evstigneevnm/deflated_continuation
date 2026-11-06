@@ -94,6 +94,35 @@ class NmfdStandaloneTest(unittest.TestCase):
                 self.assertIn("-lhipsolver", link_command)
                 self.assertFalse(any(word.endswith(".cpp") for word in link_command))
 
+    def test_mpi_setup_uses_a_fixed_runner_and_bounded_package_installation(self):
+        root = Path(__file__).resolve().parents[2]
+        jobs = ci.load_workflow(root / ".github/workflows/operations.yml")["jobs"]
+        for name in ("nmfd-standalone-mpi", "nmfd-cahn-hilliard-mpi"):
+            with self.subTest(job=name):
+                job = jobs[name]
+                self.assertEqual(job["runs-on"], "ubuntu-24.04")
+                self.assertEqual(job["strategy"]["matrix"]["ranks"], [1, 2, 4])
+                setup = next(step for step in job["steps"] if step.get("name") == "Prepare hosted MPI runtime")
+                self.assertLess(setup["timeout-minutes"], job["timeout-minutes"])
+                commands = setup["run"]
+                self.assertIn('if [ "${GITHUB_ACTIONS:-}" = "true" ]', commands)
+                self.assertEqual(commands.count("-o Acquire::Retries=3"), 2)
+                self.assertEqual(commands.count("-o Acquire::http::Timeout=30"), 2)
+                self.assertEqual(commands.count("-o Acquire::https::Timeout=30"), 2)
+                self.assertIn("install -y --no-install-recommends build-essential make openmpi-bin libopenmpi-dev",
+                              commands)
+                subprocess.run(["bash", "-n"], input=commands, check=True, text=True, timeout=10)
+
+    def test_mpi_report_is_required_only_after_validation_ran(self):
+        root = Path(__file__).resolve().parents[2]
+        job = ci.load_workflow(root / ".github/workflows/operations.yml")["jobs"]["nmfd-standalone-mpi"]
+        validation = next(step for step in job["steps"] if step.get("id") == "validation")
+        self.assertIn("scripts/validate_nmfd_standalone.py", validation["run"])
+        upload = next(step for step in job["steps"] if step.get("uses", "").startswith("actions/upload-artifact@"))
+        self.assertEqual(upload["if"],
+                         "always() && (steps.validation.outcome == 'success' || steps.validation.outcome == 'failure')")
+        self.assertEqual(upload["with"]["if-no-files-found"], "error")
+
     def test_summary_fails_for_failed_skipped_or_cancelled_required_groups(self):
         root = Path(__file__).resolve().parents[2]
         workflow = ci.load_workflow(root / ".github/workflows/operations.yml")
