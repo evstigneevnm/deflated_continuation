@@ -1287,6 +1287,7 @@ TIME_STEPPER_IMPLICIT_TEST_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/
 PERIODIC_SECTION_HEADERS = $(wildcard source/periodic_orbit/*.h source/periodic_orbit/events/*.h source/periodic_orbit/sections/*.h source/periodic_orbit/sections/detail/*.h source/periodic_orbit/matching/*.h source/periodic_orbit/flows/*.h source/periodic_orbit/tests/*.h)
 PERIODIC_SECTION_DEPS = $(PERIODIC_SECTION_HEADERS) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS)
 test_periodic_orbit_poincare_implicit_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+test_periodic_orbit_poincare_bdf_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_coordinate_solvers_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_multiple_section_newton_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_rossler_periodic_%.bin test_periodic_orbit_lorenz_periodic_%.bin test_periodic_orbit_vaidyanathan_periodic_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
@@ -1294,6 +1295,7 @@ $(foreach system,rossler_periodic lorenz_periodic vaidyanathan_periodic,$(foreac
 test_periodic_orbit_multiple_section_newton_cpu.bin test_periodic_orbit_multiple_section_newton_cpu_omp.bin test_periodic_orbit_multiple_section_newton_cuda.bin test_periodic_orbit_multiple_section_newton_hip.bin: $(NEWTON_TEST_HEADERS)
 test_periodic_orbit_coordinate_solvers_cpu.bin test_periodic_orbit_coordinate_solvers_cpu_omp.bin test_periodic_orbit_coordinate_solvers_cuda.bin test_periodic_orbit_coordinate_solvers_hip.bin: $(NEWTON_TEST_HEADERS)
 test_periodic_orbit_poincare_implicit_cpu.bin test_periodic_orbit_poincare_implicit_cpu_omp.bin test_periodic_orbit_poincare_implicit_cuda.bin test_periodic_orbit_poincare_implicit_hip.bin: $(NEWTON_TEST_HEADERS)
+test_periodic_orbit_poincare_bdf_cpu.bin test_periodic_orbit_poincare_bdf_cpu_omp.bin test_periodic_orbit_poincare_bdf_cuda.bin test_periodic_orbit_poincare_bdf_hip.bin: $(NEWTON_TEST_HEADERS)
 
 test_periodic_orbit_%_cpu.bin: source/periodic_orbit/tests/test_%.cpp $(PERIODIC_SECTION_DEPS)
 	$(G++) $(G++FLAGS) -I source $(ITIME_STEPPER) $(PERIODIC_SECTION_TEST_FLAGS) $< $(OPENMP) -o $(BUILD_DIR)/$@

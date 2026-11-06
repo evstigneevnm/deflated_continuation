@@ -628,7 +628,7 @@ Retain four/five backend vectors for adaptive BDF1/BDF2 with estimation, without
 per-step allocation or vector-sized host transfers. No problem/integrator
 interface change, rate callback or mass inverse is required. Algebraic constraints
 remain independently enforced; tested DAE cases do not imply arbitrary DAE error
-control. Dense output remains a separate stage.
+control.
 
 Automatic order selection is opt-in: `method="BDF"`, `adaptive=true`,
 `maximum_order=1..5` (default cap five). It requires an error-requiring controller;
@@ -650,6 +650,22 @@ decay/tracking and weakly damped modes explicitly. Formal high-order convergence
 must be tested separately from cold-start errors; complete trajectories must also
 pass tolerance refinement. Retain O(qN) backend storage/work with no per-step
 allocation or vector-sized transfers; cap five uses nine workspace vectors.
+
+BDF dense output is opt-in with a fifth template argument `true`, using the
+existing borrowed `get_continuous_integration().evaluate(theta,out)` interface.
+Interpolate the actual order-q candidate and q preceding nodes on the signed,
+nonuniform grid; do not substitute the LTE predictor or auxiliary startup steps.
+Report the actual dense order, including BDF1 startup/restart. Preserve exact
+endpoint copies, forbid extrapolation and invalidate views on finalize/reset/new
+attempts. Sampling is read-only O(qN) backend algebra without allocation, host
+vector transfers, rate evaluation or nonlinear solves. Reuse history storage;
+only fixed BDF1 needs an extra saved input. Disabled dense output retains its
+existing vector budgets. Event-shortened or reconstructed endpoints restart
+history/order at BDF1; failed commitments preserve old history. Algebraic
+reconstruction remains problem-owned and must precede constrained event
+evaluation/commitment. Polynomial degree does not guarantee DAE accuracy.
+Section flights may consume BDF dense output; prepared BDF return-map
+derivatives still require their own history-aware implementation.
 
 The Jacobian exposes:
 

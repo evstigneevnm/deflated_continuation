@@ -7,7 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 MODERN = ROOT / "source/periodic_orbit"
 SYSTEMS = (
-    "section_geometry", "event_locator", "poincare_harmonic", "poincare_implicit",
+    "section_geometry", "event_locator", "poincare_harmonic", "poincare_implicit", "poincare_bdf",
     "poincare_dae", "section_map_lifecycle", "section_layout_variable_speed", "section_rpo_target",
     "section_coordinates", "coordinate_solvers", "multiple_section_matching",
     "prepared_section_derivatives", "multiple_section_newton",
