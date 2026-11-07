@@ -106,6 +106,34 @@ class TimestepperExtractionTest(unittest.TestCase):
             for backend in ("cpu", "cuda"):
                 self.assertIn(f"timestepper-implicit-{test}-{backend}", workflow["jobs"])
 
+    def test_rosenbrock_engine_is_standalone_and_required_by_ci(self):
+        tests = ("rosenbrock", "rosenbrock_lifecycle", "rosenbrock_backend")
+        for directory in (ROOT, MODULE):
+            for test in tests:
+                output = self.make(directory, f"test_implicit_{test}_cpu.bin", "BUILD_DIR=build/rosenbrock_probe")
+                self.assertIn(f"tests/test_implicit_{test}.cpp", output)
+        output = self.make(MODULE, "test_rosenbrock_cpu", "BUILD_DIR=build/rosenbrock_probe")
+        for test in tests:
+            self.assertIn(f"test_implicit_{test}_cpu_omp.bin", output)
+        for path in (MODULE / "include/nmfd/time_steppers/rosenbrock").glob("*.h"):
+            self.assertNotIn("#include <nmfd/solvers/", path.read_text())
+        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
+        self.assertEqual(jobs["timestepper-rosenbrock-cpu"]["strategy"]["matrix"]["compiler"], ["g++", "clang++"])
+        loop = "for test in " + " ".join(tests) + "; do"
+        for backend in ("cpu", "cuda", "hip"):
+            name = f"timestepper-rosenbrock-{backend}"
+            self.assertIn(name, jobs["all-tests-passed"]["needs"])
+            commands = "\n".join(step.get("run", "") for step in jobs[name]["steps"])
+            self.assertIn(loop, commands)
+            self.assertIn("test_implicit_${test}_" + backend + ".bin", commands)
+        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
+        self.assertIn("timestepper-rosenbrock-cpu", sanitizer["needs"])
+        self.assertIn(loop, "\n".join(step.get("run", "") for step in sanitizer["steps"]))
+        headers = self.make(ROOT, "test_implicit_rosenbrock_cpu.bin", "BUILD_DIR=build/rosenbrock_probe", "-p")
+        dependencies = next(line for line in headers.splitlines() if line.startswith("test_implicit_rosenbrock_cpu.bin:"))
+        self.assertIn("include/nmfd/time_steppers/rosenbrock/time_step.h", dependencies)
+        self.assertIn("tests/implicit_rosenbrock_test.h", dependencies)
+
     def test_bdf_history_engine_is_standalone_and_required_by_ci(self):
         tests = ("bdf", "bdf_lifecycle", "bdf_mass_dae", "bdf_backend", "bdf_adaptive",
                  "bdf_adaptive_lifecycle", "bdf_adaptive_mass_dae", "bdf_orders", "bdf_variable_order", "bdf_stability",

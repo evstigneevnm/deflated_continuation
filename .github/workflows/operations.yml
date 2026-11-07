@@ -268,6 +268,9 @@ jobs:
       - timestepper-filter-adaptation-cuda
       - timestepper-bdf-cuda
       - timestepper-bdf-hip
+      - timestepper-rosenbrock-cpu
+      - timestepper-rosenbrock-cuda
+      - timestepper-rosenbrock-hip
       - timestepper-implicit-adaptive-cuda
       - timestepper-implicit-dense-cuda
       - timestepper-implicit-dirk-cuda
@@ -1379,6 +1382,92 @@ jobs:
           make test_implicit_dirk_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_dirk_cuda"
           timeout 300s ./"$BUILD_DIR"/implicit_dirk_cuda/test_implicit_dirk_cuda.bin
 
+  timestepper-rosenbrock-cpu:
+    needs: [nmfd-linsolvers-operations-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare Clang OpenMP runtime
+        if: matrix.compiler == 'clang++'
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            sudo apt-get update
+            sudo apt-get install -y libomp-dev
+          fi
+      - name: Verify fixed ROS2 order, shifted solves, lifecycle and backend guards
+        run: |
+          make check_timestepper_headers_cpu "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+          for test in rosenbrock rosenbrock_lifecycle rosenbrock_backend; do
+            make -j2 "test_implicit_${test}_cpu.bin" "test_implicit_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/rosenbrock"
+            for backend in cpu cpu_omp; do
+              OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/rosenbrock/"test_implicit_${test}_${backend}.bin"
+            done
+          done
+
+  timestepper-rosenbrock-cuda:
+    needs: [timestepper-rosenbrock-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify ROS2 when CUDA is available
+        run: |
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
+            echo "Skipping ROS2 CUDA tests: no usable GPU"
+            exit 0
+          fi
+          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
+            echo "Skipping ROS2 CUDA tests: nvcc unavailable"
+            exit 0
+          fi
+          for test in rosenbrock rosenbrock_lifecycle rosenbrock_backend; do
+            make "test_implicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/rosenbrock_cuda"
+            timeout 300s ./"$BUILD_DIR"/rosenbrock_cuda/"test_implicit_${test}_cuda.bin"
+          done
+
+  timestepper-rosenbrock-hip:
+    needs: [timestepper-rosenbrock-cpu, scfd-vector-operations-hip]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Verify ROS2 when HIP is available
+        run: |
+          HIPCC_BIN="$(command -v "${HIPCC:-hipcc}" || true)"
+          if [ -z "$HIPCC_BIN" ]; then
+            echo "Skipping ROS2 HIP tests: hipcc unavailable"
+            exit 0
+          fi
+          HIP_ROOT="${ROCM_PATH:-$(dirname "$(dirname "$HIPCC_BIN")")}"
+          if "$HIPCC_BIN" --version | grep -qi nvcc; then
+            if ! nvidia-smi -L >/dev/null 2>&1; then
+              echo "Skipping ROS2 HIP tests: no usable NVIDIA GPU"
+              exit 0
+            fi
+            HIP_TARGET="${HIP_ARCH_LIST:-75}"
+          else
+            if ! "$HIP_ROOT/bin/rocm-smi" >/dev/null 2>&1; then
+              echo "Skipping ROS2 HIP tests: no usable AMD GPU"
+              exit 0
+            fi
+            HIP_TARGET="${HIP_ARCH_LIST:-native}"
+          fi
+          for test in rosenbrock rosenbrock_lifecycle rosenbrock_backend; do
+            make "test_implicit_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/rosenbrock_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
+            timeout 300s ./"$BUILD_DIR"/rosenbrock_hip/"test_implicit_${test}_hip.bin"
+          done
+
   timestepper-bdf-cpu:
     needs: [timestepper-implicit-dirk-cpu]
     runs-on: ubuntu-latest
@@ -2143,7 +2232,7 @@ jobs:
           timeout 300s ./"$BUILD_DIR"/implicit_nonautonomous_cuda/test_implicit_nonautonomous_cuda.bin
 
   timestepper-implicit-sanitizers-cpu:
-    needs: [timestepper-implicit-dirk-cpu, timestepper-bdf-cpu, timestepper-implicit-adaptive-cpu, timestepper-implicit-esdirk-cpu, timestepper-imex-cpu, timestepper-implicit-dense-cpu, timestepper-implicit-globalization-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu, timestepper-implicit-lorenz-cpu, timestepper-implicit-rossler-cpu, timestepper-implicit-vdp-cpu]
+    needs: [timestepper-implicit-dirk-cpu, timestepper-bdf-cpu, timestepper-rosenbrock-cpu, timestepper-implicit-adaptive-cpu, timestepper-implicit-esdirk-cpu, timestepper-imex-cpu, timestepper-implicit-dense-cpu, timestepper-implicit-globalization-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu, timestepper-implicit-lorenz-cpu, timestepper-implicit-rossler-cpu, timestepper-implicit-vdp-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -2175,6 +2264,10 @@ jobs:
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done
           for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend bdf_adaptive bdf_adaptive_lifecycle bdf_adaptive_mass_dae bdf_orders bdf_variable_order bdf_stability bdf_dense bdf_dense_lifecycle bdf_dense_mass_dae; do
+            make "test_implicit_${test}_cpu.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+            OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
+          done
+          for test in rosenbrock rosenbrock_lifecycle rosenbrock_backend; do
             make "test_implicit_${test}_cpu.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
             OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
           done

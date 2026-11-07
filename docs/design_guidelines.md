@@ -478,7 +478,7 @@ with public includes under `nmfd/time_steppers/` and APIs in `nmfd::time_stepper
 The module uses flat NMFD-operations/SCFD dependencies during development; explicit
 integration must not require nonlinear or linear solver headers. Parent CI owns
 the validation jobs until standalone module CI and dependency pins are introduced.
-The APIs have `runge_kutta`, `bdf`, `integration`, and `detail` subnamespaces.
+The APIs have `runge_kutta`, `bdf`, `rosenbrock`, `integration`, and `detail` subnamespaces.
 Unmigrated legacy steppers remain in
 `::time_steppers`; new code must use the NMFD namespace. Simple examples for the timesteppers should be incapsulated in a single file and should contain minimum methods required without generating spagetti code or overcomplecated structures.
 
@@ -801,6 +801,23 @@ public:
 ```
 
 Support explicit RK, (S)DIRK, Rosenbrock/W, BDF, and IMEX with method-specific engines. IRK and exponential RK are to be supported layer.
+
+`rosenbrock::time_step<VectorOperations,Problem,TimeStepAdaptation,LinearSolver>`
+initially supports fixed-step ROS2 for autonomous identity-mass ODEs with the
+exact base Jacobian. It reuses the existing shifted-stage problem interface and
+`evaluate_rate()`, but injects a linear solver (`set_operator`, `solve(rhs,out)`),
+not a nonlinear solver. Each attempt sets `previous_state()` to the input and
+`known_rhs()` to zero, then prepares `a*I-b*J_f` once at the base time/state.
+Both linear stage right-hand sides use the same balancing as that operator;
+rate evaluations must preserve its prepared data. Rebind on every new attempt,
+including changed steps or externally modified endpoints. Retain four backend
+workspace vectors, allocate none per step, and perform no vector-sized host copies.
+The integrator, controllers, and candidate/finalize contract are unchanged.
+`params::reference_time=1` and `params::autonomous=true` are defaults; setting
+the latter false is rejected, not silently treated as autonomous. Nontrivial mass,
+DAEs, approximate-Jacobian W schemes, embedded adaptation and dense output are
+not supported by this initial engine. Error-requiring controllers report
+`error_estimate_unavailable`; `DenseOutput=true` rejects construction.
 
 The current implicit RK engine supports lower-triangular DIRK/SDIRK/ESDIRK tables with
 an injected nonlinear solver. At stage i, `previous_state()` holds the RK reference
