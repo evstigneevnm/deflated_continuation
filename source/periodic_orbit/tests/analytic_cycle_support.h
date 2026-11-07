@@ -48,16 +48,18 @@ struct basic_fixture
     double                                                dt, start;
     std::size_t                                           maximum_steps;
     std::string                                           method;
+    StepAssembly                                          assembly;
 
     std::shared_ptr<step_type> make_stepper( double h ) const
     {
-        return StepAssembly::make_stepper( physical, h, method );
+        return assembly.make_stepper( physical, h, method );
     }
     basic_fixture(
-        std::size_t count, double h = .08, std::string scheme = "RK45", double t = .37, std::size_t budget = 20000
+        std::size_t count, double h = .08, std::string scheme = "RK45", double t = .37, std::size_t budget = 20000,
+        StepAssembly selected = {}
     )
         : space( std::make_shared<blocks>( coordinates, count ) ), dt( h ), start( t ), maximum_steps( budget ),
-          method( std::move( scheme ) )
+          method( std::move( scheme ) ), assembly( std::move( selected ) )
     {
         auto initial = buffer( physical );
         fill( *physical, *initial, 1, 0 );

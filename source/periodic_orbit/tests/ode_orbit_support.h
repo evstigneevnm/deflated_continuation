@@ -57,13 +57,18 @@ struct fixture
     std::shared_ptr<const typename orbit_problem::layout_type> layout;
     std::shared_ptr<tangent_rate<Model>>                       rate = std::make_shared<tangent_rate<Model>>();
     std::shared_ptr<orbit_problem>                             problem;
+    std::vector<typename orbit_problem::segment>               segments;
     double                                                     dt, start;
     std::size_t                                                maximum_steps;
     std::string                                                method;
+    Assembly                                                   assembly;
 
-    fixture( std::size_t count, double h, std::string scheme = "DOP853", double t = .37, std::size_t budget = 20000 )
+    fixture(
+        std::size_t count, double h, std::string scheme = "DOP853", double t = .37, std::size_t budget = 20000,
+        Assembly selected = {}
+    )
         : space( std::make_shared<blocks>( coordinates, count ) ), dt( h ), start( t ), maximum_steps( budget ),
-          method( std::move( scheme ) )
+          method( std::move( scheme ) ), assembly( std::move( selected ) )
     {
         auto initial = buffer( physical );
         fill_profile( *initial, Model::seed );
@@ -83,14 +88,15 @@ struct fixture
                 ", M=" + std::to_string( count ) + ", status=" + std::to_string( int( result.status ) ) +
                 ", flight=" + std::to_string( result.flight.flight_time )
             );
-        layout  = std::move( result.layout );
-        problem = std::make_shared<orbit_problem>(
-            physical, space, layout, make_segments( dt ), Assembly::make_factory( physical, budget, rate )
+        layout   = std::move( result.layout );
+        segments = make_segments( dt );
+        problem  = std::make_shared<orbit_problem>(
+            physical, space, layout, segments, assembly.make_factory( physical, budget, rate )
         );
     }
     auto make_stepper( double h ) const
     {
-        return Assembly::make_stepper( physical, h, method );
+        return assembly.make_stepper( physical, h, method );
     }
     auto block_buffer() const
     {

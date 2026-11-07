@@ -5,6 +5,7 @@
 #include "newton_test_support.h"
 #include <nmfd/time_steppers/runge_kutta/implicit_time_step.h>
 #include <nmfd/time_steppers/bdf/implicit_time_step.h>
+#include <nmfd/time_steppers/integration/time_step_adaptation_scipy.h>
 #include <periodic_orbit/flows/prepared_bdf_section.h>
 #include <periodic_orbit/flows/prepared_dirk_section.h>
 #include <periodic_orbit/flows/prepared_explicit_section.h>
@@ -231,9 +232,93 @@ struct bdf_assembly
         );
     }
 };
-template <class Model, class Run>
-int dispatch( const std::string &method, Run run )
+struct adaptive_bdf_options
 {
+    double       relative_tolerance = 1e-12, absolute_tolerance = 1e-13;
+    double       initial_step = .001, maximum_step = .1;
+    unsigned int maximum_order = 5;
+    template <class Configuration>
+    static adaptive_bdf_options read( const Configuration &c )
+    {
+        return {
+            c.value( "relative_tolerance", 1e-12 ), c.value( "absolute_tolerance", 1e-13 ), c.value( "step", .001 ),
+            c.value( "maximum_step", .1 ), c.value( "maximum_order", 5u )
+        };
+    }
+};
+template <class Configuration, class Segments>
+void add_bdf_statistics( Configuration &report, const Segments &segments )
+{
+    using record = typename std::decay_t<decltype( segments.front().flight->records() )>::value_type;
+    if constexpr ( std::is_same_v<record, periodic_orbit::bdf_step_record<double>> )
+    {
+        std::array<std::size_t, 5> orders{};
+        std::size_t                rejected = 0, accepted = 0;
+        double                     minimum = std::numeric_limits<double>::max(), maximum = 0;
+        for ( const auto &segment : segments )
+            for ( const auto &r : segment.flight->records() )
+            {
+                ++orders.at( r.order - 1 );
+                ++accepted;
+                rejected += r.attempts - 1;
+                minimum = std::min( minimum, std::abs( r.dt ) );
+                maximum = std::max( maximum, std::abs( r.dt ) );
+            }
+        report["integration"] = {
+            { "orders", orders },
+            { "accepted_steps", accepted },
+            { "rejected_attempts", rejected },
+            { "minimum_step", minimum },
+            { "maximum_step", maximum }
+        };
+    }
+}
+template <class Model>
+struct adaptive_bdf_assembly
+{
+    using solvers   = stage_solvers<Model>;
+    using control   = nmfd::time_steppers::integration::time_step_adaptation_scipy<operations>;
+    using step_type = nmfd::time_steppers::bdf::implicit_time_step<
+        operations, stage_problem<Model>, control, typename solvers::types::solver, true>;
+    using record_type  = periodic_orbit::bdf_step_record<double>;
+    using factory_type = periodic_orbit::bdf_flight_factory<operations, stage_provider_factory<Model>, plane>;
+    adaptive_bdf_options options;
+    auto make_stepper( const std::shared_ptr<operations> &ops, double h, const std::string &method ) const
+    {
+        if ( method != "BDF" || !std::isfinite( options.initial_step ) || options.initial_step <= 0 )
+            throw std::invalid_argument( "Invalid adaptive BDF assembly" );
+        typename control::params c;
+        // Verification tightens LTE tolerances as well as the initial step.
+        const double factor  = std::min( 1., h / options.initial_step );
+        c.relative_tolerance = options.relative_tolerance * factor;
+        c.absolute_tolerance = options.absolute_tolerance * factor;
+        c.initial_step       = h;
+        c.maximum_step       = options.maximum_step * factor;
+        typename step_type::params p;
+        p.method        = method;
+        p.adaptive      = true;
+        p.maximum_order = options.maximum_order;
+        return std::make_shared<step_type>(
+            ops, std::make_shared<stage_problem<Model>>( ops ), std::make_shared<control>( ops, c ),
+            solvers::make_nonlinear( ops, solvers::make_linear( ops ) ), p
+        );
+    }
+    auto make_factory(
+        const std::shared_ptr<operations> &ops, std::size_t budget,
+        const std::shared_ptr<const tangent_rate<Model>> & = nullptr
+    ) const
+    {
+        return std::make_shared<factory_type>(
+            ops, std::make_shared<stage_provider_factory<Model>>( stage_provider_factory<Model>{ ops } ),
+            typename factory_type::params{ options.maximum_order, budget, true }
+        );
+    }
+};
+template <class Model, class Run>
+int dispatch( const std::string &method, Run run, const adaptive_bdf_options &options = {} )
+{
+    if ( method == "BDF" )
+        return run( adaptive_bdf_assembly<Model>{ options } );
     if ( method == "BDF1" )
         return run( bdf_assembly<Model, 1>{} );
     if ( method == "BDF2" )

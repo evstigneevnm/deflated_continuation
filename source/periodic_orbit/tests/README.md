@@ -24,6 +24,7 @@ bash source/periodic_orbit/tests/run_all.sh --systems analytic_cycle_newton ross
 bash source/periodic_orbit/tests/run_all.sh --system analytic_cycle_newton --methods IM CN 'SDIRK2(1)2' 'ESDIRK2(1)3'
 bash source/periodic_orbit/tests/run_all.sh --system analytic_cycle_newton --methods BDF2
 bash source/periodic_orbit/tests/run_all.sh --system vaidyanathan_periodic --methods BDF2
+bash source/periodic_orbit/tests/run_all.sh --systems analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic --methods BDF
 bash source/periodic_orbit/tests/run_all.sh --plot-only build/periodic_orbit_benchmarks/runs/RUN_DIRECTORY
 ```
 
@@ -37,8 +38,8 @@ Correction adds `--newton-tolerance` (default `1e-10`) and
 `--newton-max-iterations` (default 12). Its reports include actual matching
 residuals, flight times, Newton history and independent half/quarter-step closure
 checks. Plots show initial/corrected states and convergence alongside the orbit.
-Prepared derivatives replay the selected explicit RK, DIRK or fixed BDF1/BDF2 method on a frozen
-mesh and differentiate their native dense section crossing. General DAE tangents
+Prepared derivatives replay explicit RK, DIRK, fixed BDF1/BDF2 or adaptive BDF1-5
+on a frozen mesh/order schedule and differentiate their native dense section crossing. General DAE tangents
 and relative closure are not silently inferred. Core tests include non-autonomous stage times, adaptive mesh
 recording, linearity, finite differences, rollback and retained-Jacobian lifetime.
 
@@ -65,7 +66,7 @@ with the number of accepted steps. Factorization/Krylov costs remain those of
 the supplied solvers. Nonlinear DAE reconstruction, moving-section derivatives,
 relative closure and prepared BDF derivatives are not inferred by this path.
 
-## Optional Fixed BDF Derivatives
+## Optional BDF Derivatives
 
 `prepared_bdf_derivatives` and `prepared_bdf_matching` cover BDF1/BDF2 with
 backward-Euler startup independently on each flight. Assembly supplies a
@@ -80,16 +81,29 @@ and backward flights, dense time derivatives, history restart, failed commits,
 rollback, retained Jacobians and 1,2,4,8-section Newton solves. Transfer guards
 forbid vector-sized host/device copies on CPU/OpenMP/CUDA/HIP.
 
-The visual runner supports fixed BDF1/BDF2 only, not adaptive `BDF`. BDF2 default
+The visual runner retains fixed BDF1/BDF2. BDF2 default
 steps are 0.00025 (cycle), 0.00002 (Rossler), 0.000005 (Lorenz) and 0.000003 (Vaidyanathan),
 with budgets including independent half/quarter-step verification. BDF1 requires
 `--step`, like IE; strict first-order reference accuracy may require millions of
-steps. Neither selection relaxes Newton or reference tolerances. Adaptive BDF
-prepared derivatives remain a separate stage. BDF cases default to a 900-second
+steps. Neither selection relaxes Newton or reference tolerances. BDF cases default to a 900-second
 wall-clock limit (`--timeout` overrides it); other methods retain 300 seconds.
 CPU CI runs BDF2 cycle correction
 at 1,2,4,8 sections and one-section ODE cases; core tests cover both orders on all
 backends. These tiny implicit solves are correctness tests, not GPU speed benchmarks.
+
+Adaptive `BDF` selects orders 1-5 with `--maximum-order` (default 5),
+`--relative-tolerance` (default `1e-12`), `--absolute-tolerance` (`1e-13`) and
+`--maximum-step` (`0.1`). Here `--step` is the initial step (default `0.001`).
+Verification refines local tolerances and the step cap, not merely the initial
+step. Reports/`adaptation.png` show accepted orders, step ranges and rejected
+attempts; physical reference criteria remain unchanged.
+`prepared_bdf_adaptive_derivatives` and `prepared_bdf_adaptive_matching` cover
+variable grids, order reduction without history loss, real history resets,
+native dense derivatives and multi-section correction. Factories opt in with
+`params.adaptive=true` and matching order/ratio bounds. State/tangent histories
+use native divided differences with O(qN) backend storage, q<=5. Controllers and
+order decisions are frozen during Jv, not differentiated. CPU CI additionally
+checks all four corrected benchmark systems at 1,2,4,8 sections.
 
 The ODE benchmark adapter uses identity mass and the existing model RHS/Jv:
 `R(Y)=a*(Y-w)-b*(f(t,Y)+r)`, `R_Y*v=a*v-b*J_f*v`, and

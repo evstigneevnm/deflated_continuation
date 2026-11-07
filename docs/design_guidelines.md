@@ -664,8 +664,8 @@ existing vector budgets. Event-shortened or reconstructed endpoints restart
 history/order at BDF1; failed commitments preserve old history. Algebraic
 reconstruction remains problem-owned and must precede constrained event
 evaluation/commitment. Polynomial degree does not guarantee DAE accuracy.
-Section flights may consume BDF dense output. Fixed BDF1/BDF2 prepared return-map
-derivatives use project-owned history-aware replay; adaptive BDF replay remains unsupported.
+Section flights may consume BDF dense output. Prepared return-map derivatives
+use project-owned history-aware replay for fixed BDF1/BDF2 and adaptive BDF1-5.
 
 The Jacobian exposes:
 
@@ -1223,9 +1223,10 @@ canonical solver modifications are required by this boundary. The next major
 checkpoint returns to completing `nmfd-timesteppers`; implicit/DAE tangent support
 requires separate consistency/chart policies for general DAEs.
 
-Visual benchmarks select explicit RK, DIRK or fixed BDF1/BDF2 at assembly, using the same model
-RHS/Jv, matching interface and independent reference checks. DIRK stage problems
-use the balanced identity-mass residual and opt-in prepared-flight factory;
+Visual benchmarks select explicit RK, DIRK, fixed BDF1/BDF2 or adaptive BDF1-5
+at assembly, using the same model RHS/Jv, matching interface and independent
+reference checks. Implicit stage problems use the balanced identity-mass
+residual and opt-in prepared-flight factory;
 trajectory, trial and prepared contexts do not share mutable stage dependencies.
 Method-specific steps and work budgets provide reference accuracy without
 relaxing residual, period or refined-closure tolerances. Explicit defaults,
@@ -1277,15 +1278,38 @@ Replay fixed BDF1/BDF2 with a fresh backward-Euler startup per flight; different
 both committed history states and the native dense polynomial before applying
 the section-time correction. Changed actual steps restart at order one;
 roundoff-only target clipping retains the native order. Reject unsupported order
-or history schedules before constructing a provider. Adaptive BDF coefficients,
-controller/order derivatives and nonlinear DAE reconstruction are not inferred.
+or history schedules before constructing a provider. Optional adaptive replay
+reuses native variable-grid coefficients and divided differences for both state
+and tangent. Configure `bdf_flight_factory::params.adaptive=true` and the same
+order cap/step-ratio bounds as the supplied stepper. Record actual orders and
+accepted attempts; reconstruct history resets from the accepted signed grid and
+these bounds. Order reduction alone must not discard usable history. Estimator
+half-steps and rejected candidates never enter the committed recurrence.
+Freeze steps, orders and reset decisions for each published Jacobian; this is
+the derivative of the frozen discretization, not of the adaptive controller.
+Reprepare at new Newton base points and isolate trial adaptive evaluations.
+Differentiate the native nonuniform dense polynomial analytically in time before
+applying the section-time correction. Each flight cold-starts independently.
+Controller/order derivatives and nonlinear DAE reconstruction are not inferred.
 The provider needs shifted residuals and `stage_tangent_rhs`, not an explicit
 mass inverse or rate Jacobian. Replay owns nine/eleven backend vectors for
 BDF1/BDF2, plus the common prepared-section checkpoints and injected solver
 storage. Vector algebra is O(S*N), storage O(M*N+S) for M sections and S recorded
 steps, with fixed solver workspace and no per-Jv vector allocations or vector-sized
-host transfers. Recompute base states during each Jv; do not retain a full vector
-trajectory. New residuals/preparations must not mutate published Jacobians.
+host transfers. Adaptive replay adds two bounded order-q difference histories;
+its vector algebra is O(S*q*N), storage O((M+q)*N+S), q<=5, plus injected solve costs.
+Only derivative assembly allocates these histories. Recompute base states during
+each Jv; do not retain a full vector trajectory. New residuals/preparations must
+not mutate published Jacobians.
+
+The orbit benchmark runner accepts adaptive `BDF` with independent local
+`--relative-tolerance`, `--absolute-tolerance`, `--maximum-step` and
+`--maximum-order` settings. `--step` is its initial step, not a fixed mesh.
+Half/quarter-step verification also tightens local tolerances and the maximum
+step by the same factor; physical period/closure criteria remain unchanged.
+Report accepted order counts, actual step ranges and rejected attempts alongside
+Newton histories and runtime. Cold startup and orders 3-5 stability restrictions
+must be measured rather than assuming that higher order guarantees larger steps.
 
 Use method-specific dense output (`evaluate`, optionally `evaluate_derivative`);
 otherwise use bracketed substeps. Interpolation is not an exact trajectory.

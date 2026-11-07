@@ -3,6 +3,7 @@
 
 #include "implicit_flight_test_support.h"
 #include <nmfd/time_steppers/bdf/implicit_time_step.h>
+#include <nmfd/time_steppers/integration/time_step_adaptation_scipy.h>
 #include <periodic_orbit/flows/prepared_bdf_section.h>
 
 namespace bdf_flights
@@ -80,5 +81,27 @@ inline auto make_map( const std::shared_ptr<operations> &ops, model equation, un
     );
 }
 using implicit_flights::request;
+using adaptive_control = ts::integration::time_step_adaptation_scipy<operations>;
+using adaptive_step =
+    ts::bdf::implicit_time_step<operations, residual_problem, adaptive_control, newton<residual_problem>, true>;
+using adaptive_map = periodic_orbit::recorded_section_map<operations, adaptive_step, plane, physical_rate, record_type>;
+inline auto make_adaptive_step(
+    const std::shared_ptr<operations> &ops, model equation, unsigned int order, double tolerance = 1e-6, double h = .02
+)
+{
+    adaptive_control::params control;
+    control.relative_tolerance = tolerance;
+    control.absolute_tolerance = tolerance * .01;
+    control.initial_step       = h;
+    control.maximum_step       = .05;
+    adaptive_step::params p;
+    p.method        = "BDF";
+    p.adaptive      = true;
+    p.maximum_order = order;
+    return std::make_shared<adaptive_step>(
+        ops, std::make_shared<residual_problem>( ops, equation ), std::make_shared<adaptive_control>( ops, control ),
+        implicit_flights::make_newton<residual_problem>( ops, make_linear( ops ) ), p
+    );
+}
 }
 #endif

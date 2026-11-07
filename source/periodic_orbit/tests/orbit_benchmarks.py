@@ -35,7 +35,7 @@ DIRK_STEPS = {
 METHODS = ("RK45", "DOP853", "IE", *DIRK_STEPS["analytic_cycle"])
 BDF_STEPS = {"analytic_cycle": .00025, "rossler_periodic": .00002,
              "lorenz_periodic": .000005, "vaidyanathan_periodic": .000003}
-METHODS += ("BDF1", "BDF2")
+METHODS += ("BDF1", "BDF2", "BDF")
 BUILD_ENVIRONMENT = (
     "PATH", "G++", "GCC_ROOT_PATH", "TARGET_GCC", "CPPSTD", "NVCC", "CUDA_ROOT_PATH",
     "CUDA_ARCH_LIST", "TARGET_NVCC", "HIPCC", "HIPFLAGS", "HIP_ROOT_PATH", "HIP_PATH",
@@ -61,6 +61,10 @@ def arguments(argv=None):
     parser.add_argument("--methods", nargs="+", choices=METHODS, default=["DOP853"])
     parser.add_argument("--backend", choices=("cpu", "cpu_omp", "cuda", "hip"), default="cpu")
     parser.add_argument("--step", type=positive, help="Override the system/method-specific default step")
+    parser.add_argument("--relative-tolerance", type=positive, default=1e-12, help="Adaptive BDF local relative tolerance")
+    parser.add_argument("--absolute-tolerance", type=positive, default=1e-13, help="Adaptive BDF local absolute tolerance")
+    parser.add_argument("--maximum-step", type=positive, default=.1, help="Adaptive BDF maximum step")
+    parser.add_argument("--maximum-order", type=int, choices=range(1, 6), default=5, help="Adaptive BDF order cap")
     parser.add_argument("--start", type=float, default=.37)
     parser.add_argument("--perturbation", type=positive, default=.02)
     parser.add_argument("--matching-tolerance", type=positive, default=1e-6)
@@ -86,7 +90,7 @@ def arguments(argv=None):
     args.methods = list(dict.fromkeys(args.methods))
     args.systems = list(dict.fromkeys(args.systems))
     if args.timeout is None:
-        args.timeout = 900 if any(method in args.methods for method in ("BDF1", "BDF2")) else 300
+        args.timeout = 900 if any(method.startswith("BDF") for method in args.methods) else 300
     if any(method in args.methods for method in ("IE", "BDF1")) and args.step is None:
         parser.error("IE/BDF1 require --step: first-order reference accuracy can require millions of steps")
     try:
@@ -110,17 +114,22 @@ def configurations(args):
                 h = DIRK_STEPS[key][method]
             elif method == "BDF2":
                 h = BDF_STEPS[key]
+            elif method == "BDF":
+                h = .001
             else:
                 h = ODE_CASES[system]["steps"][method] if system in ODE_CASES else .08
             budget = args.max_steps
             if budget is None:
                 budget = 20000
-                if method not in ("RK45", "DOP853"):
+                if method not in ("RK45", "DOP853", "BDF"):
                     budget = max(budget, math.ceil(8 * period / h))
             configs.extend(dict(system=system, backend=args.backend, method=method, sections=count,
                 step=h, start_time=args.start, perturbation=args.perturbation,
                 matching_tolerance=args.matching_tolerance, maximum_steps=budget) for count in args.sections)
     for config in configs:
+        if config["method"] == "BDF":
+            config.update(relative_tolerance=args.relative_tolerance, absolute_tolerance=args.absolute_tolerance,
+                          maximum_step=args.maximum_step, maximum_order=args.maximum_order)
         if config["system"] != "analytic_cycle":
             config.update(newton_tolerance=args.newton_tolerance, newton_max_iterations=args.newton_max_iterations)
     return configs
@@ -264,6 +273,17 @@ def validate_newton_case(directory, config):
             any(not abs(report[name]["period"] - reference_period) < tolerance for name in ("corrected", "refined")) or
             len(report["closure_errors"]) != 2 or any(not 0 <= e < tolerance for e in report["closure_errors"])):
         raise ValueError("Correction, refinement, closure or transfer check failed")
+    if config["method"] == "BDF":
+        integration = report.get("integration", {})
+        orders = integration.get("orders", [])
+        accepted = sum(s["steps"] for s in report["corrected"]["segments"])
+        if (len(orders) != 5 or any(not isinstance(n, int) or n < 0 for n in orders) or
+                sum(orders) != accepted or integration.get("accepted_steps") != accepted or
+                any(orders[config["maximum_order"]:]) or
+                not isinstance(integration.get("rejected_attempts"), int) or integration["rejected_attempts"] < 0 or
+                not 0 < integration.get("minimum_step", 0) <= integration.get("maximum_step", 0) or
+                not math.isfinite(integration["maximum_step"])):
+            raise ValueError("Invalid adaptive BDF integration statistics")
     for filename, name in (("initial_sections.csv", "initial"), ("corrected_sections.csv", "corrected")):
         samples = section_samples(directory, filename, config, report[name])
         if not ode and name == "corrected" and np.max(np.abs(np.hypot(samples["x"], samples["y"]) - 1)) >= tolerance:
@@ -301,7 +321,7 @@ def validate_newton_case(directory, config):
         if (any(len(t) != 401 for t in trajectories) or
                 not np.array_equal(trajectories[0]["time"], trajectories[1]["time"]) or
                 np.max(np.linalg.norm(states[0] - states[1], axis=1)) >= tolerance):
-            raise ValueError("Independent half/quarter-step trajectories disagree")
+            raise ValueError("Independent refined trajectories disagree")
         for i, state in enumerate(states):
             closure = np.linalg.norm(state[-1] - state[0])
             if not math.isclose(closure, report["closure_errors"][i], rel_tol=1e-6, abs_tol=1e-10):
@@ -333,7 +353,8 @@ def plot_newton_case(directory, config):
         reference = np.genfromtxt(directory / "refined_trajectory.csv", delimiter=",", names=True, ndmin=1)
         guess = np.genfromtxt(directory / "initial_trajectory.csv", delimiter=",", names=True, ndmin=1)
         ax.plot(*(guess[a] for a in labels[:3]), color="#be493e", alpha=.5, label="Initial-state trajectory")
-        ax.plot(*(reference[a] for a in labels[:3]), "--", color="0.5", label="Quarter-step verification")
+        verification = "Tighter-tolerance verification" if config["method"] == "BDF" else "Quarter-step verification"
+        ax.plot(*(reference[a] for a in labels[:3]), "--", color="0.5", label=verification)
         ax.plot(*(trajectory[a] for a in labels[:3]), color="#147a78", label="Corrected orbit")
         ax.scatter(*(initial[a] for a in labels[:3]), marker="x", color="#be493e", label="Initial section states")
         ax.scatter(*(solved[a] for a in labels[:3]), color="#284c98", label="Corrected section states")
@@ -377,7 +398,19 @@ def plot_newton_case(directory, config):
     axes[1, 1].set(xlabel="Segment", ylabel="Accepted steps")
     figure.savefig(directory / "diagnostics.png", dpi=150, bbox_inches="tight")
     plt.close(figure)
-    return dict(passed=True, corrected_norm=report["corrected_norm"], period=report["corrected"]["period"])
+    if "integration" in report:
+        figure, ax = plt.subplots(figsize=(7, 4), constrained_layout=True)
+        integration = report["integration"]
+        ax.bar(range(1, 6), integration["orders"], color="#147a78")
+        ax.set(xlabel="BDF order", ylabel="Accepted steps", xticks=range(1, 6),
+               title=f"h=[{integration['minimum_step']:.2g}, {integration['maximum_step']:.2g}], "
+                     f"rejected attempts={integration['rejected_attempts']}")
+        figure.savefig(directory / "adaptation.png", dpi=150, bbox_inches="tight")
+        plt.close(figure)
+    result = dict(passed=True, corrected_norm=report["corrected_norm"], period=report["corrected"]["period"])
+    if "integration" in report:
+        result["integration"] = report["integration"]
+    return result
 
 
 def plot_case(directory, config):

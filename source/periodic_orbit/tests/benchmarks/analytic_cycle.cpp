@@ -4,7 +4,7 @@
 using namespace cycle_benchmarks;
 
 template <class Assembly>
-int run_benchmark( const json &config, const std::string &directory )
+int run_benchmark( const json &config, const std::string &directory, Assembly assembly = {} )
 {
     try
     {
@@ -22,7 +22,7 @@ int run_benchmark( const json &config, const std::string &directory )
             throw std::invalid_argument( "Invalid analytical-cycle benchmark configuration" );
         using fixture  = basic_fixture<Assembly>;
         using matching = typename fixture::matching;
-        fixture  f( count, dt, method, start, budget );
+        fixture  f( count, dt, method, start, budget, assembly );
         matching residual( f.physical, f.space, f.layout, f.segments );
         auto     z = block_buffer( f.space ), r = block_buffer( f.space );
         f.space->assign_scalar( 0, *z );
@@ -107,9 +107,11 @@ int main( int argc, char **argv )
             throw std::invalid_argument( "Usage: analytic_cycle config.json output-directory" );
         std::ifstream input( argv[1] );
         const auto    config = json::parse( input );
-        return orbit_benchmarks::dispatch<differentiable_cycle>( config.at( "method" ), [&]( auto assembly ) {
-            return run_benchmark<decltype( assembly )>( config, argv[2] );
-        } );
+        return orbit_benchmarks::dispatch<differentiable_cycle>(
+            config.at( "method" ),
+            [&]( auto assembly ) { return run_benchmark<decltype( assembly )>( config, argv[2], assembly ); },
+            orbit_benchmarks::adaptive_bdf_options::read( config )
+        );
     }
     catch ( const std::exception &e )
     {

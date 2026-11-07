@@ -172,7 +172,7 @@ void write_sections(
 }
 
 template <class Model, class Assembly>
-int run_benchmark( const json &config, const std::string &directory )
+int run_benchmark( const json &config, const std::string &directory, Assembly assembly = {} )
 {
     try
     {
@@ -188,7 +188,7 @@ int run_benchmark( const json &config, const std::string &directory )
              !std::isfinite( perturbation ) || perturbation <= 0 || perturbation > .1 || !std::isfinite( tolerance ) ||
              tolerance <= 0 || !std::isfinite( newton_tolerance ) || newton_tolerance <= 0 )
             throw std::invalid_argument( "Invalid ODE orbit benchmark configuration" );
-        fixture<Model, Assembly> f( count, dt, config.at( "method" ), start, budget );
+        fixture<Model, Assembly> f( count, dt, config.at( "method" ), start, budget, assembly );
         auto                     initial = f.block_buffer(), solution = f.block_buffer(), residual = f.block_buffer();
         f.perturb( perturbation, *initial );
         auto       solver = make_newton( f.space, f.problem, newton_tolerance, iterations );
@@ -211,8 +211,10 @@ int run_benchmark( const json &config, const std::string &directory )
                 std::to_string( solver->convergence_strategy()->get_result_status() )
             );
         f.problem->apply( *solution, *residual );
-        const auto                                       corrected      = f.problem->report();
-        const auto                                       corrected_norm = f.space->norm( *residual );
+        const auto corrected      = f.problem->report();
+        const auto corrected_norm = f.space->norm( *residual );
+        json       integration    = json::object();
+        orbit_benchmarks::add_bdf_statistics( integration, f.segments );
         typename fixture<Model, Assembly>::residual_type refined(
             f.physical, f.space, f.layout, f.make_segments( dt / 2 )
         );
@@ -267,6 +269,7 @@ int run_benchmark( const json &config, const std::string &directory )
             { "matching_host_bytes", host_bytes },
             { "result_status", solver->convergence_strategy()->get_result_status() }
         };
+        report.update( integration );
         std::ofstream output( directory + "/report.json" );
         output.exceptions( std::ios::badbit | std::ios::failbit );
         output << report.dump( 2 ) << '\n';
@@ -289,9 +292,11 @@ int run_benchmark( int argc, char **argv )
             throw std::invalid_argument( "Usage: periodic ODE benchmark config.json output-directory" );
         std::ifstream input( argv[1] );
         const auto    config = json::parse( input );
-        return orbit_benchmarks::dispatch<Model>( config.at( "method" ), [&]( auto assembly ) {
-            return run_benchmark<Model, decltype( assembly )>( config, argv[2] );
-        } );
+        return orbit_benchmarks::dispatch<Model>(
+            config.at( "method" ),
+            [&]( auto assembly ) { return run_benchmark<Model, decltype( assembly )>( config, argv[2], assembly ); },
+            orbit_benchmarks::adaptive_bdf_options::read( config )
+        );
     }
     catch ( const std::exception &e )
     {

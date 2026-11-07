@@ -73,14 +73,28 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
             self.assertEqual(config["newton_tolerance"], 1e-10)
             period = runner.ODE_CASES[key]["period"] if key in runner.ODE_CASES else 2 * math.pi
             self.assertGreaterEqual(config["maximum_steps"], math.ceil(4 * period / config["step"]))
-        for method in ("BDF", "BDF1"):
-            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                runner.arguments(["--methods", method])
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            runner.arguments(["--methods", "BDF1"])
         config = runner.configurations(runner.arguments(["--methods", "BDF1", "--step", ".000001"]))[0]
         self.assertEqual(config["step"], .000001)
         self.assertEqual(config["matching_tolerance"], 1e-6)
         self.assertEqual(runner.arguments([]).timeout, 300)
         self.assertEqual(runner.arguments(["--methods", "BDF2", "--timeout", "7"]).timeout, 7)
+
+    def test_adaptive_bdf_configuration_keeps_local_and_orbit_tolerances_separate(self):
+        args = runner.arguments(["--methods", "BDF", "--maximum-order", "4",
+            "--relative-tolerance", "1e-9", "--absolute-tolerance", "1e-12", "--maximum-step", ".03"])
+        self.assertEqual(args.timeout, 900)
+        for config in runner.configurations(args):
+            self.assertEqual(config["step"], .001)
+            self.assertEqual(config["relative_tolerance"], 1e-9)
+            self.assertEqual(config["absolute_tolerance"], 1e-12)
+            self.assertEqual(config["maximum_step"], .03)
+            self.assertEqual(config["maximum_order"], 4)
+            self.assertEqual(config["matching_tolerance"], 1e-6)
+        for options in (["--maximum-order", "6"], ["--relative-tolerance", "nan"], ["--maximum-step", "0"]):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                runner.arguments(options)
 
     def test_build_stamp_is_stable_and_tracks_options(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -289,6 +303,20 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
             (path / "newton_history.csv").write_text("iteration,residual\n0,0.02\n1,0\n")
             (path / "report.json").write_text(json.dumps(report))
             self.assertTrue(runner.validate_case(path, config)["passed"])
+            adaptive_config = dict(config, method="BDF", maximum_order=5)
+            integration = dict(orders=[4, 3, 4, 5, 4], accepted_steps=20,
+                               rejected_attempts=2, minimum_step=1e-5, maximum_step=.01)
+            adaptive_report = dict(report, configuration=adaptive_config, integration=integration)
+            (path / "report.json").write_text(json.dumps(adaptive_report))
+            self.assertTrue(runner.validate_case(path, adaptive_config)["passed"])
+            for key, value in (("orders", [20, 0, 0, 0]), ("orders", [-1, 4, 5, 6, 6]),
+                               ("accepted_steps", 19), ("rejected_attempts", -1),
+                               ("minimum_step", .1), ("maximum_step", float("inf"))):
+                invalid = dict(adaptive_report, integration=dict(integration, **{key: value}))
+                (path / "report.json").write_text(json.dumps(invalid))
+                with self.subTest(adaptive_key=key), self.assertRaises(ValueError):
+                    runner.validate_case(path, adaptive_config)
+            (path / "report.json").write_text(json.dumps(report))
             for key, value in (("parameters", {}), ("reference_period", period+1), ("rate_norm", 0),
                                ("excursion", 0), ("closure_errors", [1e-7, 0])):
                 (path / "report.json").write_text(json.dumps(dict(report, **{key:value})))

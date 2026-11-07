@@ -12,6 +12,7 @@ SYSTEMS = (
     "section_coordinates", "coordinate_solvers", "multiple_section_matching",
     "prepared_section_derivatives", "prepared_dirk_derivatives", "prepared_dirk_matching",
     "prepared_bdf_derivatives", "prepared_bdf_matching", "orbit_method_assembly", "multiple_section_newton",
+    "prepared_bdf_adaptive_derivatives", "prepared_bdf_adaptive_matching",
     "rossler_periodic", "lorenz_periodic", "vaidyanathan_periodic",
 )
 

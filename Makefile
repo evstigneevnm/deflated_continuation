@@ -1289,6 +1289,8 @@ PERIODIC_SECTION_DEPS = $(PERIODIC_SECTION_HEADERS) $(TIME_STEPPER_HEADERS) $(TI
 test_periodic_orbit_poincare_implicit_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_poincare_bdf_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_prepared_bdf_derivatives_%.bin test_periodic_orbit_prepared_bdf_matching_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+test_periodic_orbit_prepared_bdf_adaptive_derivatives_%.bin test_periodic_orbit_prepared_bdf_adaptive_matching_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+$(foreach test,prepared_bdf_adaptive_derivatives prepared_bdf_adaptive_matching,$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_$(test)_$(backend).bin)): $(NEWTON_TEST_HEADERS)
 $(foreach test,prepared_bdf_derivatives prepared_bdf_matching,$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_$(test)_$(backend).bin)): $(NEWTON_TEST_HEADERS)
 test_periodic_orbit_prepared_dirk_derivatives_%.bin test_periodic_orbit_prepared_dirk_matching_%.bin test_periodic_orbit_orbit_method_assembly_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 $(foreach test,prepared_dirk_derivatives prepared_dirk_matching orbit_method_assembly,$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_$(test)_$(backend).bin)): $(NEWTON_TEST_HEADERS)

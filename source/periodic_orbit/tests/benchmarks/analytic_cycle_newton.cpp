@@ -6,7 +6,7 @@ using namespace cycle_benchmarks;
 // Correct perturbed section radii to the isolated unit cycle with NMFD Newton.
 // Independent half/quarter-step integrations validate the recovered physical orbit.
 template <class Assembly>
-int run_benchmark( const json &config, const std::string &directory )
+int run_benchmark( const json &config, const std::string &directory, Assembly assembly = {} )
 {
     try
     {
@@ -27,9 +27,10 @@ int run_benchmark( const json &config, const std::string &directory )
         using matching      = typename fixture::matching;
         using orbit_problem = periodic_orbit::multiple_section_problem<
             operations, operations, recorded_map_for<Assembly>, cycle_rate, chart, typename Assembly::factory_type>;
-        fixture f( count, dt, config.at( "method" ), start, budget );
-        auto    problem = std::make_shared<orbit_problem>(
-            f.physical, f.space, f.layout, recorded_segments( f ), Assembly::make_factory( f.physical, budget )
+        fixture f( count, dt, config.at( "method" ), start, budget, assembly );
+        auto    segments = recorded_segments( f );
+        auto    problem  = std::make_shared<orbit_problem>(
+            f.physical, f.space, f.layout, segments, assembly.make_factory( f.physical, budget )
         );
         auto solver  = make_newton( f.space, problem, newton_tolerance, maximum_iterations );
         auto initial = block_buffer( f.space ), solution = block_buffer( f.space ), residual = block_buffer( f.space );
@@ -108,6 +109,7 @@ int run_benchmark( const json &config, const std::string &directory )
             { "matching_host_bytes", numerical_host_bytes },
             { "result_status", solver->convergence_strategy()->get_result_status() }
         };
+        orbit_benchmarks::add_bdf_statistics( report, segments );
         std::ofstream output( directory + "/report.json" );
         output.exceptions( std::ios::badbit | std::ios::failbit );
         output << report.dump( 2 ) << '\n';
@@ -130,9 +132,11 @@ int main( int argc, char **argv )
             throw std::invalid_argument( "Usage: analytic_cycle_newton config.json output-directory" );
         std::ifstream input( argv[1] );
         const auto    config = json::parse( input );
-        return orbit_benchmarks::dispatch<differentiable_cycle>( config.at( "method" ), [&]( auto assembly ) {
-            return run_benchmark<decltype( assembly )>( config, argv[2] );
-        } );
+        return orbit_benchmarks::dispatch<differentiable_cycle>(
+            config.at( "method" ),
+            [&]( auto assembly ) { return run_benchmark<decltype( assembly )>( config, argv[2], assembly ); },
+            orbit_benchmarks::adaptive_bdf_options::read( config )
+        );
     }
     catch ( const std::exception &e )
     {
