@@ -8,7 +8,8 @@ namespace periodic_orbit
 {
 template <
     class Space, class CoordinateSpace, class RecordedMap, class RateProvider,
-    class Chart = affine_chart<Space, CoordinateSpace>>
+    class Chart                 = affine_chart<Space, CoordinateSpace>,
+    class PreparedFlightFactory = explicit_flight_factory<Space, RateProvider, typename Chart::section_type>>
 class multiple_section_problem
 {
 public:
@@ -19,7 +20,7 @@ public:
     using layout_type   = typename residual_type::layout_type;
     using segment       = typename residual_type::segment;
     using params        = typename residual_type::params;
-    using flow_type     = prepared_explicit_section<Space, RateProvider, typename Chart::section_type>;
+    using flow_type     = typename PreparedFlightFactory::flow_type;
     using physical_wrap = nmfd::detail::vector_wrap<Space, false, false>;
     using block_wrap    = nmfd::detail::vector_wrap<space_type, false, false>;
 
@@ -31,13 +32,21 @@ public:
             const std::vector<segment> &segments, std::shared_ptr<const RateProvider> rate, const vector_type &base,
             const vector_type &residual, const params &p
         )
+            : jacobi_operator_type(
+                  physical, coordinates, layout, segments, PreparedFlightFactory( physical, std::move( rate ) ), base,
+                  residual, p
+              )
+        {
+        }
+        jacobi_operator_type(
+            std::shared_ptr<Space> physical, std::shared_ptr<space_type> coordinates, const layout_type &layout,
+            const std::vector<segment> &segments, const PreparedFlightFactory &factory, const vector_type &base,
+            const vector_type &residual, const params &p
+        )
             : physical_( std::move( physical ) ), coordinates_( std::move( coordinates ) ), pending_( *coordinates_ ),
               direction_( *physical_ ), image_( *physical_ )
         {
-            std::size_t stages = 0;
-            for ( const auto &s : segments )
-                stages = std::max( stages, s.flight->table().dense_outout_stage_count() );
-            auto replay = std::make_shared<typename flow_type::replay_type>( physical_, std::move( rate ), stages );
+            auto replay = factory.make_workspace( segments );
             pending_.init();
             pending_.start_use();
             direction_.init();
@@ -59,10 +68,10 @@ public:
                     1, base.comp( next ), 1, residual.comp( i ), ( *pending_ ).comp( i )
                 );
                 segments[next].chart->lift( ( *pending_ ).comp( i ), *image_ );
-                flows_.emplace_back(
-                    physical_, replay, segments[i].flight->table(), segments[i].flight->records(), *direction_, *image_,
-                    layout.at( next ).section, p.rule.minimum_crossing_speed, p.section_tolerance * T( 10 )
-                );
+                flows_.push_back( factory.prepare(
+                    replay, *segments[i].flight, *direction_, *image_, layout.at( next ).section,
+                    p.rule.minimum_crossing_speed, p.section_tolerance * T( 10 )
+                ) );
             }
         }
         // A serial operator owns its scratch; in/out may alias. No mesh or
@@ -110,12 +119,33 @@ public:
 
     multiple_section_problem(
         std::shared_ptr<Space> physical, std::shared_ptr<space_type> coordinates,
+        std::shared_ptr<const layout_type> layout, std::vector<segment> segments, std::nullptr_t, const params &p = {}
+    )
+        : multiple_section_problem(
+              physical, coordinates, layout, std::move( segments ), std::shared_ptr<const RateProvider>{}, p
+          )
+    {
+    }
+
+    multiple_section_problem(
+        std::shared_ptr<Space> physical, std::shared_ptr<space_type> coordinates,
         std::shared_ptr<const layout_type> layout, std::vector<segment> segments,
         std::shared_ptr<const RateProvider> rate, const params &p = {}
     )
+        : multiple_section_problem(
+              physical, coordinates, layout, std::move( segments ),
+              std::make_shared<PreparedFlightFactory>( physical, std::move( rate ) ), p
+          )
+    {
+    }
+    multiple_section_problem(
+        std::shared_ptr<Space> physical, std::shared_ptr<space_type> coordinates,
+        std::shared_ptr<const layout_type> layout, std::vector<segment> segments,
+        std::shared_ptr<PreparedFlightFactory> factory, const params &p = {}
+    )
         : physical_( std::move( physical ) ), coordinates_( std::move( coordinates ) ), layout_( std::move( layout ) ),
           segments_( std::move( segments ) ),
-          rate_( rate ? std::move( rate ) : throw std::invalid_argument( "Missing tangent rate provider" ) ),
+          factory_( factory ? std::move( factory ) : throw std::invalid_argument( "Missing prepared flight factory" ) ),
           params_( p ), residual_( physical_, coordinates_, layout_, segments_, p ), scratch_( *coordinates_ )
     {
         scratch_.init();
@@ -134,7 +164,7 @@ public:
         // Nothing is published until all flights and replay checks succeed.
         residual_.apply( base, *scratch_ );
         auto pending = std::make_shared<jacobi_operator_type>(
-            physical_, coordinates_, *layout_, segments_, rate_, base, *scratch_, params_
+            physical_, coordinates_, *layout_, segments_, *factory_, base, *scratch_, params_
         );
         jacobi_ = std::move( pending );
     }
@@ -150,7 +180,7 @@ private:
     std::shared_ptr<space_type>                 coordinates_;
     std::shared_ptr<const layout_type>          layout_;
     std::vector<segment>                        segments_;
-    std::shared_ptr<const RateProvider>         rate_;
+    std::shared_ptr<PreparedFlightFactory>      factory_;
     params                                      params_;
     residual_type                               residual_;
     block_wrap                                  scratch_;

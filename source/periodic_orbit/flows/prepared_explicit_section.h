@@ -4,6 +4,7 @@
 #include <limits>
 #include <nmfd/time_steppers/runge_kutta/butcher_table.h>
 #include <periodic_orbit/flows/recording_stepper.h>
+#include <periodic_orbit/flows/prepared_rk_section.h>
 
 namespace periodic_orbit
 {
@@ -17,6 +18,10 @@ public:
     using X          = typename Space::vector_type;
     using table_type = nmfd::time_steppers::runge_kutta::butcher_table;
     using wrap       = nmfd::detail::vector_wrap<Space, false, false>;
+    static bool supports( const table_type &table )
+    {
+        return table.type() == table_type::scheme_type::explicit_rk && table.has_dense_output();
+    }
     explicit_flight_replay( std::shared_ptr<Space> space, std::shared_ptr<const RateProvider> rate, std::size_t stages )
         : space_( space ? std::move( space ) : throw std::invalid_argument( "Missing replay space" ) ),
           rate_( rate ? std::move( rate ) : throw std::invalid_argument( "Missing replay rate/Jv provider" ) ),
@@ -117,102 +122,48 @@ private:
     std::vector<wrap>                   rates_, tangents_;
 };
 
-// Initial state + bounded scalar schedule form a one-checkpoint replay policy.
-// Immutable preparation survives trial evaluations; scratch is not concurrent.
 template <class Space, class RateProvider, class Section>
-class prepared_explicit_section
+using prepared_explicit_section = prepared_rk_section<Space, explicit_flight_replay<Space, RateProvider>, Section>;
+
+template <class Segments>
+std::size_t maximum_rk_stages( const Segments &segments )
+{
+    std::size_t stages = 0;
+    for ( const auto &s : segments )
+        stages = std::max( stages, s.flight->table().dense_outout_stage_count() );
+    return stages;
+}
+
+template <class Space, class RateProvider, class Section>
+class explicit_flight_factory
 {
 public:
-    using T           = typename Space::scalar_type;
-    using X           = typename Space::vector_type;
-    using traits      = scfd::utils::scalar_traits<T>;
-    using replay_type = explicit_flight_replay<Space, RateProvider>;
-    using table_type  = typename replay_type::table_type;
-    using wrap        = nmfd::detail::vector_wrap<Space, false, false>;
-    prepared_explicit_section(
-        std::shared_ptr<Space> space, std::shared_ptr<replay_type> replay, const table_type &table,
-        const std::vector<flight_step_record<T>> &steps, const X &initial, const X &arrival,
-        std::shared_ptr<const Section> target, T minimum_speed, T replay_tolerance
-    )
-        : space_( space ? std::move( space ) : throw std::invalid_argument( "Missing prepared flight space" ) ),
-          replay_( std::move( replay ) ), table_( table ), steps_( steps ), target_( std::move( target ) ),
-          initial_( *space_ ), time_rate_( *space_ ), endpoint_( *space_ ), pending_( *space_ ), work_( space_ )
+    using flow_type = prepared_explicit_section<Space, RateProvider, Section>;
+    explicit_flight_factory( std::shared_ptr<Space> space, std::shared_ptr<const RateProvider> rate )
+        : space_( std::move( space ) ), rate_( std::move( rate ) )
     {
-        if ( !replay_ || !target_ || table.type() != table_type::scheme_type::explicit_rk ||
-             !table.has_dense_output() || steps.empty() || !traits::is_finite( minimum_speed ) ||
-             minimum_speed <= T( 0 ) || !traits::is_finite( replay_tolerance ) || replay_tolerance <= T( 0 ) )
-            throw std::invalid_argument(
-                "Prepared sections require an explicit RK dense table and transverse identity-state flights"
-            );
-        if ( space_->get_size( initial ) != space_->get_vector_size() ||
-             space_->get_size( arrival ) != space_->get_vector_size() || !space_->is_valid_number( initial ) ||
-             !space_->is_valid_number( arrival ) )
-            throw std::invalid_argument( "Invalid prepared flight states" );
-        for ( std::size_t i = 0; i < steps.size(); ++i )
-        {
-            const auto &r = steps[i];
-            if ( !traits::is_finite( r.time ) || !traits::is_finite( r.dt ) || !traits::is_finite( r.end ) ||
-                 !traits::is_finite( r.theta ) || r.dt == T( 0 ) || r.theta <= T( 0 ) || r.theta > T( 1 ) ||
-                 ( i && r.time != steps[i - 1].end ) || ( i + 1 < steps.size() && r.theta != T( 1 ) ) ||
-                 r.end == r.time || ( r.end > r.time ) != ( r.dt > T( 0 ) ) ||
-                 ( r.dt > T( 0 ) ) != ( steps.front().dt > T( 0 ) ) ||
-                 traits::abs( r.end - ( r.time + r.theta * r.dt ) ) >
-                     T( 64 ) * std::numeric_limits<T>::epsilon() *
-                         std::max( T( 1 ), std::max( traits::abs( r.time ), traits::abs( r.end ) ) ) )
-                throw std::invalid_argument( "Invalid frozen flight schedule" );
-        }
-        for ( auto *x : { &initial_, &time_rate_, &endpoint_, &pending_ } )
-        {
-            x->init();
-            x->start_use();
-        }
-        space_->assign( initial, *initial_ );
-        replay_->run( table_, steps_, *initial_, nullptr, *endpoint_, nullptr, &*time_rate_ );
-        space_->assign_lin_comb( 1, *endpoint_, -1, arrival, *pending_ );
-        if ( space_->norm( *pending_ ) > replay_tolerance * ( T( 1 ) + space_->norm( arrival ) ) ||
-             !space_->is_valid_number( *time_rate_ ) )
-            throw std::runtime_error( "Frozen replay disagrees with the prepared section flight" );
-        denominator_ = target_->bind( work_ ).state_derivative( steps_.back().end, *endpoint_, *time_rate_ );
-        if ( !traits::is_finite( denominator_ ) || traits::abs( denominator_ ) <= minimum_speed )
-            throw std::runtime_error( "Grazing dense-output derivative" );
+        if ( !space_ || !rate_ )
+            throw std::invalid_argument( "Missing explicit replay dependencies" );
     }
-
-    void apply( const X &in, X &out ) const
+    template <class Segments>
+    auto make_workspace( const Segments &segments ) const
     {
-        if ( space_->get_size( in ) != space_->get_vector_size() ||
-             space_->get_size( out ) != space_->get_vector_size() )
-            throw std::invalid_argument( "Prepared flight direction shape mismatch" );
-        if ( !space_->is_valid_number( in ) )
-            throw std::runtime_error( "Nonfinite flight direction" );
-        replay_->run( table_, steps_, *initial_, &in, *endpoint_, &*pending_, nullptr );
-        const T dt =
-            -target_->bind( work_ ).state_derivative( steps_.back().end, *endpoint_, *pending_ ) / denominator_;
-        space_->add_lin_comb( dt, *time_rate_, *pending_ );
-        if ( !traits::is_finite( dt ) || !space_->is_valid_number( *pending_ ) )
-            throw std::runtime_error( "Nonfinite section derivative" );
-        space_->assign( *pending_, out );
-        last_time_increment_ = dt;
+        return std::make_shared<typename flow_type::replay_type>( space_, rate_, maximum_rk_stages( segments ) );
     }
-    T last_time_increment() const
+    template <class Map>
+    flow_type prepare(
+        std::shared_ptr<typename flow_type::replay_type> workspace, const Map &flight,
+        const typename Space::vector_type &initial, const typename Space::vector_type &arrival,
+        std::shared_ptr<const Section> target, typename Space::scalar_type speed, typename Space::scalar_type tolerance
+    ) const
     {
-        return last_time_increment_;
-    }
-    const auto &records() const
-    {
-        return steps_;
+        return { space_,  std::move( workspace ), flight.table(), flight.records(), initial,
+                 arrival, std::move( target ),    speed,          tolerance };
     }
 
 private:
-    std::shared_ptr<Space>                         space_;
-    std::shared_ptr<replay_type>                   replay_;
-    table_type                                     table_;
-    std::vector<flight_step_record<T>>             steps_;
-    std::shared_ptr<const Section>                 target_;
-    wrap                                           initial_, time_rate_;
-    mutable wrap                                   endpoint_, pending_;
-    mutable typename Section::evaluation_workspace work_;
-    T                                              denominator_{};
-    mutable T                                      last_time_increment_{};
+    std::shared_ptr<Space>              space_;
+    std::shared_ptr<const RateProvider> rate_;
 };
 }
 #endif

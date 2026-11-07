@@ -22,6 +22,20 @@ ODE_CASES = {
                                   axes=("x1", "x2", "x3", "x4", "x5"),
                                   parameters=dict(a=10, b=8/3, c=28, p=1.3, q=2.5)),
 }
+DIRK_STEPS = {
+    "analytic_cycle": {"IM": .0004, "CN": .0004, "SDIRK2(1)2": .0004,
+                       "ESDIRK2(1)3": .0004, "SDIRK3(1)3": .01, "ARK324L2SA": .02},
+    "rossler_periodic": {"IM": .00005, "CN": .00005, "SDIRK2(1)2": .00005,
+                         "ESDIRK2(1)3": .00005, "SDIRK3(1)3": .003, "ARK324L2SA": .003},
+    "lorenz_periodic": {"IM": .00001, "CN": .00001, "SDIRK2(1)2": .00001,
+                        "ESDIRK2(1)3": .00001, "SDIRK3(1)3": .00025, "ARK324L2SA": .00025},
+    "vaidyanathan_periodic": {"IM": .00001, "CN": .00001, "SDIRK2(1)2": .00001,
+                              "ESDIRK2(1)3": .00001, "SDIRK3(1)3": .00015, "ARK324L2SA": .00015},
+}
+METHODS = ("RK45", "DOP853", "IE", *DIRK_STEPS["analytic_cycle"])
+BDF_STEPS = {"analytic_cycle": .00025, "rossler_periodic": .00002,
+             "lorenz_periodic": .000005, "vaidyanathan_periodic": .000003}
+METHODS += ("BDF1", "BDF2")
 BUILD_ENVIRONMENT = (
     "PATH", "G++", "GCC_ROOT_PATH", "TARGET_GCC", "CPPSTD", "NVCC", "CUDA_ROOT_PATH",
     "CUDA_ARCH_LIST", "TARGET_NVCC", "HIPCC", "HIPFLAGS", "HIP_ROOT_PATH", "HIP_PATH",
@@ -44,7 +58,7 @@ def arguments(argv=None):
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build/periodic_orbit_benchmarks")
     parser.add_argument("--systems", "--system", nargs="+", choices=("analytic_cycle", "analytic_cycle_newton", *ODE_CASES), default=["analytic_cycle"])
     parser.add_argument("--sections", nargs="+", type=int, default=[1, 2, 4, 8])
-    parser.add_argument("--methods", nargs="+", choices=("RK45", "DOP853"), default=["DOP853"])
+    parser.add_argument("--methods", nargs="+", choices=METHODS, default=["DOP853"])
     parser.add_argument("--backend", choices=("cpu", "cpu_omp", "cuda", "hip"), default="cpu")
     parser.add_argument("--step", type=positive, help="Override the system/method-specific default step")
     parser.add_argument("--start", type=float, default=.37)
@@ -52,14 +66,14 @@ def arguments(argv=None):
     parser.add_argument("--matching-tolerance", type=positive, default=1e-6)
     parser.add_argument("--newton-tolerance", type=positive, default=1e-10)
     parser.add_argument("--newton-max-iterations", type=int, default=12)
-    parser.add_argument("--max-steps", type=int, default=20000)
+    parser.add_argument("--max-steps", type=int, help="Override the method-specific integration budget")
     parser.add_argument("--threads", type=int, default=1)
-    parser.add_argument("--timeout", type=positive, default=300)
+    parser.add_argument("--timeout", type=positive, help="Per-case seconds; defaults to 900 for BDF, otherwise 300")
     parser.add_argument("--config-file", type=Path, default=ROOT / "build_configs/config_github_ubuntu_cpu.inc")
     parser.add_argument("--make-option", action="append", default=[], metavar="KEY=VALUE")
     args = parser.parse_args(argv)
     if (not math.isfinite(args.start) or (args.step is not None and args.start + args.step == args.start) or
-            args.perturbation > .1 or args.max_steps < 1 or args.threads < 1 or args.newton_max_iterations < 1 or
+            args.perturbation > .1 or (args.max_steps is not None and args.max_steps < 1) or args.threads < 1 or args.newton_max_iterations < 1 or
             any(n < 1 or n > 64 for n in args.sections)):
         parser.error("Invalid start, section count, perturbation or execution budget")
     for option in args.make_option:
@@ -71,17 +85,41 @@ def arguments(argv=None):
     args.sections = list(dict.fromkeys(args.sections))
     args.methods = list(dict.fromkeys(args.methods))
     args.systems = list(dict.fromkeys(args.systems))
-    if any(args.start + c["step"] == args.start for c in configurations(args)):
+    if args.timeout is None:
+        args.timeout = 900 if any(method in args.methods for method in ("BDF1", "BDF2")) else 300
+    if any(method in args.methods for method in ("IE", "BDF1")) and args.step is None:
+        parser.error("IE/BDF1 require --step: first-order reference accuracy can require millions of steps")
+    try:
+        configs = configurations(args)
+    except OverflowError:
+        parser.error("The chosen step requires an unrepresentable integration budget")
+    if any(args.start + c["step"] == args.start for c in configs):
         parser.error("The chosen step cannot advance the starting time")
     return args
 
 
 def configurations(args):
-    configs = [dict(system=system, backend=args.backend, method=method, sections=count,
-                 step=args.step or (ODE_CASES[system]["steps"][method] if system in ODE_CASES else .08),
-                 start_time=args.start, perturbation=args.perturbation,
-                 matching_tolerance=args.matching_tolerance, maximum_steps=args.max_steps)
-            for system in args.systems for method in args.methods for count in args.sections]
+    configs = []
+    for system in args.systems:
+        key = "analytic_cycle" if system == "analytic_cycle_newton" else system
+        period = ODE_CASES[system]["period"] if system in ODE_CASES else 2 * math.pi
+        for method in args.methods:
+            if args.step is not None:
+                h = args.step
+            elif method in DIRK_STEPS[key]:
+                h = DIRK_STEPS[key][method]
+            elif method == "BDF2":
+                h = BDF_STEPS[key]
+            else:
+                h = ODE_CASES[system]["steps"][method] if system in ODE_CASES else .08
+            budget = args.max_steps
+            if budget is None:
+                budget = 20000
+                if method not in ("RK45", "DOP853"):
+                    budget = max(budget, math.ceil(8 * period / h))
+            configs.extend(dict(system=system, backend=args.backend, method=method, sections=count,
+                step=h, start_time=args.start, perturbation=args.perturbation,
+                matching_tolerance=args.matching_tolerance, maximum_steps=budget) for count in args.sections)
     for config in configs:
         if config["system"] != "analytic_cycle":
             config.update(newton_tolerance=args.newton_tolerance, newton_max_iterations=args.newton_max_iterations)

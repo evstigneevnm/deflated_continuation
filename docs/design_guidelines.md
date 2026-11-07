@@ -664,8 +664,8 @@ existing vector budgets. Event-shortened or reconstructed endpoints restart
 history/order at BDF1; failed commitments preserve old history. Algebraic
 reconstruction remains problem-owned and must precede constrained event
 evaluation/commitment. Polynomial degree does not guarantee DAE accuracy.
-Section flights may consume BDF dense output; prepared BDF return-map
-derivatives still require their own history-aware implementation.
+Section flights may consume BDF dense output. Fixed BDF1/BDF2 prepared return-map
+derivatives use project-owned history-aware replay; adaptive BDF replay remains unsupported.
 
 The Jacobian exposes:
 
@@ -1161,8 +1161,8 @@ vector-sized host transfer or dense orbit Jacobian is introduced.
 
 `multiple_section_problem` adds the standard nonlinear `apply`,
 `set_linearization_point` and `get_jacobi_operator` interface to this residual.
-The current prepared derivative supports identity-state explicit RK flights with
-native polynomial dense output, not implicit stages, Hermite fallback, DAE
+The default prepared derivative supports identity-state explicit RK flights with
+native polynomial dense output, not explicit Hermite fallback, DAE
 reconstruction, or relative closure. Assembly supplies an independent physical
 rate/Jv provider with immutable parameters:
 
@@ -1221,7 +1221,71 @@ that their norms are identical. These are seeded correction benchmarks, not
 general discovery or long-time chaotic shadowing claims. No timestepper or
 canonical solver modifications are required by this boundary. The next major
 checkpoint returns to completing `nmfd-timesteppers`; implicit/DAE tangent support
-still requires differentiated stage solves and consistency/chart policies.
+requires separate consistency/chart policies for general DAEs.
+
+Visual benchmarks select explicit RK, DIRK or fixed BDF1/BDF2 at assembly, using the same model
+RHS/Jv, matching interface and independent reference checks. DIRK stage problems
+use the balanced identity-mass residual and opt-in prepared-flight factory;
+trajectory, trial and prepared contexts do not share mutable stage dependencies.
+Method-specific steps and work budgets provide reference accuracy without
+relaxing residual, period or refined-closure tolerances. Explicit defaults,
+incremental builds and build-only execution remain unchanged.
+
+DIRK prepared derivatives are a project-owned opt-in through a last, defaulted
+`PreparedFlightFactory` template parameter of `multiple_section_problem`.
+Existing explicit constructors and aliases remain supported. The factory owns
+method-specific replay construction; matching does not assume an RK table or
+stage count. Ordinary NMFD steppers, dense-only sampling and section flights
+acquire no sensitivity fields, solver dependencies or tangent buffers. Factory
+construction and residual evaluation create no derivative workspace; only
+`set_linearization_point` creates a provider/replay per Jacobian, shared serially
+by its segments. Each new provider must own an isolated mutable problem/solver
+context and immutable model parameters. Extracted older Jacobians remain valid.
+
+`dirk_stage_provider` injects the usual nonlinear and linear solvers, rebinds the
+Jacobian at each converged stage and solves `R_Y*dY=-R_previous*dw`.
+The optional sensitivity provider supplies
+`bool stage_tangent_rhs(const dirk_stage_context<Space>&, const X& dw, X& rhs)`;
+the context borrows stage/reference vectors and carries time and balanced a/b.
+This must include the correct mass action and unscaled algebraic rows, without
+inverting a singular mass. Only consumed zero-diagonal or additional dense
+rates require `Problem::evaluate_rate` and the optional
+`bool rate_jacobian_apply(T time,const X& state,const X& direction,X& out) const`.
+Do not infer these from shifted residual calls. Unsupported tables fail before
+replay. Replay follows the actual DIRK stages, stiffly accurate endpoint copies
+and method-specific continuous extension; event correction differentiates that
+same polynomial. Linear-constraint DAE cases are tested, but nonlinear
+reconstruction, moving-section derivatives and general DAE sensitivities remain
+explicitly unsupported by this identity-state prepared path.
+
+Retain eight replay vectors and two vectors per configured dense stage, one
+provider RHS, and the injected problems/solvers' own storage. The latter must
+preallocate or be warmed during preparation, not the first published Jv.
+Each segment retains a bounded scalar schedule and a fixed number of vectors,
+not a trajectory-sized vector history. `maximum_replay_steps` bounds replay
+(default 1000000); linear/nonlinear solver budgets remain injected. For S steps
+and s stages, stage combinations cost O(S*s^2*N), plus base/tangent solve work;
+s is fixed by the selected method, so vector algebra is linear in N. Krylov
+iterations, matrix assembly/factorization and scalar reductions are additional
+solver costs, not a claimed O(N) direct solve. No vector-sized host transfers or
+per-Jv vector allocation are permitted.
+
+`bdf_flight_factory` uses the same optional matching injection and shared
+`implicit_stage_provider` (`dirk_stage_provider` remains an alias). Record signed
+steps, actual order, unshortened candidate time and the final dense fraction.
+Replay fixed BDF1/BDF2 with a fresh backward-Euler startup per flight; differentiate
+both committed history states and the native dense polynomial before applying
+the section-time correction. Changed actual steps restart at order one;
+roundoff-only target clipping retains the native order. Reject unsupported order
+or history schedules before constructing a provider. Adaptive BDF coefficients,
+controller/order derivatives and nonlinear DAE reconstruction are not inferred.
+The provider needs shifted residuals and `stage_tangent_rhs`, not an explicit
+mass inverse or rate Jacobian. Replay owns nine/eleven backend vectors for
+BDF1/BDF2, plus the common prepared-section checkpoints and injected solver
+storage. Vector algebra is O(S*N), storage O(M*N+S) for M sections and S recorded
+steps, with fixed solver workspace and no per-Jv vector allocations or vector-sized
+host transfers. Recompute base states during each Jv; do not retain a full vector
+trajectory. New residuals/preparations must not mutate published Jacobians.
 
 Use method-specific dense output (`evaluate`, optionally `evaluate_derivative`);
 otherwise use bracketed substeps. Interpolation is not an exact trajectory.

@@ -23,6 +23,7 @@ using native_backend = scfd::backend::serial_cpu<std::ptrdiff_t>;
 #include <nmfd/time_steppers/integration/time_step_adaptation_constant.h>
 #include <nmfd/time_steppers/integration/time_step_adaptation_matlab.h>
 #include <periodic_orbit/sections/automatic_layout.h>
+#include <periodic_orbit/flows/recording_stepper.h>
 
 namespace section_tests
 {
@@ -52,9 +53,25 @@ void require_throws( Action action, const char *message )
 // permitted; a vector-sized host transfer fails the test on every backend.
 struct guarded_memory : native_backend::memory_type
 {
-    using parent                         = native_backend::memory_type;
-    inline static std::size_t host_bytes = 0;
-    static void               copy_to_host( std::size_t bytes, const void *src, void *dst )
+    using parent                               = native_backend::memory_type;
+    inline static std::size_t host_bytes       = 0;
+    inline static std::size_t allocation_calls = 0, live_allocations = 0;
+    static void               malloc( void **pointer, std::size_t bytes )
+    {
+        parent::malloc( pointer, bytes );
+        if ( bytes )
+        {
+            ++allocation_calls;
+            ++live_allocations;
+        }
+    }
+    static void free( void *pointer )
+    {
+        if ( pointer )
+            --live_allocations;
+        parent::free( pointer );
+    }
+    static void copy_to_host( std::size_t bytes, const void *src, void *dst )
     {
         if ( bytes > sizeof( double ) )
             throw std::runtime_error( "Vector-sized device-to-host copy" );
@@ -185,6 +202,19 @@ auto make_step( const std::shared_ptr<operations> &ops, double dt = .05, Model m
         ops, rhs, std::make_shared<fixed>( fixed::params{ dt } ), typename step<Model>::params{ "RK45" }
     );
 }
+template <class Model>
+struct explicit_step_assembly
+{
+    using step_type   = step<Model>;
+    using record_type = periodic_orbit::flight_step_record<typename step_type::scalar_type>;
+    static auto make_stepper( const std::shared_ptr<operations> &ops, double h, const std::string &method )
+    {
+        return std::make_shared<step_type>(
+            ops, std::make_shared<problem<Model>>( problem<Model>{ ops, {} } ),
+            std::make_shared<fixed>( fixed::params{ h } ), typename step_type::params{ method }
+        );
+    }
+};
 inline std::shared_ptr<const plane>
 make_plane( const std::shared_ptr<operations> &ops, double cx, double cy, double nx, double ny )
 {

@@ -1288,6 +1288,10 @@ PERIODIC_SECTION_HEADERS = $(wildcard source/periodic_orbit/*.h source/periodic_
 PERIODIC_SECTION_DEPS = $(PERIODIC_SECTION_HEADERS) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS)
 test_periodic_orbit_poincare_implicit_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_poincare_bdf_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+test_periodic_orbit_prepared_bdf_derivatives_%.bin test_periodic_orbit_prepared_bdf_matching_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+$(foreach test,prepared_bdf_derivatives prepared_bdf_matching,$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_$(test)_$(backend).bin)): $(NEWTON_TEST_HEADERS)
+test_periodic_orbit_prepared_dirk_derivatives_%.bin test_periodic_orbit_prepared_dirk_matching_%.bin test_periodic_orbit_orbit_method_assembly_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+$(foreach test,prepared_dirk_derivatives prepared_dirk_matching orbit_method_assembly,$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_$(test)_$(backend).bin)): $(NEWTON_TEST_HEADERS)
 test_periodic_orbit_coordinate_solvers_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_multiple_section_newton_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_rossler_periodic_%.bin test_periodic_orbit_lorenz_periodic_%.bin test_periodic_orbit_vaidyanathan_periodic_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
@@ -1319,10 +1323,9 @@ check_periodic_orbit_headers_cpu:
 
 PERIODIC_BENCHMARK_OPTIONS ?=
 PERIODIC_BENCHMARK_TARGETS = $(foreach system,analytic_cycle analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic,$(foreach backend,cpu cpu_omp cuda hip,periodic_orbit_benchmark_$(system)_$(backend).bin))
-PERIODIC_NEWTON_BENCHMARK_TARGETS = $(filter-out $(foreach backend,cpu cpu_omp cuda hip,periodic_orbit_benchmark_analytic_cycle_$(backend).bin),$(PERIODIC_BENCHMARK_TARGETS))
 PERIODIC_BENCHMARK_DEPS = $(PERIODIC_SECTION_DEPS) $(wildcard source/periodic_orbit/tests/benchmarks/*.h) Makefile $(CONFIG_FILE) $(PERIODIC_BENCHMARK_OPTIONS)
-$(addprefix $(BUILD_DIR)/,$(PERIODIC_NEWTON_BENCHMARK_TARGETS)): PERIODIC_BENCHMARK_FLAGS = $(INMFD_NEWTON)
-$(addprefix $(BUILD_DIR)/,$(PERIODIC_NEWTON_BENCHMARK_TARGETS)): $(NEWTON_TEST_HEADERS)
+$(addprefix $(BUILD_DIR)/,$(PERIODIC_BENCHMARK_TARGETS)): PERIODIC_BENCHMARK_FLAGS = $(INMFD_NEWTON)
+$(addprefix $(BUILD_DIR)/,$(PERIODIC_BENCHMARK_TARGETS)): $(NEWTON_TEST_HEADERS)
 .PHONY: $(PERIODIC_BENCHMARK_TARGETS)
 $(PERIODIC_BENCHMARK_TARGETS): %: $(BUILD_DIR)/%
 

@@ -41,17 +41,17 @@ inline json describe( const periodic_orbit::matching_report<double> &report )
 
 // Sample identical physical times through borrowed dense views. Only scalar
 // plotting observables leave the backend; no trajectory vectors are kept.
-template <class Model>
+template <class Model, class Assembly>
 class trajectory_writer
 {
-    std::shared_ptr<operations>  ops_;
-    std::shared_ptr<step<Model>> step_;
-    std::ostream                &stream_;
-    wrap                         sample_, initial_;
-    double                       start_, period_, begin_ = 0, end_ = 0;
-    std::size_t                  next_   = 1;
-    static constexpr std::size_t samples = 400;
-    void                         write( double time, const X &x )
+    std::shared_ptr<operations>                   ops_;
+    std::shared_ptr<typename Assembly::step_type> step_;
+    std::ostream                                 &stream_;
+    wrap                                          sample_, initial_;
+    double                                        start_, period_, begin_ = 0, end_ = 0;
+    std::size_t                                   next_   = 1;
+    static constexpr std::size_t                  samples = 400;
+    void                                          write( double time, const X &x )
     {
         stream_ << time;
         for ( std::size_t i = 0; i < Model::seed.size(); ++i )
@@ -64,8 +64,8 @@ class trajectory_writer
 public:
     double excursion = 0;
     trajectory_writer(
-        std::shared_ptr<operations> ops, std::shared_ptr<step<Model>> step, std::ostream &stream, double start,
-        double period, const X &initial
+        std::shared_ptr<operations> ops, std::shared_ptr<typename Assembly::step_type> step, std::ostream &stream,
+        double start, double period, const X &initial
     )
         : ops_( std::move( ops ) ), step_( std::move( step ) ), stream_( stream ), sample_( buffer( ops_ ) ),
           initial_( buffer( ops_ ) ), start_( start ), period_( period )
@@ -102,9 +102,10 @@ public:
     }
 };
 
-template <class Model>
+template <class Model, class Assembly>
 double write_trajectory(
-    const fixture<Model> &f, const X &initial, double period, double dt, const std::string &path, double &excursion
+    const fixture<Model, Assembly> &f, const X &initial, double period, double dt, const std::string &path,
+    double &excursion
 )
 {
     std::ofstream out( path );
@@ -113,10 +114,11 @@ double write_trajectory(
     for ( std::size_t i = 0; i < Model::seed.size(); ++i )
         out << ',' << coordinate_name<Model>( i );
     out << '\n';
-    auto step        = f.make_stepper( dt );
-    auto observer    = std::make_shared<trajectory_writer<Model>>( f.physical, step, out, f.start, period, initial );
+    auto step = f.make_stepper( dt );
+    auto observer =
+        std::make_shared<trajectory_writer<Model, Assembly>>( f.physical, step, out, f.start, period, initial );
     using integrator = nmfd::time_steppers::integration::time_integrator<
-        operations, section_tests::step<Model>, trajectory_writer<Model>>;
+        operations, typename Assembly::step_type, trajectory_writer<Model, Assembly>>;
     integrator run( f.physical, step, typename integrator::params{ f.maximum_steps }, observer );
     auto       end = buffer( f.physical );
     run.set_time_interval( f.start, f.start + period );
@@ -128,9 +130,10 @@ double write_trajectory(
     return f.physical->norm( *end );
 }
 
-template <class Model>
+template <class Model, class Assembly>
 void write_sections(
-    const fixture<Model> &f, const typename fixture<Model>::blocks::vector_type &z, const std::string &path
+    const fixture<Model, Assembly> &f, const typename fixture<Model, Assembly>::blocks::vector_type &z,
+    const std::string &path
 )
 {
     std::ofstream out( path );
@@ -168,17 +171,13 @@ void write_sections(
     }
 }
 
-template <class Model>
-int run_benchmark( int argc, char **argv )
+template <class Model, class Assembly>
+int run_benchmark( const json &config, const std::string &directory )
 {
     try
     {
-        if ( argc != 3 )
-            throw std::invalid_argument( "Usage: periodic ODE benchmark config.json output-directory" );
-        std::ifstream input( argv[1] );
-        const auto    config = json::parse( input );
-        const auto    count  = config.at( "sections" ).get<std::size_t>(),
-                   budget    = config.at( "maximum_steps" ).get<std::size_t>();
+        const auto count  = config.at( "sections" ).get<std::size_t>(),
+                   budget = config.at( "maximum_steps" ).get<std::size_t>();
         const auto dt = config.at( "step" ).get<double>(), start = config.at( "start_time" ).get<double>();
         const auto perturbation     = config.at( "perturbation" ).get<double>(),
                    tolerance        = config.at( "matching_tolerance" ).get<double>();
@@ -189,8 +188,8 @@ int run_benchmark( int argc, char **argv )
              !std::isfinite( perturbation ) || perturbation <= 0 || perturbation > .1 || !std::isfinite( tolerance ) ||
              tolerance <= 0 || !std::isfinite( newton_tolerance ) || newton_tolerance <= 0 )
             throw std::invalid_argument( "Invalid ODE orbit benchmark configuration" );
-        fixture<Model> f( count, dt, config.at( "method" ), start, budget );
-        auto           initial = f.block_buffer(), solution = f.block_buffer(), residual = f.block_buffer();
+        fixture<Model, Assembly> f( count, dt, config.at( "method" ), start, budget );
+        auto                     initial = f.block_buffer(), solution = f.block_buffer(), residual = f.block_buffer();
         f.perturb( perturbation, *initial );
         auto       solver = make_newton( f.space, f.problem, newton_tolerance, iterations );
         const auto before = guarded_memory::host_bytes;
@@ -198,7 +197,6 @@ int run_benchmark( int argc, char **argv )
         const auto          initial_report = f.problem->report();
         const auto          initial_norm   = f.space->norm( *residual );
         const bool          solved         = solver->solve( *initial, *solution );
-        const std::string   directory( argv[2] );
         std::vector<double> history{ initial_norm };
         const auto         &norms = *solver->convergence_strategy()->get_norms_history_handle();
         history.insert( history.end(), norms.begin(), norms.end() );
@@ -213,9 +211,11 @@ int run_benchmark( int argc, char **argv )
                 std::to_string( solver->convergence_strategy()->get_result_status() )
             );
         f.problem->apply( *solution, *residual );
-        const auto                             corrected      = f.problem->report();
-        const auto                             corrected_norm = f.space->norm( *residual );
-        typename fixture<Model>::residual_type refined( f.physical, f.space, f.layout, f.make_segments( dt / 2 ) );
+        const auto                                       corrected      = f.problem->report();
+        const auto                                       corrected_norm = f.space->norm( *residual );
+        typename fixture<Model, Assembly>::residual_type refined(
+            f.physical, f.space, f.layout, f.make_segments( dt / 2 )
+        );
         refined.apply( *solution, *residual );
         const auto refined_report = refined.report();
         const auto refined_norm   = f.space->norm( *residual );
@@ -273,6 +273,25 @@ int run_benchmark( int argc, char **argv )
         std::cout << Model::name << " M=" << count << ": " << ( passed ? "PASS" : "FAIL" )
                   << ", residual=" << corrected_norm << '\n';
         return passed ? 0 : 1;
+    }
+    catch ( const std::exception &e )
+    {
+        std::cerr << "FAIL: " << e.what() << '\n';
+        return 2;
+    }
+}
+template <class Model>
+int run_benchmark( int argc, char **argv )
+{
+    try
+    {
+        if ( argc != 3 )
+            throw std::invalid_argument( "Usage: periodic ODE benchmark config.json output-directory" );
+        std::ifstream input( argv[1] );
+        const auto    config = json::parse( input );
+        return orbit_benchmarks::dispatch<Model>( config.at( "method" ), [&]( auto assembly ) {
+            return run_benchmark<Model, decltype( assembly )>( config, argv[2] );
+        } );
     }
     catch ( const std::exception &e )
     {

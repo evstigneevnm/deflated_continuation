@@ -1687,7 +1687,7 @@ jobs:
         run: |
           export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE
           make check_periodic_orbit_headers_cpu CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc 'G++ = ${{ matrix.compiler }}'
-          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_bdf poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target section_coordinates coordinate_solvers multiple_section_matching prepared_section_derivatives multiple_section_newton rossler_periodic lorenz_periodic vaidyanathan_periodic; do
+          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_bdf poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target section_coordinates coordinate_solvers multiple_section_matching prepared_section_derivatives prepared_dirk_derivatives prepared_dirk_matching prepared_bdf_derivatives prepared_bdf_matching orbit_method_assembly multiple_section_newton rossler_periodic lorenz_periodic vaidyanathan_periodic; do
             make -j2 "test_periodic_orbit_${test}_cpu.bin" "test_periodic_orbit_${test}_cpu_omp.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/sections_cpu" 'G++ = ${{ matrix.compiler }}'
             for backend in cpu cpu_omp; do
               timeout 180s "$BUILD_DIR/sections_cpu/test_periodic_orbit_${test}_${backend}.bin"
@@ -1697,7 +1697,7 @@ jobs:
   periodic-orbit-matching-benchmark-cpu:
     needs: periodic-orbit-sections-cpu
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
         with:
@@ -1719,6 +1719,36 @@ jobs:
               --build-dir "$BUILD_DIR/orbit_matching/$backend" --backend "$backend" \
               --systems analytic_cycle analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic \
               --methods RK45 DOP853 --sections 1 2 4 8 --threads 2
+            if [ "$backend" = cpu ]; then
+              bash source/periodic_orbit/tests/run_all.sh \
+                --build-dir "$BUILD_DIR/orbit_matching/$backend" --backend "$backend" \
+                --systems analytic_cycle analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic \
+                --methods 'SDIRK3(1)3' ARK324L2SA --sections 1 2 4 8 --threads 1
+            else
+              # Tiny implicit stage solves are dominated by OpenMP launch overhead.
+              # Core tests cover every model's adapter and prepared derivatives.
+              bash source/periodic_orbit/tests/run_all.sh \
+                --build-dir "$BUILD_DIR/orbit_matching/$backend" --backend "$backend" \
+                --systems analytic_cycle_newton --methods 'SDIRK3(1)3' ARK324L2SA \
+                --sections 1 4 --threads 1
+            fi
+            if [ "$backend" = cpu ]; then
+              bash source/periodic_orbit/tests/run_all.sh \
+                --build-dir "$BUILD_DIR/orbit_matching/$backend" --backend "$backend" \
+                --systems analytic_cycle_newton --methods IM CN 'SDIRK2(1)2' 'ESDIRK2(1)3' \
+                --sections 1 4 --threads 1
+              bash source/periodic_orbit/tests/run_all.sh \
+                --build-dir "$BUILD_DIR/orbit_matching/$backend" --backend "$backend" \
+                --systems rossler_periodic lorenz_periodic vaidyanathan_periodic \
+                --methods 'SDIRK2(1)2' --sections 1 --threads 1
+              bash source/periodic_orbit/tests/run_all.sh \
+                --build-dir "$BUILD_DIR/orbit_matching/$backend" --backend "$backend" \
+                --systems analytic_cycle_newton --methods BDF2 --sections 1 2 4 8 --threads 1
+              bash source/periodic_orbit/tests/run_all.sh \
+                --build-dir "$BUILD_DIR/orbit_matching/$backend" --backend "$backend" \
+                --systems rossler_periodic lorenz_periodic vaidyanathan_periodic \
+                --methods BDF2 --sections 1 --threads 1
+            fi
           done
       - uses: actions/upload-artifact@v4
         if: always()
@@ -1741,7 +1771,7 @@ jobs:
       - name: Verify section ownership, bounds and failure cleanup
         run: |
           export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE
-          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_bdf poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target section_coordinates coordinate_solvers multiple_section_matching prepared_section_derivatives multiple_section_newton rossler_periodic lorenz_periodic vaidyanathan_periodic; do
+          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_bdf poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target section_coordinates coordinate_solvers multiple_section_matching prepared_section_derivatives prepared_dirk_derivatives prepared_dirk_matching prepared_bdf_derivatives prepared_bdf_matching orbit_method_assembly multiple_section_newton rossler_periodic lorenz_periodic vaidyanathan_periodic; do
             make -j2 "test_periodic_orbit_${test}_cpu.bin" "test_periodic_orbit_${test}_cpu_omp.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/sections_sanitizers" TARGET_GCC='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer'
             for backend in cpu cpu_omp; do
               timeout 180s "$BUILD_DIR/sections_sanitizers/test_periodic_orbit_${test}_${backend}.bin"
@@ -1751,7 +1781,7 @@ jobs:
   periodic-orbit-sections-cuda:
     needs: [periodic-orbit-sections-cpu, scfd-vector-operations-cuda]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
         with:
@@ -1762,17 +1792,21 @@ jobs:
             echo "Skipping CUDA sections: compiler or usable GPU unavailable"
             exit 0
           fi
-          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_bdf poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target section_coordinates coordinate_solvers multiple_section_matching prepared_section_derivatives multiple_section_newton rossler_periodic lorenz_periodic vaidyanathan_periodic; do
+          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_bdf poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target section_coordinates coordinate_solvers multiple_section_matching prepared_section_derivatives prepared_dirk_derivatives prepared_dirk_matching prepared_bdf_derivatives prepared_bdf_matching orbit_method_assembly multiple_section_newton rossler_periodic lorenz_periodic vaidyanathan_periodic; do
             make "test_periodic_orbit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/sections_cuda"
             timeout_seconds=300
             if [ "$test" = vaidyanathan_periodic ]; then timeout_seconds=600; fi
+            case "$test" in
+              prepared_bdf_matching) timeout_seconds=1200;;
+              prepared_dirk_*|prepared_bdf_*) timeout_seconds=600;;
+            esac
             timeout "${timeout_seconds}s" "$BUILD_DIR/sections_cuda/test_periodic_orbit_${test}_cuda.bin"
           done
 
   periodic-orbit-sections-hip:
     needs: [periodic-orbit-sections-cpu, scfd-vector-operations-hip]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
         with:
@@ -1798,10 +1832,14 @@ jobs:
             fi
             HIP_TARGET="${HIP_ARCH_LIST:-native}"
           fi
-          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_bdf poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target section_coordinates coordinate_solvers multiple_section_matching prepared_section_derivatives multiple_section_newton rossler_periodic lorenz_periodic vaidyanathan_periodic; do
+          for test in section_geometry event_locator poincare_harmonic poincare_implicit poincare_bdf poincare_dae section_map_lifecycle section_layout_variable_speed section_rpo_target section_coordinates coordinate_solvers multiple_section_matching prepared_section_derivatives prepared_dirk_derivatives prepared_dirk_matching prepared_bdf_derivatives prepared_bdf_matching orbit_method_assembly multiple_section_newton rossler_periodic lorenz_periodic vaidyanathan_periodic; do
             make "test_periodic_orbit_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/sections_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
             timeout_seconds=300
             if [ "$test" = vaidyanathan_periodic ]; then timeout_seconds=600; fi
+            case "$test" in
+              prepared_bdf_matching) timeout_seconds=1200;;
+              prepared_dirk_*|prepared_bdf_*) timeout_seconds=600;;
+            esac
             timeout "${timeout_seconds}s" "$BUILD_DIR/sections_hip/test_periodic_orbit_${test}_hip.bin"
           done
 

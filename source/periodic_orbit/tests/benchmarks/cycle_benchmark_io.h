@@ -72,7 +72,8 @@ struct trajectory_writer
     }
 };
 
-inline void write_sections( fixture &f, const blocks::vector_type &z, const std::string &path )
+template <class Steps>
+void write_sections( basic_fixture<Steps> &f, const blocks::vector_type &z, const std::string &path )
 {
     std::ofstream out( path );
     out.exceptions( std::ios::badbit | std::ios::failbit );

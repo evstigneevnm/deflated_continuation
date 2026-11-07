@@ -24,14 +24,20 @@ using recorded_map =
     periodic_orbit::recorded_section_map<operations, step<analytic_cycle>, plane, rate_provider<analytic_cycle>>;
 using orbit_problem = periodic_orbit::multiple_section_problem<operations, operations, recorded_map, cycle_rate>;
 
-inline std::vector<orbit_problem::segment> recorded_segments( const fixture &f )
+template <class Steps>
+using recorded_map_for = periodic_orbit::recorded_section_map<
+    operations, typename Steps::step_type, plane, rate_provider<analytic_cycle>, typename Steps::record_type>;
+template <class Steps>
+auto recorded_segments( const basic_fixture<Steps> &f )
 {
-    std::vector<orbit_problem::segment>     segments;
-    typename recorded_map::map_type::params p;
+    using map_type     = recorded_map_for<Steps>;
+    using problem_type = periodic_orbit::multiple_section_problem<operations, operations, map_type, cycle_rate>;
+    std::vector<typename problem_type::segment> segments;
+    typename map_type::map_type::params         p;
     p.maximum_steps = f.maximum_steps;
     for ( std::size_t i = 0; i < f.layout->size(); ++i )
         segments.push_back(
-            { std::make_shared<recorded_map>(
+            { std::make_shared<map_type>(
                   f.physical, f.make_stepper( f.dt ), std::make_shared<rate_provider<analytic_cycle>>(), p
               ),
               std::make_shared<chart>( f.physical, f.coordinates, f.layout->at( i ).section ) }

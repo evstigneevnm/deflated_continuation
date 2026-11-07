@@ -28,11 +28,59 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
     def test_reject_invalid_options(self):
         for options in (["--sections", "0"], ["--sections", "65"], ["--start", "nan"],
                         ["--perturbation", "1"], ["--threads", "0"], ["-B", "--plot-only", "x"],
-                        ["--make-option", "BUILD_DIR=x"], ["--make-option", "-n"], ["--newton-max-iterations", "0"]):
+                        ["--make-option", "BUILD_DIR=x"], ["--make-option", "-n"], ["--newton-max-iterations", "0"],
+                        ["--start", "0", "--step", "1e-320", "--methods", "CN"]):
             with self.subTest(options=options), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 runner.arguments(options)
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             runner.arguments(["--start", "1e20"])
+
+    def test_dirk_configuration_preserves_accuracy_and_sizes_budgets(self):
+        args = runner.arguments(["--systems", "analytic_cycle_newton", *runner.ODE_CASES,
+                                 "--methods", "CN", "SDIRK2(1)2", "ESDIRK2(1)3", "SDIRK3(1)3", "ARK324L2SA",
+                                 "--sections", "1", "4"])
+        configs = runner.configurations(args)
+        self.assertEqual(len(configs), 40)
+        for config in configs:
+            key = "analytic_cycle" if config["system"] == "analytic_cycle_newton" else config["system"]
+            self.assertEqual(config["step"], runner.DIRK_STEPS[key][config["method"]])
+            self.assertEqual(config["matching_tolerance"], 1e-6)
+            self.assertEqual(config["newton_tolerance"], 1e-10)
+            period = runner.ODE_CASES[key]["period"] if key in runner.ODE_CASES else 2 * math.pi
+            self.assertGreaterEqual(config["maximum_steps"], math.ceil(4 * period / config["step"]))
+        override = runner.configurations(runner.arguments(["--methods", "CN", "--step", ".03", "--max-steps", "7"]))
+        self.assertTrue(all(c["step"] == .03 and c["maximum_steps"] == 7 for c in override))
+        explicit = runner.configurations(runner.arguments([]))
+        self.assertTrue(all(c["step"] == .08 and c["maximum_steps"] == 20000 for c in explicit))
+
+    def test_backward_euler_requires_an_explicit_work_choice(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            runner.arguments(["--methods", "IE"])
+        config = runner.configurations(runner.arguments(["--methods", "IE", "--step", ".000001"]))[0]
+        self.assertEqual(config["method"], "IE")
+        self.assertEqual(config["matching_tolerance"], 1e-6)
+
+    def test_fixed_bdf_configuration_and_startup_budgets(self):
+        args = runner.arguments(["--systems", "analytic_cycle_newton", *runner.ODE_CASES,
+                                 "--methods", "BDF2", "--sections", "1", "4"])
+        configs = runner.configurations(args)
+        self.assertEqual(args.timeout, 900)
+        self.assertEqual(len(configs), 8)
+        for config in configs:
+            key = "analytic_cycle" if config["system"] == "analytic_cycle_newton" else config["system"]
+            self.assertEqual(config["step"], runner.BDF_STEPS[key])
+            self.assertEqual(config["matching_tolerance"], 1e-6)
+            self.assertEqual(config["newton_tolerance"], 1e-10)
+            period = runner.ODE_CASES[key]["period"] if key in runner.ODE_CASES else 2 * math.pi
+            self.assertGreaterEqual(config["maximum_steps"], math.ceil(4 * period / config["step"]))
+        for method in ("BDF", "BDF1"):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                runner.arguments(["--methods", method])
+        config = runner.configurations(runner.arguments(["--methods", "BDF1", "--step", ".000001"]))[0]
+        self.assertEqual(config["step"], .000001)
+        self.assertEqual(config["matching_tolerance"], 1e-6)
+        self.assertEqual(runner.arguments([]).timeout, 300)
+        self.assertEqual(runner.arguments(["--methods", "BDF2", "--timeout", "7"]).timeout, 7)
 
     def test_build_stamp_is_stable_and_tracks_options(self):
         with tempfile.TemporaryDirectory() as directory:

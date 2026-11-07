@@ -34,25 +34,26 @@ inline block_wrap block_buffer( const std::shared_ptr<blocks> &space )
     return x;
 }
 
-struct fixture
+template <class StepAssembly = explicit_step_assembly<analytic_cycle>>
+struct basic_fixture
 {
-    std::shared_ptr<operations>                  physical    = std::make_shared<operations>( 2 );
-    std::shared_ptr<operations>                  coordinates = std::make_shared<operations>( 1 );
-    std::shared_ptr<blocks>                      space;
-    std::shared_ptr<const matching::layout_type> layout;
-    std::vector<matching::segment>               segments;
-    double                                       dt, start;
-    std::size_t                                  maximum_steps;
-    std::string                                  method;
+    using step_type = typename StepAssembly::step_type;
+    using map       = periodic_orbit::section_map<operations, step_type, plane, policy, rate_provider<analytic_cycle>>;
+    using matching  = periodic_orbit::multiple_section_residual<operations, operations, map>;
+    std::shared_ptr<operations>                           physical    = std::make_shared<operations>( 2 );
+    std::shared_ptr<operations>                           coordinates = std::make_shared<operations>( 1 );
+    std::shared_ptr<blocks>                               space;
+    std::shared_ptr<const typename matching::layout_type> layout;
+    std::vector<typename matching::segment>               segments;
+    double                                                dt, start;
+    std::size_t                                           maximum_steps;
+    std::string                                           method;
 
-    std::shared_ptr<step<analytic_cycle>> make_stepper( double h ) const
+    std::shared_ptr<step_type> make_stepper( double h ) const
     {
-        auto rhs = std::make_shared<problem<analytic_cycle>>( problem<analytic_cycle>{ physical, {} } );
-        return std::make_shared<step<analytic_cycle>>(
-            physical, rhs, std::make_shared<fixed>( fixed::params{ h } ), step<analytic_cycle>::params{ method }
-        );
+        return StepAssembly::make_stepper( physical, h, method );
     }
-    fixture(
+    basic_fixture(
         std::size_t count, double h = .08, std::string scheme = "RK45", double t = .37, std::size_t budget = 20000
     )
         : space( std::make_shared<blocks>( coordinates, count ) ), dt( h ), start( t ), maximum_steps( budget ),
@@ -63,7 +64,7 @@ struct fixture
         auto rate         = std::make_shared<rate_provider<analytic_cycle>>();
         auto state_policy = std::make_shared<policy>( physical );
         auto metric       = std::make_shared<periodic_orbit::euclidean_section_metric<operations>>( physical );
-        periodic_orbit::automatic_layout<operations, step<analytic_cycle>, rate_provider<analytic_cycle>> builder(
+        periodic_orbit::automatic_layout<operations, step_type, rate_provider<analytic_cycle>> builder(
             physical, make_stepper( h ), rate, state_policy, metric
         );
         periodic_orbit::placement_params<double> p;
@@ -78,10 +79,10 @@ struct fixture
         layout   = std::move( result.layout );
         segments = make_segments( h );
     }
-    std::vector<matching::segment> make_segments( double h ) const
+    std::vector<typename matching::segment> make_segments( double h ) const
     {
-        std::vector<matching::segment> result;
-        map::params                    p;
+        std::vector<typename matching::segment> result;
+        typename map::params                    p;
         p.maximum_steps = maximum_steps;
         for ( std::size_t i = 0; i < layout->size(); ++i )
             result.push_back(
@@ -94,5 +95,6 @@ struct fixture
         return result;
     }
 };
+using fixture = basic_fixture<>;
 }
 #endif

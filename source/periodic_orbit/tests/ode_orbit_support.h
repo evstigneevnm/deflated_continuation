@@ -3,6 +3,7 @@
 
 #include "variational_test_support.h"
 #include "newton_test_support.h"
+#include "orbit_method_assembly.h"
 #include <periodic_orbit/matching/multiple_section_problem.h>
 
 namespace ode_orbit_tests
@@ -39,14 +40,17 @@ std::string coordinate_name( std::size_t i )
     return "x" + std::to_string( i + 1 );
 }
 
-template <class Model>
+template <class Model, class Assembly = orbit_benchmarks::explicit_assembly<Model>>
 struct fixture
 {
     static constexpr std::size_t dimension = Model::seed.size();
-    using map           = periodic_orbit::recorded_section_map<operations, step<Model>, plane, rate_provider<Model>>;
-    using orbit_problem = periodic_orbit::multiple_section_problem<operations, operations, map, tangent_rate<Model>>;
-    using residual_type = typename orbit_problem::residual_type;
-    using blocks        = typename orbit_problem::space_type;
+    using step_type                        = typename Assembly::step_type;
+    using map                              = periodic_orbit::recorded_section_map<
+                                     operations, step_type, plane, rate_provider<Model>, typename Assembly::record_type>;
+    using orbit_problem = periodic_orbit::multiple_section_problem<
+        operations, operations, map, tangent_rate<Model>, chart, typename Assembly::factory_type>;
+    using residual_type                     = typename orbit_problem::residual_type;
+    using blocks                            = typename orbit_problem::space_type;
     std::shared_ptr<operations> physical    = std::make_shared<operations>( dimension );
     std::shared_ptr<operations> coordinates = std::make_shared<operations>( dimension - 1 );
     std::shared_ptr<blocks>     space;
@@ -63,7 +67,7 @@ struct fixture
     {
         auto initial = buffer( physical );
         fill_profile( *initial, Model::seed );
-        periodic_orbit::automatic_layout<operations, step<Model>, rate_provider<Model>> builder(
+        periodic_orbit::automatic_layout<operations, step_type, rate_provider<Model>> builder(
             physical, make_stepper( dt ), std::make_shared<rate_provider<Model>>(),
             std::make_shared<policy>( physical ),
             std::make_shared<periodic_orbit::euclidean_section_metric<operations>>( physical )
@@ -80,14 +84,13 @@ struct fixture
                 ", flight=" + std::to_string( result.flight.flight_time )
             );
         layout  = std::move( result.layout );
-        problem = std::make_shared<orbit_problem>( physical, space, layout, make_segments( dt ), rate );
+        problem = std::make_shared<orbit_problem>(
+            physical, space, layout, make_segments( dt ), Assembly::make_factory( physical, budget, rate )
+        );
     }
     auto make_stepper( double h ) const
     {
-        auto rhs = std::make_shared<section_tests::problem<Model>>( section_tests::problem<Model>{ physical, {} } );
-        return std::make_shared<step<Model>>(
-            physical, rhs, std::make_shared<fixed>( fixed::params{ h } ), typename step<Model>::params{ method }
-        );
+        return Assembly::make_stepper( physical, h, method );
     }
     auto block_buffer() const
     {
@@ -124,7 +127,7 @@ struct fixture
         auto  initial = buffer( physical ), endpoint = buffer( physical );
         chart section( physical, coordinates, layout->at( 0 ).section );
         section.lift( state.comp( 0 ), *initial );
-        using integrator = nmfd::time_steppers::integration::time_integrator<operations, step<Model>>;
+        using integrator = nmfd::time_steppers::integration::time_integrator<operations, step_type>;
         integrator verify( physical, make_stepper( h ), typename integrator::params{ maximum_steps } );
         verify.set_time_interval( start, start + period );
         verify.apply( *initial, *endpoint );
