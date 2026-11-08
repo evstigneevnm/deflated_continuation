@@ -112,7 +112,8 @@ class TimestepperExtractionTest(unittest.TestCase):
                  "rosenbrock_ros3_adaptive", "rosenbrock_ros3_lifecycle",
                  "rosenbrock_dense", "rosenbrock_dense_lifecycle", "rosenbrock_w",
                  "rosenbrock_w_adaptive", "rosenbrock_w_lifecycle", "rosenbrock_w_dense",
-                 "rosenbrock_w_dense_lifecycle")
+                 "rosenbrock_w_dense_lifecycle", "rosenbrock_mass",
+                 "rosenbrock_mass_adaptive", "rosenbrock_mass_lifecycle")
         for directory in (ROOT, MODULE):
             for test in tests:
                 output = self.make(directory, f"test_implicit_{test}_cpu.bin", "BUILD_DIR=build/rosenbrock_probe")

@@ -835,8 +835,9 @@ base time/state; evaluate later rates at the selected table's stage times
 (ROS2 endpoint, ROS3 `t+gamma*h`), using the actual clipped/signed timestep,
 and restore base time even after failures or exceptions. Balance all
 `h*gamma_i*f_t` terms consistently. Allocate one additional backend vector only
-for non-autonomous runs; adaptation adds no vectors. Nontrivial mass and DAEs
-remain unsupported. `DenseOutput=true` enables
+for non-autonomous rate runs; adaptation adds no vectors. Autonomous constant
+nonsingular mass is supported by the opt-in residual form described below;
+variable/singular mass and DAEs remain unsupported. `DenseOutput=true` enables
 native continuous extensions of orders two/three for ROS2/ROS3. The existing
 borrowed `get_continuous_integration().evaluate(theta,out)` contract applies;
 finalize/reset invalidate views, including rejected or shortened endpoints.
@@ -870,6 +871,23 @@ interpolant. Bounded stiff-decay samples do not establish positivity or
 stiffness-uniform interpolation accuracy.
 Coefficient conversion and separate J/B order conditions are documented in
 `nmfd-timesteppers/docs/rosenbrock_w_methods.md`.
+
+Set `rosenbrock::time_step::params::mass_form=true` for autonomous constant
+nonsingular `M*u'=f(u)`. The default rate path is unchanged. Use the existing
+shifted residual `R(U)=a*M*(U-previous_state)-b*(f(U)+known_rhs)` and frozen
+`a*M-b*B`, with B=J_f for ROS2/ROS3 or an admissible W approximation. No new
+problem methods, mass-action API or M inverse are required; `evaluate_rate`
+is not required or called in this mode. Each stage sets `known_rhs=0` and
+`previous_state=U_i+gamma*sum(c_ij*y_j)`, then solves against `-R(U_i)`.
+Residual calls must preserve the prepared operator. Native dense corrections
+use the same mass-weighted construction; the existing sampling/view contract
+and all workspace counts are unchanged. Ordinary mass stages cost 2/3/4
+residuals/solves, dense output adds 0/1/2 after error acceptance. No per-attempt
+allocation or vector-sized host/device transfers are introduced. Non-autonomous
+mass selection is rejected, because the existing f_t callback is a physical-rate
+derivative, not a force derivative. No singular/variable-mass or DAE capability
+is inferred. Details and rounding limits are documented in
+`nmfd-timesteppers/docs/rosenbrock_mass.md`.
 
 The current implicit RK engine supports lower-triangular DIRK/SDIRK/ESDIRK tables with
 an injected nonlinear solver. At stage i, `previous_state()` holds the RK reference
