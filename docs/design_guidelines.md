@@ -835,8 +835,8 @@ base time/state; evaluate later rates at the selected table's stage times
 (ROS2 endpoint, ROS3 `t+gamma*h`), using the actual clipped/signed timestep,
 and restore base time even after failures or exceptions. Balance all
 `h*gamma_i*f_t` terms consistently. Allocate one additional backend vector only
-for non-autonomous runs; adaptation adds no vectors. Nontrivial mass, DAEs and
-approximate-Jacobian W schemes remain unsupported. `DenseOutput=true` enables
+for non-autonomous runs; adaptation adds no vectors. Nontrivial mass and DAEs
+remain unsupported. `DenseOutput=true` enables
 native continuous extensions of orders two/three for ROS2/ROS3. The existing
 borrowed `get_continuous_integration().evaluate(theta,out)` contract applies;
 finalize/reset invalidate views, including rejected or shortened endpoints.
@@ -847,6 +847,21 @@ Disabled dense output retains the original storage and work. Classical continuou
 order and bounded stiff-decay samples do not establish stiffness-uniform accuracy
 or positivity inside unresolved initial layers. The derivation is documented in
 `nmfd-timesteppers/docs/rosenbrock_dense_output.md`.
+
+Select `params::method="ROS34PW2"` for the four-stage, order-3/2 W-method.
+Only this selection currently advertises validated approximate-Jacobian support.
+Keep the physical rate and partial time derivative unchanged; the problem may
+supply `a*I-b*B` with an approximate/lagged B frozen per attempt. Reprepare and
+rebind every attempt, updating the shift even if the problem reuses B. W order
+does not excuse failed linear solves or guarantee stability for arbitrary B.
+Each successful attempt uses four rates/solves, one binding, and six retained
+backend vectors (seven for non-autonomous problems), without per-step allocation
+or vector-sized host/device transfers. Existing controllers use exponent three;
+all problem, solver and integrator interfaces remain unchanged. W dense output
+is not yet validated: construction with `DenseOutput=true` must reject ROS34PW2
+before workspace allocation, never substitute another method's interpolant.
+Coefficient conversion and separate J/B order conditions are documented in
+`nmfd-timesteppers/docs/rosenbrock_w_methods.md`.
 
 The current implicit RK engine supports lower-triangular DIRK/SDIRK/ESDIRK tables with
 an injected nonlinear solver. At stage i, `previous_state()` holds the RK reference
