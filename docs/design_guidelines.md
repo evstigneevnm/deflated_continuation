@@ -837,7 +837,8 @@ and restore base time even after failures or exceptions. Balance all
 `h*gamma_i*f_t` terms consistently. Allocate one additional backend vector only
 for non-autonomous runs; adaptation adds no vectors. Constant
 nonsingular mass is supported by the opt-in residual form described below;
-variable/singular mass and DAEs remain unsupported. `DenseOutput=true` enables
+variable mass remains unsupported; singular mass requires the bounded index-1
+selection below. `DenseOutput=true` enables
 native continuous extensions of orders two/three for ROS2/ROS3. The existing
 borrowed `get_continuous_integration().evaluate(theta,out)` contract applies;
 finalize/reset invalidate views, including rejected or shortened endpoints.
@@ -890,9 +891,27 @@ M*q_t=f_t, add `h^2*gamma*d_i*q_t` to the reference using two timestep-scaled
 vector operations, without forming scalar h^2. This needs only the existing
 q_t vector and RHS scratch. Evaluate residuals at actual table/endpoint times
 and restore base time after failures or exceptions, preserving the frozen
-operator. Dense-only stages add no q_t calls. No singular/variable-mass or DAE capability
+operator. Dense-only stages add no q_t calls. No variable-mass or general DAE capability
 is inferred. Details and rounding limits are documented in
 `nmfd-timesteppers/docs/rosenbrock_mass.md`.
+
+For autonomous constant-singular-mass index-1 problems, additionally select
+`params.index1_dae=true` with `method="ROS34PW2"` and `mass_form=true`.
+`table().supports_constant_mass_index1()` declares this bounded applicability.
+ROS2/ROS3, non-autonomous execution and enabled dense output reject this selection
+before workspace allocation. Keep algebraic residual/Jacobian rows unscaled and
+exact; only differential Jacobian rows may be approximated in this capability.
+Use the existing complete shifted residual/operator and injected full-system
+solve, never an inverse of singular M. No new problem/controller signatures or
+engine workspace are required: four residuals/solves, six backend vectors.
+Consistent initialization and modified endpoints remain problem-owned. The
+embedded state estimate does not certify constraints; enforce their independent
+unscaled tolerance through the existing controller/external-manager boundary.
+Nonlinear algebraic defects are numerical errors, not an implicit projection.
+Moving constraints, higher-index formulations, variable mass and DAE dense
+output need separate validation. Tests cover differential/algebraic order,
+backward integration, embedded estimates, constraint rejection, initialization,
+rollback, restart and backend transfer/allocation guards.
 
 The current implicit RK engine supports lower-triangular DIRK/SDIRK/ESDIRK tables with
 an injected nonlinear solver. At stage i, `previous_state()` holds the RK reference
