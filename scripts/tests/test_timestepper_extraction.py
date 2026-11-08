@@ -111,7 +111,8 @@ class TimestepperExtractionTest(unittest.TestCase):
                  "rosenbrock_adaptive", "rosenbrock_nonautonomous", "rosenbrock_ros3",
                  "rosenbrock_ros3_adaptive", "rosenbrock_ros3_lifecycle",
                  "rosenbrock_dense", "rosenbrock_dense_lifecycle", "rosenbrock_w",
-                 "rosenbrock_w_adaptive", "rosenbrock_w_lifecycle")
+                 "rosenbrock_w_adaptive", "rosenbrock_w_lifecycle", "rosenbrock_w_dense",
+                 "rosenbrock_w_dense_lifecycle")
         for directory in (ROOT, MODULE):
             for test in tests:
                 output = self.make(directory, f"test_implicit_{test}_cpu.bin", "BUILD_DIR=build/rosenbrock_probe")
@@ -345,7 +346,7 @@ class TimestepperExtractionTest(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/operations.yml").read_text()
         self.assertIn("python3 source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py", workflow)
         self.assertIn('"$PYTHON" source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py', workflow)
-        self.assertIn("--methods ROS2 ROS3 --controllers scipy", workflow)
+        self.assertIn("--methods ROS2 ROS3 ROS34PW2 --controllers scipy", workflow)
 
 
 if __name__ == "__main__":

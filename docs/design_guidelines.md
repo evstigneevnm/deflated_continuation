@@ -854,12 +854,20 @@ Keep the physical rate and partial time derivative unchanged; the problem may
 supply `a*I-b*B` with an approximate/lagged B frozen per attempt. Reprepare and
 rebind every attempt, updating the shift even if the problem reuses B. W order
 does not excuse failed linear solves or guarantee stability for arbitrary B.
-Each successful attempt uses four rates/solves, one binding, and six retained
+Without dense output, each successful attempt uses four rates/solves, one binding, and six retained
 backend vectors (seven for non-autonomous problems), without per-step allocation
 or vector-sized host/device transfers. Existing controllers use exponent three;
-all problem, solver and integrator interfaces remain unchanged. W dense output
-is not yet validated: construction with `DenseOutput=true` must reject ROS34PW2
-before workspace allocation, never substitute another method's interpolant.
+all problem, solver and integrator interfaces remain unchanged. Optional W dense
+output has classical order three, verified with separate J/B order conditions.
+After error acceptance, two native slope solves use the frozen shifted operator
+and one extra endpoint-rate evaluation. Retain three additional backend vectors;
+reuse the first slope buffer for the base-rate cache. Error-rejected trials skip
+dense-only solves/rates; disabled storage/work are unchanged. Sampling is
+backend-only O(N) algebra and copies endpoints exactly; finalize/reset expires
+views, including rejected or shortened steps. Dense-only failures must not
+publish partial candidates. Do not substitute ROS3 or the published exact-Jacobian
+interpolant. Bounded stiff-decay samples do not establish positivity or
+stiffness-uniform interpolation accuracy.
 Coefficient conversion and separate J/B order conditions are documented in
 `nmfd-timesteppers/docs/rosenbrock_w_methods.md`.
 
