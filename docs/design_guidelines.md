@@ -838,8 +838,8 @@ and restore base time even after failures or exceptions. Balance all
 for non-autonomous runs; adaptation adds no vectors. Constant
 nonsingular mass is supported by the opt-in residual form described below;
 native variable-mass residual execution remains unsupported; nonsingular variable
-mass may use the rate formulation below. Singular mass requires the bounded index-1
-selection below. `DenseOutput=true` enables
+mass may use the rate formulation below. Singular mass requires an explicitly
+validated DAE selection below. `DenseOutput=true` enables
 native continuous extensions of orders two/three for ROS2/ROS3. The existing
 borrowed `get_continuous_integration().evaluate(theta,out)` contract applies;
 finalize/reset invalidate views, including rejected or shortened endpoints.
@@ -930,6 +930,26 @@ not supported by this reduction. The validation runner includes the existing
 state/time-mass equations with normalized rate Jacobians; focused tests additionally
 cover nonlinear state mass, coupled time/state mass, omitted derivative terms,
 forward/backward primary/dense orders, adaptation, failures and transfer guards.
+
+The bounded Rosenbrock index-2 path selects `method="ROSI2P2"`,
+`mass_form=true`, `index2_dae=true`. Supply an exact complete shifted operator
+with unscaled constraint/gauge rows; pressure gauges and primary/hidden
+consistency remain problem-owned. Moving constraints use a problem-owned
+autonomous clock augmentation, never a reinterpretation of q_t. Native variable
+singular mass and general nonlinear multiplier coupling are not inferred.
+Index-2 error assessment uses independently validated constraint-aware weights
+and exponent two, without extra stages/storage. Keep ordinary ODE weights and
+all existing default selections unchanged. Validate velocity and pressure
+orders separately: the moving example has third-order velocity and second-order
+raw pressure. Optional dense output requires consistent full endpoint rates and
+uses Hermite interpolation with differential order three. Problem-owned
+reconstruction must establish constrained sample/pressure accuracy before
+events or commitment. It is not generic interpolation of algebraic variables.
+Retain six backend vectors, or nine with dense output; dense preparation adds
+two rates but no shifted solves. No per-attempt vector allocations or bulk
+host/device transfers. Preserve rejection/shortening/view invalidation and
+prepare the actual reconstructed endpoint on the next attempt. Details and
+limits: `nmfd-timesteppers/docs/rosenbrock_index2.md`.
 
 The current implicit RK engine supports lower-triangular DIRK/SDIRK/ESDIRK tables with
 an injected nonlinear solver. At stage i, `previous_state()` holds the RK reference
