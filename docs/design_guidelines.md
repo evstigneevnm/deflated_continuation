@@ -803,17 +803,23 @@ public:
 Support explicit RK, (S)DIRK, Rosenbrock/W, BDF, and IMEX with method-specific engines. IRK and exponential RK are to be supported layer.
 
 `rosenbrock::time_step<VectorOperations,Problem,TimeStepAdaptation,LinearSolver>`
-supports fixed/adaptive ROS2 for identity-mass ODEs with the
+supports fixed/adaptive ROS2 and ROS3 for identity-mass ODEs with the
 exact base Jacobian. It reuses the existing shifted-stage problem interface and
 `evaluate_rate()`, but injects a linear solver (`set_operator`, `solve(rhs,out)`),
 not a nonlinear solver. Each attempt sets `previous_state()` to the input and
 `known_rhs()` to zero, then prepares `a*I-b*J_f` once at the base time/state.
-Both linear stage right-hand sides use the same balancing as that operator;
+All linear stage right-hand sides use the same balancing as that operator;
 rate evaluations must preserve its prepared data. Rebind on every new attempt,
-including changed steps or externally modified endpoints. Retain four backend
-workspace vectors, allocate none per step, and perform no vector-sized host copies.
-The embedded state error `e1*k1+e2*k2` reuses RHS scratch after the stage solves;
-increments already contain the timestep, and the controller exponent is two.
+including changed steps or externally modified endpoints. Select `params::method`
+as `ROS2` (default, order 2/1) or `ROS3` (order 3/2). Both use two rate evaluations;
+ROS3 performs three shifted solves and reuses the second rate in its third stage.
+Retain four backend workspace vectors for ROS2, five for ROS3, allocate none per
+step, and perform no vector-sized host copies. The embedded state error
+`sum(e_i*k_i)` reuses RHS scratch; increments already contain the timestep.
+The controller exponent is two for ROS2 and three for ROS3. Named tables use
+full-precision coefficients; `table()` returns a method-neutral `method_table`
+with stage/order metadata and indexed accessors. The standalone ROS2
+`coefficients` descriptor and `table().gamma` diagnostic remain available.
 MATLAB, SciPy and digital-filter controllers use their existing assessment API.
 Error-requiring five-argument-only controllers report `error_estimate_unavailable`.
 The integrator, controllers, and candidate/finalize contract are unchanged.
@@ -825,8 +831,9 @@ the current `set_time()` value, not the total derivative along a trajectory.
 It must preserve prepared linearization and stage buffers; false is a numerical
 failure, nonfinite output is rejected, and exceptions propagate. No numerical
 differencing or zero fallback is inferred. Evaluate it once per attempt at the
-base time/state; evaluate the second rate at the actual (possibly clipped)
-endpoint and restore base time even after failures or exceptions. Balance both
+base time/state; evaluate later rates at the selected table's stage times
+(ROS2 endpoint, ROS3 `t+gamma*h`), using the actual clipped/signed timestep,
+and restore base time even after failures or exceptions. Balance all
 `h*gamma_i*f_t` terms consistently. Allocate one additional backend vector only
 for non-autonomous runs; adaptation adds no vectors. Nontrivial mass, DAEs,
 approximate-Jacobian W schemes and dense output remain unsupported;
