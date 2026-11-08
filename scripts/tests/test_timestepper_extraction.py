@@ -115,7 +115,9 @@ class TimestepperExtractionTest(unittest.TestCase):
                  "rosenbrock_w_dense_lifecycle", "rosenbrock_mass",
                  "rosenbrock_mass_adaptive", "rosenbrock_mass_lifecycle",
                  "rosenbrock_mass_nonautonomous", "rosenbrock_mass_time_lifecycle",
-                 "rosenbrock_dae", "rosenbrock_dae_lifecycle")
+                 "rosenbrock_dae", "rosenbrock_dae_lifecycle", "rosenbrock_variable_mass",
+                 "rosenbrock_variable_mass_adaptive", "rosenbrock_variable_mass_lifecycle",
+                 "rosenbrock_variable_mass_benchmarks")
         for directory in (ROOT, MODULE):
             for test in tests:
                 output = self.make(directory, f"test_implicit_{test}_cpu.bin", "BUILD_DIR=build/rosenbrock_probe")
@@ -350,6 +352,7 @@ class TimestepperExtractionTest(unittest.TestCase):
         self.assertIn("python3 source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py", workflow)
         self.assertIn('"$PYTHON" source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py', workflow)
         self.assertIn("--methods ROS2 ROS3 ROS34PW2 --controllers scipy", workflow)
+        self.assertIn("--systems lorenz rossler vdp vdp_stiff time_coefficient stiff_tracking state_mass time_mass", workflow)
 
 
 if __name__ == "__main__":

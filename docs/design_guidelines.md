@@ -803,7 +803,7 @@ public:
 Support explicit RK, (S)DIRK, Rosenbrock/W, BDF, and IMEX with method-specific engines. IRK and exponential RK are to be supported layer.
 
 `rosenbrock::time_step<VectorOperations,Problem,TimeStepAdaptation,LinearSolver>`
-supports fixed/adaptive ROS2 and ROS3 for identity-mass ODEs with the
+supports fixed/adaptive ROS2 and ROS3 for physical-rate ODEs with the
 exact base Jacobian. It reuses the existing shifted-stage problem interface and
 `evaluate_rate()`, but injects a linear solver (`set_operator`, `solve(rhs,out)`),
 not a nonlinear solver. Each attempt sets `previous_state()` to the input and
@@ -837,7 +837,8 @@ and restore base time even after failures or exceptions. Balance all
 `h*gamma_i*f_t` terms consistently. Allocate one additional backend vector only
 for non-autonomous runs; adaptation adds no vectors. Constant
 nonsingular mass is supported by the opt-in residual form described below;
-variable mass remains unsupported; singular mass requires the bounded index-1
+native variable-mass residual execution remains unsupported; nonsingular variable
+mass may use the rate formulation below. Singular mass requires the bounded index-1
 selection below. `DenseOutput=true` enables
 native continuous extensions of orders two/three for ROS2/ROS3. The existing
 borrowed `get_continuous_integration().evaluate(theta,out)` contract applies;
@@ -891,7 +892,7 @@ M*q_t=f_t, add `h^2*gamma*d_i*q_t` to the reference using two timestep-scaled
 vector operations, without forming scalar h^2. This needs only the existing
 q_t vector and RHS scratch. Evaluate residuals at actual table/endpoint times
 and restore base time after failures or exceptions, preserving the frozen
-operator. Dense-only stages add no q_t calls. No variable-mass or general DAE capability
+operator. Dense-only stages add no q_t calls. No native variable-mass or general DAE capability
 is inferred. Details and rounding limits are documented in
 `nmfd-timesteppers/docs/rosenbrock_mass.md`.
 
@@ -908,10 +909,27 @@ Consistent initialization and modified endpoints remain problem-owned. The
 embedded state estimate does not certify constraints; enforce their independent
 unscaled tolerance through the existing controller/external-manager boundary.
 Nonlinear algebraic defects are numerical errors, not an implicit projection.
-Moving constraints, higher-index formulations, variable mass and DAE dense
+Moving constraints, higher-index formulations, variable mass in this native path and DAE dense
 output need separate validation. Tests cover differential/algebraic order,
 backward integration, embedded estimates, constraint rejection, initialization,
 rollback, restart and backend transfer/allocation guards.
+
+Nonsingular time/state-dependent mass uses the existing rate path (`mass_form=false`):
+`evaluate_rate()` solves `M*q=f` and the problem supplies `a*I-b*Bq`.
+Exact rate derivatives satisfy `M*Dq[v]=Df[v]-(DM[v])*q` and
+`M*q_t=f_t-M_t*q`, with the latter holding state fixed. ROS2/ROS3 require Dq;
+only ROS34PW2 permits its admissible approximation. A physical-mass DIRK/BDF
+Jacobian cannot be passed unchanged; assembly may supply a normalized problem
+facade sharing the same model. Signatures, adaptation, dense views and commitment
+rules remain unchanged. Mass/derivative solves, tolerances and bounded backend
+scratch remain problem-owned. Freeze prepared operators and keep Jv linear
+throughout each Krylov solve. There are no additional engine vectors or bulk
+host/device copies; each consumed rate/derivative may incur a mass solve, whose
+cost is not generically O(N). Variable singular mass and moving constraints are
+not supported by this reduction. The validation runner includes the existing
+state/time-mass equations with normalized rate Jacobians; focused tests additionally
+cover nonlinear state mass, coupled time/state mass, omitted derivative terms,
+forward/backward primary/dense orders, adaptation, failures and transfer guards.
 
 The current implicit RK engine supports lower-triangular DIRK/SDIRK/ESDIRK tables with
 an injected nonlinear solver. At stage i, `previous_state()` holds the RK reference
