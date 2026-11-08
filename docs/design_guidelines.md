@@ -835,7 +835,7 @@ base time/state; evaluate later rates at the selected table's stage times
 (ROS2 endpoint, ROS3 `t+gamma*h`), using the actual clipped/signed timestep,
 and restore base time even after failures or exceptions. Balance all
 `h*gamma_i*f_t` terms consistently. Allocate one additional backend vector only
-for non-autonomous rate runs; adaptation adds no vectors. Autonomous constant
+for non-autonomous runs; adaptation adds no vectors. Constant
 nonsingular mass is supported by the opt-in residual form described below;
 variable/singular mass and DAEs remain unsupported. `DenseOutput=true` enables
 native continuous extensions of orders two/three for ROS2/ROS3. The existing
@@ -872,9 +872,9 @@ stiffness-uniform interpolation accuracy.
 Coefficient conversion and separate J/B order conditions are documented in
 `nmfd-timesteppers/docs/rosenbrock_w_methods.md`.
 
-Set `rosenbrock::time_step::params::mass_form=true` for autonomous constant
-nonsingular `M*u'=f(u)`. The default rate path is unchanged. Use the existing
-shifted residual `R(U)=a*M*(U-previous_state)-b*(f(U)+known_rhs)` and frozen
+Set `rosenbrock::time_step::params::mass_form=true` for constant
+nonsingular `M*u'=f(t,u)`. The default rate path is unchanged. Use the existing
+shifted residual `R(U)=a*M*(U-previous_state)-b*(f(t,U)+known_rhs)` and frozen
 `a*M-b*B`, with B=J_f for ROS2/ROS3 or an admissible W approximation. No new
 problem methods, mass-action API or M inverse are required; `evaluate_rate`
 is not required or called in this mode. Each stage sets `known_rhs=0` and
@@ -884,8 +884,13 @@ use the same mass-weighted construction; the existing sampling/view contract
 and all workspace counts are unchanged. Ordinary mass stages cost 2/3/4
 residuals/solves, dense output adds 0/1/2 after error acceptance. No per-attempt
 allocation or vector-sized host/device transfers are introduced. Non-autonomous
-mass selection is rejected, because the existing f_t callback is a physical-rate
-derivative, not a force derivative. No singular/variable-mass or DAE capability
+mass runs use `params.autonomous=false` and the existing partial-rate callback
+q_t, evaluated once per attempt at the base time/state. Since constant M gives
+M*q_t=f_t, add `h^2*gamma*d_i*q_t` to the reference using two timestep-scaled
+vector operations, without forming scalar h^2. This needs only the existing
+q_t vector and RHS scratch. Evaluate residuals at actual table/endpoint times
+and restore base time after failures or exceptions, preserving the frozen
+operator. Dense-only stages add no q_t calls. No singular/variable-mass or DAE capability
 is inferred. Details and rounding limits are documented in
 `nmfd-timesteppers/docs/rosenbrock_mass.md`.
 
