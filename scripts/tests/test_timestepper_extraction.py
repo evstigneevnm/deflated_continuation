@@ -107,7 +107,8 @@ class TimestepperExtractionTest(unittest.TestCase):
                 self.assertIn(f"timestepper-implicit-{test}-{backend}", workflow["jobs"])
 
     def test_rosenbrock_engine_is_standalone_and_required_by_ci(self):
-        tests = ("rosenbrock", "rosenbrock_lifecycle", "rosenbrock_backend")
+        tests = ("rosenbrock", "rosenbrock_lifecycle", "rosenbrock_backend",
+                 "rosenbrock_adaptive", "rosenbrock_nonautonomous")
         for directory in (ROOT, MODULE):
             for test in tests:
                 output = self.make(directory, f"test_implicit_{test}_cpu.bin", "BUILD_DIR=build/rosenbrock_probe")

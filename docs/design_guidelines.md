@@ -803,7 +803,7 @@ public:
 Support explicit RK, (S)DIRK, Rosenbrock/W, BDF, and IMEX with method-specific engines. IRK and exponential RK are to be supported layer.
 
 `rosenbrock::time_step<VectorOperations,Problem,TimeStepAdaptation,LinearSolver>`
-initially supports fixed-step ROS2 for autonomous identity-mass ODEs with the
+supports fixed/adaptive ROS2 for identity-mass ODEs with the
 exact base Jacobian. It reuses the existing shifted-stage problem interface and
 `evaluate_rate()`, but injects a linear solver (`set_operator`, `solve(rhs,out)`),
 not a nonlinear solver. Each attempt sets `previous_state()` to the input and
@@ -812,12 +812,25 @@ Both linear stage right-hand sides use the same balancing as that operator;
 rate evaluations must preserve its prepared data. Rebind on every new attempt,
 including changed steps or externally modified endpoints. Retain four backend
 workspace vectors, allocate none per step, and perform no vector-sized host copies.
+The embedded state error `e1*k1+e2*k2` reuses RHS scratch after the stage solves;
+increments already contain the timestep, and the controller exponent is two.
+MATLAB, SciPy and digital-filter controllers use their existing assessment API.
+Error-requiring five-argument-only controllers report `error_estimate_unavailable`.
 The integrator, controllers, and candidate/finalize contract are unchanged.
-`params::reference_time=1` and `params::autonomous=true` are defaults; setting
-the latter false is rejected, not silently treated as autonomous. Nontrivial mass,
-DAEs, approximate-Jacobian W schemes, embedded adaptation and dense output are
-not supported by this initial engine. Error-requiring controllers report
-`error_estimate_unavailable`; `DenseOutput=true` rejects construction.
+`params::reference_time=1` and `params::autonomous=true` are defaults. Setting the
+latter false requires the optional problem method
+`bool evaluate_time_derivative(const vector_type& state, vector_type& out)`.
+It returns the partial time derivative of the physical rate at fixed state and
+the current `set_time()` value, not the total derivative along a trajectory.
+It must preserve prepared linearization and stage buffers; false is a numerical
+failure, nonfinite output is rejected, and exceptions propagate. No numerical
+differencing or zero fallback is inferred. Evaluate it once per attempt at the
+base time/state; evaluate the second rate at the actual (possibly clipped)
+endpoint and restore base time even after failures or exceptions. Balance both
+`h*gamma_i*f_t` terms consistently. Allocate one additional backend vector only
+for non-autonomous runs; adaptation adds no vectors. Nontrivial mass, DAEs,
+approximate-Jacobian W schemes and dense output remain unsupported;
+`DenseOutput=true` rejects construction.
 
 The current implicit RK engine supports lower-triangular DIRK/SDIRK/ESDIRK tables with
 an injected nonlinear solver. At stage i, `previous_state()` holds the RK reference
