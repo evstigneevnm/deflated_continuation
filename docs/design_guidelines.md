@@ -835,9 +835,18 @@ base time/state; evaluate later rates at the selected table's stage times
 (ROS2 endpoint, ROS3 `t+gamma*h`), using the actual clipped/signed timestep,
 and restore base time even after failures or exceptions. Balance all
 `h*gamma_i*f_t` terms consistently. Allocate one additional backend vector only
-for non-autonomous runs; adaptation adds no vectors. Nontrivial mass, DAEs,
-approximate-Jacobian W schemes and dense output remain unsupported;
-`DenseOutput=true` rejects construction.
+for non-autonomous runs; adaptation adds no vectors. Nontrivial mass, DAEs and
+approximate-Jacobian W schemes remain unsupported. `DenseOutput=true` enables
+native continuous extensions of orders two/three for ROS2/ROS3. The existing
+borrowed `get_continuous_integration().evaluate(theta,out)` contract applies;
+finalize/reset invalidate views, including rejected or shortened endpoints.
+Sampling uses backend algebra only and preserves both endpoints exactly.
+ROS2 adds one snapshot vector and no solves/rates; ROS3 adds two vectors and one
+endpoint-rate/shifted-solve pair after error acceptance, reusing the base operator.
+Disabled dense output retains the original storage and work. Classical continuous
+order and bounded stiff-decay samples do not establish stiffness-uniform accuracy
+or positivity inside unresolved initial layers. The derivation is documented in
+`nmfd-timesteppers/docs/rosenbrock_dense_output.md`.
 
 The current implicit RK engine supports lower-triangular DIRK/SDIRK/ESDIRK tables with
 an injected nonlinear solver. At stage i, `previous_state()` holds the RK reference
