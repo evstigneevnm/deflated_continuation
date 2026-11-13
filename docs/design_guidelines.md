@@ -992,21 +992,38 @@ enum class single_step_status
   idle = 0,
   converged,
   failed_minimum_dt,
-  failed_nan,
-  failed_inf,
+  failed_nonfinite,
   failed_solver,
+  error_estimate_unavailable,
+  attempt_limit_reached,
+  step_size_underflow,
+  failed_projection
 };
 ```
 
 Construction and `reset()` report `idle`: no numerical step result is available.
 A successful `apply()` reports `converged`; `finalize()` retains that result status.
 
+Explicit RK optionally appends `ProjectionOperator` after `DenseOutput`, with
+shared constructor injection after `params`. The identity default is compiled
+out and needs no instance. Other projectors require `bool apply(rate)` and a
+nonnull instance: each newly evaluated stage/dense rate is projected before
+storage and checked for finite values. False follows bounded numerical rejection
+with `failed_projection`; exceptions propagate without publication. Projector
+scratch is reusable and trial calls must not commit pressure/history. The
+validated case is a fixed linear homogeneous rate projector with consistent
+initial data; embedded defects and dense formulas use the same projected stages.
+No vector-sized transfer or additional stage vector is introduced. This does not
+add DIRK/IMEX pressure splitting, nonlinear state projection, or automatic
+projected shooting derivatives. Prepared providers must supply the corresponding
+projected rate/Jv explicitly; fixed/moving boundaries need their own validation.
+
 FSAL reuse is optional (`reuse_endpoint_rate`, default `false`). Derive capability
 from the Butcher coefficients. Reuse a finite base derivative during retries;
 promote an endpoint only after an unchanged, full `accepted` commit. Exchange
 logical stage-buffer indices, without copying or allocating trajectory vectors.
 Invalidate after modified/shortened endpoints, failed commits, resets, or time
-discontinuities. Call `invalidate_rhs_cache()` after independent state/RHS changes;
+discontinuities. Call `invalidate_rhs_cache()` after independent state/RHS/projector changes;
 it preserves adaptation history and prevents promotion of a pending stale endpoint.
 
 The `continuous_integration` class is a lightweight structure the has the follwing life time. Dense output describes the pending numerical step and remains valid until the next apply(), reset(), or finalize(). External event processing must finish before finalization. It should provide a structure with:
