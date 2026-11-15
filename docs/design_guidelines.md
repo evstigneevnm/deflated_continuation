@@ -956,6 +956,22 @@ an injected nonlinear solver. At stage i, `previous_state()` holds the RK refere
 `u_n+h*sum(a_ij*k_j)` and `known_rhs()` is zero. Nonzero diagonals use `alpha=1/(h*a_ii)`.
 The solver is bound once; stage calls use `solve(stage_state)`. Problem buffers
 must not alias caller states or solver scratch. No mass inverse is required.
+Optional DIRK/ESDIRK `ProjectionOperator` follows the existing `DenseOutput`
+template parameter; its shared instance follows constructor `params`. Require
+`bool apply(vector_type&)` for nondefault projectors. Project provisional implicit
+stage states before recovering rates, even if the endpoint rate is omitted;
+project consumed zero-diagonal/dense-only rates after evaluation. Corrected rates
+feed embedded estimates and dense output; sampling does not invoke projection.
+Default identity is compiled out and adds no scans or backend vectors. Failures
+use bounded rejection and never publish a candidate; exceptions propagate.
+Trial projectors must not commit pressure/history or overwrite prepared operators.
+This post-solve path requires identity mass, consistent initial data and a fixed
+linear homogeneous projector with `P*f(t,v)=P*f(t,P*v)`. Periodic Stokes diffusion
+is validated with manufactured velocity/pressure forcing and Fourier-space Leray
+projection. It is not a general nonlinear pressure-splitting or DAE method;
+incompatible implicit equations need a problem-owned consistent residual/Jacobian.
+No automatic projected shooting derivative is implied. Keep all vector work on
+the backend with bounded workspace; immutable geometry may be uploaded at setup.
 DAE initial data and externally modified endpoints must be consistent; use a
 method suitable for the formulation (initial DAE tests use stiff accuracy).
 Embedded DIRK pairs support the MATLAB/SciPy and digital-filter error controllers. Their

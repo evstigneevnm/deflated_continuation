@@ -1280,9 +1280,26 @@ test_nmfd_dense_%_cuda.bin: $(CONTRIB_NMFD_NEWTON)/test/solvers/test_%_dense.cpp
 	$(NVCC) $(NVCCFLAGS) $(NEWTON_TEST_INCLUDES) $(ICUDA) $(BUILD_DIR)/test_nmfd_dense_$*_cuda_main.o $(NMFD_DENSE_CUDA_INSTANTIATIONS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LCUDA) -lcublas -lcusolver -o $(BUILD_DIR)/$@
 
 TIME_STEPPER_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/include/nmfd/time_steppers/*/*.h)
-TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/explicit_*_problem.h $(NMFD_TIMESTEPPERS_ROOT)/tests/nonautonomous_test_problems.h)
+TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/explicit_*_problem.h $(NMFD_TIMESTEPPERS_ROOT)/tests/nonautonomous_test_problems.h $(NMFD_TIMESTEPPERS_ROOT)/tests/projection_transfer_guard.h)
 TIME_STEPPER_VECTOR_WRAP_HEADER = $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
-TIME_STEPPER_IMPLICIT_TEST_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/implicit_*.h $(NMFD_TIMESTEPPERS_ROOT)/tests/nonautonomous_test_problems.h)
+TIME_STEPPER_IMPLICIT_TEST_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/implicit_*.h $(NMFD_TIMESTEPPERS_ROOT)/tests/nonautonomous_test_problems.h) $(TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS)
+
+STOKES_PROJECTION_DEPS = source/nonlinear_operators/stokes/periodic_stokes.h $(FOURIER_DISCRETIZATION_HEADERS) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_IMPLICIT_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(NEWTON_TEST_HEADERS)
+STOKES_PROJECTION_FLAGS = -I source -I $(NMFD_TIMESTEPPERS_ROOT)/tests $(ITIME_STEPPER) $(INMFD_NEWTON)
+
+test_periodic_stokes_projection_cpu.bin: source/nonlinear_operators/stokes/tests/test_periodic_stokes_projection.cpp $(STOKES_PROJECTION_DEPS)
+	$(G++) $(G++FLAGS) $(STOKES_PROJECTION_FLAGS) $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_periodic_stokes_projection_cpu_omp.bin: source/nonlinear_operators/stokes/tests/test_periodic_stokes_projection.cpp $(STOKES_PROJECTION_DEPS)
+	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP $(STOKES_PROJECTION_FLAGS) $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_periodic_stokes_projection_cuda.bin: source/nonlinear_operators/stokes/tests/test_periodic_stokes_projection.cpp $(STOKES_PROJECTION_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(STOKES_PROJECTION_FLAGS) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_periodic_stokes_projection_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_periodic_stokes_projection_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
+
+test_periodic_stokes_projection_hip.bin: source/nonlinear_operators/stokes/tests/test_periodic_stokes_projection.cpp $(STOKES_PROJECTION_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
+	$(HIPCC) $(HIPFLAGS) -DTEST_VECTOR_BACKEND_HIP $(STOKES_PROJECTION_FLAGS) -c $< -o $(BUILD_DIR)/test_periodic_stokes_projection_hip.o
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_periodic_stokes_projection_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $(BUILD_DIR)/$@
 
 PERIODIC_SECTION_HEADERS = $(wildcard source/periodic_orbit/*.h source/periodic_orbit/events/*.h source/periodic_orbit/sections/*.h source/periodic_orbit/sections/detail/*.h source/periodic_orbit/matching/*.h source/periodic_orbit/flows/*.h source/periodic_orbit/tests/*.h)
 PERIODIC_SECTION_DEPS = $(PERIODIC_SECTION_HEADERS) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS)

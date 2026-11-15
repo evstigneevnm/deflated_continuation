@@ -11,6 +11,7 @@ env:
   SCFD_ROOT: ${{ github.workspace }}/source/contrib/scfd
   NMFD_OPERATIONS_ROOT: ${{ github.workspace }}/source/contrib/nmfd-operations
   NMFD_LINSOLVERS_ROOT: ${{ github.workspace }}/source/contrib/nmfd-linsolvers
+  NMFD_NEWTON_ROOT: ${{ github.workspace }}/source/contrib/nmfd-newton
   NMFD_TIMESTEPPERS_ROOT: ${{ github.workspace }}/source/contrib/nmfd-timesteppers
 
 defaults:
@@ -2422,24 +2423,27 @@ jobs:
           fi
       - name: Verify stage projection, dense output, retries and backend guards
         run: |
-          for test in projection projection_lifecycle projection_backend; do
-            make -j2 "test_explicit_${test}_cpu.bin" "test_explicit_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/projection"
+          for test in explicit_projection explicit_projection_lifecycle explicit_projection_backend implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection; do
+            make -j2 "test_${test}_cpu.bin" "test_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/projection"
             for backend in cpu cpu_omp; do
-              OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/projection/"test_explicit_${test}_${backend}.bin"
+              OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/projection/"test_${test}_${backend}.bin"
             done
-            make -j2 "test_explicit_${test}_cpu.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/projection_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-            ASAN_OPTIONS=detect_leaks=1 OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/projection_sanitizers/"test_explicit_${test}_cpu.bin"
+            make -j2 "test_${test}_cpu.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/projection_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+            ASAN_OPTIONS=detect_leaks=1 OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/projection_sanitizers/"test_${test}_cpu.bin"
           done
       - name: Reject nondefault void-returning projectors
         run: |
-          if '${{ matrix.compiler }}' -std=c++17 -fopenmp -fsyntax-only -DTEST_PROJECTION_VOID_MUST_FAIL \
+          for family in explicit implicit; do
+            if '${{ matrix.compiler }}' -std=c++17 -fopenmp -fsyntax-only -DTEST_PROJECTION_VOID_MUST_FAIL \
               -I "$NMFD_TIMESTEPPERS_ROOT/include" -I "$NMFD_OPERATIONS_ROOT/include" -I "$SCFD_ROOT/include" \
-              "$NMFD_TIMESTEPPERS_ROOT/tests/test_explicit_projection_lifecycle.cpp" \
-              > "$BUILD_DIR/projection/void_projector.log" 2>&1; then
-            echo "A nondefault projector without a Boolean result was accepted"
-            exit 1
-          fi
-          grep -F 'RK stage projection requires bool apply(vector_type&)' "$BUILD_DIR/projection/void_projector.log"
+              -I "$NMFD_NEWTON_ROOT/include" -I "$NMFD_LINSOLVERS_ROOT/include" \
+              "$NMFD_TIMESTEPPERS_ROOT/tests/test_${family}_projection_lifecycle.cpp" \
+              > "$BUILD_DIR/projection/${family}_void_projector.log" 2>&1; then
+              echo "A nondefault projector without a Boolean result was accepted"
+              exit 1
+            fi
+            grep -F 'stage projection requires bool apply(vector_type&)' "$BUILD_DIR/projection/${family}_void_projector.log"
+          done
 
   timestepper-projection-cuda:
     needs: [timestepper-projection-cpu, scfd-vector-operations-cuda]
@@ -2459,9 +2463,9 @@ jobs:
             echo "Skipping stage projection CUDA tests: nvcc unavailable"
             exit 0
           fi
-          for test in projection projection_lifecycle projection_backend; do
-            make "test_explicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/projection_cuda"
-            timeout 300s ./"$BUILD_DIR"/projection_cuda/"test_explicit_${test}_cuda.bin"
+          for test in explicit_projection explicit_projection_lifecycle explicit_projection_backend implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection; do
+            make "test_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/projection_cuda"
+            timeout 300s ./"$BUILD_DIR"/projection_cuda/"test_${test}_cuda.bin"
           done
 
   timestepper-projection-hip:
@@ -2493,9 +2497,9 @@ jobs:
             fi
             HIP_TARGET="${HIP_ARCH_LIST:-native}"
           fi
-          for test in projection projection_lifecycle projection_backend; do
-            make "test_explicit_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/projection_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
-            timeout 300s ./"$BUILD_DIR"/projection_hip/"test_explicit_${test}_hip.bin"
+          for test in explicit_projection explicit_projection_lifecycle explicit_projection_backend implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection; do
+            make "test_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/projection_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
+            timeout 300s ./"$BUILD_DIR"/projection_hip/"test_${test}_hip.bin"
           done
 
   scfd-transform-reduction-cpu:
