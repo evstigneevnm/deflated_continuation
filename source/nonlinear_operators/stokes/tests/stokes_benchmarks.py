@@ -17,7 +17,8 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[3]
 METHODS = {"IE": 1, "IM": 2, "CN": 2, "SDIRK2(1)2": 2, "ESDIRK2(1)3": 2,
            "SDIRK3(1)3": 3, "ARK324L2SA": 3, "IMEX_EULER": 1, "IMEX_HEUN_TR2": 2,
-           "IMEX_ARS233": 3, "IMEX_ARS222": 2, "IMEX_ARK324L2SA": 3}
+           "IMEX_ARS233": 3, "IMEX_ARS222": 2, "IMEX_ARK324L2SA": 3,
+           "BDF1": 1, "BDF2": 2, "BDF": None}
 MODE_KEYS = {(0, 0), (1, 1), (-1, 1), (3, 2), (-3, 2)}
 BUILD_ENVIRONMENT = ("PATH", "G++", "G++FLAGS", "GCC_ROOT_PATH", "CPPSTD", "NVCC", "NVCCFLAGS",
                      "CUDA_ROOT_PATH", "CUDA_ARCH_LIST", "HIPCC", "HIPFLAGS", "HIP_ROOT_PATH", "HIP_PATH",
@@ -25,6 +26,8 @@ BUILD_ENVIRONMENT = ("PATH", "G++", "G++FLAGS", "GCC_ROOT_PATH", "CPPSTD", "NVCC
 
 
 def family(method):
+    if method.startswith("BDF"):
+        return "bdf"
     return "imex" if method.startswith("IMEX_") else "dirk"
 
 
@@ -44,6 +47,12 @@ def arguments(argv=None):
     parser.add_argument("--grid", type=int, default=12)
     parser.add_argument("--plot-grid", type=int, default=64)
     parser.add_argument("--threads", type=int, default=1)
+    parser.add_argument("--relative-tolerance", type=float, default=1e-3)
+    parser.add_argument("--absolute-tolerance", type=float, default=1e-5)
+    parser.add_argument("--initial-step", type=float, default=.02)
+    parser.add_argument("--maximum-step", type=float, default=.1)
+    parser.add_argument("--maximum-order", type=int, choices=range(1, 6), default=5)
+    parser.add_argument("--maximum-steps", type=int, default=20000)
     parser.add_argument("--timeout", type=float, default=300)
     parser.add_argument("--config-file", type=Path, default=ROOT / "build_configs/config_github_ubuntu_cpu.inc")
     parser.add_argument("--make-option", action="append", default=[], metavar="KEY=VALUE")
@@ -53,6 +62,11 @@ def arguments(argv=None):
             not 8 <= args.grid <= 512 or args.grid % 2 or not 16 <= args.plot_grid <= 256 or
             not 4 <= args.base_steps <= 512 or args.base_steps % 2 or not 3 <= args.levels <= 8):
         parser.error("Invalid time interval, grid, refinement or execution budget")
+    if (not all(math.isfinite(x) and x > 0 for x in
+                (args.relative_tolerance, args.absolute_tolerance, args.initial_step, args.maximum_step)) or
+            args.maximum_steps < 1 or args.maximum_steps > 1000000 or
+            args.relative_tolerance * .1**(args.levels-1) < 100*sys.float_info.epsilon):
+        parser.error("Invalid adaptive BDF tolerances or step budget")
     finest = (args.end - args.start) / (args.base_steps * 2**(args.levels - 1))
     if not math.isfinite(finest) or args.start + finest == args.start:
         parser.error("The finest step cannot advance the initial time")
@@ -66,14 +80,20 @@ def arguments(argv=None):
     args.build_dir = args.build_dir.resolve()
     args.config_file = args.config_file.resolve()
     if not configurations(args):
-        parser.error("The Oseen validation requires an IMEX method; DIRK cases cover Stokes")
+        parser.error("The Oseen validation requires an IMEX or BDF method; DIRK cases cover Stokes")
     return args
 
 
 def configurations(args):
-    return [dict(system=system, method=method, backend=args.backend, start=args.start, end=args.end,
+    configs = [dict(system=system, method=method, backend=args.backend, start=args.start, end=args.end,
                  grid=args.grid, base_steps=args.base_steps, levels=args.levels)
-            for system in args.systems for method in args.methods if system == "stokes" or family(method) == "imex"]
+            for system in args.systems for method in args.methods if system == "stokes" or family(method) != "dirk"]
+    for config in configs:
+        if config["method"] == "BDF":
+            config.update(relative_tolerance=args.relative_tolerance, absolute_tolerance=args.absolute_tolerance,
+                          initial_step=args.initial_step, maximum_step=args.maximum_step,
+                          maximum_order=args.maximum_order, maximum_steps=args.maximum_steps)
+    return configs
 
 
 def case_name(config):
@@ -161,9 +181,10 @@ def measured_order(rows, floor):
 
 def validate_report(report, config):
     if (config["method"] not in METHODS or config["system"] not in ("stokes", "oseen") or
-            (config["system"] == "oseen" and family(config["method"]) != "imex")):
+            (config["system"] == "oseen" and family(config["method"]) == "dirk")):
         raise ValueError("Unsupported system/method combination")
     expected = METHODS[config["method"]]
+    adaptive = expected is None
     if (report.get("format") != "stokes.timestepper.validation.v1" or report.get("configuration") != config or
             report.get("passed") is not True or report.get("norm") != "physical_velocity_rms" or
             report.get("expected_order") != expected or report.get("pressure_reconstructed") is not False or
@@ -175,22 +196,44 @@ def validate_report(report, config):
         raise ValueError("Incomplete refinement sweep")
     for level, row in enumerate(rows):
         count = config["base_steps"] * 2**level
-        if (row["steps"] != count or not math.isclose(row["step"], (config["end"]-config["start"])/count, rel_tol=1e-13) or
-                not finite_nonnegative(row["error_rms"]) or row["error_rms"] == 0 or
+        if adaptive:
+            counts = row["order_counts"]
+            if (report.get("validation_mode") != "tolerance_refinement" or row["step"] is not None or
+                    not isinstance(row["steps"], int) or not 1 <= row["steps"] <= config["maximum_steps"] or
+                    len(counts) != 6 or sum(counts) != row["steps"] or counts[0] != 0 or
+                    any(not isinstance(c, int) or c < 0 for c in counts) or
+                    any(counts[config["maximum_order"]+1:]) or counts[1] == 0 or
+                    not math.isclose(row["relative_tolerance"], config["relative_tolerance"]*.1**level) or
+                    not math.isclose(row["absolute_tolerance"], config["absolute_tolerance"]*.1**level) or
+                    not 0 < row["minimum_step"] <= row["maximum_step"] <= config["maximum_step"]*(1+1e-12) or
+                    not isinstance(row["rejected_attempts"], int) or row["rejected_attempts"] < 0):
+                raise ValueError("Invalid adaptive BDF tolerance, history or order diagnostics")
+        elif row["steps"] != count or not math.isclose(row["step"], (config["end"]-config["start"])/count, rel_tol=1e-13):
+            raise ValueError("Invalid fixed-step refinement")
+        if (not finite_nonnegative(row["error_rms"]) or row["error_rms"] == 0 or
                 not finite_nonnegative(row["maximum_divergence_rms"]) or row["maximum_divergence_rms"] > 1e-11 or
                 row["backend_allocations_after_warmup"] != 0):
             raise ValueError("Invalid refinement, physical error, divergence or allocation data")
     for a, b in zip(rows, rows[1:]):
-        if b["error_rms"] > report["fit_error_floor"] and b["error_rms"] >= a["error_rms"]:
+        if not adaptive and b["error_rms"] > report["fit_error_floor"] and b["error_rms"] >= a["error_rms"]:
             raise ValueError("Physical errors do not decrease under refinement")
-    observed = measured_order(rows, report["fit_error_floor"])
-    if observed < expected - .4:
+    # Step ceilings and order switches can produce plateaus/nonmonotone local
+    # changes. Require net accuracy gain, not a fictitious fixed-order slope.
+    if adaptive and rows[-1]["error_rms"] >= .5*rows[0]["error_rms"]:
+        raise ValueError("Adaptive tolerance refinement did not improve physical accuracy")
+    observed = None if adaptive else measured_order(rows, report["fit_error_floor"])
+    if not adaptive and observed < expected - .4:
         raise ValueError(f"Observed order {observed:.3f} is below expected order {expected}")
     history, frames = report["history"], report["snapshots"]
     if len(history) != rows[-1]["steps"] or len(frames) != 3:
         raise ValueError("Incomplete finest trajectory or solution snapshots")
     for index, row in enumerate(history):
-        t = config["start"] + (index+1)*rows[-1]["step"]
+        previous = history[index-1]["time"] if index else config["start"]
+        t = previous+row["step"] if adaptive else config["start"] + (index+1)*rows[-1]["step"]
+        if adaptive and (not previous < row["time"] <= config["end"] or
+                         not 1 <= row["order"] <= config["maximum_order"] or
+                         not isinstance(row["attempts"], int) or row["attempts"] < 1):
+            raise ValueError("Invalid adaptive BDF trajectory")
         if (not math.isclose(row["time"], t, abs_tol=1e-12, rel_tol=1e-13) or
                 not finite_nonnegative(row["error_rms"]) or not finite_nonnegative(row["divergence_rms"]) or
                 row["divergence_rms"] > 1e-11):
@@ -200,11 +243,22 @@ def validate_report(report, config):
         if not math.isfinite(frame["time"]) or not math.isclose(frame["time"], t, abs_tol=1e-12, rel_tol=1e-13):
             raise ValueError("Incorrect snapshot time")
         error = snapshot_error(frame, config)
-        logged = 0 if index == 0 else history[(len(history)//2 if index == 1 else len(history))-1]["error_rms"]
+        logged = (frame["error_rms"] if adaptive else
+                  0 if index == 0 else history[(len(history)//2 if index == 1 else len(history))-1]["error_rms"])
         if not math.isclose(error, logged, abs_tol=1e-13, rel_tol=1e-6):
             raise ValueError("Exported velocity and physical RMS error disagree")
     if not math.isclose(history[-1]["error_rms"], rows[-1]["error_rms"], abs_tol=1e-14, rel_tol=1e-8):
         raise ValueError("Refinement endpoint and trajectory disagree")
+    if not math.isclose(history[-1]["time"], config["end"], abs_tol=1e-12):
+        raise ValueError("Incomplete trajectory endpoint")
+    if adaptive:
+        if ([sum(r["order"] == q for r in history) for q in range(6)] != rows[-1]["order_counts"] or
+                sum(r["attempts"]-1 for r in history) != rows[-1]["rejected_attempts"]):
+            raise ValueError("Adaptive history and refinement counters disagree")
+        return dict(expected_order=None, observed_order=None, finest_step=None,
+                    finest_error_rms=rows[-1]["error_rms"], accepted_steps=rows[-1]["steps"],
+                    maximum_order=max(r["order"] for r in history),
+                    finest_relative_tolerance=rows[-1]["relative_tolerance"])
     return dict(expected_order=expected, observed_order=observed,
                 finest_step=rows[-1]["step"], finest_error_rms=rows[-1]["error_rms"])
 
@@ -257,7 +311,9 @@ def plot_solutions(directory, report, points):
                 ax.set_title(("Manufactured velocity |u|", "Numerical velocity |u|", "Pointwise velocity error")[col])
     fig.colorbar(axes[0, 0].collections[0], ax=axes[:, :2].ravel().tolist(), shrink=.8, label="Speed")
     fig.colorbar(im, ax=axes[:, 2].ravel().tolist(), shrink=.8, label="Absolute velocity error", format="%.1e")
-    fig.suptitle(f"Periodic {config['system'].title()} / {config['method']} / h={report['refinements'][-1]['step']:.5g}")
+    finest = report['refinements'][-1]
+    setting = f"rtol={finest['relative_tolerance']:.1e}" if config['method'] == 'BDF' else f"h={finest['step']:.5g}"
+    fig.suptitle(f"Periodic {config['system'].title()} / {config['method']} / {setting}")
     fig.supxlabel(f"Five exported Fourier modes; maximum omitted-tail RMS = {max(f['omitted_rms'] for f in report['snapshots']):.1e}", fontsize=9)
     save_figure(fig, directory / "solutions")
     plt.close(fig)
@@ -272,6 +328,9 @@ def plot_orders(directory, reports):
     import matplotlib.pyplot as plt
     groups = {}
     for config, report, metrics in reports:
+        if metrics["expected_order"] is None:
+            plot_adaptation(directory, config, report)
+            continue
         groups.setdefault((config["system"], family(config["method"])), []).append((config, report, metrics))
     for (system, engine), cases in groups.items():
         fig, axes = plt.subplots(1, 2, figsize=(14, 5.2), constrained_layout=True,
@@ -308,6 +367,24 @@ def plot_orders(directory, reports):
         plt.close(fig)
 
 
+def plot_adaptation(directory, config, report):
+    import matplotlib.pyplot as plt
+    rows, history = report["refinements"], report["history"]
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.2), constrained_layout=True)
+    axes[0].loglog([r["relative_tolerance"] for r in rows], [r["error_rms"] for r in rows], "o-")
+    axes[0].set(xlabel="Requested relative tolerance", ylabel="Endpoint velocity RMS error")
+    axes[1].semilogy([r["time"] for r in history], [r["step"] for r in history])
+    axes[1].set(xlabel="Time", ylabel="Accepted timestep")
+    axes[2].step([r["time"] for r in history], [r["order"] for r in history], where="post")
+    axes[2].set(xlabel="Time", ylabel="Actual BDF order", yticks=range(1, 6), ylim=(.8, 5.2))
+    for ax in axes:
+        ax.grid(True, which="both", alpha=.2)
+    fig.suptitle(f"Periodic {config['system'].title()} / adaptive BDF1-{config['maximum_order']}")
+    fig.supxlabel("Tolerance refinement is not a fixed-order h sweep; no h^5 reference is implied.", fontsize=9)
+    save_figure(fig, directory / f"adaptation_{config['system']}_bdf")
+    plt.close(fig)
+
+
 def summarize(directory, points=64):
     manifest = json.loads((directory / "manifest.json").read_text())
     if manifest.get("format") != "stokes.benchmark.manifest.v1" or not manifest.get("cases"):
@@ -327,7 +404,10 @@ def summarize(directory, points=64):
             plot_solutions(path, report, points)
             valid.append((config, report, metrics))
             summary.append(dict(case=case_name(config), passed=True, **metrics))
-            print(f"PASS {case_name(config)}: observed order {metrics['observed_order']:.3f}, expected {metrics['expected_order']}")
+            if metrics['expected_order'] is None:
+                print(f"PASS {case_name(config)}: {metrics['accepted_steps']} adaptive steps, maximum order {metrics['maximum_order']}")
+            else:
+                print(f"PASS {case_name(config)}: observed order {metrics['observed_order']:.3f}, expected {metrics['expected_order']}")
         except (OSError, ValueError, KeyError, TypeError) as error:
             summary.append(dict(case=case_name(config), passed=False, error=str(error)))
             print(f"FAIL {case_name(config)}: {error}", file=sys.stderr)
@@ -338,8 +418,15 @@ def summarize(directory, points=64):
         writer = csv.DictWriter(stream, fieldnames=("case", "expected_order", "observed_order", "finest_step", "finest_error_rms"))
         writer.writeheader()
         for row in summary:
-            if row["passed"]:
+            if row["passed"] and row["expected_order"] is not None:
                 writer.writerow({key: row[key] for key in writer.fieldnames})
+    with (directory / "tolerance_validation.csv").open("w", newline="") as stream:
+        fields = ("case", "finest_relative_tolerance", "finest_error_rms", "accepted_steps", "maximum_order")
+        writer = csv.DictWriter(stream, fieldnames=fields)
+        writer.writeheader()
+        for row in summary:
+            if row["passed"] and row["expected_order"] is None:
+                writer.writerow({key: row[key] for key in fields})
     return 0 if summary and all(row["passed"] for row in summary) else 1
 
 

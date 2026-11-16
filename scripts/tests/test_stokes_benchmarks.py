@@ -50,9 +50,9 @@ def fixture(order=2):
 class StokesBenchmarksTest(unittest.TestCase):
     def test_default_cases_and_supported_combinations(self):
         configs = runner.configurations(runner.arguments([]))
-        self.assertEqual(len(configs), 17)
-        self.assertEqual(len({runner.case_name(c) for c in configs}), 17)
-        self.assertTrue(all(c["system"] == "stokes" or c["method"].startswith("IMEX_") for c in configs))
+        self.assertEqual(len(configs), 23)
+        self.assertEqual(len({runner.case_name(c) for c in configs}), 23)
+        self.assertTrue(all(c["system"] == "stokes" or runner.family(c["method"]) != "dirk" for c in configs))
         configs = runner.configurations(runner.arguments(["--methods", "CN", "CN", "--systems", "stokes", "stokes"]))
         self.assertEqual(len(configs), 1)
 
@@ -60,7 +60,9 @@ class StokesBenchmarksTest(unittest.TestCase):
         for options in (["--start", "nan"], ["--end", "0"], ["--grid", "7"], ["--grid", "10", "--levels", "2"],
                         ["--base-steps", "5"], ["--threads", "0"], ["--timeout", "inf"], ["--plot-grid", "4"],
                         ["--make-option", "-n"], ["--make-option", "BUILD_DIR=x"], ["--systems", "oseen", "--methods", "CN"],
-                        ["-B", "--plot-only", "x"], ["--start", "1e20", "--end", "1e20"]):
+                        ["-B", "--plot-only", "x"], ["--start", "1e20", "--end", "1e20"],
+                        ["--relative-tolerance", "0"], ["--maximum-step", "nan"], ["--maximum-order", "6"],
+                        ["--maximum-steps", "0"], ["--relative-tolerance", "1e-14"], ["--levels", "-100000"]):
             with self.subTest(options=options), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 runner.arguments(options)
 
@@ -70,6 +72,38 @@ class StokesBenchmarksTest(unittest.TestCase):
         self.assertAlmostEqual(values[1]/values[2], 8)
         config, report = fixture()
         self.assertAlmostEqual(runner.validate_report(report, config)["observed_order"], 2)
+
+    def test_adaptive_bdf_reports_actual_orders_not_an_h5_slope(self):
+        _, report = fixture()
+        config = runner.configurations(runner.arguments(["--systems", "stokes", "--methods", "BDF",
+                                                         "--base-steps", "4", "--levels", "3"]))[0]
+        report.update(configuration=config, expected_order=None, validation_mode="tolerance_refinement")
+        h = (config["end"]-config["start"])/16
+        for level, row in enumerate(report["refinements"]):
+            row.update(step=None, steps=16, relative_tolerance=config["relative_tolerance"]*.1**level,
+                       absolute_tolerance=config["absolute_tolerance"]*.1**level,
+                       minimum_step=h, maximum_step=h, order_counts=[0, 1, 15, 0, 0, 0], rejected_attempts=0)
+        for j, row in enumerate(report["history"]):
+            row.update(step=h, order=1 if j == 0 else 2, attempts=1)
+        for j, frame in enumerate(report["snapshots"]):
+            frame["error_rms"] = report["refinements"][-1]["error_rms"]*j/2
+        metrics = runner.validate_report(report, config)
+        self.assertIsNone(metrics["observed_order"])
+        self.assertEqual(metrics["maximum_order"], 2)
+        plateau = copy.deepcopy(report)
+        plateau["refinements"][1]["error_rms"] = plateau["refinements"][0]["error_rms"]
+        runner.validate_report(plateau, config)
+        for mutate in (lambda r: r.update(expected_order=5),
+                       lambda r: r["refinements"][-1].update(error_rms=r["refinements"][0]["error_rms"]),
+                       lambda r: r["refinements"][1].update(relative_tolerance=.5),
+                       lambda r: r["refinements"][1].update(order_counts=[0, 0, 16, 0, 0, 0]),
+                       lambda r: r["history"][2].update(order=6),
+                       lambda r: r["history"][2].update(attempts=2),
+                       lambda r: r["snapshots"][1].update(error_rms=.1)):
+            bad = copy.deepcopy(report)
+            mutate(bad)
+            with self.subTest(mutate=mutate), self.assertRaises(ValueError):
+                runner.validate_report(bad, config)
 
     def test_degraded_order_and_floor_are_not_passed(self):
         config, report = fixture(order=1)

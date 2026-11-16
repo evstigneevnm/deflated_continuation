@@ -2,6 +2,7 @@
 #define PERIODIC_STOKES_H
 
 #include <cmath>
+#include <array>
 #include <cstddef>
 #include <memory>
 #include <stdexcept>
@@ -103,7 +104,8 @@ private:
     std::shared_ptr<const modes_type> modes_;
 };
 
-// Provisional equation u'=nu*Delta(u)+forcing. A timestepper-supplied Leray
+// Provisional equation u'=nu*Delta(u)-c.grad(u)+forcing (c=0 by default).
+// A timestepper-supplied Leray
 // projector supplies incompressibility at every stage. Diffusion commutes with
 // that fixed projector. Forcing is a backend functor returning four real Fourier
 // coefficients at (kx,ky,time); it must preserve real-field Hermitian symmetry.
@@ -118,39 +120,57 @@ public:
     {
         std::shared_ptr<const modes_type> modes;
         scalar_type                       a = 0, b = 1, viscosity = 1;
+        std::array<scalar_type, 2>        transport{ 0, 0 };
         struct mapping
         {
             vector_type         in, out;
             const scalar_type  *k2;
             scalar_type         a, b, viscosity;
+            const scalar_type  *kx, *ky;
+            scalar_type         cx, cy;
             __DEVICE_TAG__ void operator()( std::ptrdiff_t mode ) const
             {
                 const scalar_type diagonal = a + b * viscosity * k2[mode];
-                for ( int j = 0; j < 4; ++j )
-                    out( 4 * mode + j ) = diagonal * in( 4 * mode + j );
+                const scalar_type skew     = b * ( cx * kx[mode] + cy * ky[mode] );
+                for ( int component = 0; component < 2; ++component )
+                {
+                    const auto        i    = 4 * mode + 2 * component;
+                    const scalar_type real = in( i ), imag = in( i + 1 );
+                    out( i )     = diagonal * real - skew * imag;
+                    out( i + 1 ) = diagonal * imag + skew * real;
+                }
             }
         };
         void apply( const vector_type &in, vector_type &out ) const
         {
             typename Space::for_each_type each;
-            each( mapping{ in, out, modes->k_squared().data(), a, b, viscosity }, modes->index_space().complex_size() );
+            each(
+                mapping{
+                    in, out, modes->k_squared().data(), a, b, viscosity, modes->kx().data(), modes->ky().data(),
+                    transport[0], transport[1]
+                },
+                modes->index_space().complex_size()
+            );
             each.wait();
         }
     };
     periodic_stokes(
         std::shared_ptr<Space> operations, std::shared_ptr<const modes_type> modes, scalar_type viscosity,
-        Forcing forcing = {}
+        Forcing forcing = {}, std::array<scalar_type, 2> transport = { 0, 0 }
     )
         : operations_( operations ? std::move( operations ) : throw std::invalid_argument( "Missing Stokes space" ) ),
           modes_( std::move( modes ) ), previous_( *operations_ ), rhs_( *operations_ ),
           jacobian_( std::make_shared<jacobi_operator_type>() ), viscosity_( viscosity ),
-          forcing_( std::move( forcing ) )
+          forcing_( std::move( forcing ) ), transport_( transport )
     {
         periodic_projector<Space> validate( operations_, modes_ );
         if ( !std::isfinite( viscosity ) || viscosity <= 0 )
             throw std::invalid_argument( "Stokes requires positive finite viscosity" );
+        if ( !std::isfinite( transport[0] ) || !std::isfinite( transport[1] ) )
+            throw std::invalid_argument( "Nonfinite periodic transport velocity" );
         jacobian_->modes     = modes_;
         jacobian_->viscosity = viscosity;
+        jacobian_->transport = transport;
         previous_.start_use();
         rhs_.start_use();
     }
@@ -208,15 +228,20 @@ public:
         scalar_type         time, a, b, viscosity;
         Forcing             forcing;
         bool                rate;
+        scalar_type         cx, cy;
         __DEVICE_TAG__ void operator()( std::ptrdiff_t mode ) const
         {
             scalar_type force[4];
             forcing( kx[mode], ky[mode], time, force );
-            for ( int j = 0; j < 4; ++j )
+            const scalar_type frequency = cx * kx[mode] + cy * ky[mode];
+            for ( int component = 0; component < 2; ++component )
             {
-                const auto        i = 4 * mode + j;
-                const scalar_type f = -viscosity * k2[mode] * state( i ) + force[j];
-                out( i )            = rate ? f : a * ( state( i ) - previous( i ) ) - b * ( f + rhs( i ) );
+                const auto        i    = 4 * mode + 2 * component;
+                const scalar_type real = state( i ), imag = state( i + 1 );
+                const scalar_type fr = -viscosity * k2[mode] * real + frequency * imag + force[2 * component];
+                const scalar_type fi = -viscosity * k2[mode] * imag - frequency * real + force[2 * component + 1];
+                out( i )             = rate ? fr : a * ( real - previous( i ) ) - b * ( fr + rhs( i ) );
+                out( i + 1 )         = rate ? fi : a * ( imag - previous( i + 1 ) ) - b * ( fi + rhs( i + 1 ) );
             }
         }
     };
@@ -228,7 +253,7 @@ private:
         each(
             mapping{
                 state, *previous_, *rhs_, out, modes_->kx().data(), modes_->ky().data(), modes_->k_squared().data(),
-                time_, a_, b_, viscosity_, forcing_, rate
+                time_, a_, b_, viscosity_, forcing_, rate, transport_[0], transport_[1]
             },
             modes_->index_space().complex_size()
         );
@@ -240,6 +265,7 @@ private:
     std::shared_ptr<jacobi_operator_type> jacobian_;
     scalar_type                           time_ = 0, a_ = 0, b_ = 1, viscosity_;
     Forcing                               forcing_;
+    std::array<scalar_type, 2>            transport_;
 };
 }
 #endif

@@ -73,9 +73,21 @@ OMP_NUM_THREADS=2 build/stokes_imex_projection/test_periodic_stokes_imex_project
 
 The `_cpu_omp.bin`, `_cuda.bin` and `_hip.bin` variants use identical equations.
 
+## BDF Stokes And Oseen
+
+`periodic_stokes` optionally accepts constant transport after the forcing functor;
+zero remains the default. Its full residual/Jacobian fuse diffusion and advection,
+without extra fields, kernels or transfers. BDF uses this unsplit problem, not
+the IMEX bundle. The fixed Leray projector commutes with both spatial terms.
+`test_periodic_stokes_bdf_projection` covers fixed BDF1/2 temporal orders,
+adaptive BDF1-5 tolerance refinement, backward/dense samples, the unsplit Jacobian
+and a 33280-component allocation/transfer guard. The generic BDF tests separately
+exercise startup failure, rollback and order growth. No pressure accuracy or
+general Navier-Stokes splitting is claimed.
+
 ## Reference Figures
 
-The project-owned runner builds incrementally, runs fixed-step temporal refinement,
+The project-owned runner builds incrementally, runs temporal/tolerance refinement,
 validates the exported data, and creates PNG/PDF figures:
 
 ```bash
@@ -83,7 +95,8 @@ bash source/nonlinear_operators/stokes/tests/run_all.sh
 ```
 
 Defaults cover all seven DIRK methods for Stokes and all five IMEX pairs for
-Stokes/Oseen: 17 cases, five refinements, 16 initial steps over `[0.3,1.3]`.
+Stokes/Oseen, plus BDF1, BDF2 and automatic BDF for both: 23 cases, five
+refinements, 16 initial fixed steps over `[0.3,1.3]`.
 The spatial grid is fixed at 12x12 and resolves the manufactured modes exactly;
 these are temporal, not spatial, order tests. Each case shows initial/midpoint/final
 manufactured and numerical velocity fields, with vector directions and error maps.
@@ -92,6 +105,17 @@ lines and pairwise observed orders. Reference-line vertical offsets are arbitrar
 not error bounds. Fits use the finest three errors above the declared numerical
 floor; insufficient resolved data or degraded order is a failed validation.
 Pressure is not reconstructed and no numerical pressure accuracy is claimed.
+
+Automatic `BDF` instead sweeps local tolerances by factors of ten, using the
+existing SciPy controller. `--relative-tolerance`, `--absolute-tolerance`,
+`--initial-step`, `--maximum-step`, `--maximum-order` and `--maximum-steps`
+configure this path. Its `adaptation_*.png/pdf` plots physical errors versus
+tolerance and the finest trajectory's actual steps/orders. Midpoint fields use
+the borrowed dense view without shortening steps or changing history. A step
+ceiling may produce plateaus; validation requires net error improvement, not
+an invented fifth-order slope or a global-error-equals-local-tolerance claim.
+`tolerance_validation.csv` remains separate from fixed-order fits. Controller
+norms weight spectral storage slots; physical validation uses Parseval RMS.
 
 ```bash
 # Select methods or another backend.
@@ -111,7 +135,7 @@ runs. Each run contains `order_*.png/pdf`, `order_validation.csv`, `validation.j
 and per-case `solutions.png/pdf`, numerical reports, configurations and logs.
 Change `--build-dir`, `--start/--end`, `--base-steps`, `--levels`, `--grid` and
 `--plot-grid` as needed. `--methods` selects only supported system/method combinations;
-Oseen is the validated IMEX formulation, not an inferred DIRK transport implementation.
+Oseen is validated with IMEX and unsplit BDF, not an inferred DIRK transport implementation.
 
 `PYTHON` selects the interpreter; NumPy/Matplotlib are required only for plotting,
 not `-B`. CUDA/HIP use the same source and accept existing compiler options via

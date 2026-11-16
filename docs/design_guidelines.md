@@ -1013,6 +1013,18 @@ may be nonlinear. Project-owned Fourier Stokes/Oseen validation keeps vector-siz
 work resident and checks allocation/transfer guards. Do not infer general mass,
 wall-boundary splitting, moving constraints or projected shooting derivatives.
 
+Optional BDF `ProjectionOperator` follows `DenseOutput`, with shared constructor
+injection after `params`. Project every successful provisional solve, including
+both startup half-steps, before error estimation. Corrected states feed committed
+history and dense interpolation. Normal projection does not mark a commit modified;
+external modification/shortening still restarts at BDF1. Identity is compiled out
+with no extra vector/scan. Nondefault projectors require `bool apply(state)`;
+false/nonfinite/exception handling follows DIRK. The validated scope is identity
+mass, consistent initial/history states and fixed linear homogeneous P satisfying
+`P*f(t,v)=P*f(t,P*v)`. Reset after independent projector changes. Each successful
+state solve adds one backend projection/check, no BDF vector or host transfer.
+General pressure splitting and projected shooting derivatives are not implied.
+
 The status of a single step is given as the following structure:
 
 ```cpp
