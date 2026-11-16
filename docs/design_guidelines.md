@@ -958,8 +958,8 @@ The solver is bound once; stage calls use `solve(stage_state)`. Problem buffers
 must not alias caller states or solver scratch. No mass inverse is required.
 Optional DIRK/ESDIRK `ProjectionOperator` follows the existing `DenseOutput`
 template parameter; its shared instance follows constructor `params`. Require
-`bool apply(vector_type&)` for nondefault projectors. Project provisional implicit
-stage states before recovering rates, even if the endpoint rate is omitted;
+`apply(vector_type&)` returning `void` or `bool` for nondefault projectors. Project
+provisional implicit stage states before recovering rates, even if the endpoint rate is omitted;
 project consumed zero-diagonal/dense-only rates after evaluation. Corrected rates
 feed embedded estimates and dense output; sampling does not invoke projection.
 Default identity is compiled out and adds no scans or backend vectors. Failures
@@ -1005,7 +1005,7 @@ Project implicit stage states before rate reconstruction and explicit evaluation
 project directly evaluated explicit, zero-diagonal implicit and dense-endpoint
 rates. Corrected partition rates feed combined estimates/dense output; sampling
 does no projection. Identity projection is compiled out with no extra scans or
-backend vectors. Nondefault `bool apply(vector_type&)` failures follow bounded
+backend vectors. Nondefault Boolean `apply(vector_type&)` failures follow bounded
 rejection without publication; exceptions propagate. Preserve trial pressure/
 history and prepared operators. The validated scope is identity mass, consistent
 initial data and fixed linear P with `P*fI(t,v)=P*fI(t,P*v)`; explicit partitions
@@ -1018,8 +1018,8 @@ injection after `params`. Project every successful provisional solve, including
 both startup half-steps, before error estimation. Corrected states feed committed
 history and dense interpolation. Normal projection does not mark a commit modified;
 external modification/shortening still restarts at BDF1. Identity is compiled out
-with no extra vector/scan. Nondefault projectors require `bool apply(state)`;
-false/nonfinite/exception handling follows DIRK. The validated scope is identity
+with no extra vector/scan. Nondefault projectors require `apply(state)` returning
+`void` or `bool`; false/nonfinite/exception handling follows DIRK. The validated scope is identity
 mass, consistent initial/history states and fixed linear homogeneous P satisfying
 `P*f(t,v)=P*f(t,P*v)`. Reset after independent projector changes. Each successful
 state solve adds one backend projection/check, no BDF vector or host transfer.
@@ -1029,8 +1029,9 @@ Optional Rosenbrock `ProjectionOperator` follows `DenseOutput`, with shared
 constructor injection after `params`. Project each successful ordinary/dense-only
 linear increment before it enters later stages, endpoint, embedded defect or
 dense polynomial. Sampling performs no callback. Identity is compiled out with
-no extra scan/vector; custom projectors require a nonnull instance and Boolean
-`apply(increment)`. Rejection/exception/publication rules match RK/BDF.
+no extra scan/vector; custom projectors require a nonnull instance and
+`apply(increment)` returning `void` or `bool`. Rejection/exception/publication
+rules match RK/BDF.
 The validated scope is ROS2/ROS3/ROS34PW2 identity-mass/rate form, consistent
 initial states and fixed linear homogeneous P with `P*f(t,v)=P*f(t,P*v)` and
 `P*B*(I-P)=0` for the frozen exact/approximate Jacobian B. Commutation suffices;
@@ -1061,13 +1062,19 @@ A successful `apply()` reports `converged`; `finalize()` retains that result sta
 
 Explicit RK optionally appends `ProjectionOperator` after `DenseOutput`, with
 shared constructor injection after `params`. The identity default is compiled
-out and needs no instance. Other projectors require `bool apply(rate)` and a
-nonnull instance: each newly evaluated stage/dense rate is projected before
+out and needs no instance. Other projectors require `apply(rate)` returning
+`void` or `bool` and a nonnull instance: each newly evaluated stage/dense rate is projected before
 storage and checked for finite values. False follows bounded numerical rejection
 with `failed_projection`; exceptions propagate without publication. Projector
 scratch is reusable and trial calls must not commit pressure/history. The
 validated case is a fixed linear homogeneous rate projector with consistent
 initial data; embedded defects and dense formulas use the same projected stages.
+All engines use `detail/apply_operator.h` for exactly-once, compile-time return-type
+dispatch. Constructor traits reject a missing in-place apply or a result other
+than exact void/bool before workspace allocation. Boolean false is checked at
+runtime and requests bounded rejection. Void reports no retryable failure flag;
+finite checks remain for both forms, exceptions propagate, and neither return
+type certifies constraint accuracy. The identity default remains bypassed.
 No vector-sized transfer or additional stage vector is introduced. This does not
 add general pressure splitting, nonlinear state projection, or automatic
 projected shooting derivatives. Prepared providers must supply the corresponding

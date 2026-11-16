@@ -29,7 +29,7 @@ public:
         if ( !operations_ || !modes_ || operations_->size() != 4 * modes_->index_space().complex_size() )
             throw std::invalid_argument( "Periodic Stokes velocity/mode size mismatch" );
     }
-    bool apply( vector_type &velocity ) const
+    void apply( vector_type &velocity ) const
     {
         execute(
             mapping{
@@ -37,7 +37,6 @@ public:
                 modes_->index_space().my()
             }
         );
-        return true;
     }
     // Store complex divergence in component zero; clear component one.
     void divergence( const vector_type &velocity, vector_type &out ) const

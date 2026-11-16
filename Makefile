@@ -1413,7 +1413,7 @@ test_explicit_%_cuda.bin: $(NMFD_TIMESTEPPERS_ROOT)/tests/test_explicit_%.cpp $(
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(ITIME_STEPPER) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_explicit_$*_cuda.o 2>$(RESULTS)
 	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_explicit_$*_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@ 2>$(RESULTS)
 
-$(foreach test,projection projection_lifecycle projection_backend,test_explicit_$(test)_hip.bin): test_explicit_%_hip.bin: $(NMFD_TIMESTEPPERS_ROOT)/tests/test_explicit_%.cpp $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
+$(foreach test,apply_operator projection projection_lifecycle projection_backend,test_explicit_$(test)_hip.bin): test_explicit_%_hip.bin: $(NMFD_TIMESTEPPERS_ROOT)/tests/test_explicit_%.cpp $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
 	$(HIPCC) $(HIPFLAGS) -DTEST_VECTOR_BACKEND_HIP $(ITIME_STEPPER) -c $< -o $(BUILD_DIR)/test_explicit_$*_hip.o
 	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_explicit_$*_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $(BUILD_DIR)/$@
 

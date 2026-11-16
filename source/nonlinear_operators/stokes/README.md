@@ -9,6 +9,12 @@ its mean to zero; velocity means are retained. The problem injects a backend
 forcing functor and NMFD Newton
 and linear solvers are selected by assembly, not by the spatial operator.
 
+`periodic_projector::apply` returns void: its direct Fourier mapping has no
+iterative convergence flag. Timesteppers accept both void and Boolean in-place
+operators through compile-time `apply_operator` dispatch, retaining finite-value
+checks and exception/rollback behavior. This does not claim exact arithmetic or
+add a field transfer/allocation.
+
 For identity mass, diffusion commutes with the projector. Projecting provisional
 DIRK stage states therefore gives the RK discretization of the incompressible
 Stokes equation. This does not validate a nonlinear Navier-Stokes splitting,
