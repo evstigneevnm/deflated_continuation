@@ -85,6 +85,22 @@ and a 33280-component allocation/transfer guard. The generic BDF tests separatel
 exercise startup failure, rollback and order growth. No pressure accuracy or
 general Navier-Stokes splitting is claimed.
 
+## Rosenbrock/W Stokes And Oseen
+
+`periodic_stokes` optionally exposes `evaluate_time_derivative` when its forcing
+functor supplies analytic `time_derivative(kx,ky,time,out)`. This is the partial
+physical-rate derivative at fixed velocity, not a derivative along the exact
+trajectory. Existing forcing functors need no new method. No finite-difference
+provider or silent zero derivative is substituted.
+
+`test_periodic_stokes_rosenbrock_projection` validates ROS2, ROS3 and ROS34PW2
+with projected stage/dense increments, independent pressure elimination, embedded
+defects, temporal/tolerance refinement, backward/dense samples and a large
+allocation/transfer guard. The test-owned W adapter uses B=J or B=J/2 while
+preserving the physical equation and frozen preparation. Both matrices commute
+with the fixed Leray projector. This does not validate arbitrary W matrices or
+general pressure splitting; existing mass/DAE paths remain separate.
+
 ## Reference Figures
 
 The project-owned runner builds incrementally, runs temporal/tolerance refinement,
@@ -95,8 +111,11 @@ bash source/nonlinear_operators/stokes/tests/run_all.sh
 ```
 
 Defaults cover all seven DIRK methods for Stokes and all five IMEX pairs for
-Stokes/Oseen, plus BDF1, BDF2 and automatic BDF for both: 23 cases, five
+Stokes/Oseen, BDF1/BDF2/automatic BDF, and ROS2/ROS3/ROS34PW2 for both: 31 cases, five
 refinements, 16 initial fixed steps over `[0.3,1.3]`.
+ROS34PW2 includes separate B=J and B=J/2 cases; use
+`--w-jacobian-factors 1 .5` to select approximations. Its physical reference is
+unchanged. Rosenbrock figures retain their actual second/third-order guides.
 The spatial grid is fixed at 12x12 and resolves the manufactured modes exactly;
 these are temporal, not spatial, order tests. Each case shows initial/midpoint/final
 manufactured and numerical velocity fields, with vector directions and error maps.
@@ -135,7 +154,7 @@ runs. Each run contains `order_*.png/pdf`, `order_validation.csv`, `validation.j
 and per-case `solutions.png/pdf`, numerical reports, configurations and logs.
 Change `--build-dir`, `--start/--end`, `--base-steps`, `--levels`, `--grid` and
 `--plot-grid` as needed. `--methods` selects only supported system/method combinations;
-Oseen is validated with IMEX and unsplit BDF, not an inferred DIRK transport implementation.
+Oseen is validated with IMEX, unsplit BDF and Rosenbrock/W, not an inferred DIRK transport implementation.
 
 `PYTHON` selects the interpreter; NumPy/Matplotlib are required only for plotting,
 not `-B`. CUDA/HIP use the same source and accept existing compiler options via

@@ -1025,6 +1025,20 @@ mass, consistent initial/history states and fixed linear homogeneous P satisfyin
 state solve adds one backend projection/check, no BDF vector or host transfer.
 General pressure splitting and projected shooting derivatives are not implied.
 
+Optional Rosenbrock `ProjectionOperator` follows `DenseOutput`, with shared
+constructor injection after `params`. Project each successful ordinary/dense-only
+linear increment before it enters later stages, endpoint, embedded defect or
+dense polynomial. Sampling performs no callback. Identity is compiled out with
+no extra scan/vector; custom projectors require a nonnull instance and Boolean
+`apply(increment)`. Rejection/exception/publication rules match RK/BDF.
+The validated scope is ROS2/ROS3/ROS34PW2 identity-mass/rate form, consistent
+initial states and fixed linear homogeneous P with `P*f(t,v)=P*f(t,P*v)` and
+`P*B*(I-P)=0` for the frozen exact/approximate Jacobian B. Commutation suffices;
+arbitrary W approximations do not. No runtime global compatibility audit is added.
+Projected mass/DAE modes and other tables are refused; their unprojected paths
+remain unchanged. No general pressure splitting or prepared shooting derivative
+support is implied. Storage is unchanged; projection cost is application-owned.
+
 The status of a single step is given as the following structure:
 
 ```cpp

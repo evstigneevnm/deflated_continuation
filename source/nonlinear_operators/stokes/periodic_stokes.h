@@ -210,6 +210,20 @@ public:
         evaluate( state, rate, true );
         return true;
     }
+    // Partial derivative at fixed state. Only available for forcing functors
+    // supplying an analytic time derivative; old forcing contracts are unchanged.
+    template <class F = Forcing>
+    auto evaluate_time_derivative( const vector_type &, vector_type &out ) const
+        -> decltype( std::declval<const F &>().time_derivative( scalar_type{}, scalar_type{}, scalar_type{}, std::declval<scalar_type *>() ), bool() )
+    {
+        typename Space::for_each_type each;
+        each(
+            time_mapping{ out, modes_->kx().data(), modes_->ky().data(), time_, forcing_ },
+            modes_->index_space().complex_size()
+        );
+        each.wait();
+        return true;
+    }
     void set_linearization_point( const vector_type & )
     {
         jacobian_->a = a_;
@@ -221,6 +235,20 @@ public:
     }
 
     // CUDA requires accessible kernel argument types.
+    struct time_mapping
+    {
+        vector_type         out;
+        const scalar_type  *kx, *ky;
+        scalar_type         time;
+        Forcing             forcing;
+        __DEVICE_TAG__ void operator()( std::ptrdiff_t mode ) const
+        {
+            scalar_type values[4];
+            forcing.time_derivative( kx[mode], ky[mode], time, values );
+            for ( int j = 0; j < 4; ++j )
+                out( 4 * mode + j ) = values[j];
+        }
+    };
     struct mapping
     {
         vector_type         state, previous, rhs, out;

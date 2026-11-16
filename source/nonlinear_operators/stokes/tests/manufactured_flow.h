@@ -55,6 +55,30 @@ struct manufactured_flow
             out[3] += y * p * cos( phase );
         }
     }
+    __DEVICE_TAG__ void time_derivative( double x, double y, double t, double *out ) const
+    {
+        double u[4];
+        velocity( x, y, t, u );
+        const double decay = y == 2 ? .7 : 1, frequency = cx * x + cy * y;
+        const double multiplier = .15 * ( x * x + y * y ) - decay;
+        for ( int c = 0; c < 2; ++c )
+        {
+            out[2 * c]     = multiplier * ( -decay * u[2 * c] + frequency * u[2 * c + 1] );
+            out[2 * c + 1] = multiplier * ( -decay * u[2 * c + 1] - frequency * u[2 * c] );
+        }
+        if ( x == 0 && y == 0 )
+            out[0] = out[2] = 0;
+        if ( pressure && ( x == 1 || x == -1 ) && y == 1 )
+        {
+            const double phase = frequency * t, p = .25 * ( 1 + .2 * sin( t ) ), pt = .05 * cos( t );
+            const double r = pt * sin( phase ) + frequency * p * cos( phase );
+            const double i = pt * cos( phase ) - frequency * p * sin( phase );
+            out[0] += x * r;
+            out[1] += x * i;
+            out[2] += y * r;
+            out[3] += y * i;
+        }
+    }
 };
 template <class Space>
 using modes_type = typename stokes::periodic_projector<Space>::modes_type;

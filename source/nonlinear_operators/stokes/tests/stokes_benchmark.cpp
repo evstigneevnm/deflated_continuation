@@ -1,6 +1,7 @@
 #include "implicit_projection_problem.h"
 #include "projection_transfer_guard.h"
 #include "manufactured_flow.h"
+#include "rosenbrock_validation_problem.h"
 #include <nonlinear_operators/stokes/periodic_stokes_imex.h>
 #include <nmfd/time_steppers/runge_kutta/imex_time_step.h>
 #include <nmfd/time_steppers/bdf/implicit_time_step.h>
@@ -88,39 +89,63 @@ json snapshot(
     };
 }
 
-template <bool Split, bool Bdf = false, bool Adaptive = false>
+enum class engine
+{
+    dirk,
+    imex,
+    bdf,
+    rosenbrock
+};
+
+template <engine Engine, bool Adaptive = false>
 struct benchmark_types
 {
-    using full_problem  = stokes::periodic_stokes<space, manufactured_flow>;
-    using split_problem = stokes::periodic_stokes_imex<space, manufactured_flow>;
-    using problem       = std::conditional_t<Split, split_problem, full_problem>;
-    using implicit      = std::conditional_t<Split, typename split_problem::implicit_type, full_problem>;
-    using solver        = typename implicit_newton<space, implicit>::solver;
-    using control       = std::conditional_t<Adaptive, adaptive_control<space>, fixed_control<space>>;
-    using projector     = stokes::periodic_projector<space>;
-    using rk_step       = std::conditional_t<
-              Split, runge_kutta::imex_time_step<space, problem, control, solver, false, projector>,
-              runge_kutta::implicit_time_step<space, problem, control, solver, false, projector>>;
-    using step =
-        std::conditional_t<Bdf, bdf::implicit_time_step<space, problem, control, solver, Adaptive, projector>, rk_step>;
-    static auto make_problem( std::shared_ptr<space> ops, std::shared_ptr<modes> grid, manufactured_flow flow )
+    static constexpr bool Split      = Engine == engine::imex;
+    static constexpr bool Bdf        = Engine == engine::bdf;
+    static constexpr bool Rosenbrock = Engine == engine::rosenbrock;
+    using full_problem               = stokes::periodic_stokes<space, manufactured_flow>;
+    using split_problem              = stokes::periodic_stokes_imex<space, manufactured_flow>;
+    using problem                    = std::conditional_t<
+                           Rosenbrock, rosenbrock_problem<space>, std::conditional_t<Split, split_problem, full_problem>>;
+    using implicit = std::conditional_t<Split, typename split_problem::implicit_type, full_problem>;
+    using solver   = std::conditional_t<
+          Rosenbrock, projection_linear_solver<space, problem>, typename implicit_newton<space, implicit>::solver>;
+    using control   = std::conditional_t<Adaptive, adaptive_control<space>, fixed_control<space>>;
+    using projector = stokes::periodic_projector<space>;
+    using rk_step   = std::conditional_t<
+          Split, runge_kutta::imex_time_step<space, problem, control, solver, false, projector>,
+          runge_kutta::implicit_time_step<space, problem, control, solver, false, projector>>;
+    using step = std::conditional_t<
+        Rosenbrock, rosenbrock::time_step<space, problem, control, solver, true, projector>,
+        std::conditional_t<
+            Bdf, bdf::implicit_time_step<space, problem, control, solver, Adaptive, projector>, rk_step>>;
+    static auto
+    make_problem( std::shared_ptr<space> ops, std::shared_ptr<modes> grid, manufactured_flow flow, double factor )
     {
-        if constexpr ( Split )
-            return std::make_shared<problem>( ops, grid, .15, flow, std::array<double, 2>{ flow.cx, flow.cy } );
+        if constexpr ( Rosenbrock )
+            return std::make_shared<problem>( ops, grid, flow, factor );
         else
             return std::make_shared<problem>( ops, grid, .15, flow, std::array<double, 2>{ flow.cx, flow.cy } );
     }
+    static auto make_solver( std::shared_ptr<space> ops )
+    {
+        if constexpr ( Rosenbrock )
+            return std::make_shared<solver>( ops );
+        else
+            return implicit_newton<space, implicit>::make( ops );
+    }
 };
 
-template <bool Split, bool Bdf = false, bool Adaptive = false>
+template <engine Engine, bool Adaptive = false>
 json execute( const json &config )
 {
-    using types         = benchmark_types<Split, Bdf, Adaptive>;
-    const auto   method = config.at( "method" ).get<std::string>();
-    const auto   n      = config.at( "grid" ).get<std::size_t>();
-    const auto   levels = config.at( "levels" ).get<unsigned int>();
-    const auto   base   = config.at( "base_steps" ).get<std::size_t>();
-    const double begin = config.at( "start" ).get<double>(), end = config.at( "end" ).get<double>();
+    using types          = benchmark_types<Engine, Adaptive>;
+    constexpr bool Split = types::Split, Bdf = types::Bdf, Rosenbrock = types::Rosenbrock;
+    const auto     method = config.at( "method" ).get<std::string>();
+    const auto     n      = config.at( "grid" ).get<std::size_t>();
+    const auto     levels = config.at( "levels" ).get<unsigned int>();
+    const auto     base   = config.at( "base_steps" ).get<std::size_t>();
+    const double   begin = config.at( "start" ).get<double>(), end = config.at( "end" ).get<double>();
     if ( config.at( "backend" ) != backend_name || n < 8 || n > 512 || n % 2 || base < 4 || base > 512 || base % 2 ||
          levels < 3 || levels > 8 || !std::isfinite( begin ) || !std::isfinite( end ) || end <= begin ||
          begin + ( end - begin ) / ( base << ( levels - 1 ) ) == begin )
@@ -128,9 +153,12 @@ json execute( const json &config )
     const auto system = config.at( "system" ).get<std::string>();
     if ( system != "stokes" && system != "oseen" )
         throw std::invalid_argument( "Unknown Stokes benchmark system" );
-    if ( !Split && !Bdf && system == "oseen" )
+    if ( !Split && !Bdf && !Rosenbrock && system == "oseen" )
         throw std::invalid_argument( "DIRK validation covers the existing Stokes formulation only" );
     manufactured_flow flow;
+    const double      factor = config.value( "jacobian_factor", 1. );
+    if ( !std::isfinite( factor ) || factor < 0 || ( factor != 1 && method != "ROS34PW2" ) )
+        throw std::invalid_argument( "Approximate Jacobians require ROS34PW2" );
     if ( system == "oseen" )
     {
         flow.cx = .7;
@@ -147,7 +175,7 @@ json execute( const json &config )
         const auto   count            = base << level;
         const double dt               = ( end - begin ) / count;
         const double tolerance_factor = std::pow( .1, level );
-        auto         p                = types::make_problem( ops, grid, flow );
+        auto         p                = types::make_problem( ops, grid, flow, factor );
         auto         control          = [&]() {
             if constexpr ( Adaptive )
             {
@@ -162,16 +190,16 @@ json execute( const json &config )
                 return std::make_shared<typename types::control>( typename types::control::params{ dt } );
         }();
         typename types::step::params sp{ method };
+        if constexpr ( Rosenbrock )
+            sp.autonomous = false;
         if constexpr ( Bdf )
         {
             sp.adaptive = Adaptive;
             if constexpr ( Adaptive )
                 sp.maximum_order = config.at( "maximum_order" );
         }
-        typename types::step step(
-            ops, p, control, implicit_newton<space, typename types::implicit>::make( ops ), sp, projector
-        );
-        buffer<space> state( *ops ), out( *ops ), reference( *ops ), scratch( *ops ), divergence( *ops );
+        typename types::step step( ops, p, control, types::make_solver( ops ), sp, projector );
+        buffer<space>        state( *ops ), out( *ops ), reference( *ops ), scratch( *ops ), divergence( *ops );
         exact_state<space>( *grid, *state, begin, flow );
         ops->assign( *state, *reference );
         const bool capture = level + 1 == levels;
@@ -211,7 +239,9 @@ json execute( const json &config )
             unsigned int order = 0;
             if constexpr ( Bdf )
                 order = step.get_order();
-            if constexpr ( Bdf )
+            else if constexpr ( Rosenbrock )
+                order = step.table().order();
+            if constexpr ( Bdf || Rosenbrock )
                 ++orders[order];
             ++steps;
             retries += step.get_attempts() - 1;
@@ -271,6 +301,8 @@ json execute( const json &config )
     unsigned int order = 0;
     if constexpr ( Bdf )
         order = method == "BDF1" ? 1 : 2;
+    else if constexpr ( Rosenbrock )
+        order = rosenbrock::method_table( method ).order();
     else if constexpr ( Split )
         order = runge_kutta::make_imex_butcher_table( method ).order;
     else
@@ -301,10 +333,11 @@ try
     const auto    config = json::parse( input );
     backend_type::init_device();
     const auto    method = config.at( "method" ).get<std::string>();
-    const auto    report = method == "BDF"                   ? execute<false, true, true>( config )
-                           : method.rfind( "BDF", 0 ) == 0   ? execute<false, true>( config )
-                           : method.rfind( "IMEX_", 0 ) == 0 ? execute<true>( config )
-                                                             : execute<false>( config );
+    const auto    report = method == "BDF"                   ? execute<engine::bdf, true>( config )
+                           : method.rfind( "BDF", 0 ) == 0   ? execute<engine::bdf>( config )
+                           : method.rfind( "ROS", 0 ) == 0   ? execute<engine::rosenbrock>( config )
+                           : method.rfind( "IMEX_", 0 ) == 0 ? execute<engine::imex>( config )
+                                                             : execute<engine::dirk>( config );
     std::ofstream output( argv[2] );
     output.exceptions( std::ios::badbit | std::ios::failbit );
     output << report.dump( 2 ) << '\n';

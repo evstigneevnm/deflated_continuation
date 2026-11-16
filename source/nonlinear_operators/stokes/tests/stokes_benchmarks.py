@@ -18,7 +18,7 @@ ROOT = HERE.parents[3]
 METHODS = {"IE": 1, "IM": 2, "CN": 2, "SDIRK2(1)2": 2, "ESDIRK2(1)3": 2,
            "SDIRK3(1)3": 3, "ARK324L2SA": 3, "IMEX_EULER": 1, "IMEX_HEUN_TR2": 2,
            "IMEX_ARS233": 3, "IMEX_ARS222": 2, "IMEX_ARK324L2SA": 3,
-           "BDF1": 1, "BDF2": 2, "BDF": None}
+           "BDF1": 1, "BDF2": 2, "BDF": None, "ROS2": 2, "ROS3": 3, "ROS34PW2": 3}
 MODE_KEYS = {(0, 0), (1, 1), (-1, 1), (3, 2), (-3, 2)}
 BUILD_ENVIRONMENT = ("PATH", "G++", "G++FLAGS", "GCC_ROOT_PATH", "CPPSTD", "NVCC", "NVCCFLAGS",
                      "CUDA_ROOT_PATH", "CUDA_ARCH_LIST", "HIPCC", "HIPFLAGS", "HIP_ROOT_PATH", "HIP_PATH",
@@ -26,6 +26,8 @@ BUILD_ENVIRONMENT = ("PATH", "G++", "G++FLAGS", "GCC_ROOT_PATH", "CPPSTD", "NVCC
 
 
 def family(method):
+    if method.startswith("ROS"):
+        return "rosenbrock"
     if method.startswith("BDF"):
         return "bdf"
     return "imex" if method.startswith("IMEX_") else "dirk"
@@ -47,6 +49,8 @@ def arguments(argv=None):
     parser.add_argument("--grid", type=int, default=12)
     parser.add_argument("--plot-grid", type=int, default=64)
     parser.add_argument("--threads", type=int, default=1)
+    parser.add_argument("--w-jacobian-factors", type=float, nargs="+", default=[1., .5],
+                        help="ROS34PW2 B=factor*J approximations; physical rates are unchanged")
     parser.add_argument("--relative-tolerance", type=float, default=1e-3)
     parser.add_argument("--absolute-tolerance", type=float, default=1e-5)
     parser.add_argument("--initial-step", type=float, default=.02)
@@ -57,6 +61,9 @@ def arguments(argv=None):
     parser.add_argument("--config-file", type=Path, default=ROOT / "build_configs/config_github_ubuntu_cpu.inc")
     parser.add_argument("--make-option", action="append", default=[], metavar="KEY=VALUE")
     args = parser.parse_args(argv)
+    if not all(math.isfinite(x) and x >= 0 for x in args.w_jacobian_factors):
+        parser.error("W Jacobian factors must be finite and nonnegative")
+    args.w_jacobian_factors = list(dict.fromkeys(args.w_jacobian_factors))
     if (not math.isfinite(args.start) or not math.isfinite(args.end) or args.end <= args.start or
             not math.isfinite(args.timeout) or args.timeout <= 0 or args.threads < 1 or
             not 8 <= args.grid <= 512 or args.grid % 2 or not 16 <= args.plot_grid <= 256 or
@@ -80,7 +87,7 @@ def arguments(argv=None):
     args.build_dir = args.build_dir.resolve()
     args.config_file = args.config_file.resolve()
     if not configurations(args):
-        parser.error("The Oseen validation requires an IMEX or BDF method; DIRK cases cover Stokes")
+        parser.error("Oseen requires IMEX, BDF or Rosenbrock; DIRK cases cover Stokes")
     return args
 
 
@@ -93,11 +100,22 @@ def configurations(args):
             config.update(relative_tolerance=args.relative_tolerance, absolute_tolerance=args.absolute_tolerance,
                           initial_step=args.initial_step, maximum_step=args.maximum_step,
                           maximum_order=args.maximum_order, maximum_steps=args.maximum_steps)
-    return configs
+    expanded = []
+    for config in configs:
+        if config["method"] == "ROS34PW2":
+            expanded.extend(dict(config, jacobian_factor=factor) for factor in args.w_jacobian_factors)
+        else:
+            expanded.append(config)
+    return expanded
 
 
 def case_name(config):
-    return f"{config['system']}_{config['method']}"
+    suffix = f"_B{config['jacobian_factor']:g}" if config.get("jacobian_factor", 1) != 1 else ""
+    return f"{config['system']}_{config['method']}{suffix}"
+
+
+def method_label(config):
+    return config['method'] + (f" (B={config['jacobian_factor']:g} J)" if 'jacobian_factor' in config else "")
 
 
 def write_if_changed(path, value):
@@ -184,6 +202,9 @@ def validate_report(report, config):
             (config["system"] == "oseen" and family(config["method"]) == "dirk")):
         raise ValueError("Unsupported system/method combination")
     expected = METHODS[config["method"]]
+    factor = config.get("jacobian_factor", 1)
+    if not math.isfinite(factor) or factor < 0 or (factor != 1 and config["method"] != "ROS34PW2"):
+        raise ValueError("Unsupported approximate Jacobian selection")
     adaptive = expected is None
     if (report.get("format") != "stokes.timestepper.validation.v1" or report.get("configuration") != config or
             report.get("passed") is not True or report.get("norm") != "physical_velocity_rms" or
@@ -313,7 +334,7 @@ def plot_solutions(directory, report, points):
     fig.colorbar(im, ax=axes[:, 2].ravel().tolist(), shrink=.8, label="Absolute velocity error", format="%.1e")
     finest = report['refinements'][-1]
     setting = f"rtol={finest['relative_tolerance']:.1e}" if config['method'] == 'BDF' else f"h={finest['step']:.5g}"
-    fig.suptitle(f"Periodic {config['system'].title()} / {config['method']} / {setting}")
+    fig.suptitle(f"Periodic {config['system'].title()} / {method_label(config)} / {setting}")
     fig.supxlabel(f"Five exported Fourier modes; maximum omitted-tail RMS = {max(f['omitted_rms'] for f in report['snapshots']):.1e}", fontsize=9)
     save_figure(fig, directory / "solutions")
     plt.close(fig)
@@ -341,7 +362,7 @@ def plot_orders(directory, reports):
             h, error = [r["step"] for r in rows], [r["error_rms"] for r in rows]
             marker = ("o", "s", "^", "D", "v", "P", "X")[index % 7]
             line, = axes[0].loglog(h, error, marker=marker, linestyle="-", markersize=4,
-                label=f"{config['method']} (fit {metrics['observed_order']:.2f})")
+                label=f"{method_label(config)} (fit {metrics['observed_order']:.2f})")
             local = np.log(np.array(error[:-1])/error[1:])/np.log(np.array(h[:-1])/h[1:])
             above_floor = (np.array(error[:-1]) > report["fit_error_floor"]) & (np.array(error[1:]) > report["fit_error_floor"])
             axes[1].semilogx(np.sqrt(np.array(h[:-1])*h[1:])[above_floor], local[above_floor], marker=marker,

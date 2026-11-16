@@ -50,8 +50,8 @@ def fixture(order=2):
 class StokesBenchmarksTest(unittest.TestCase):
     def test_default_cases_and_supported_combinations(self):
         configs = runner.configurations(runner.arguments([]))
-        self.assertEqual(len(configs), 23)
-        self.assertEqual(len({runner.case_name(c) for c in configs}), 23)
+        self.assertEqual(len(configs), 31)
+        self.assertEqual(len({runner.case_name(c) for c in configs}), 31)
         self.assertTrue(all(c["system"] == "stokes" or runner.family(c["method"]) != "dirk" for c in configs))
         configs = runner.configurations(runner.arguments(["--methods", "CN", "CN", "--systems", "stokes", "stokes"]))
         self.assertEqual(len(configs), 1)
@@ -62,7 +62,8 @@ class StokesBenchmarksTest(unittest.TestCase):
                         ["--make-option", "-n"], ["--make-option", "BUILD_DIR=x"], ["--systems", "oseen", "--methods", "CN"],
                         ["-B", "--plot-only", "x"], ["--start", "1e20", "--end", "1e20"],
                         ["--relative-tolerance", "0"], ["--maximum-step", "nan"], ["--maximum-order", "6"],
-                        ["--maximum-steps", "0"], ["--relative-tolerance", "1e-14"], ["--levels", "-100000"]):
+                        ["--maximum-steps", "0"], ["--relative-tolerance", "1e-14"], ["--levels", "-100000"],
+                        ["--w-jacobian-factors", "-1"], ["--w-jacobian-factors", "nan"]):
             with self.subTest(options=options), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 runner.arguments(options)
 
@@ -72,6 +73,23 @@ class StokesBenchmarksTest(unittest.TestCase):
         self.assertAlmostEqual(values[1]/values[2], 8)
         config, report = fixture()
         self.assertAlmostEqual(runner.validate_report(report, config)["observed_order"], 2)
+
+    def test_rosenbrock_w_variants_have_distinct_names_and_keep_physical_reference(self):
+        args = runner.arguments(["--methods", "ROS2", "ROS3", "ROS34PW2", "--w-jacobian-factors", "1", ".5", ".5", "0"])
+        configs = runner.configurations(args)
+        self.assertEqual(len(configs), 10)
+        self.assertEqual(len({runner.case_name(c) for c in configs}), 10)
+        self.assertTrue(all(runner.family(c["method"]) == "rosenbrock" for c in configs))
+        self.assertTrue(any(runner.case_name(c) == "oseen_ROS34PW2_B0.5" for c in configs))
+        self.assertEqual(runner.METHODS["ROS2"], 2)
+        self.assertEqual(runner.METHODS["ROS34PW2"], 3)
+        config, report = fixture(order=3)
+        config = dict(config, method="ROS34PW2", jacobian_factor=.5)
+        report.update(configuration=config, expected_order=3)
+        runner.validate_report(report, config)
+        config["method"] = "ROS3"
+        with self.assertRaisesRegex(ValueError, "approximate Jacobian"):
+            runner.validate_report(report, config)
 
     def test_adaptive_bdf_reports_actual_orders_not_an_h5_slope(self):
         _, report = fixture()
