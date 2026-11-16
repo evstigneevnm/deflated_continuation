@@ -63,6 +63,7 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p test_periodic_orbit_sections.py
           python3 -S -m unittest discover -s scripts/tests -p test_orbit_benchmarks.py
           python3 -S -m unittest discover -s scripts/tests -p test_stokes_benchmarks.py
+          python3 -S -m unittest discover -s scripts/tests -p test_timestepper_capabilities.py
           python3 -m unittest discover -s scripts/tests -p test_nmfd_standalone.py
           python3 -m unittest discover -s scripts/tests -p test_timestepper_extraction.py
           python3 source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py
@@ -270,6 +271,9 @@ jobs:
       - timestepper-projection-cpu
       - timestepper-projection-cuda
       - timestepper-projection-hip
+      - timestepper-pde-cpu
+      - timestepper-pde-cuda
+      - timestepper-pde-hip
       - timestepper-filter-adaptation-cuda
       - timestepper-bdf-cuda
       - timestepper-bdf-hip
@@ -1350,6 +1354,137 @@ jobs:
             done
           done
 
+
+  timestepper-capability-contract:
+    needs: [operations-dependency-boundaries]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Compare documented orders with compiled tables and check isolated PDE headers
+        run: |
+          make test_pde_capabilities_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/capabilities"
+          python3 scripts/check_timestepper_capabilities.py --metadata-binary "$BUILD_DIR/capabilities/test_pde_capabilities_cpu.bin" --report "$BUILD_DIR/capabilities/report.json"
+          for header in source/nonlinear_operators/pde_validation/*.h source/discretization/finite_difference/*.h; do
+            printf '#include <%s>\n' "${header#source/}" | g++ -std=c++17 -I source -I "$NMFD_TIMESTEPPERS_ROOT/include" -I "$NMFD_OPERATIONS_ROOT/include" -I "$SCFD_ROOT/include" -x c++ -fsyntax-only -
+          done
+
+  timestepper-pde-cpu:
+    needs: [timestepper-capability-contract, timestepper-implicit-dirk-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare Clang OpenMP runtime
+        if: matrix.compiler == 'clang++'
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            sudo apt-get update
+            sudo apt-get install -y libomp-dev
+          fi
+      - name: Validate PDE contracts, temporal accuracy, constraints and rollback
+        run: |
+          mkdir -p "$BUILD_DIR/pde"
+          '${{ matrix.compiler }}' --version > "$BUILD_DIR/pde/compiler.txt"
+          printf '{"backend":"cpu/openmp","executed":true,"result":"started"}\n' > "$BUILD_DIR/pde/backend.json"
+          for test in diffusion reaction_diffusion cahn_hilliard; do
+            make -j2 "test_pde_${test}_cpu.bin" "test_pde_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/pde"
+            for backend in cpu cpu_omp; do
+              OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/pde/"test_pde_${test}_${backend}.bin" > "$BUILD_DIR/pde/${test}_${backend}.log" 2>&1
+            done
+            make "test_pde_${test}_cpu.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/pde_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+            ASAN_OPTIONS=detect_leaks=1 OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/pde_sanitizers/"test_pde_${test}_cpu.bin" > "$BUILD_DIR/pde/${test}_sanitizers.log" 2>&1
+          done
+          printf '{"backend":"cpu/openmp","executed":true,"result":"passed"}\n' > "$BUILD_DIR/pde/backend.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: timestepper-pde-${{ matrix.compiler }}
+          path: |
+            ${{ env.BUILD_DIR }}/pde/*.log
+            ${{ env.BUILD_DIR }}/pde/*.json
+            ${{ env.BUILD_DIR }}/pde/*.txt
+
+  timestepper-pde-cuda:
+    needs: [timestepper-pde-cpu, scfd-vector-operations-cuda]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Validate PDEs on CUDA when available
+        run: |
+          mkdir -p "$BUILD_DIR/pde_cuda"
+          NVCC_BIN="$(command -v "${NVCC:-nvcc}" || true)"
+          if [ -z "$NVCC_BIN" ] && [ -x /usr/local/cuda/bin/nvcc ]; then NVCC_BIN=/usr/local/cuda/bin/nvcc; fi
+          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L > "$BUILD_DIR/pde_cuda/device.txt" 2>&1 || [ -z "$NVCC_BIN" ]; then
+            printf '{"backend":"cuda","executed":false,"reason":"GPU or toolkit unavailable"}\n' > "$BUILD_DIR/pde_cuda/backend.json"
+            exit 0
+          fi
+          "$NVCC_BIN" --version > "$BUILD_DIR/pde_cuda/compiler.txt"
+          printf '{"backend":"cuda","executed":true,"result":"started"}\n' > "$BUILD_DIR/pde_cuda/backend.json"
+          for test in diffusion reaction_diffusion cahn_hilliard; do
+            make "test_pde_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/pde_cuda" NVCC="$NVCC_BIN"
+            timeout 300s ./"$BUILD_DIR"/pde_cuda/"test_pde_${test}_cuda.bin" > "$BUILD_DIR/pde_cuda/${test}.log" 2>&1
+          done
+          printf '{"backend":"cuda","executed":true,"result":"passed"}\n' > "$BUILD_DIR/pde_cuda/backend.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: timestepper-pde-cuda
+          path: |
+            ${{ env.BUILD_DIR }}/pde_cuda/*.log
+            ${{ env.BUILD_DIR }}/pde_cuda/*.json
+            ${{ env.BUILD_DIR }}/pde_cuda/*.txt
+
+  timestepper-pde-hip:
+    needs: [timestepper-pde-cpu, scfd-vector-operations-hip]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Validate PDEs on HIP when available
+        run: |
+          mkdir -p "$BUILD_DIR/pde_hip"
+          printf '{"backend":"hip","executed":false,"reason":"GPU or toolkit unavailable"}\n' > "$BUILD_DIR/pde_hip/backend.json"
+          HIPCC_BIN="$(command -v "${HIPCC:-hipcc}" || true)"
+          if [ -z "$HIPCC_BIN" ]; then exit 0; fi
+          HIP_ROOT="${ROCM_PATH:-$(dirname "$(dirname "$HIPCC_BIN")")}"
+          "$HIPCC_BIN" --version > "$BUILD_DIR/pde_hip/compiler.txt"
+          if grep -qi nvcc "$BUILD_DIR/pde_hip/compiler.txt"; then
+            if ! nvidia-smi -L > "$BUILD_DIR/pde_hip/device.txt" 2>&1; then exit 0; fi
+            HIP_TARGET="${HIP_ARCH_LIST:-75}"
+            PLATFORM=hip-on-nvidia
+          else
+            if ! "$HIP_ROOT/bin/rocm-smi" > "$BUILD_DIR/pde_hip/device.txt" 2>&1; then exit 0; fi
+            HIP_TARGET="${HIP_ARCH_LIST:-native}"
+            PLATFORM=hip-on-amd
+          fi
+          printf '{"backend":"%s","executed":true,"result":"started"}\n' "$PLATFORM" > "$BUILD_DIR/pde_hip/backend.json"
+          for test in diffusion reaction_diffusion cahn_hilliard; do
+            make "test_pde_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/pde_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
+            timeout 300s ./"$BUILD_DIR"/pde_hip/"test_pde_${test}_hip.bin" > "$BUILD_DIR/pde_hip/${test}.log" 2>&1
+          done
+          printf '{"backend":"%s","executed":true,"result":"passed"}\n' "$PLATFORM" > "$BUILD_DIR/pde_hip/backend.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: timestepper-pde-hip
+          path: |
+            ${{ env.BUILD_DIR }}/pde_hip/*.log
+            ${{ env.BUILD_DIR }}/pde_hip/*.json
+            ${{ env.BUILD_DIR }}/pde_hip/*.txt
 
   timestepper-implicit-dirk-cpu:
     needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]

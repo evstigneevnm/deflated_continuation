@@ -473,6 +473,14 @@ reference comparisons, a gauge-fixed Stokes case, and supported backend/MPI test
 
 ## Time Integration
 
+The authoritative method/formulation capability matrix is in
+[nmfd-timesteppers](../source/contrib/nmfd-timesteppers/docs/capabilities.md).
+Project-owned manufactured diffusion, reaction-diffusion and mixed CH validations
+live under `source/nonlinear_operators/pde_validation`. They consume the existing
+rate/shifted-residual contracts; spatial kernels remain in `source/discretization`.
+Neither the PDE nor timestepper constructs a solver. Backend execution evidence,
+DAE/projection restrictions and prepared shooting derivatives are separate claims.
+
 Refactored timesteppers live in the `source/contrib/nmfd-timesteppers` submodule,
 with public includes under `nmfd/time_steppers/` and APIs in `nmfd::time_steppers`.
 The module uses flat NMFD-operations/SCFD dependencies during development; explicit

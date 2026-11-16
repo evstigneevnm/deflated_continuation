@@ -1301,6 +1301,23 @@ test_periodic_stokes_%_hip.bin: source/nonlinear_operators/stokes/tests/test_per
 	$(HIPCC) $(HIPFLAGS) -DTEST_VECTOR_BACKEND_HIP $(STOKES_PROJECTION_FLAGS) -c $< -o $(BUILD_DIR)/test_periodic_stokes_$*_hip.o
 	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_periodic_stokes_$*_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $(BUILD_DIR)/$@
 
+PDE_VALIDATION_DEPS = $(wildcard source/nonlinear_operators/pde_validation/*.h source/nonlinear_operators/pde_validation/tests/*.h source/discretization/finite_difference/*.h source/discretization/common/*.h) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_IMPLICIT_TEST_HEADERS) $(NEWTON_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+PDE_VALIDATION_FLAGS = -I source -I $(NMFD_TIMESTEPPERS_ROOT)/tests $(ITIME_STEPPER) $(INMFD_NEWTON)
+
+test_pde_%_cpu.bin: source/nonlinear_operators/pde_validation/tests/test_%.cpp $(PDE_VALIDATION_DEPS) | $(BUILD_STAMP)
+	$(G++) $(G++FLAGS) $(PDE_VALIDATION_FLAGS) $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_pde_%_cpu_omp.bin: source/nonlinear_operators/pde_validation/tests/test_%.cpp $(PDE_VALIDATION_DEPS) | $(BUILD_STAMP)
+	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP $(PDE_VALIDATION_FLAGS) $< $(OPENMP) -o $(BUILD_DIR)/$@
+
+test_pde_%_cuda.bin: source/nonlinear_operators/pde_validation/tests/test_%.cpp $(PDE_VALIDATION_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o | $(BUILD_STAMP)
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(PDE_VALIDATION_FLAGS) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_pde_$*_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_pde_$*_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
+
+test_pde_%_hip.bin: source/nonlinear_operators/pde_validation/tests/test_%.cpp $(PDE_VALIDATION_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o | $(BUILD_STAMP)
+	$(HIPCC) $(HIPFLAGS) -DTEST_VECTOR_BACKEND_HIP $(PDE_VALIDATION_FLAGS) -c $< -o $(BUILD_DIR)/test_pde_$*_hip.o
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_pde_$*_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $(BUILD_DIR)/$@
+
 STOKES_BENCHMARK_OPTIONS ?=
 STOKES_BENCHMARK_TARGETS = $(foreach backend,cpu cpu_omp cuda hip,stokes_benchmark_$(backend).bin)
 STOKES_BENCHMARK_DEPS = $(STOKES_PROJECTION_DEPS) Makefile $(CONFIG_FILE) $(STOKES_BENCHMARK_OPTIONS)
