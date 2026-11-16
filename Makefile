@@ -1284,22 +1284,44 @@ TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tes
 TIME_STEPPER_VECTOR_WRAP_HEADER = $(COMMON_NMFD_OPERATIONS)/nmfd/detail/vector_wrap.h
 TIME_STEPPER_IMPLICIT_TEST_HEADERS = $(wildcard $(NMFD_TIMESTEPPERS_ROOT)/tests/implicit_*.h $(NMFD_TIMESTEPPERS_ROOT)/tests/nonautonomous_test_problems.h) $(TIME_STEPPER_EXPLICIT_PROBLEM_HEADERS)
 
-STOKES_PROJECTION_DEPS = source/nonlinear_operators/stokes/periodic_stokes.h $(FOURIER_DISCRETIZATION_HEADERS) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_IMPLICIT_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(NEWTON_TEST_HEADERS)
+STOKES_PROJECTION_DEPS = $(wildcard source/nonlinear_operators/stokes/*.h source/nonlinear_operators/stokes/tests/*.h) $(FOURIER_DISCRETIZATION_HEADERS) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_IMPLICIT_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS) $(NEWTON_TEST_HEADERS)
 STOKES_PROJECTION_FLAGS = -I source -I $(NMFD_TIMESTEPPERS_ROOT)/tests $(ITIME_STEPPER) $(INMFD_NEWTON)
 
-test_periodic_stokes_projection_cpu.bin: source/nonlinear_operators/stokes/tests/test_periodic_stokes_projection.cpp $(STOKES_PROJECTION_DEPS)
+test_periodic_stokes_%_cpu.bin: source/nonlinear_operators/stokes/tests/test_periodic_stokes_%.cpp $(STOKES_PROJECTION_DEPS)
 	$(G++) $(G++FLAGS) $(STOKES_PROJECTION_FLAGS) $< $(OPENMP) -o $(BUILD_DIR)/$@
 
-test_periodic_stokes_projection_cpu_omp.bin: source/nonlinear_operators/stokes/tests/test_periodic_stokes_projection.cpp $(STOKES_PROJECTION_DEPS)
+test_periodic_stokes_%_cpu_omp.bin: source/nonlinear_operators/stokes/tests/test_periodic_stokes_%.cpp $(STOKES_PROJECTION_DEPS)
 	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP $(STOKES_PROJECTION_FLAGS) $< $(OPENMP) -o $(BUILD_DIR)/$@
 
-test_periodic_stokes_projection_cuda.bin: source/nonlinear_operators/stokes/tests/test_periodic_stokes_projection.cpp $(STOKES_PROJECTION_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
-	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(STOKES_PROJECTION_FLAGS) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_periodic_stokes_projection_cuda.o
-	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_periodic_stokes_projection_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
+test_periodic_stokes_%_cuda.bin: source/nonlinear_operators/stokes/tests/test_periodic_stokes_%.cpp $(STOKES_PROJECTION_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(STOKES_PROJECTION_FLAGS) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_periodic_stokes_$*_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_periodic_stokes_$*_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
 
-test_periodic_stokes_projection_hip.bin: source/nonlinear_operators/stokes/tests/test_periodic_stokes_projection.cpp $(STOKES_PROJECTION_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
-	$(HIPCC) $(HIPFLAGS) -DTEST_VECTOR_BACKEND_HIP $(STOKES_PROJECTION_FLAGS) -c $< -o $(BUILD_DIR)/test_periodic_stokes_projection_hip.o
-	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_periodic_stokes_projection_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $(BUILD_DIR)/$@
+test_periodic_stokes_%_hip.bin: source/nonlinear_operators/stokes/tests/test_periodic_stokes_%.cpp $(STOKES_PROJECTION_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
+	$(HIPCC) $(HIPFLAGS) -DTEST_VECTOR_BACKEND_HIP $(STOKES_PROJECTION_FLAGS) -c $< -o $(BUILD_DIR)/test_periodic_stokes_$*_hip.o
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_periodic_stokes_$*_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $(BUILD_DIR)/$@
+
+STOKES_BENCHMARK_OPTIONS ?=
+STOKES_BENCHMARK_TARGETS = $(foreach backend,cpu cpu_omp cuda hip,stokes_benchmark_$(backend).bin)
+STOKES_BENCHMARK_DEPS = $(STOKES_PROJECTION_DEPS) Makefile $(CONFIG_FILE) $(STOKES_BENCHMARK_OPTIONS)
+.PHONY: $(STOKES_BENCHMARK_TARGETS)
+$(STOKES_BENCHMARK_TARGETS): %: $(BUILD_DIR)/%
+
+$(BUILD_DIR)/stokes_benchmark_cpu.bin: source/nonlinear_operators/stokes/tests/stokes_benchmark.cpp $(STOKES_BENCHMARK_DEPS) | $(BUILD_STAMP)
+	$(G++) $(G++FLAGS) $(STOKES_PROJECTION_FLAGS) -MMD -MP -MF $@.d -MT $@ $< $(OPENMP) -o $@
+
+$(BUILD_DIR)/stokes_benchmark_cpu_omp.bin: source/nonlinear_operators/stokes/tests/stokes_benchmark.cpp $(STOKES_BENCHMARK_DEPS) | $(BUILD_STAMP)
+	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP $(STOKES_PROJECTION_FLAGS) -MMD -MP -MF $@.d -MT $@ $< $(OPENMP) -o $@
+
+$(BUILD_DIR)/stokes_benchmark_cuda.bin: source/nonlinear_operators/stokes/tests/stokes_benchmark.cpp $(STOKES_BENCHMARK_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o | $(BUILD_STAMP)
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(STOKES_PROJECTION_FLAGS) $(ICUDA) -MMD -MP -MF $@.d -MT $@ -x cu $< -c -o $@.o
+	$(NVCC) $(NVCCFLAGS) $@.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $@
+
+$(BUILD_DIR)/stokes_benchmark_hip.bin: source/nonlinear_operators/stokes/tests/stokes_benchmark.cpp $(STOKES_BENCHMARK_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o | $(BUILD_STAMP)
+	$(HIPCC) $(HIPFLAGS) -DTEST_VECTOR_BACKEND_HIP $(STOKES_PROJECTION_FLAGS) -MMD -MP -MF $@.d -MT $@ -c $< -o $@.o
+	$(HIPCC) $(HIPFLAGS) $@.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $@
+
+-include $(wildcard $(BUILD_DIR)/stokes_benchmark_*.bin.d)
 
 PERIODIC_SECTION_HEADERS = $(wildcard source/periodic_orbit/*.h source/periodic_orbit/events/*.h source/periodic_orbit/sections/*.h source/periodic_orbit/sections/detail/*.h source/periodic_orbit/matching/*.h source/periodic_orbit/flows/*.h source/periodic_orbit/tests/*.h)
 PERIODIC_SECTION_DEPS = $(PERIODIC_SECTION_HEADERS) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS)

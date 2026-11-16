@@ -62,6 +62,7 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p test_periodic_orbit_archive.py
           python3 -m unittest discover -s scripts/tests -p test_periodic_orbit_sections.py
           python3 -S -m unittest discover -s scripts/tests -p test_orbit_benchmarks.py
+          python3 -S -m unittest discover -s scripts/tests -p test_stokes_benchmarks.py
           python3 -m unittest discover -s scripts/tests -p test_nmfd_standalone.py
           python3 -m unittest discover -s scripts/tests -p test_timestepper_extraction.py
           python3 source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py
@@ -2423,7 +2424,7 @@ jobs:
           fi
       - name: Verify stage projection, dense output, retries and backend guards
         run: |
-          for test in explicit_projection explicit_projection_lifecycle explicit_projection_backend implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection; do
+          for test in explicit_projection explicit_projection_lifecycle explicit_projection_backend implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection implicit_imex_projection implicit_imex_projection_lifecycle implicit_imex_projection_backend periodic_stokes_imex_projection; do
             make -j2 "test_${test}_cpu.bin" "test_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/projection"
             for backend in cpu cpu_omp; do
               OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/projection/"test_${test}_${backend}.bin"
@@ -2433,7 +2434,7 @@ jobs:
           done
       - name: Reject nondefault void-returning projectors
         run: |
-          for family in explicit implicit; do
+          for family in explicit implicit implicit_imex; do
             if '${{ matrix.compiler }}' -std=c++17 -fopenmp -fsyntax-only -DTEST_PROJECTION_VOID_MUST_FAIL \
               -I "$NMFD_TIMESTEPPERS_ROOT/include" -I "$NMFD_OPERATIONS_ROOT/include" -I "$SCFD_ROOT/include" \
               -I "$NMFD_NEWTON_ROOT/include" -I "$NMFD_LINSOLVERS_ROOT/include" \
@@ -2444,6 +2445,35 @@ jobs:
             fi
             grep -F 'stage projection requires bool apply(vector_type&)' "$BUILD_DIR/projection/${family}_void_projector.log"
           done
+
+      - name: Prepare Stokes/Oseen figure dependencies
+        if: matrix.compiler == 'g++'
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends python3-numpy python3-matplotlib
+          fi
+      - name: Validate and plot manufactured PDE solutions and temporal orders
+        if: matrix.compiler == 'g++'
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            export PYTHON=/usr/bin/python3
+          fi
+          "${PYTHON:-python3}" -m unittest discover -s scripts/tests -p test_stokes_benchmarks.py
+          for backend in cpu cpu_omp; do
+            bash source/nonlinear_operators/stokes/tests/run_all.sh \
+              --build-dir "$BUILD_DIR/stokes_figures/$backend" --backend "$backend" \
+              --methods IE CN IMEX_ARK324L2SA --levels 4 --threads 2
+          done
+      - name: Save Stokes/Oseen figures and numerical reports
+        if: always() && matrix.compiler == 'g++'
+        uses: actions/upload-artifact@v4
+        with:
+          name: stokes-oseen-timestepper-validation
+          path: |
+            ${{ env.BUILD_DIR }}/stokes_figures/*/runs/
+            ${{ env.BUILD_DIR }}/stokes_figures/*/build_*.log
+          if-no-files-found: warn
 
   timestepper-projection-cuda:
     needs: [timestepper-projection-cpu, scfd-vector-operations-cuda]
@@ -2463,7 +2493,7 @@ jobs:
             echo "Skipping stage projection CUDA tests: nvcc unavailable"
             exit 0
           fi
-          for test in explicit_projection explicit_projection_lifecycle explicit_projection_backend implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection; do
+          for test in explicit_projection explicit_projection_lifecycle explicit_projection_backend implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection implicit_imex_projection implicit_imex_projection_lifecycle implicit_imex_projection_backend periodic_stokes_imex_projection; do
             make "test_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/projection_cuda"
             timeout 300s ./"$BUILD_DIR"/projection_cuda/"test_${test}_cuda.bin"
           done
@@ -2497,7 +2527,7 @@ jobs:
             fi
             HIP_TARGET="${HIP_ARCH_LIST:-native}"
           fi
-          for test in explicit_projection explicit_projection_lifecycle explicit_projection_backend implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection; do
+          for test in explicit_projection explicit_projection_lifecycle explicit_projection_backend implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection implicit_imex_projection implicit_imex_projection_lifecycle implicit_imex_projection_backend periodic_stokes_imex_projection; do
             make "test_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/projection_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
             timeout 300s ./"$BUILD_DIR"/projection_hip/"test_${test}_hip.bin"
           done

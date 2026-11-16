@@ -998,7 +998,20 @@ provider. Do not cache rates across rejected attempts or modified endpoints.
 DAE rate reconstruction must include the formulation's differentiated constraints;
 never infer algebraic derivatives or invert a singular mass matrix. Generic embedded
 control does not certify algebraic accuracy or method suitability for every DAE.
-The fixed-step IMEX engine uses this same rate contract for each partition.
+The IMEX engine uses this same rate contract for each partition.
+Optional IMEX `ProjectionOperator` follows `DenseOutput`; its shared instance
+follows constructor `params`, without changing the partition/controller contract.
+Project implicit stage states before rate reconstruction and explicit evaluation;
+project directly evaluated explicit, zero-diagonal implicit and dense-endpoint
+rates. Corrected partition rates feed combined estimates/dense output; sampling
+does no projection. Identity projection is compiled out with no extra scans or
+backend vectors. Nondefault `bool apply(vector_type&)` failures follow bounded
+rejection without publication; exceptions propagate. Preserve trial pressure/
+history and prepared operators. The validated scope is identity mass, consistent
+initial data and fixed linear P with `P*fI(t,v)=P*fI(t,P*v)`; explicit partitions
+may be nonlinear. Project-owned Fourier Stokes/Oseen validation keeps vector-sized
+work resident and checks allocation/transfer guards. Do not infer general mass,
+wall-boundary splitting, moving constraints or projected shooting derivatives.
 
 The status of a single step is given as the following structure:
 
@@ -1030,7 +1043,7 @@ scratch is reusable and trial calls must not commit pressure/history. The
 validated case is a fixed linear homogeneous rate projector with consistent
 initial data; embedded defects and dense formulas use the same projected stages.
 No vector-sized transfer or additional stage vector is introduced. This does not
-add DIRK/IMEX pressure splitting, nonlinear state projection, or automatic
+add general pressure splitting, nonlinear state projection, or automatic
 projected shooting derivatives. Prepared providers must supply the corresponding
 projected rate/Jv explicitly; fixed/moving boundaries need their own validation.
 
