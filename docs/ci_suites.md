@@ -85,6 +85,21 @@ make test-timesteppers PLATFORM=OMP 'G++ = clang++' CONFIG_FILE=build_configs/co
 
 Per-case logs and `summary.json` are under `BUILD_DIR/PLATFORM/rosenbrock/`. Look for the `rosenbrock-g++`, `rosenbrock-clang++`, `rosenbrock-CUDA` or `rosenbrock-HIP` workflow artifact. An optional hosted GPU skip produces `backend.json` instead.
 
+## Projection and periodic Stokes
+
+The module's `projection` group has 17 cases: operator dispatch and stage projection, lifecycle and backend contracts for explicit RK, DIRK, IMEX, BDF and Rosenbrock/W. The parent [Stokes CI profile](../source/nonlinear_operators/stokes/tests/projection_ci.py) adds four manufactured periodic Stokes cases without making the module depend on the application. Invoking the Stokes launcher without `--profile ci` still runs its plotting benchmark.
+
+```bash
+PLATFORM=SERIAL bash source/nonlinear_operators/stokes/tests/run_all.sh --profile ci --list
+make test-projection PLATFORM=OMP 'G++ = clang++' CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
+    BUILD_DIR=build/projection_clang
+make check-projection-contracts 'G++ = clang++' BUILD_DIR=build/projection_clang/negative
+```
+
+GCC and Clang each run 21 cases on SERIAL, OMP and SERIAL with ASan/UBSan and leak detection. Each compiler also checks ten expected failures: bad return type and missing `apply` for each of five method families. A compiler failure for a different diagnostic is not a pass. CUDA and HIP run all 21 numerical cases after the hardware probe. On equipped runners this is 168 binary executions and 20 diagnostic checks.
+
+Parent CPU suites compile at most two targets at once with isolated build directories; executions are serial with two OpenMP threads and the original 180-second timeout. GPU cases retain 300 seconds. Workflow artifacts `projection-g++`, `projection-clang++`, `projection-CUDA` and `projection-HIP` contain case logs and summaries (or `backend.json` for an optional hosted skip). Sanitizer and negative-compile logs are in the compiler's artifact.
+
 ## Required vs optional hardware
 
 Select the expected platform explicitly; never infer the test list from installed compilers. A requested local/self-hosted GPU must compile, link, launch and synchronize a kernel and read the expected value before running numerical cases. A compile or runtime failure is fatal; no CPU fallback is allowed. The direct suite is always strict. Only the optional accelerator steps in the hosted workflow may skip for absent hardware/toolchains, and only with an explicit `optional-on-hosted` policy **and** GitHub's [hosted runner identity](https://docs.github.com/en/actions/reference/workflows-and-actions/variables). Once selected for execution, even a hosted probe or test failure is fatal.

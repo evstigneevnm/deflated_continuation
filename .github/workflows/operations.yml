@@ -2042,50 +2042,28 @@ jobs:
           submodules: true
       - name: Prepare Clang OpenMP runtime
         if: matrix.compiler == 'clang++'
+        timeout-minutes: 3
+        run: bash scripts/ci/prepare_hosted_openmp.sh
+      - name: Run projection and periodic Stokes contracts on serial CPU and OpenMP
+        run: bash scripts/ci/run_timestepper_family.sh projection CPU '${{ matrix.compiler }}'
+      - name: Run projection and periodic Stokes contracts under ASan and UBSan
+        env:
+          ASAN_OPTIONS: detect_leaks=1
         run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            sudo apt-get update
-            sudo apt-get install -y libomp-dev
-          fi
-      - name: Verify stage projection, dense output, retries and backend guards
-        run: |
-          cases=(explicit_apply_operator implicit_operator_projection
-                 explicit_projection explicit_projection_lifecycle explicit_projection_backend
-                 implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection
-                 implicit_imex_projection implicit_imex_projection_lifecycle implicit_imex_projection_backend periodic_stokes_imex_projection
-                 implicit_bdf_projection implicit_bdf_projection_lifecycle implicit_bdf_projection_backend periodic_stokes_bdf_projection
-                 implicit_rosenbrock_projection implicit_rosenbrock_projection_lifecycle implicit_rosenbrock_projection_backend periodic_stokes_rosenbrock_projection)
-          cpu=() omp=()
-          for case_name in "${cases[@]}"; do
-            cpu+=("test_${case_name}_cpu.bin")
-            omp+=("test_${case_name}_cpu_omp.bin")
-          done
-          opts=("G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc)
-          make -j2 "${cpu[@]}" "${omp[@]}" "${opts[@]}" BUILD_DIR="$BUILD_DIR/projection"
-          for binary in "${cpu[@]}" "${omp[@]}"; do
-            OMP_NUM_THREADS=2 timeout 180s "$BUILD_DIR/projection/$binary"
-          done
-          make -j2 "${cpu[@]}" "${opts[@]}" BUILD_DIR="$BUILD_DIR/projection_sanitizers" \
+          make test-projection PLATFORM=SERIAL "G++ = ${{ matrix.compiler }}" \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/projection/${{ matrix.compiler }}/sanitizers" \
             G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-          for binary in "${cpu[@]}"; do
-            ASAN_OPTIONS=detect_leaks=1 OMP_NUM_THREADS=2 timeout 180s "$BUILD_DIR/projection_sanitizers/$binary"
-          done
       - name: Reject unsupported operator results and missing apply methods
         run: |
-          for family in explicit implicit implicit_imex implicit_bdf implicit_rosenbrock; do
-            for invalid in BAD_RETURN MISSING_APPLY; do
-              log="$BUILD_DIR/projection/${family}_${invalid}.log"
-              if '${{ matrix.compiler }}' -std=c++17 -fopenmp -fsyntax-only "-DTEST_PROJECTION_${invalid}_MUST_FAIL" \
-                -I "$NMFD_TIMESTEPPERS_ROOT/include" -I "$NMFD_OPERATIONS_ROOT/include" -I "$SCFD_ROOT/include" \
-                -I "$NMFD_NEWTON_ROOT/include" -I "$NMFD_LINSOLVERS_ROOT/include" \
-                "$NMFD_TIMESTEPPERS_ROOT/tests/test_${family}_projection_lifecycle.cpp" \
-                > "$log" 2>&1; then
-                echo "An unsupported projector interface was accepted"
-                exit 1
-              fi
-              grep -F 'Operator apply(vector&) must return void or bool' "$log"
-            done
-          done
+          make check-projection-contracts "G++ = ${{ matrix.compiler }}" \
+            CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/projection/${{ matrix.compiler }}/negative"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: projection-${{ matrix.compiler }}
+          path: |
+            ${{ env.BUILD_DIR }}/projection/${{ matrix.compiler }}/**/*.log
+            ${{ env.BUILD_DIR }}/projection/${{ matrix.compiler }}/**/summary.json
 
   timestepper-pde-figures-cpu:
     needs: [timestepper-capability-contract, scfd-vector-operations-cpu]
@@ -2153,20 +2131,18 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify stage projection when CUDA is available
-        run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
-            echo "Skipping stage projection CUDA tests: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping stage projection CUDA tests: nvcc unavailable"
-            exit 0
-          fi
-          for test in explicit_apply_operator implicit_operator_projection explicit_projection explicit_projection_lifecycle explicit_projection_backend implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection implicit_imex_projection implicit_imex_projection_lifecycle implicit_imex_projection_backend periodic_stokes_imex_projection implicit_bdf_projection implicit_bdf_projection_lifecycle implicit_bdf_projection_backend periodic_stokes_bdf_projection implicit_rosenbrock_projection implicit_rosenbrock_projection_lifecycle implicit_rosenbrock_projection_backend periodic_stokes_rosenbrock_projection; do
-            make "test_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/projection_cuda"
-            timeout 300s ./"$BUILD_DIR"/projection_cuda/"test_${test}_cuda.bin"
-          done
+      - name: Run projection and periodic Stokes contracts on CUDA
+        env:
+          GPU_POLICY: optional-on-hosted
+        run: bash scripts/ci/run_timestepper_family.sh projection CUDA
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: projection-CUDA
+          path: |
+            ${{ env.BUILD_DIR }}/projection_cuda/**/*.log
+            ${{ env.BUILD_DIR }}/projection_cuda/**/summary.json
+            ${{ env.BUILD_DIR }}/projection_cuda/backend.json
 
   timestepper-projection-hip:
     needs: [timestepper-projection-cpu, scfd-vector-operations-hip]
@@ -2176,31 +2152,19 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify stage projection when HIP is available
-        run: |
-          HIPCC_BIN="$(command -v "${HIPCC:-hipcc}" || true)"
-          if [ -z "$HIPCC_BIN" ]; then
-            echo "Skipping stage projection HIP tests: hipcc unavailable"
-            exit 0
-          fi
-          HIP_ROOT="${ROCM_PATH:-$(dirname "$(dirname "$HIPCC_BIN")")}"
-          if "$HIPCC_BIN" --version | grep -qi nvcc; then
-            if ! nvidia-smi -L >/dev/null 2>&1; then
-              echo "Skipping stage projection HIP tests: no usable NVIDIA GPU"
-              exit 0
-            fi
-            HIP_TARGET="${HIP_ARCH_LIST:-75}"
-          else
-            if ! "$HIP_ROOT/bin/rocm-smi" >/dev/null 2>&1; then
-              echo "Skipping stage projection HIP tests: no usable AMD GPU"
-              exit 0
-            fi
-            HIP_TARGET="${HIP_ARCH_LIST:-native}"
-          fi
-          for test in explicit_apply_operator implicit_operator_projection explicit_projection explicit_projection_lifecycle explicit_projection_backend implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection implicit_imex_projection implicit_imex_projection_lifecycle implicit_imex_projection_backend periodic_stokes_imex_projection implicit_bdf_projection implicit_bdf_projection_lifecycle implicit_bdf_projection_backend periodic_stokes_bdf_projection implicit_rosenbrock_projection implicit_rosenbrock_projection_lifecycle implicit_rosenbrock_projection_backend periodic_stokes_rosenbrock_projection; do
-            make "test_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/projection_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
-            timeout 300s ./"$BUILD_DIR"/projection_hip/"test_${test}_hip.bin"
-          done
+      - name: Run projection and periodic Stokes contracts on HIP
+        env:
+          GPU_POLICY: optional-on-hosted
+        run: bash scripts/ci/run_timestepper_family.sh projection HIP
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: projection-HIP
+          path: |
+            ${{ env.BUILD_DIR }}/projection_hip/**/*.log
+            ${{ env.BUILD_DIR }}/projection_hip/**/summary.json
+            ${{ env.BUILD_DIR }}/projection_hip/backend.json
+            ${{ env.BUILD_DIR }}/projection_hip/compiler.txt
 
   scfd-transform-reduction-cpu:
     needs: [scfd-vector-operations-cpu]

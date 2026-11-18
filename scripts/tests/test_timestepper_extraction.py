@@ -120,10 +120,39 @@ class TimestepperExtractionTest(unittest.TestCase):
                                ("timestepper-imex-cuda", "imex_cuda"), ("timestepper-imex-hip", "imex_hip"),
                                ("timestepper-bdf-cuda", "bdf_cuda"), ("timestepper-bdf-hip", "bdf_hip"),
                                ("timestepper-rosenbrock-cuda", "rosenbrock_cuda"),
-                               ("timestepper-rosenbrock-hip", "rosenbrock_hip")):
+                               ("timestepper-rosenbrock-hip", "rosenbrock_hip"),
+                               ("timestepper-projection-cuda", "projection_cuda"),
+                               ("timestepper-projection-hip", "projection_hip")):
             step = next(s for s in jobs[job]["steps"] if "run" in s)
             with self.subTest(job=job):
                 self.check_missing_compiler(step, directory)
+
+    def test_projection_integration_inventory_and_gates(self):
+        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
+        cpu = jobs["timestepper-projection-cpu"]
+        self.assertEqual(cpu["strategy"]["matrix"]["compiler"], ["g++", "clang++"])
+        run = "\n".join(s.get("run", "") for s in cpu["steps"])
+        self.assertIn("run_timestepper_family.sh projection CPU '${{ matrix.compiler }}'", run)
+        self.assertIn("make test-projection PLATFORM=SERIAL", run)
+        self.assertIn("-fsanitize=address,undefined", run)
+        self.assertIn("make check-projection-contracts", run)
+        self.assertTrue(any(s.get("env", {}).get("ASAN_OPTIONS") == "detect_leaks=1" for s in cpu["steps"]))
+        for backend in ("cpu", "cuda", "hip"):
+            name = "timestepper-projection-"+backend
+            self.assertIn(name, jobs["all-tests-passed"]["needs"])
+            self.assertTrue(any(s.get("if") == "always()" and "summary.json" in s["with"]["path"]
+                                for s in jobs[name]["steps"] if s.get("uses", "").startswith("actions/upload-artifact")))
+        suite = ROOT/"source/nonlinear_operators/stokes/tests/run_all.sh"
+        for platform, suffix in (("SERIAL", "cpu"), ("OMP", "cpu_omp"), ("CUDA", "cuda"), ("HIP", "hip")):
+            env = dict(os.environ, PLATFORM=platform, PYTHON=sys.executable)
+            def listing(launcher):
+                out = subprocess.check_output(["bash", str(launcher), "--profile", "ci", "--group", "projection",
+                                               "--list"], env=env, text=True)
+                return [line.split()[1] for line in out.splitlines()]
+            module = listing(MODULE/"tests/run_all.sh")
+            self.assertEqual(len(module), 17)
+            self.assertCountEqual(listing(suite), module + [f"test_periodic_stokes_{prefix}projection_{suffix}.bin"
+                                  for prefix in ("", "imex_", "bdf_", "rosenbrock_")])
 
     def check_missing_compiler(self, step, directory):
         for runner, actions, expected in (("github-hosted", "true", "skipped"),

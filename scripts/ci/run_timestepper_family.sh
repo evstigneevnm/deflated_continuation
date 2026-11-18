@@ -4,15 +4,17 @@ set -euo pipefail
 family=${1:?expected a timestepper group}
 backend=${2:?expected CPU, CUDA or HIP}
 options=("TIMESTEPPER_TEST_OPTIONS=--group $family")
+target=test-timesteppers
+if [[ $family == projection ]]; then target=test-projection; fi
 case "$backend" in
     CPU)
         compiler=${3:?expected the matrix compiler}
         options+=("G++ = $compiler" "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc"
                   "BUILD_DIR=$BUILD_DIR/$family/$compiler")
-        make check_timestepper_headers_cpu "${options[@]}"
+        if [[ $family != projection ]]; then make check_timestepper_headers_cpu "${options[@]}"; fi
         failed=0
         for platform in SERIAL OMP; do
-            make test-timesteppers PLATFORM="$platform" "${options[@]}" || failed=1
+            make "$target" PLATFORM="$platform" "${options[@]}" || failed=1
         done
         exit "$failed"
         ;;
@@ -27,7 +29,7 @@ case "$backend" in
             select_hip_compiler "$dir"
             options+=("HIPCC=$HIPCC" "HIP_ROOT_PATH=$HIP_ROOT_PATH" "HIP_PATH=$HIP_PATH" "HIP_ARCH_LIST=$HIP_ARCH_LIST")
         fi
-        make test-timesteppers PLATFORM="$backend" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$dir" "${options[@]}"
+        make "$target" PLATFORM="$backend" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$dir" "${options[@]}"
         ;;
     *) echo "Unknown timestepper CI backend: $backend" >&2; exit 2 ;;
 esac

@@ -1346,6 +1346,18 @@ CH_BENCHMARK_OPTIONS ?=
 PLATFORM ?= SERIAL
 RK_TEST_OPTIONS ?= $(EXPLICIT_RK_OPTIONS)
 TIMESTEPPER_TEST_OPTIONS ?= $(RK_TEST_OPTIONS)
+.PHONY: test-projection check-projection-contracts
+test-projection:
+	PLATFORM="$(PLATFORM)" CONFIG_FILE="$(abspath $(CONFIG_FILE))" NVCC="$(NVCC)" \
+	    NMFD_TIMESTEPPERS_ROOT="$(abspath $(NMFD_TIMESTEPPERS_ROOT))" \
+	    bash source/nonlinear_operators/stokes/tests/run_all.sh --profile ci \
+	    --make-option "G++ = $(G++)" --build-dir "$(BUILD_DIR)" \
+	    $(if $(filter SERIAL OMP,$(PLATFORM)),--build-jobs 2) $(TIMESTEPPER_TEST_OPTIONS)
+
+check-projection-contracts:
+	python3 "$(NMFD_TIMESTEPPERS_ROOT)/tests/check_projection_contracts.py" "$(BUILD_DIR)" "$(G++)" \
+	    $(ITIME_STEPPER) $(INMFD_NEWTON)
+
 .PHONY: test-explicit-rk test-rk test-timesteppers
 test-explicit-rk test-rk test-timesteppers:
 	PLATFORM="$(PLATFORM)" CONFIG_FILE="$(abspath $(CONFIG_FILE))" NVCC="$(NVCC)" \
