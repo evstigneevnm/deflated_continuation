@@ -1,12 +1,14 @@
 """Keep extracted explicit timesteppers independent of parent/solver headers."""
 
 import configparser
+import json
 import os
 from pathlib import Path
 import re
 import shlex
 import subprocess
 import sys
+import tempfile
 import unittest
 
 
@@ -111,6 +113,21 @@ class TimestepperExtractionTest(unittest.TestCase):
         self.assertNotIn(".cpp", link)
         self.assertIn("cuda_reductions.o", link)
 
+    def test_explicit_cuda_missing_compiler_fails_except_on_optional_hosted_runner(self):
+        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
+        step = next(s for s in jobs["timestepper-explicit-cuda"]["steps"] if "run" in s)
+        for runner, actions, expected in (("github-hosted", "true", "skipped"),
+                                          ("self-hosted", "true", "failed"), ("", "", "failed")):
+            with self.subTest(runner=runner), tempfile.TemporaryDirectory() as tmp:
+                env = dict(os.environ, **step["env"], RUNNER_ENVIRONMENT=runner, GITHUB_ACTIONS=actions,
+                           NVCC=str(Path(tmp)/"missing-nvcc"), BUILD_DIR=tmp)
+                result = subprocess.run(["bash", "-eu", "-c", step["run"]], cwd=ROOT, env=env,
+                                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 0 if expected == "skipped" else 1, result.stderr)
+                report = json.loads((Path(tmp)/"explicit_cuda/backend.json").read_text())
+                self.assertEqual(report["result"], expected)
+                self.assertFalse(report["executed"])
+
     def test_parent_ci_initializes_module_and_uses_migrated_scripts(self):
         workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
         self.assertEqual(ci.expand_expressions(workflow["env"]["NMFD_TIMESTEPPERS_ROOT"], {}, ROOT), str(MODULE))
@@ -126,6 +143,15 @@ class TimestepperExtractionTest(unittest.TestCase):
         gpu = workflow["jobs"]["timestepper-explicit-cuda"]
         self.assertIn("check_timestepper_headers_cpu", "\n".join(step.get("run", "") for step in cpu["steps"]))
         self.assertIn("check_timestepper_headers_cuda", "\n".join(step.get("run", "") for step in gpu["steps"]))
+        self.assertEqual(cpu["strategy"]["matrix"]["platform"], ["SERIAL", "OMP"])
+        self.assertIn("test_transform_reduce_sum_cuda.bin", "\n".join(step.get("run", "") for step in gpu["steps"]))
+        for job in (cpu, gpu):
+            self.assertTrue(any("make test-explicit-rk" in step.get("run", "") for step in job["steps"]))
+        for group in ("lorenz", "rk4", "dop853"):
+            references = [step for job in workflow["jobs"].values() for step in job["steps"]
+                          if f'EXPLICIT_RK_OPTIONS="--group {group}-reference"' in step.get("run", "")]
+            self.assertEqual(len(references), 1)
+            self.assertIn("for platform in SERIAL OMP", references[0]["run"])
 
     def test_implicit_solver_dependencies_are_test_only(self):
         output = self.make(MODULE, "test_implicit_dirk_cpu.bin", "BUILD_DIR=build/implicit_probe")
@@ -340,13 +366,8 @@ class TimestepperExtractionTest(unittest.TestCase):
             self.assertNotIn("nmfd-newton/include", output)
             self.assertNotIn("nmfd-linsolvers/include", output)
         jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
-        self.assertIn("timestepper-filter-adaptation-cpu", jobs["timestepper-implicit-adaptive-cpu"]["needs"])
-        self.assertIn("timestepper-filter-adaptation-cuda", jobs["all-tests-passed"]["needs"])
-        for backend in ("cpu", "cuda"):
-            commands = "\n".join(step.get("run", "") for step in jobs[f"timestepper-filter-adaptation-{backend}"]["steps"])
-            self.assertIn(f"test_explicit_filter_adaptation_{backend}.bin", commands)
-            if backend == "cpu":
-                self.assertIn("test_explicit_filter_adaptation_cpu_omp.bin", commands)
+        self.assertIn("timestepper-explicit-rk-cpu", jobs["timestepper-implicit-adaptive-cpu"]["needs"])
+        self.assertIn("timestepper-explicit-cuda", jobs["all-tests-passed"]["needs"])
         self.assertIn("explicit_filter_adaptation", self.sanitizer_cases(jobs["timestepper-implicit-sanitizers-cpu"]))
 
     def test_nonautonomous_matrix_preserves_explicit_independence(self):
@@ -359,8 +380,9 @@ class TimestepperExtractionTest(unittest.TestCase):
             if mode == "explicit":
                 self.assertNotIn("nmfd-newton/include", output)
                 self.assertNotIn("nmfd-linsolvers/include", output)
-            for backend in ("cpu", "cuda"):
-                self.assertIn(f"timestepper-{mode}-nonautonomous-{backend}", workflow["jobs"])
+            else:
+                for backend in ("cpu", "cuda"):
+                    self.assertIn(f"timestepper-implicit-nonautonomous-{backend}", workflow["jobs"])
 
     def test_visual_benchmark_runner_is_standalone_and_tested_in_ci(self):
         for backend in ("cpu", "cpu_omp", "cuda"):

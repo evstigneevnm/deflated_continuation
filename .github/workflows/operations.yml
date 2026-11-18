@@ -68,6 +68,7 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p test_nmfd_standalone.py
           python3 -m unittest discover -s scripts/tests -p test_timestepper_extraction.py
           python3 source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py
+          python3 -S source/contrib/nmfd-timesteppers/tests/test_explicit_ci.py
           python3 -m unittest discover -s scripts/tests -p test_ks1d_reference.py
           python3 -m unittest discover -s scripts/tests -p test_write_ks1d_ci_config.py
           python3 scripts/check_operations_dependencies.py
@@ -251,19 +252,9 @@ jobs:
       - periodic-orbit-matching-benchmark-cpu
       - star-shaped-bd-cuda
       - star-shaped-bd-hip
-      - timestepper-dense-output-cuda
-      - timestepper-dense-output-lorenz-cpu
-      - timestepper-dense-output-rk-cpu
-      - timestepper-dense-output-rossler-cpu
-      - timestepper-dense-output-vdp-cpu
-      - timestepper-dop853-adaptive-cuda
-      - timestepper-dop853-dense-cuda
+      - timestepper-explicit-cuda
+      - timestepper-explicit-rk-cpu
       - timestepper-dop853-dense-python-cpu
-      - timestepper-dop853-fixed-cuda
-      - timestepper-explicit-nonautonomous-cuda
-      - timestepper-explicit-rossler-cpu
-      - timestepper-explicit-vdp-cpu
-      - timestepper-fsal-cuda
       - timestepper-projection-cpu
       - timestepper-pde-figures-cpu
       - timestepper-projection-cuda
@@ -271,7 +262,6 @@ jobs:
       - timestepper-pde-cpu
       - timestepper-pde-cuda
       - timestepper-pde-hip
-      - timestepper-filter-adaptation-cuda
       - timestepper-bdf-cuda
       - timestepper-bdf-hip
       - timestepper-rosenbrock-cpu
@@ -292,9 +282,7 @@ jobs:
       - timestepper-implicit-sanitizers-cpu
       - timestepper-implicit-vdp-cuda
       - timestepper-lorenz-simulation-python-cpu
-      - timestepper-ownership-cuda
       - timestepper-rk4-simulation-python-cpu
-      - timestepper-scipy-adaptation-cuda
       - workflow-ownership-cuda
     steps:
       - run: echo "All preliminary test jobs passed; N=64 reference validation may start."
@@ -1719,7 +1707,7 @@ jobs:
           done
 
   timestepper-implicit-adaptive-cpu:
-    needs: [timestepper-implicit-dirk-cpu, timestepper-scipy-adaptation-cpu, timestepper-filter-adaptation-cpu]
+    needs: [timestepper-implicit-dirk-cpu, timestepper-explicit-rk-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -2322,43 +2310,6 @@ jobs:
           make test_implicit_vdp_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/implicit_vdp_cuda"
           timeout 300s ./"$BUILD_DIR"/implicit_vdp_cuda/test_implicit_vdp_cuda.bin
 
-
-  timestepper-explicit-nonautonomous-cpu:
-    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Verify explicit non-autonomous systems on serial CPU and OMP
-        run: |
-          make -j2 test_explicit_nonautonomous_cpu.bin test_explicit_nonautonomous_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/explicit_nonautonomous"
-          for backend in cpu cpu_omp; do
-            OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/explicit_nonautonomous/"test_explicit_nonautonomous_${backend}.bin"
-          done
-
-  timestepper-explicit-nonautonomous-cuda:
-    needs: [timestepper-explicit-nonautonomous-cpu, scfd-vector-operations-cuda]
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Verify explicit non-autonomous systems when CUDA is available
-        run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
-            echo "Skipping non-autonomous CUDA test: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping non-autonomous CUDA test: nvcc unavailable"
-            exit 0
-          fi
-          make test_explicit_nonautonomous_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_nonautonomous_cuda"
-          timeout 300s ./"$BUILD_DIR"/explicit_nonautonomous_cuda/test_explicit_nonautonomous_cuda.bin
-
   timestepper-implicit-nonautonomous-cpu:
     needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
     runs-on: ubuntu-latest
@@ -2396,7 +2347,7 @@ jobs:
           timeout 300s ./"$BUILD_DIR"/implicit_nonautonomous_cuda/test_implicit_nonautonomous_cuda.bin
 
   timestepper-implicit-sanitizers-cpu:
-    needs: [timestepper-implicit-dirk-cpu, timestepper-bdf-cpu, timestepper-rosenbrock-cpu, timestepper-implicit-adaptive-cpu, timestepper-implicit-esdirk-cpu, timestepper-imex-cpu, timestepper-implicit-dense-cpu, timestepper-implicit-globalization-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu, timestepper-implicit-lorenz-cpu, timestepper-implicit-rossler-cpu, timestepper-implicit-vdp-cpu]
+    needs: [timestepper-implicit-dirk-cpu, timestepper-bdf-cpu, timestepper-rosenbrock-cpu, timestepper-implicit-adaptive-cpu, timestepper-implicit-esdirk-cpu, timestepper-imex-cpu, timestepper-implicit-dense-cpu, timestepper-implicit-globalization-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-rk-cpu, timestepper-implicit-lorenz-cpu, timestepper-implicit-rossler-cpu, timestepper-implicit-vdp-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 12
     strategy:
@@ -2461,21 +2412,6 @@ jobs:
           implicit_rosenbrock_index2_moving implicit_rosenbrock_index2_dense
           implicit_rosenbrock_index2_lifecycle
 
-  timestepper-tables-explicit-cpu:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Check explicit table coefficients and order
-        run: |
-          make test_rk_tables_explicit.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/tables_explicit"
-          ./"$BUILD_DIR"/tables_explicit/test_rk_tables_explicit.bin
 
   timestepper-tables-implicit-cpu:
     runs-on: ubuntu-latest
@@ -2494,99 +2430,34 @@ jobs:
           ./"$BUILD_DIR"/tables_implicit/test_rk_tables_implicit.bin
 
   timestepper-explicit-rk-cpu:
-    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
+    needs: [scfd-transform-reduction-cpu]
     runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [SERIAL, OMP]
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Prepare hosted CPU compiler
+      - name: Check isolated public headers
+        if: matrix.platform == 'SERIAL'
+        run: make check_timestepper_headers_cpu CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/explicit_headers"
+      - name: Run explicit RK contracts
         run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Test explicit rk on serial and OMP
-        run: |
-          make check_timestepper_headers_cpu CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_rk"
-          make test_explicit_rk_cpu.bin test_explicit_rk_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_rk"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rk/test_explicit_rk_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rk/test_explicit_rk_cpu_omp.bin
-
-  timestepper-ownership-cpu:
-    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v6
+          make test-explicit-rk PLATFORM=${{ matrix.platform }} CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
+            BUILD_DIR="$BUILD_DIR/explicit_rk"
+      - uses: actions/upload-artifact@v6
+        if: always()
         with:
-          submodules: true
-      - name: Verify retained timestepper dependencies on serial CPU and OMP
-        run: |
-          make test_explicit_ownership_cpu.bin test_explicit_ownership_cpu_omp.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/timestepper_ownership"
-          OMP_NUM_THREADS=4 timeout 30s ./"$BUILD_DIR"/timestepper_ownership/test_explicit_ownership_cpu.bin
-          OMP_NUM_THREADS=4 timeout 30s ./"$BUILD_DIR"/timestepper_ownership/test_explicit_ownership_cpu_omp.bin
-
-  timestepper-ownership-cuda:
-    needs: [timestepper-ownership-cpu, scfd-vector-operations-cuda]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Verify retained timestepper dependencies when CUDA is available
-        run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
-            echo "Skipping CUDA ownership tests: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping CUDA ownership tests: nvcc unavailable"
-            exit 0
-          fi
-          make test_explicit_ownership_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/timestepper_ownership_cuda"
-          timeout 60s ./"$BUILD_DIR"/timestepper_ownership_cuda/test_explicit_ownership_cuda.bin
-
-  timestepper-fsal-cpu:
-    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Verify FSAL lifecycle and memory on serial and OMP
-        run: |
-          make test_explicit_fsal_cpu.bin test_explicit_fsal_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fsal"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/fsal/test_explicit_fsal_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/fsal/test_explicit_fsal_cpu_omp.bin
-
-  timestepper-fsal-cuda:
-    needs: [timestepper-fsal-cpu, scfd-vector-operations-cuda]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Verify FSAL lifecycle and memory when CUDA is available
-        run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
-            echo "Skipping CUDA FSAL: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping CUDA FSAL: nvcc unavailable"
-            exit 0
-          fi
-          make test_explicit_fsal_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/fsal_cuda" REAL_TYPE=double
-          ./"$BUILD_DIR"/fsal_cuda/test_explicit_fsal_cuda.bin
+          name: explicit-rk-${{ matrix.platform }}
+          path: |
+            ${{ env.BUILD_DIR }}/explicit_rk/**/*.log
+            ${{ env.BUILD_DIR }}/explicit_rk/**/summary.json
 
   timestepper-projection-cpu:
-    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
+    needs: [timestepper-explicit-rk-cpu, scfd-vector-operations-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -2777,141 +2648,8 @@ jobs:
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/transform_sum/test_transform_reduce_sum_cpu.bin
           OMP_NUM_THREADS=8 ./"$BUILD_DIR"/transform_sum/test_transform_reduce_sum_cpu_omp.bin
 
-  timestepper-scipy-adaptation-cpu:
-    needs: [timestepper-tables-explicit-cpu, scfd-transform-reduction-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Verify SciPy adaptation on serial and OMP
-        run: |
-          make test_explicit_scipy_adaptation_cpu.bin test_explicit_scipy_adaptation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scipy_adaptation"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/scipy_adaptation/test_explicit_scipy_adaptation_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/scipy_adaptation/test_explicit_scipy_adaptation_cpu_omp.bin
-
-  timestepper-scipy-adaptation-cuda:
-    needs: [timestepper-scipy-adaptation-cpu, scfd-vector-operations-cuda]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Verify transformed sums and SciPy adaptation when CUDA is available
-        run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
-            echo "Skipping SciPy adaptation CUDA tests: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping SciPy adaptation CUDA tests: nvcc unavailable"
-            exit 0
-          fi
-          make test_transform_reduce_sum_cuda.bin test_explicit_scipy_adaptation_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/scipy_adaptation_cuda" REAL_TYPE=double
-          ./"$BUILD_DIR"/scipy_adaptation_cuda/test_transform_reduce_sum_cuda.bin
-          ./"$BUILD_DIR"/scipy_adaptation_cuda/test_explicit_scipy_adaptation_cuda.bin
-
-  timestepper-filter-adaptation-cpu:
-    needs: [timestepper-tables-explicit-cpu, scfd-transform-reduction-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Verify filter recurrences, committed history and explicit RK on serial and OMP
-        run: |
-          make test_explicit_filter_adaptation_cpu.bin test_explicit_filter_adaptation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/filter_adaptation"
-          OMP_NUM_THREADS=8 timeout 90s ./"$BUILD_DIR"/filter_adaptation/test_explicit_filter_adaptation_cpu.bin
-          OMP_NUM_THREADS=8 timeout 90s ./"$BUILD_DIR"/filter_adaptation/test_explicit_filter_adaptation_cpu_omp.bin
-
-  timestepper-filter-adaptation-cuda:
-    needs: [timestepper-filter-adaptation-cpu, scfd-vector-operations-cuda]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Verify filter adaptation when CUDA is available
-        run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
-            echo "Skipping filter CUDA tests: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping filter CUDA tests: nvcc unavailable"
-            exit 0
-          fi
-          make test_explicit_filter_adaptation_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/filter_adaptation_cuda"
-          timeout 300s ./"$BUILD_DIR"/filter_adaptation_cuda/test_explicit_filter_adaptation_cuda.bin
-
-  timestepper-dop853-fixed-cpu:
-    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Verify fixed DOP853 on serial and OMP
-        run: |
-          make test_explicit_dop853_cpu.bin test_explicit_dop853_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dop853_fixed"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dop853_fixed/test_explicit_dop853_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dop853_fixed/test_explicit_dop853_cpu_omp.bin
-
-  timestepper-dop853-fixed-cuda:
-    needs: [timestepper-dop853-fixed-cpu, scfd-vector-operations-cuda]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Verify fixed DOP853 when CUDA is available
-        run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
-            echo "Skipping fixed CUDA DOP853: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping fixed CUDA DOP853: nvcc unavailable"
-            exit 0
-          fi
-          make test_explicit_dop853_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dop853_fixed_cuda" REAL_TYPE=double
-          ./"$BUILD_DIR"/dop853_fixed_cuda/test_explicit_dop853_cuda.bin
-
-  timestepper-dop853-dense-cpu:
-    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Verify native DOP853 dense output on serial and OMP
-        run: |
-          make test_explicit_dop853_dense_output_cpu.bin test_explicit_dop853_dense_output_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dop853_dense"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dop853_dense/test_explicit_dop853_dense_output_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dop853_dense/test_explicit_dop853_dense_output_cpu_omp.bin
-
   timestepper-dop853-dense-python-cpu:
-    needs: [timestepper-dop853-dense-cpu]
+    needs: [timestepper-explicit-rk-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -2936,92 +2674,23 @@ jobs:
               PYTHON="$HOME/anaconda3/bin/python"
             fi
           fi
-          make test_explicit_dop853_dense_output_cpu.bin test_explicit_dop853_dense_output_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$DENSE_BUILD"
-          for backend in cpu cpu_omp; do
-            SAMPLES="$DENSE_BUILD/samples_${backend}.txt"
-            OMP_NUM_THREADS=8 "$DENSE_BUILD/test_explicit_dop853_dense_output_${backend}.bin" "$SAMPLES"
-            "$PYTHON" source/contrib/nmfd-timesteppers/tests/compare_explicit_dop853_dense_output.py "$SAMPLES"
+          failed=0
+          for platform in SERIAL OMP; do
+            PYTHON="$PYTHON" make test-explicit-rk PLATFORM="$platform" CONFIG_FILE="$CONFIG_FILE" \
+              BUILD_DIR="$DENSE_BUILD" EXPLICIT_RK_OPTIONS="--group dop853-reference" || failed=1
           done
-
-  timestepper-dop853-dense-cuda:
-    needs: [timestepper-dop853-dense-cpu, scfd-vector-operations-cuda]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
+          exit "$failed"
+      - uses: actions/upload-artifact@v6
+        if: always()
         with:
-          submodules: true
-      - name: Verify native DOP853 dense output when CUDA is available
-        run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
-            echo "Skipping CUDA DOP853 dense output: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping CUDA DOP853 dense output: nvcc unavailable"
-            exit 0
-          fi
-          make test_explicit_dop853_dense_output_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dop853_dense_cuda" REAL_TYPE=double
-          ./"$BUILD_DIR"/dop853_dense_cuda/test_explicit_dop853_dense_output_cuda.bin
-
-  timestepper-dop853-adaptive-cpu:
-    needs: [timestepper-tables-explicit-cpu, timestepper-scipy-adaptation-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Verify adaptive DOP853 on serial and OMP
-        run: |
-          make test_explicit_dop853_adaptive_cpu.bin test_explicit_dop853_adaptive_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dop853_adaptive"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dop853_adaptive/test_explicit_dop853_adaptive_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dop853_adaptive/test_explicit_dop853_adaptive_cpu_omp.bin
-
-  timestepper-dop853-adaptive-cuda:
-    needs: [timestepper-dop853-adaptive-cpu, scfd-vector-operations-cuda]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Verify adaptive DOP853 and Lorenz simulation when CUDA is available
-        run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
-            echo "Skipping adaptive CUDA DOP853: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping adaptive CUDA DOP853: nvcc unavailable"
-            exit 0
-          fi
-          make test_explicit_dop853_adaptive_cuda.bin test_explicit_lorenz_simulation_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dop853_adaptive_cuda" REAL_TYPE=double
-          ./"$BUILD_DIR"/dop853_adaptive_cuda/test_explicit_dop853_adaptive_cuda.bin
-          ./"$BUILD_DIR"/dop853_adaptive_cuda/test_explicit_lorenz_simulation_cuda.bin 1 "$BUILD_DIR/dop853_adaptive_cuda/lorenz_DOP853_scipy.dat" DOP853 scipy
-
-  timestepper-explicit-lorenz-cpu:
-    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Test explicit lorenz on serial and OMP
-        run: |
-          make test_explicit_lorenz_cpu.bin test_explicit_lorenz_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_lorenz"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_lorenz/test_explicit_lorenz_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_lorenz/test_explicit_lorenz_cpu_omp.bin
+          name: explicit-rk-dop853-reference
+          path: |
+            ${{ env.BUILD_DIR }}/dop853_dense_python/**/*.log
+            ${{ env.BUILD_DIR }}/dop853_dense_python/**/summary.json
+            ${{ env.BUILD_DIR }}/dop853_dense_python/**/samples_*.txt
 
   timestepper-lorenz-simulation-python-cpu:
-    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-lorenz-cpu, timestepper-scipy-adaptation-cpu, timestepper-dop853-adaptive-cpu, timestepper-rosenbrock-cpu]
+    needs: [timestepper-explicit-rk-cpu, timestepper-rosenbrock-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -3074,32 +2743,26 @@ jobs:
             --build-dir "$SIMULATION_BUILD/imex_benchmarks" \
             --systems lorenz rossler vdp vdp_stiff coupled_mass state_mass time_mass time_coefficient stiff_tracking \
             --end 0.4 --methods BDF1 BDF2 BDF --controllers scipy --sample-step 0.017 --rtol 1e-7 --atol 1e-9
-          make test_explicit_lorenz_simulation_cpu.bin test_explicit_lorenz_simulation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$SIMULATION_BUILD"
-          for backend in cpu cpu_omp; do
-            for method in RK45 RK23 DOP853; do
-              for controller in matlab scipy; do
-                if [ "$method" = DOP853 ] && [ "$controller" != scipy ]; then
-                  continue
-                fi
-                TRAJECTORY="$SIMULATION_BUILD/lorenz_${backend}_${method}_${controller}.dat"
-                OMP_NUM_THREADS=8 "$SIMULATION_BUILD/test_explicit_lorenz_simulation_${backend}.bin" 1 "$TRAJECTORY" "$method" "$controller"
-                "$PYTHON" source/contrib/nmfd-timesteppers/tests/compare_explicit_lorenz_simulation.py "$TRAJECTORY"
-              done
-            done
+          failed=0
+          for platform in SERIAL OMP; do
+            PYTHON="$PYTHON" make test-explicit-rk PLATFORM="$platform" CONFIG_FILE="$CONFIG_FILE" \
+              BUILD_DIR="$SIMULATION_BUILD" EXPLICIT_RK_OPTIONS="--group lorenz-reference" || failed=1
           done
+          exit "$failed"
       - name: Save trajectories, comparisons, and plots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: timestepper-lorenz-simulation
           path: |
-            ${{ env.BUILD_DIR }}/lorenz_simulation/*.dat
-            ${{ env.BUILD_DIR }}/lorenz_simulation/*.json
-            ${{ env.BUILD_DIR }}/lorenz_simulation/*.png
+            ${{ env.BUILD_DIR }}/lorenz_simulation/*/lorenz-reference/*.dat
+            ${{ env.BUILD_DIR }}/lorenz_simulation/*/lorenz-reference/*.json
+            ${{ env.BUILD_DIR }}/lorenz_simulation/*/lorenz-reference/*.png
+            ${{ env.BUILD_DIR }}/lorenz_simulation/*/lorenz-reference/*.log
             ${{ env.BUILD_DIR }}/lorenz_simulation/imex_benchmarks/
 
   timestepper-rk4-simulation-python-cpu:
-    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-rk-cpu]
+    needs: [timestepper-explicit-rk-cpu]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -3126,178 +2789,54 @@ jobs:
           fi
           export MPLCONFIGDIR="$SIMULATION_BUILD/matplotlib"
           "$PYTHON" source/contrib/nmfd-timesteppers/tests/test_compare_explicit_lorenz_simulation.py
-          make test_explicit_lorenz_simulation_cpu.bin test_explicit_lorenz_simulation_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$SIMULATION_BUILD"
-          for backend in cpu cpu_omp; do
-            TRAJECTORY="$SIMULATION_BUILD/lorenz_${backend}_RK4.dat"
-            OMP_NUM_THREADS=8 "$SIMULATION_BUILD/test_explicit_lorenz_simulation_${backend}.bin" 0.1003 "$TRAJECTORY" RK4 constant 0.0005
-            "$PYTHON" source/contrib/nmfd-timesteppers/tests/compare_explicit_lorenz_simulation.py "$TRAJECTORY"
-            if OMP_NUM_THREADS=8 "$SIMULATION_BUILD/test_explicit_lorenz_simulation_${backend}.bin" 0.1 "$TRAJECTORY.invalid" RK4 scipy; then
-              echo "RK4 must reject embedded-error adaptation"
-              exit 1
-            fi
+          failed=0
+          for platform in SERIAL OMP; do
+            PYTHON="$PYTHON" make test-explicit-rk PLATFORM="$platform" CONFIG_FILE="$CONFIG_FILE" \
+              BUILD_DIR="$SIMULATION_BUILD" EXPLICIT_RK_OPTIONS="--group rk4-reference" || failed=1
           done
+          exit "$failed"
       - name: Save RK4 trajectories, comparisons, and plots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: timestepper-rk4-simulation
           path: |
-            ${{ env.BUILD_DIR }}/rk4_simulation/*.dat
-            ${{ env.BUILD_DIR }}/rk4_simulation/*.json
-            ${{ env.BUILD_DIR }}/rk4_simulation/*.png
-
-  timestepper-explicit-rossler-cpu:
-    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Test explicit rossler on serial and OMP
-        run: |
-          make test_explicit_rossler_cpu.bin test_explicit_rossler_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_rossler"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rossler/test_explicit_rossler_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_rossler/test_explicit_rossler_cpu_omp.bin
-
-  timestepper-explicit-vdp-cpu:
-    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Test explicit vdp on serial and OMP
-        run: |
-          make test_explicit_vdp_cpu.bin test_explicit_vdp_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_vdp"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_vdp/test_explicit_vdp_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/explicit_vdp/test_explicit_vdp_cpu_omp.bin
+            ${{ env.BUILD_DIR }}/rk4_simulation/*/rk4-reference/*.dat
+            ${{ env.BUILD_DIR }}/rk4_simulation/*/rk4-reference/*.json
+            ${{ env.BUILD_DIR }}/rk4_simulation/*/rk4-reference/*.png
+            ${{ env.BUILD_DIR }}/rk4_simulation/*/rk4-reference/*.log
 
   timestepper-explicit-cuda:
-    needs: [timestepper-tables-explicit-cpu, scfd-vector-operations-cuda]
+    needs: [timestepper-explicit-rk-cpu, scfd-vector-operations-cuda]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Test explicit RK when CUDA is available
+      - name: Verify explicit RK on CUDA
+        env:
+          GPU_POLICY: optional-on-hosted
         run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
-            echo "Skipping explicit CUDA RK: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping explicit CUDA RK: nvcc unavailable"
-            exit 0
-          fi
-          for test in rk lorenz rossler vdp; do
-            make "test_explicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_cuda" REAL_TYPE=double
-            ./"$BUILD_DIR"/explicit_cuda/"test_explicit_${test}_cuda.bin"
-          done
-          make check_timestepper_headers_cuda CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/explicit_cuda"
-
-  timestepper-dense-output-rk-cpu:
-    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-rk-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
+          source scripts/ci/hosted_gpu_policy.sh
+          dir="$BUILD_DIR/explicit_cuda"
+          mkdir -p "$dir"
+          nvcc=$(command -v "${NVCC:-nvcc}" || true)
+          if [[ -z ${NVCC:-} && -z $nvcc && -x /usr/local/cuda/bin/nvcc ]]; then nvcc=/usr/local/cuda/bin/nvcc; fi
+          if [[ -z $nvcc ]]; then gpu_unavailable cuda "$dir/backend.json" "compiler unavailable"; fi
+          if gpu_skip_allowed && ! nvidia-smi -L; then gpu_unavailable cuda "$dir/backend.json" "device unavailable"; fi
+          opts=(CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$dir" NVCC="$nvcc" REAL_TYPE=double)
+          make test-explicit-rk PLATFORM=CUDA "${opts[@]}"
+          make check_timestepper_headers_cuda test_transform_reduce_sum_cuda.bin "${opts[@]}"
+          "$dir/test_transform_reduce_sum_cuda.bin"
+      - uses: actions/upload-artifact@v6
+        if: always()
         with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Verify rk dense output on serial and OMP
-        run: |
-          make test_explicit_dense_output_cpu.bin test_explicit_dense_output_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dense_rk"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_rk/test_explicit_dense_output_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_rk/test_explicit_dense_output_cpu_omp.bin
-
-  timestepper-dense-output-lorenz-cpu:
-    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-rk-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Verify lorenz dense output on serial and OMP
-        run: |
-          make test_explicit_lorenz_dense_output_cpu.bin test_explicit_lorenz_dense_output_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dense_lorenz"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_lorenz/test_explicit_lorenz_dense_output_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_lorenz/test_explicit_lorenz_dense_output_cpu_omp.bin
-
-  timestepper-dense-output-rossler-cpu:
-    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-rk-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Verify rossler dense output on serial and OMP
-        run: |
-          make test_explicit_rossler_dense_output_cpu.bin test_explicit_rossler_dense_output_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dense_rossler"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_rossler/test_explicit_rossler_dense_output_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_rossler/test_explicit_rossler_dense_output_cpu_omp.bin
-
-  timestepper-dense-output-vdp-cpu:
-    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-rk-cpu]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Prepare hosted CPU compiler
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-          fi
-      - name: Verify vdp dense output on serial and OMP
-        run: |
-          make test_explicit_vdp_dense_output_cpu.bin test_explicit_vdp_dense_output_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dense_vdp"
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_vdp/test_explicit_vdp_dense_output_cpu.bin
-          OMP_NUM_THREADS=8 ./"$BUILD_DIR"/dense_vdp/test_explicit_vdp_dense_output_cpu_omp.bin
-
-  timestepper-dense-output-cuda:
-    needs: [timestepper-tables-explicit-cpu, timestepper-explicit-cuda]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Verify dense output when CUDA is available
-        run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
-            echo "Skipping CUDA dense output: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping CUDA dense output: nvcc unavailable"
-            exit 0
-          fi
-          for test in dense_output lorenz_dense_output rossler_dense_output vdp_dense_output; do
-            make "test_explicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/dense_cuda" REAL_TYPE=double
-            ./"$BUILD_DIR"/dense_cuda/"test_explicit_${test}_cuda.bin"
-          done
+          name: explicit-rk-CUDA
+          path: |
+            ${{ env.BUILD_DIR }}/explicit_cuda/**/*.log
+            ${{ env.BUILD_DIR }}/explicit_cuda/**/summary.json
+            ${{ env.BUILD_DIR }}/explicit_cuda/backend.json
 
   stability-reference-contract:
     runs-on: ubuntu-latest

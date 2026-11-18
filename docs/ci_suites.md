@@ -1,6 +1,8 @@
 # Directory CI suites
 
-The first suite is Cahn-Hilliard (CH). Its [case list](../source/nonlinear_operators/cahn_hilliard/tests/ch_ci.py) is shared by local runs and CI. The default [launcher](../source/nonlinear_operators/cahn_hilliard/tests/run_all.sh) is still the configurable plotting benchmark; put `--profile ci` first to use the registered CI cases.
+## Cahn-Hilliard
+
+The Cahn-Hilliard (CH) [case list](../source/nonlinear_operators/cahn_hilliard/tests/ch_ci.py) is shared by local runs and CI. The default [launcher](../source/nonlinear_operators/cahn_hilliard/tests/run_all.sh) is still the configurable plotting benchmark; put `--profile ci` first to use the registered CI cases.
 
 ```bash
 suite=source/nonlinear_operators/cahn_hilliard/tests/run_all.sh
@@ -20,6 +22,19 @@ The four contracts are split residual/Jacobian, energy, split lifecycle and unsp
 
 `--group all` runs contracts and benchmarks for the selected platform. Use `--group sanitizers` separately on SERIAL. `-B` builds only; it neither probes hardware nor counts as an execution pass. Set `--config-file` and repeat `--make-option KEY=VALUE` for the site toolchain. Use a separate build root per compiler. The suite writes a status per case in `PLATFORM/group/summary.json`, keeps logs for failed cases, and exits nonzero if any case fails. The plotting runner still saves timestamped numerical results and figures.
 
+## Explicit Runge-Kutta
+
+The timestepper module owns the [explicit RK cases](../source/contrib/nmfd-timesteppers/tests/explicit_ci.py); the parent Make target supplies the same build configuration as its other tests. For example:
+
+```bash
+make test-explicit-rk PLATFORM=OMP CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/explicit_ci
+make test-explicit-rk PLATFORM=OMP EXPLICIT_RK_OPTIONS='--group dop853-reference --list'
+```
+
+The default group runs 16 numerical cases on each of SERIAL, OMP and CUDA, plus the coefficient tables on SERIAL and the DOP853 Lorenz trajectory on CUDA. HIP was not in this explicit RK matrix and is rejected rather than silently skipped. CPU and CUDA public-header builds and the SCFD CUDA reduction remain parent checks. Three CPU reference groups (`dop853-reference`, `lorenz-reference`, `rk4-reference`) retain the independent Python comparisons; the mixed Lorenz job also retains its implicit benchmarks.
+
+Each group reports per-case results in `BUILD_DIR/PLATFORM/group/summary.json` and writes a log per case. A failed case makes the group fail without hiding later cases. Core workflow artifacts are named `explicit-rk-SERIAL`, `explicit-rk-OMP` and `explicit-rk-CUDA`. An unavailable optional hosted GPU publishes `backend.json`, not a numerical pass. Use `EXPLICIT_RK_OPTIONS=-B` for a forced build without execution.
+
 ## Required vs optional hardware
 
 Select the expected platform explicitly; never infer the test list from installed compilers. A requested local/self-hosted GPU must compile, link, launch and synchronize a kernel and read the expected value before running numerical cases. A compile or runtime failure is fatal; no CPU fallback is allowed. The direct suite is always strict. Only the optional accelerator steps in the hosted workflow may skip for absent hardware/toolchains, and only with an explicit `optional-on-hosted` policy **and** GitHub's [hosted runner identity](https://docs.github.com/en/actions/reference/workflows-and-actions/variables). Once selected for execution, even a hosted probe or test failure is fatal.
@@ -32,4 +47,4 @@ At the pilot baseline the parent [Operations workflow](../.github/workflows/oper
 
 Implicit sanitizer tests run in six method-family groups. Each runner builds at most two binaries concurrently, then runs its cases one at a time with ASan/UBSan and the existing 90-second per-binary timeout. To reproduce a group locally, use its `bash scripts/ci/run_timestepper_sanitizers.sh ...` command and sanitizer environment from the workflow.
 
-Subsequent batches should inventory actual cases inside each job (including compiler variants, sanitizers, Python checks, and backend-specific exceptions) before removing its graph nodes. The CH policy is not yet a claim of strict GPU coverage for unmigrated legacy jobs.
+The explicit RK batch replaced 27 core jobs with three platform runs under two job definitions. Across Operations this changed 190 job definitions (222 after matrix expansion) to 165 (198 after expansion). Independent reference, sanitizer and final KS1D gates remain separate. Subsequent batches should inventory cases and compare hosted runtime before regrouping another family. The hardware policy above is not a claim of strict GPU coverage for unmigrated legacy jobs.
