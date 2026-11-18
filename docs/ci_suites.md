@@ -24,7 +24,7 @@ The four contracts are split residual/Jacobian, energy, split lifecycle and unsp
 
 ## Explicit Runge-Kutta
 
-The timestepper module owns the [explicit RK cases](../source/contrib/nmfd-timesteppers/tests/explicit_ci.py); the parent Make target supplies the same build configuration as its other tests. For example:
+The timestepper module owns the [RK case inventory](../source/contrib/nmfd-timesteppers/tests/rk_ci.py); the parent Make target supplies the same build configuration as its other tests. For example:
 
 ```bash
 make test-explicit-rk PLATFORM=OMP CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/explicit_ci
@@ -34,6 +34,21 @@ make test-explicit-rk PLATFORM=OMP EXPLICIT_RK_OPTIONS='--group dop853-reference
 The default group runs 16 numerical cases on each of SERIAL, OMP and CUDA, plus the coefficient tables on SERIAL and the DOP853 Lorenz trajectory on CUDA. HIP was not in this explicit RK matrix and is rejected rather than silently skipped. CPU and CUDA public-header builds and the SCFD CUDA reduction remain parent checks. Three CPU reference groups (`dop853-reference`, `lorenz-reference`, `rk4-reference`) retain the independent Python comparisons; the mixed Lorenz job also retains its implicit benchmarks.
 
 Each group reports per-case results in `BUILD_DIR/PLATFORM/group/summary.json` and writes a log per case. A failed case makes the group fail without hiding later cases. Core workflow artifacts are named `explicit-rk-SERIAL`, `explicit-rk-OMP` and `explicit-rk-CUDA`. An unavailable optional hosted GPU publishes `backend.json`, not a numerical pass. Use `EXPLICIT_RK_OPTIONS=-B` for a forced build without execution.
+
+## Implicit Runge-Kutta
+
+| CI group | Cases on SERIAL, OMP and CUDA |
+| --- | --- |
+| `dirk-core` | DIRK, adaptation, mass/DAE, lifecycle, non-autonomous, Lorenz, Rossler and Van der Pol. SERIAL also runs the implicit coefficient tables. |
+| `dirk-extensions` | Three ESDIRK, three dense-output, globalization and four steady-state cases. |
+
+```bash
+make test-rk PLATFORM=OMP CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
+    BUILD_DIR=build/dirk_ci RK_TEST_OPTIONS='--group dirk-extensions'
+make test-rk PLATFORM=CUDA RK_TEST_OPTIONS='--group dirk-core --list'
+```
+
+Both groups use the same per-case logs and summaries as explicit RK. Artifacts are named `<group>-<platform>`. CPU cases use two OpenMP threads and the original 120/180-second budgets; CUDA cases keep their 300-second budgets and require the device probe before execution. HIP was not registered for these cases. The six sanitizer groups remain independent.
 
 ## Required vs optional hardware
 
@@ -47,4 +62,4 @@ At the pilot baseline the parent [Operations workflow](../.github/workflows/oper
 
 Implicit sanitizer tests run in six method-family groups. Each runner builds at most two binaries concurrently, then runs its cases one at a time with ASan/UBSan and the existing 90-second per-binary timeout. To reproduce a group locally, use its `bash scripts/ci/run_timestepper_sanitizers.sh ...` command and sanitizer environment from the workflow.
 
-The explicit RK batch replaced 27 core jobs with three platform runs under two job definitions. Across Operations this changed 190 job definitions (222 after matrix expansion) to 165 (198 after expansion). Independent reference, sanitizer and final KS1D gates remain separate. Subsequent batches should inventory cases and compare hosted runtime before regrouping another family. The hardware policy above is not a claim of strict GPU coverage for unmigrated legacy jobs.
+The explicit RK batch replaced 27 core jobs with three platform runs under two job definitions. The DIRK batch replaced 23 jobs with six platform/group runs under two definitions, preserving 58 binary executions when CUDA is available. Together these changed Operations from 190 job definitions (222 after matrix expansion) to 144 (181 after expansion). Independent reference, sanitizer and final KS1D gates remain separate. Subsequent batches should inventory cases and compare hosted runtime before regrouping another family. The hardware policy above is not a claim of strict GPU coverage for unmigrated legacy jobs.

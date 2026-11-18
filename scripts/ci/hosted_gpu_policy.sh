@@ -14,3 +14,15 @@ gpu_unavailable() {
         "$platform" "$result" "$reason" | tee "$report"
     exit "$code"
 }
+
+# Export the selected compiler for Make; only the optional hosted lane may skip.
+select_cuda_compiler() {
+    local report=$1 compiler
+    compiler=$(command -v "${NVCC:-nvcc}" || true)
+    if [[ -z ${NVCC:-} && -z $compiler && -x /usr/local/cuda/bin/nvcc ]]; then
+        compiler=/usr/local/cuda/bin/nvcc
+    fi
+    if [[ -z $compiler ]]; then gpu_unavailable cuda "$report" "compiler unavailable"; fi
+    if gpu_skip_allowed && ! nvidia-smi -L; then gpu_unavailable cuda "$report" "device unavailable"; fi
+    export NVCC="$compiler"
+}

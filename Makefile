@@ -1344,11 +1344,12 @@ CH_BENCHMARK_OPTIONS ?=
 # SCFD-style platform selection for migrated suites only. Existing backend-specific
 # targets retain their names and do not inherit a new compiler or preprocessor flag.
 PLATFORM ?= SERIAL
-.PHONY: test-explicit-rk
-test-explicit-rk:
+RK_TEST_OPTIONS ?= $(EXPLICIT_RK_OPTIONS)
+.PHONY: test-explicit-rk test-rk
+test-explicit-rk test-rk:
 	PLATFORM="$(PLATFORM)" CONFIG_FILE="$(abspath $(CONFIG_FILE))" NVCC="$(NVCC)" \
 	    bash "$(NMFD_TIMESTEPPERS_ROOT)/tests/run_all.sh" --profile ci --make-dir "$(CURDIR)" \
-	    --device-probe-target ci-device-probe --build-dir "$(BUILD_DIR)" $(EXPLICIT_RK_OPTIONS)
+	    --device-probe-target ci-device-probe --build-dir "$(BUILD_DIR)" $(RK_TEST_OPTIONS)
 
 .PHONY: test-ch ci-device-probe
 test-ch:

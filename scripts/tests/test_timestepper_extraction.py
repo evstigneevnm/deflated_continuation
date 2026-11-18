@@ -113,9 +113,15 @@ class TimestepperExtractionTest(unittest.TestCase):
         self.assertNotIn(".cpp", link)
         self.assertIn("cuda_reductions.o", link)
 
-    def test_explicit_cuda_missing_compiler_fails_except_on_optional_hosted_runner(self):
+    def test_rk_cuda_missing_compiler_fails_except_on_optional_hosted_runner(self):
         jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
-        step = next(s for s in jobs["timestepper-explicit-cuda"]["steps"] if "run" in s)
+        for job, directory in (("timestepper-explicit-cuda", "explicit_cuda"),
+                               ("timestepper-implicit-dirk-cuda", "dirk_ci")):
+            step = next(s for s in jobs[job]["steps"] if "run" in s)
+            with self.subTest(job=job):
+                self.check_missing_compiler(step, directory)
+
+    def check_missing_compiler(self, step, directory):
         for runner, actions, expected in (("github-hosted", "true", "skipped"),
                                           ("self-hosted", "true", "failed"), ("", "", "failed")):
             with self.subTest(runner=runner), tempfile.TemporaryDirectory() as tmp:
@@ -124,7 +130,7 @@ class TimestepperExtractionTest(unittest.TestCase):
                 result = subprocess.run(["bash", "-eu", "-c", step["run"]], cwd=ROOT, env=env,
                                         capture_output=True, text=True, timeout=10)
                 self.assertEqual(result.returncode, 0 if expected == "skipped" else 1, result.stderr)
-                report = json.loads((Path(tmp)/"explicit_cuda/backend.json").read_text())
+                report = json.loads((Path(tmp)/directory/"backend.json").read_text())
                 self.assertEqual(report["result"], expected)
                 self.assertFalse(report["executed"])
 
@@ -159,10 +165,6 @@ class TimestepperExtractionTest(unittest.TestCase):
         self.assertIn("-I../nmfd-linsolvers/include", output)
         header = (MODULE / "include/nmfd/time_steppers/runge_kutta/implicit_time_step.h").read_text()
         self.assertNotIn("#include <nmfd/solvers/", header)
-        workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
-        for test in ("dirk", "adaptive", "mass-dae", "lifecycle", "lorenz", "rossler", "vdp", "nonautonomous"):
-            for backend in ("cpu", "cuda"):
-                self.assertIn(f"timestepper-implicit-{test}-{backend}", workflow["jobs"])
 
     def test_rosenbrock_engine_is_standalone_and_required_by_ci(self):
         tests = ("rosenbrock", "rosenbrock_lifecycle", "rosenbrock_backend",
@@ -236,104 +238,48 @@ class TimestepperExtractionTest(unittest.TestCase):
             dependencies = next(line for line in output.splitlines() if line.startswith(target + ":"))
             self.assertIn("include/nmfd/time_steppers/bdf/implicit_time_step.h", dependencies)
 
-    def test_adaptive_dirk_is_built_standalone_and_required_by_ci(self):
-        output = self.make(MODULE, "test_implicit_adaptive_cpu.bin", "BUILD_DIR=build/adaptive_probe")
-        self.assertIn("tests/test_implicit_adaptive.cpp", output)
-        workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
-        jobs = workflow["jobs"]
-        self.assertIn("timestepper-implicit-adaptive-cuda", jobs["all-tests-passed"]["needs"])
-        self.assertIn("timestepper-implicit-adaptive-cpu", jobs["timestepper-implicit-adaptive-cuda"]["needs"])
-        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
-        self.assertIn("timestepper-implicit-adaptive-cpu", sanitizer["needs"])
-        self.assertTrue({"implicit_" + name for name in ("dirk", "adaptive", "mass_dae", "lifecycle", "nonautonomous")}
-                        <= self.sanitizer_cases(sanitizer))
-
-    def test_adaptive_system_matrix_runs_on_all_supported_test_backends(self):
+    def test_grouped_dirk_inventory_and_dependencies(self):
         jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
-        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
-        sanitizer_cases = self.sanitizer_cases(sanitizer)
-        for system in ("lorenz", "rossler", "vdp", "mass-dae"):
-            cpu_job = f"timestepper-implicit-{system}-cpu"
-            self.assertIn("timestepper-implicit-adaptive-cpu", jobs[cpu_job]["needs"])
-            self.assertIn(cpu_job, sanitizer["needs"])
-            target = "test_implicit_" + system.replace("-", "_")
-            self.assertIn(target.removeprefix("test_"), sanitizer_cases)
-            for backend in ("cpu", "cuda"):
-                steps = jobs[f"timestepper-implicit-{system}-{backend}"]["steps"]
-                commands = "\n".join(step.get("run", "") for step in steps)
-                self.assertIn(target + f"_{backend}.bin", commands)
-            cpu_commands = "\n".join(step.get("run", "") for step in jobs[cpu_job]["steps"])
-            self.assertIn(target + "_cpu_omp.bin", cpu_commands)
-        self.assertIn("explicit_nonautonomous", sanitizer_cases)
+        cpu, cuda = "timestepper-implicit-dirk-cpu", "timestepper-implicit-dirk-cuda"
+        groups = ["dirk-core", "dirk-extensions"]
+        self.assertEqual(jobs[cpu]["strategy"]["matrix"], {"group": groups, "platform": ["SERIAL", "OMP"]})
+        self.assertEqual(jobs[cuda]["strategy"]["matrix"], {"group": groups})
+        self.assertIn(cpu, jobs[cuda]["needs"])
+        self.assertIn("scfd-vector-operations-cuda", jobs[cuda]["needs"])
+        self.assertIn(cuda, jobs["all-tests-passed"]["needs"])
+        for dependent in ("timestepper-implicit-sanitizers-cpu", "periodic-orbit-sections-cpu",
+                          "timestepper-pde-cpu", "timestepper-bdf-cpu", "timestepper-imex-cpu"):
+            self.assertIn(cpu, jobs[dependent]["needs"])
+        for job in (cpu, cuda):
+            self.assertFalse(jobs[job]["strategy"]["fail-fast"])
+            commands = "\n".join(step.get("run", "") for step in jobs[job]["steps"])
+            self.assertIn("make test-rk PLATFORM=", commands)
+            self.assertIn("RK_TEST_OPTIONS=\"--group ", commands)
+            self.assertTrue(any(step.get("if") == "always()" and "summary.json" in step["with"]["path"]
+                                for step in jobs[job]["steps"] if step.get("uses", "").startswith("actions/upload-")))
 
-    def test_globalization_is_standalone_and_required_by_ci(self):
-        tests = ("globalization", "nonnormal_steady_state", "lorenz_steady_state",
-                 "rossler_steady_state", "vdp_steady_state")
-        test_loop = "for test in " + " ".join(tests) + "; do"
-        for directory in (ROOT, MODULE):
-            for test in tests:
-                output = self.make(directory, f"test_implicit_{test}_cpu_omp.bin",
-                                   "BUILD_DIR=build/globalization_probe")
-                self.assertIn(f"tests/test_implicit_{test}.cpp", output)
-        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
-        self.assertIn("timestepper-implicit-globalization-cuda", jobs["all-tests-passed"]["needs"])
-        for backend in ("cpu", "cuda"):
-            commands = "\n".join(step.get("run", "") for step in
-                                 jobs[f"timestepper-implicit-globalization-{backend}"]["steps"])
-            self.assertIn(test_loop, commands)
-            self.assertIn("test_implicit_${test}_" + backend + ".bin", commands)
-            if backend == "cpu":
-                self.assertIn("test_implicit_${test}_cpu_omp.bin", commands)
-                self.assertIn("for backend in cpu cpu_omp; do", commands)
-                self.assertIn("test_implicit_${test}_${backend}.bin", commands)
-        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
-        self.assertIn("timestepper-implicit-globalization-cpu", sanitizer["needs"])
-        self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))
-
-    def test_esdirk_rate_matrix_is_standalone_and_required_by_ci(self):
-        tests = ("esdirk", "esdirk_adaptive", "esdirk_mass_dae")
-        test_loop = "for test in " + " ".join(tests) + "; do"
-        for directory in (ROOT, MODULE):
-            for test in tests:
-                output = self.make(directory, f"test_implicit_{test}_cpu_omp.bin",
-                                   "BUILD_DIR=build/esdirk_probe")
-                self.assertIn(f"tests/test_implicit_{test}.cpp", output)
-        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
-        self.assertIn("timestepper-implicit-esdirk-cuda", jobs["all-tests-passed"]["needs"])
-        for backend in ("cpu", "cuda"):
-            commands = "\n".join(step.get("run", "") for step in
-                                 jobs[f"timestepper-implicit-esdirk-{backend}"]["steps"])
-            self.assertIn(test_loop, commands)
-            self.assertIn("test_implicit_${test}_" + backend + ".bin", commands)
-            if backend == "cpu":
-                self.assertIn("test_implicit_${test}_cpu_omp.bin", commands)
-                self.assertIn("test_implicit_${test}_${backend}.bin", commands)
-        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
-        self.assertIn("timestepper-implicit-esdirk-cpu", sanitizer["needs"])
-        self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))
-
-    def test_implicit_dense_matrix_is_standalone_and_required_by_ci(self):
-        tests = ("dense_output", "dense_lifecycle", "dense_mass_dae")
-        for directory in (ROOT, MODULE):
-            for test in tests:
-                output = self.make(directory, f"test_implicit_{test}_cpu_omp.bin",
-                                   "BUILD_DIR=build/implicit_dense_probe")
-                self.assertIn(f"tests/test_implicit_{test}.cpp", output)
-        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
-        self.assertIn("timestepper-implicit-dense-cuda", jobs["all-tests-passed"]["needs"])
-        self.assertIn("timestepper-implicit-dense-cpu", jobs["timestepper-implicit-dense-cuda"]["needs"])
-        test_loop = "for test in " + " ".join(tests) + "; do"
-        for backend in ("cpu", "cuda"):
-            commands = "\n".join(step.get("run", "") for step in
-                                 jobs[f"timestepper-implicit-dense-{backend}"]["steps"])
-            self.assertIn(test_loop, commands)
-            self.assertIn("test_implicit_${test}_" + backend + ".bin", commands)
-            if backend == "cpu":
-                self.assertIn("test_implicit_${test}_cpu_omp.bin", commands)
-                self.assertIn("test_implicit_${test}_${backend}.bin", commands)
-        sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
-        self.assertIn("timestepper-implicit-dense-cpu", sanitizer["needs"])
-        self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))
+        expected = set(("dirk adaptive mass_dae lifecycle nonautonomous lorenz rossler vdp "
+                        "esdirk esdirk_adaptive esdirk_mass_dae dense_output dense_lifecycle dense_mass_dae "
+                        "globalization nonnormal_steady_state lorenz_steady_state rossler_steady_state "
+                        "vdp_steady_state").split())
+        for platform, suffix in (("SERIAL", "cpu"), ("OMP", "cpu_omp"), ("CUDA", "cuda")):
+            targets = []
+            for group in groups:
+                listing = subprocess.check_output(
+                    ["bash", str(MODULE/"tests/run_all.sh"), "--profile", "ci", "--group", group, "--list"],
+                    env=dict(os.environ, PLATFORM=platform, PYTHON=sys.executable), text=True)
+                targets.extend(line.split()[1] for line in listing.splitlines())
+            baseline = [f"test_implicit_{name}_{suffix}.bin" for name in expected]
+            if platform == "SERIAL":
+                baseline.append("test_rk_tables_implicit.bin")
+            self.assertCountEqual(targets, baseline)
+            for directory in (ROOT, MODULE):
+                output = self.make(directory, *targets, "BUILD_DIR=build/dirk_inventory_probe")
+                for name in expected:
+                    self.assertIn(f"tests/test_implicit_{name}.cpp", output)
+        sanitizer = self.sanitizer_cases(jobs["timestepper-implicit-sanitizers-cpu"])
+        self.assertTrue({f"implicit_{name}" for name in expected} <= sanitizer)
+        self.assertIn("explicit_nonautonomous", sanitizer)
 
     def test_imex_execution_is_built_standalone_and_required_by_ci(self):
         tests = ("imex", "imex_adaptive", "imex_mass", "imex_lifecycle", "imex_backend", "imex_benchmarks",
@@ -366,12 +312,11 @@ class TimestepperExtractionTest(unittest.TestCase):
             self.assertNotIn("nmfd-newton/include", output)
             self.assertNotIn("nmfd-linsolvers/include", output)
         jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
-        self.assertIn("timestepper-explicit-rk-cpu", jobs["timestepper-implicit-adaptive-cpu"]["needs"])
+        self.assertIn("timestepper-explicit-rk-cpu", jobs["timestepper-implicit-dirk-cpu"]["needs"])
         self.assertIn("timestepper-explicit-cuda", jobs["all-tests-passed"]["needs"])
         self.assertIn("explicit_filter_adaptation", self.sanitizer_cases(jobs["timestepper-implicit-sanitizers-cpu"]))
 
     def test_nonautonomous_matrix_preserves_explicit_independence(self):
-        workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
         for mode in ("explicit", "implicit"):
             output = self.make(ROOT, f"test_{mode}_nonautonomous_cpu.bin",
                                "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc",
@@ -381,8 +326,7 @@ class TimestepperExtractionTest(unittest.TestCase):
                 self.assertNotIn("nmfd-newton/include", output)
                 self.assertNotIn("nmfd-linsolvers/include", output)
             else:
-                for backend in ("cpu", "cuda"):
-                    self.assertIn(f"timestepper-implicit-nonautonomous-{backend}", workflow["jobs"])
+                self.assertIn("nmfd-newton/include", output)
 
     def test_visual_benchmark_runner_is_standalone_and_tested_in_ci(self):
         for backend in ("cpu", "cpu_omp", "cuda"):
