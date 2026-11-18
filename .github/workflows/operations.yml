@@ -68,7 +68,7 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p test_nmfd_standalone.py
           python3 -m unittest discover -s scripts/tests -p test_timestepper_extraction.py
           python3 source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py
-          python3 -S source/contrib/nmfd-timesteppers/tests/test_rk_ci.py
+          python3 -S source/contrib/nmfd-timesteppers/tests/test_timestepper_ci.py
           python3 -m unittest discover -s scripts/tests -p test_ks1d_reference.py
           python3 -m unittest discover -s scripts/tests -p test_write_ks1d_ci_config.py
           python3 scripts/check_operations_dependencies.py
@@ -1645,20 +1645,17 @@ jobs:
           submodules: true
       - name: Prepare Clang OpenMP runtime
         if: matrix.compiler == 'clang++'
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            sudo apt-get update
-            sudo apt-get install -y libomp-dev
-          fi
-      - name: Verify BDF orders, committed history, mass and transfer guards
-        run: |
-          make check_timestepper_headers_cpu "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
-          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend bdf_adaptive bdf_adaptive_lifecycle bdf_adaptive_mass_dae bdf_orders bdf_variable_order bdf_stability bdf_dense bdf_dense_lifecycle bdf_dense_mass_dae; do
-            make -j2 "test_implicit_${test}_cpu.bin" "test_implicit_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/bdf"
-            for backend in cpu cpu_omp; do
-              OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/bdf/"test_implicit_${test}_${backend}.bin"
-            done
-          done
+        timeout-minutes: 3
+        run: bash scripts/ci/prepare_hosted_openmp.sh
+      - name: Verify BDF headers and contracts on serial CPU and OpenMP
+        run: bash scripts/ci/run_timestepper_family.sh bdf CPU '${{ matrix.compiler }}'
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: bdf-${{ matrix.compiler }}
+          path: |
+            ${{ env.BUILD_DIR }}/bdf/**/*.log
+            ${{ env.BUILD_DIR }}/bdf/**/summary.json
 
   timestepper-bdf-cuda:
     needs: [timestepper-bdf-cpu, scfd-vector-operations-cuda]
@@ -1668,20 +1665,18 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify BDF when CUDA is available
-        run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
-            echo "Skipping BDF CUDA tests: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping BDF CUDA tests: nvcc unavailable"
-            exit 0
-          fi
-          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend bdf_adaptive bdf_adaptive_lifecycle bdf_adaptive_mass_dae bdf_orders bdf_variable_order bdf_stability bdf_dense bdf_dense_lifecycle bdf_dense_mass_dae; do
-            make "test_implicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/bdf_cuda"
-            timeout 300s ./"$BUILD_DIR"/bdf_cuda/"test_implicit_${test}_cuda.bin"
-          done
+      - name: Run BDF contracts on CUDA
+        env:
+          GPU_POLICY: optional-on-hosted
+        run: bash scripts/ci/run_timestepper_family.sh bdf CUDA
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: bdf-CUDA
+          path: |
+            ${{ env.BUILD_DIR }}/bdf_cuda/**/*.log
+            ${{ env.BUILD_DIR }}/bdf_cuda/**/summary.json
+            ${{ env.BUILD_DIR }}/bdf_cuda/backend.json
 
   timestepper-bdf-hip:
     needs: [timestepper-bdf-cpu, scfd-vector-operations-hip]
@@ -1691,31 +1686,19 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify BDF when HIP is available
-        run: |
-          HIPCC_BIN="$(command -v "${HIPCC:-hipcc}" || true)"
-          if [ -z "$HIPCC_BIN" ]; then
-            echo "Skipping BDF HIP tests: hipcc unavailable"
-            exit 0
-          fi
-          HIP_ROOT="${ROCM_PATH:-$(dirname "$(dirname "$HIPCC_BIN")")}"
-          if "$HIPCC_BIN" --version | grep -qi nvcc; then
-            if ! nvidia-smi -L >/dev/null 2>&1; then
-              echo "Skipping BDF HIP tests: no usable NVIDIA GPU"
-              exit 0
-            fi
-            HIP_TARGET="${HIP_ARCH_LIST:-75}"
-          else
-            if ! "$HIP_ROOT/bin/rocm-smi" >/dev/null 2>&1; then
-              echo "Skipping BDF HIP tests: no usable AMD GPU"
-              exit 0
-            fi
-            HIP_TARGET="${HIP_ARCH_LIST:-native}"
-          fi
-          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend bdf_adaptive bdf_adaptive_lifecycle bdf_adaptive_mass_dae bdf_orders bdf_variable_order bdf_stability bdf_dense bdf_dense_lifecycle bdf_dense_mass_dae; do
-            make "test_implicit_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/bdf_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
-            timeout 300s ./"$BUILD_DIR"/bdf_hip/"test_implicit_${test}_hip.bin"
-          done
+      - name: Run BDF contracts on HIP
+        env:
+          GPU_POLICY: optional-on-hosted
+        run: bash scripts/ci/run_timestepper_family.sh bdf HIP
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: bdf-HIP
+          path: |
+            ${{ env.BUILD_DIR }}/bdf_hip/**/*.log
+            ${{ env.BUILD_DIR }}/bdf_hip/**/summary.json
+            ${{ env.BUILD_DIR }}/bdf_hip/backend.json
+            ${{ env.BUILD_DIR }}/bdf_hip/compiler.txt
 
   timestepper-imex-cpu:
     needs: [timestepper-implicit-dirk-cpu, timestepper-explicit-rk-cpu]
@@ -1732,28 +1715,9 @@ jobs:
       - name: Prepare Clang OpenMP runtime
         if: matrix.compiler == 'clang++'
         timeout-minutes: 3
-        run: |
-          if [[ ${RUNNER_ENVIRONMENT:-} == github-hosted && ${GITHUB_ACTIONS:-} == true ]]; then
-            probe="$RUNNER_TEMP/imex_openmp"
-            if printf '#include <omp.h>\nint main() { return omp_get_max_threads() < 1; }\n' | \
-               clang++ -fopenmp -x c++ - -o "$probe" && "$probe"; then
-              exit 0
-            fi
-            sudo apt-get -o Acquire::Retries=1 update
-            sudo apt-get -o Acquire::Retries=1 install -y --no-install-recommends libomp-dev
-          fi
+        run: bash scripts/ci/prepare_hosted_openmp.sh
       - name: Verify IMEX headers and contracts on serial CPU and OpenMP
-        run: |
-          compiler='${{ matrix.compiler }}'
-          dir="$BUILD_DIR/imex/$compiler"
-          config=build_configs/config_github_ubuntu_cpu.inc
-          make check_timestepper_headers_cpu "G++ = $compiler" CONFIG_FILE="$config" BUILD_DIR="$dir"
-          failed=0
-          for platform in SERIAL OMP; do
-            make test-rk PLATFORM="$platform" "G++ = $compiler" CONFIG_FILE="$config" \
-              BUILD_DIR="$dir" RK_TEST_OPTIONS="--group imex" || failed=1
-          done
-          exit "$failed"
+        run: bash scripts/ci/run_timestepper_family.sh imex CPU '${{ matrix.compiler }}'
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -1773,13 +1737,7 @@ jobs:
       - name: Run IMEX contracts on CUDA
         env:
           GPU_POLICY: optional-on-hosted
-        run: |
-          source scripts/ci/hosted_gpu_policy.sh
-          dir="$BUILD_DIR/imex_cuda"
-          mkdir -p "$dir"
-          select_cuda_compiler "$dir/backend.json"
-          make test-rk PLATFORM=CUDA RK_TEST_OPTIONS="--group imex" CONFIG_FILE="$CONFIG_FILE" \
-            BUILD_DIR="$dir" NVCC="$NVCC"
+        run: bash scripts/ci/run_timestepper_family.sh imex CUDA
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -1800,13 +1758,7 @@ jobs:
       - name: Run IMEX contracts on HIP
         env:
           GPU_POLICY: optional-on-hosted
-        run: |
-          source scripts/ci/hosted_gpu_policy.sh
-          dir="$BUILD_DIR/imex_hip"
-          mkdir -p "$dir"
-          select_hip_compiler "$dir"
-          make test-rk PLATFORM=HIP RK_TEST_OPTIONS="--group imex" CONFIG_FILE="$CONFIG_FILE" \
-            BUILD_DIR="$dir" HIPCC="$HIPCC" HIP_ROOT_PATH="$HIP_ROOT_PATH" HIP_PATH="$HIP_PATH" HIP_ARCH_LIST="$HIP_ARCH_LIST"
+        run: bash scripts/ci/run_timestepper_family.sh imex HIP
       - uses: actions/upload-artifact@v6
         if: always()
         with:

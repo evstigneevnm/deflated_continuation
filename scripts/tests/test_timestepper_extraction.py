@@ -113,11 +113,12 @@ class TimestepperExtractionTest(unittest.TestCase):
         self.assertNotIn(".cpp", link)
         self.assertIn("cuda_reductions.o", link)
 
-    def test_rk_missing_gpu_compiler_fails_except_on_optional_hosted_runner(self):
+    def test_missing_gpu_compiler_fails_except_on_optional_hosted_runner(self):
         jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
         for job, directory in (("timestepper-explicit-cuda", "explicit_cuda"),
                                ("timestepper-implicit-dirk-cuda", "dirk_ci"),
-                               ("timestepper-imex-cuda", "imex_cuda"), ("timestepper-imex-hip", "imex_hip")):
+                               ("timestepper-imex-cuda", "imex_cuda"), ("timestepper-imex-hip", "imex_hip"),
+                               ("timestepper-bdf-cuda", "bdf_cuda"), ("timestepper-bdf-hip", "bdf_hip")):
             step = next(s for s in jobs[job]["steps"] if "run" in s)
             with self.subTest(job=job):
                 self.check_missing_compiler(step, directory)
@@ -234,15 +235,7 @@ class TimestepperExtractionTest(unittest.TestCase):
                 output = self.make(directory, f"test_implicit_{test}_cpu.bin", "BUILD_DIR=build/bdf_probe")
                 self.assertIn(f"tests/test_implicit_{test}.cpp", output)
         jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
-        self.assertEqual(jobs["timestepper-bdf-cpu"]["strategy"]["matrix"]["compiler"], ["g++", "clang++"])
-        for backend in ("cuda", "hip"):
-            self.assertIn(f"timestepper-bdf-{backend}", jobs["all-tests-passed"]["needs"])
-            self.assertIn("timestepper-bdf-cpu", jobs[f"timestepper-bdf-{backend}"]["needs"])
-        loop = "for test in " + " ".join(tests) + "; do"
-        for backend in ("cpu", "cuda", "hip"):
-            commands = "\n".join(step.get("run", "") for step in jobs[f"timestepper-bdf-{backend}"]["steps"])
-            self.assertIn(loop, commands)
-            self.assertIn("test_implicit_${test}_" + backend + ".bin", commands)
+        self.check_family_workflow(jobs, "bdf", tests)
         sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
         self.assertIn("timestepper-bdf-cpu", sanitizer["needs"])
         self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))
@@ -310,36 +303,81 @@ class TimestepperExtractionTest(unittest.TestCase):
                                    "BUILD_DIR=build/imex_probe")
                 self.assertIn(f"tests/test_implicit_{test}.cpp", output)
         jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
-        self.assertIn("timestepper-imex-cuda", jobs["all-tests-passed"]["needs"])
-        self.assertIn("timestepper-imex-hip", jobs["all-tests-passed"]["needs"])
-        self.assertEqual(jobs["timestepper-imex-cpu"]["strategy"]["matrix"]["compiler"], ["g++", "clang++"])
-        self.assertIn("timestepper-imex-cpu", jobs["timestepper-imex-cuda"]["needs"])
-        for backend in ("cpu", "cuda", "hip"):
-            job = jobs[f"timestepper-imex-{backend}"]
-            commands = "\n".join(step.get("run", "") for step in job["steps"])
-            self.assertIn('RK_TEST_OPTIONS="--group imex"', commands)
-            self.assertTrue(any(s.get("if") == "always()" and "summary.json" in s["with"]["path"]
-                                for s in job["steps"] if s.get("uses", "").startswith("actions/upload-artifact")))
-            if backend == "cpu":
-                self.assertIn('make check_timestepper_headers_cpu "G++ = $compiler"', commands)
-                self.assertIn("for platform in SERIAL OMP", commands)
-                self.assertIn('make test-rk PLATFORM="$platform" "G++ = $compiler"', commands)
-                for compiler in ("g++", "clang++"):
-                    invocation = self.make(ROOT, "test-rk", f"G++ = {compiler}", "PLATFORM=OMP",
-                                           "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc")
-                    self.assertIn(f'--make-option "G++ = {compiler}"', invocation)
-            else:
-                self.assertIn(f"make test-rk PLATFORM={backend.upper()}", commands)
-                self.assertIn("timestepper-imex-cpu", job["needs"])
-        for platform, backend in (("SERIAL", "cpu"), ("OMP", "cpu_omp"), ("CUDA", "cuda"), ("HIP", "hip")):
-            listing = subprocess.check_output(
-                ["bash", str(MODULE/"tests/run_all.sh"), "--profile", "ci", "--group", "imex", "--list"],
-                env=dict(os.environ, PLATFORM=platform, PYTHON=sys.executable), text=True)
-            self.assertCountEqual([line.split()[1] for line in listing.splitlines()],
-                                  [f"test_implicit_{test}_{backend}.bin" for test in tests])
+        self.check_family_workflow(jobs, "imex", tests)
         sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
         self.assertIn("timestepper-imex-cpu", sanitizer["needs"])
         self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))
+
+    def check_family_workflow(self, jobs, family, tests):
+        cpu_job = f"timestepper-{family}-cpu"
+        self.assertEqual(jobs[cpu_job]["strategy"]["matrix"]["compiler"], ["g++", "clang++"])
+        for backend in ("cpu", "cuda", "hip"):
+            name = f"timestepper-{family}-{backend}"
+            job = jobs[name]
+            command = f"bash scripts/ci/run_timestepper_family.sh {family} {backend.upper()}"
+            if backend == "cpu":
+                command += " '${{ matrix.compiler }}'"
+            self.assertIn(command, [s.get("run") for s in job["steps"]])
+            self.assertTrue(any(s.get("if") == "always()" and "summary.json" in s["with"]["path"]
+                                for s in job["steps"] if s.get("uses", "").startswith("actions/upload-artifact")))
+            if backend != "cpu":
+                self.assertIn(name, jobs["all-tests-passed"]["needs"])
+                self.assertIn(cpu_job, job["needs"])
+        for platform, backend in (("SERIAL", "cpu"), ("OMP", "cpu_omp"), ("CUDA", "cuda"), ("HIP", "hip")):
+            listing = subprocess.check_output(
+                ["bash", str(MODULE/"tests/run_all.sh"), "--profile", "ci", "--group", family, "--list"],
+                env=dict(os.environ, PLATFORM=platform, PYTHON=sys.executable), text=True)
+            self.assertCountEqual([line.split()[1] for line in listing.splitlines()],
+                                  [f"test_implicit_{test}_{backend}.bin" for test in tests])
+
+    def test_cpu_family_checks_headers_and_both_platforms_even_if_serial_fails(self):
+        harness = """
+            make() {
+                printf '<%s>' "$@"; printf '\\n'
+                [[ " $* " != *' PLATFORM=SERIAL '* ]]
+            }
+            export -f make
+            bash scripts/ci/run_timestepper_family.sh bdf CPU "$COMPILER"
+        """
+        for compiler in ("g++", "clang++"):
+            env = dict(os.environ, BUILD_DIR="build/mock", COMPILER=compiler)
+            result = subprocess.run(["bash", "-c", harness], env=env, cwd=ROOT, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            header, serial, omp = result.stdout.splitlines()
+            self.assertTrue(header.startswith("<check_timestepper_headers_cpu>"))
+            for line in (header, serial, omp):
+                self.assertIn(f"<G++ = {compiler}>", line)
+                self.assertIn(f"<BUILD_DIR=build/mock/bdf/{compiler}>", line)
+            for platform, line in (("SERIAL", serial), ("OMP", omp)):
+                self.assertIn(f"<test-timesteppers><PLATFORM={platform}>", line)
+                self.assertIn("<TIMESTEPPER_TEST_OPTIONS=--group bdf>", line)
+            invocation = self.make(ROOT, "test-timesteppers", f"G++ = {compiler}", "PLATFORM=OMP",
+                                   "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc")
+            self.assertIn(f'--make-option "G++ = {compiler}"', invocation)
+
+    def test_gpu_family_passes_site_settings_and_propagates_suite_failure(self):
+        harness = """
+            local_nvcc() { echo nvcc; }
+            local_hipcc() { echo AMD; }
+            make() { printf '<%s>' "$@"; return 9; }
+            export -f make local_nvcc local_hipcc
+            bash scripts/ci/run_timestepper_family.sh bdf "$PLATFORM"
+        """
+        for platform in ("CUDA", "HIP"):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as directory:
+                env = dict(os.environ, BUILD_DIR=directory, CONFIG_FILE="site.inc", PLATFORM=platform,
+                           GPU_POLICY="required", NVCC="local_nvcc", HIPCC="local_hipcc",
+                           ROCM_PATH="/opt/site-rocm", HIP_ARCH_LIST="gfx90a")
+                result = subprocess.run(["bash", "-c", harness], cwd=ROOT, env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 9, result.stderr)
+                self.assertIn(f"<test-timesteppers><PLATFORM={platform}><CONFIG_FILE=site.inc>", result.stdout)
+                self.assertIn("<TIMESTEPPER_TEST_OPTIONS=--group bdf>", result.stdout)
+                if platform == "CUDA":
+                    self.assertIn("<NVCC=local_nvcc>", result.stdout)
+                else:
+                    for value in ("HIPCC=local_hipcc", "HIP_ROOT_PATH=/opt/site-rocm", "HIP_PATH=/opt/site-rocm",
+                                  "HIP_ARCH_LIST=gfx90a"):
+                        self.assertIn(f"<{value}>", result.stdout)
 
     def test_filter_adaptation_is_standalone_and_gates_implicit_tests(self):
         for directory in (ROOT, MODULE):

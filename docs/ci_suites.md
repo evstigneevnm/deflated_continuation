@@ -24,7 +24,7 @@ The four contracts are split residual/Jacobian, energy, split lifecycle and unsp
 
 ## Explicit Runge-Kutta
 
-The timestepper module owns the [RK case inventory](../source/contrib/nmfd-timesteppers/tests/rk_ci.py); the parent Make target supplies the same build configuration as its other tests. For example:
+The timestepper module owns the [timestepper case inventory](../source/contrib/nmfd-timesteppers/tests/timestepper_ci.py); the parent Make target supplies the same build configuration as its other tests. For example:
 
 ```bash
 make test-explicit-rk PLATFORM=OMP CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR=build/explicit_ci
@@ -61,6 +61,18 @@ make test-rk PLATFORM=HIP RK_TEST_OPTIONS='--group imex'  # use the site's HIP c
 ```
 
 Keep the space before `=` in `G++ = clang++`: without it Make parses an append assignment. Use a separate build directory for each compiler. The standalone module Makefile provides SERIAL, OMP and CUDA targets; use the parent target for HIP. Reports are under `BUILD_DIR/PLATFORM/imex/`; workflow artifacts are `imex-g++`, `imex-clang++`, `imex-CUDA` and `imex-HIP`. For an optional hosted skip, inspect `backend.json` instead of a numerical summary.
+
+## BDF
+
+The `bdf` group runs 13 cases covering fixed and adaptive stepping, rollback, mass/DAE systems, backend transfer guards, variable order, stability and dense output. GCC and Clang each check the public headers and execute all cases on SERIAL and OMP (two threads, 180 seconds per case). CUDA and HIP each run the same cases with a 300-second limit after a device probe. The six compiler/platform combinations give 78 numerical executions on equipped runners. Sanitizers and the BDF trajectory benchmarks remain separate.
+
+```bash
+make test-timesteppers PLATFORM=OMP 'G++ = clang++' CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
+    BUILD_DIR=build/bdf_clang TIMESTEPPER_TEST_OPTIONS='--group bdf'
+make test-timesteppers PLATFORM=CUDA TIMESTEPPER_TEST_OPTIONS='--group bdf --list'
+```
+
+Logs and `summary.json` are under `BUILD_DIR/PLATFORM/bdf/`. Workflow artifacts are `bdf-g++`, `bdf-clang++`, `bdf-CUDA` and `bdf-HIP`. An optional hosted GPU skip produces `backend.json`, not a numerical pass. `test-rk` and `test-explicit-rk` retain their original defaults and option variables.
 
 ## Required vs optional hardware
 
