@@ -104,14 +104,66 @@ class NmfdStandaloneTest(unittest.TestCase):
                 self.assertEqual(job["strategy"]["matrix"]["ranks"], [1, 2, 4])
                 setup = next(step for step in job["steps"] if step.get("name") == "Prepare hosted MPI runtime")
                 self.assertLess(setup["timeout-minutes"], job["timeout-minutes"])
-                commands = setup["run"]
-                self.assertIn('if [ "${GITHUB_ACTIONS:-}" = "true" ]', commands)
-                self.assertEqual(commands.count("-o Acquire::Retries=3"), 2)
-                self.assertEqual(commands.count("-o Acquire::http::Timeout=30"), 2)
-                self.assertEqual(commands.count("-o Acquire::https::Timeout=30"), 2)
-                self.assertIn("install -y --no-install-recommends build-essential make openmpi-bin libopenmpi-dev",
-                              commands)
-                subprocess.run(["bash", "-n"], input=commands, check=True, text=True, timeout=10)
+                self.assertEqual(setup["run"], "bash scripts/ci/prepare_hosted_mpi.sh")
+
+    def test_mpi_provisioning_paths(self):
+        root = Path(__file__).resolve().parents[2]
+        # No live apt, sudo or network is used. A successful install makes the
+        # simulated compiler available; the launcher can still fail independently.
+        for scenario, runner, success, fetches, installs in (
+                ("ready", "github-hosted", True, 0, 0),
+                ("absent", "self-hosted", False, 0, 0),
+                ("normal", "github-hosted", True, 1, 1),
+                ("slow", "github-hosted", True, 2, 1),
+                ("offline", "github-hosted", False, 2, 0),
+                ("dpkg-error", "github-hosted", False, 1, 1),
+                ("broken-runtime", "github-hosted", False, 1, 1)):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp)
+                def tool(name, body):
+                    path = directory / name
+                    path.write_text("#!/bin/bash\nset -eu\n" + body)
+                    path.chmod(0o755)
+                    return str(path)
+                cc = tool("mpicxx", '[[ -e "$TEST_DIR/ready" ]]\ncat >/dev/null\n')
+                launch = tool("mpiexec", '[[ "$1 $2 $3" = "--oversubscribe -n 2" && "$SCENARIO" != broken-runtime ]]\n')
+                tool("sudo", '''
+echo "$*" >> "$TEST_DIR/log"
+case " $* " in
+    *" --download-only "*)
+        [[ "$SCENARIO" != offline ]] || exit 124
+        if [[ "$SCENARIO" = slow && "$*" != *Dir::Etc::sourcelist=* ]]; then exit 124; fi
+        ;;
+    *" --no-download "*)
+        [[ "$SCENARIO" != dpkg-error ]] || exit 1
+        touch "$TEST_DIR/ready"
+        ;;
+    *" update ") ;;
+    *) exit 2 ;;
+esac
+''')
+                if scenario == "ready":
+                    (directory / "ready").touch()
+                env = dict(os.environ, PATH=tmp + os.pathsep + os.environ["PATH"], GITHUB_ACTIONS="true",
+                           RUNNER_ENVIRONMENT=runner, MPICXX=cc, MPIEXEC=launch, TEST_DIR=tmp, SCENARIO=scenario)
+                result = subprocess.run(["bash", "scripts/ci/prepare_hosted_mpi.sh"], cwd=root,
+                                        env=env, capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode == 0, success, result.stderr)
+                log = directory / "log"
+                commands = log.read_text().splitlines() if log.exists() else []
+                downloads = [c for c in commands if "--download-only" in c]
+                installation = [c for c in commands if "--no-download" in c]
+                self.assertEqual((len(downloads), len(installation)), (fetches, installs))
+                if fetches == 0:
+                    self.assertFalse(commands)
+                for command in downloads:
+                    self.assertIn("timeout -k", command)
+                    self.assertIn("openmpi-bin libopenmpi-dev", command)
+                if fetches == 2:
+                    self.assertNotIn("Dir::Etc::sourcelist", downloads[0])
+                    self.assertIn("Dir::Etc::sourcelist", downloads[1])
+                    if installation:
+                        self.assertIn("Dir::Etc::sourcelist", installation[0])
 
     def test_mpi_report_is_required_only_after_validation_ran(self):
         root = Path(__file__).resolve().parents[2]
