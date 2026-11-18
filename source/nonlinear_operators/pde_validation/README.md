@@ -48,7 +48,23 @@ Diffusion/reaction tests cover all five engine families, adaptive refinement and
 dense samples. CH covers suitable stiffly accurate DIRK, BDF and the autonomous
 ROS34PW2 mass/index-1 selection, with mean and algebraic checks at every endpoint.
 ESDIRK without a consistent-rate provider is explicitly rejected. No general
-singular-mass IMEX, nonlinear CH energy law or raw DAE dense accuracy is claimed.
+singular-mass IMEX or raw DAE dense accuracy is claimed.
+
+The separate nonlinear [convex-split CH](../cahn_hilliard/README.md) validation
+uses a concentration-only IMEX_EULER facade. `test_cahn_hilliard_imex` checks
+mixed/reduced equivalence and first-order accuracy; `test_cahn_hilliard_energy`
+checks the unforced discrete energy law and mass; `test_cahn_hilliard_imex_lifecycle`
+checks failures/restart/ownership. This does not replace the linear mixed DAE
+test or establish energy stability for arbitrary higher-order IMEX pairs.
+Its [graphical runner](../cahn_hilliard/README.md#graphical-validation) adds
+energy histories, temporal-order plots and concentration/chemical-potential
+snapshots, exporting saved fields only after integration finishes. Its `--methods`
+selection compares split IMEX_EULER with unsplit IE/CN/SDIRK2/BDF2/ROS3 using
+common physical-field color scales and shared energy/order figures.
+The corresponding `unsplit_problem` supplies the full nonlinear rate and shifted
+Jacobian for ordinary DIRK/BDF/Rosenbrock methods. `test_cahn_hilliard_unsplit`
+verifies this adapter against the same spatial equation; it does not impose the
+convex-split Euler energy inequality on unrelated time discretizations.
 
 ```bash
 make -j2 test_pde_diffusion_cpu.bin test_pde_reaction_diffusion_cpu.bin \

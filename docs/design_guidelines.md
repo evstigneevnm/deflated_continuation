@@ -481,6 +481,14 @@ rate/shifted-residual contracts; spatial kernels remain in `source/discretizatio
 Neither the PDE nor timestepper constructs a solver. Backend execution evidence,
 DAE/projection restrictions and prepared shooting derivatives are separate claims.
 
+`source/nonlinear_operators/cahn_hilliard` adds constant-mobility, periodic
+double-well CH through the unchanged IMEX bundle. Concentration-only algebraic
+reduction and IMEX_EULER give implicit-convex/explicit-concave energy splitting;
+this is not general singular-mass IMEX support. Optional diagnostics use the
+same Laplacian/volume inner product, actual before/after states and independent
+step-defect checks. Do not substitute the affine stage reference for c_old,
+equate mu_star with physical mu, or infer energy stability of other tables.
+
 Refactored timesteppers live in the `source/contrib/nmfd-timesteppers` submodule,
 with public includes under `nmfd/time_steppers/` and APIs in `nmfd::time_steppers`.
 The module uses flat NMFD-operations/SCFD dependencies during development; explicit

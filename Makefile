@@ -1301,7 +1301,7 @@ test_periodic_stokes_%_hip.bin: source/nonlinear_operators/stokes/tests/test_per
 	$(HIPCC) $(HIPFLAGS) -DTEST_VECTOR_BACKEND_HIP $(STOKES_PROJECTION_FLAGS) -c $< -o $(BUILD_DIR)/test_periodic_stokes_$*_hip.o
 	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_periodic_stokes_$*_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $(BUILD_DIR)/$@
 
-PDE_VALIDATION_DEPS = $(wildcard source/nonlinear_operators/pde_validation/*.h source/nonlinear_operators/pde_validation/tests/*.h source/discretization/finite_difference/*.h source/discretization/common/*.h) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_IMPLICIT_TEST_HEADERS) $(NEWTON_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
+PDE_VALIDATION_DEPS = $(wildcard source/nonlinear_operators/pde_validation/*.h source/nonlinear_operators/pde_validation/tests/*.h source/nonlinear_operators/cahn_hilliard/*.h source/nonlinear_operators/cahn_hilliard/detail/*.h source/discretization/finite_difference/*.h source/discretization/common/*.h) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_IMPLICIT_TEST_HEADERS) $(NEWTON_TEST_HEADERS) $(SCFD_VECTOR_OPS_HEADERS)
 PDE_VALIDATION_FLAGS = -I source -I $(NMFD_TIMESTEPPERS_ROOT)/tests $(ITIME_STEPPER) $(INMFD_NEWTON)
 
 test_pde_%_cpu.bin: source/nonlinear_operators/pde_validation/tests/test_%.cpp $(PDE_VALIDATION_DEPS) | $(BUILD_STAMP)
@@ -1339,6 +1339,34 @@ $(BUILD_DIR)/stokes_benchmark_hip.bin: source/nonlinear_operators/stokes/tests/s
 	$(HIPCC) $(HIPFLAGS) $@.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $@
 
 -include $(wildcard $(BUILD_DIR)/stokes_benchmark_*.bin.d)
+
+CH_BENCHMARK_OPTIONS ?=
+CH_BENCHMARK_TARGETS = $(foreach backend,cpu cpu_omp cuda hip,ch_energy_benchmark_$(backend).bin)
+CH_FOURIER_TARGETS = $(foreach backend,cpu cpu_omp cuda hip,ch_fourier_benchmark_$(backend).bin)
+CH_BENCHMARK_DEPS = $(PDE_VALIDATION_DEPS) Makefile $(CONFIG_FILE) $(CH_BENCHMARK_OPTIONS)
+CH_BENCHMARK_FLAGS = $(PDE_VALIDATION_FLAGS) -I source/nonlinear_operators/pde_validation/tests
+.PHONY: $(CH_BENCHMARK_TARGETS) $(CH_FOURIER_TARGETS)
+$(CH_BENCHMARK_TARGETS) $(CH_FOURIER_TARGETS): %: $(BUILD_DIR)/%
+$(addprefix $(BUILD_DIR)/,$(CH_FOURIER_TARGETS)): private CH_BENCHMARK_FLAGS += -DCH_FOURIER
+$(BUILD_DIR)/ch_fourier_benchmark_cpu.bin $(BUILD_DIR)/ch_fourier_benchmark_cpu_omp.bin: private CH_FFT_LIBS = $(LFFTW)
+$(BUILD_DIR)/ch_fourier_benchmark_cuda.bin: private CH_FFT_LIBS = -lcufft
+$(BUILD_DIR)/ch_fourier_benchmark_hip.bin: private CH_FFT_LIBS = -lhipfft
+
+$(BUILD_DIR)/ch_energy_benchmark_cpu.bin $(BUILD_DIR)/ch_fourier_benchmark_cpu.bin: source/nonlinear_operators/cahn_hilliard/tests/benchmark.cpp $(CH_BENCHMARK_DEPS) | $(BUILD_STAMP)
+	$(G++) $(G++FLAGS) $(CH_BENCHMARK_FLAGS) -MMD -MP -MF $@.d -MT $@ $< $(OPENMP) $(CH_FFT_LIBS) -o $@
+
+$(BUILD_DIR)/ch_energy_benchmark_cpu_omp.bin $(BUILD_DIR)/ch_fourier_benchmark_cpu_omp.bin: source/nonlinear_operators/cahn_hilliard/tests/benchmark.cpp $(CH_BENCHMARK_DEPS) | $(BUILD_STAMP)
+	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP $(CH_BENCHMARK_FLAGS) -MMD -MP -MF $@.d -MT $@ $< $(OPENMP) $(CH_FFT_LIBS) -o $@
+
+$(BUILD_DIR)/ch_energy_benchmark_cuda.bin $(BUILD_DIR)/ch_fourier_benchmark_cuda.bin: source/nonlinear_operators/cahn_hilliard/tests/benchmark.cpp $(CH_BENCHMARK_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o | $(BUILD_STAMP)
+	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA $(CH_BENCHMARK_FLAGS) $(ICUDA) -MMD -MP -MF $@.d -MT $@ -x cu $< -c -o $@.o
+	$(NVCC) $(NVCCFLAGS) $@.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) $(CH_FFT_LIBS) -o $@
+
+$(BUILD_DIR)/ch_energy_benchmark_hip.bin $(BUILD_DIR)/ch_fourier_benchmark_hip.bin: source/nonlinear_operators/cahn_hilliard/tests/benchmark.cpp $(CH_BENCHMARK_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o | $(BUILD_STAMP)
+	$(HIPCC) $(HIPFLAGS) -DTEST_VECTOR_BACKEND_HIP $(CH_BENCHMARK_FLAGS) -MMD -MP -MF $@.d -MT $@ -c $< -o $@.o
+	$(HIPCC) $(HIPFLAGS) $@.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) $(CH_FFT_LIBS) -o $@
+
+-include $(wildcard $(BUILD_DIR)/ch_energy_benchmark_*.bin.d $(BUILD_DIR)/ch_fourier_benchmark_*.bin.d)
 
 PERIODIC_SECTION_HEADERS = $(wildcard source/periodic_orbit/*.h source/periodic_orbit/events/*.h source/periodic_orbit/sections/*.h source/periodic_orbit/sections/detail/*.h source/periodic_orbit/matching/*.h source/periodic_orbit/flows/*.h source/periodic_orbit/tests/*.h)
 PERIODIC_SECTION_DEPS = $(PERIODIC_SECTION_HEADERS) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS)

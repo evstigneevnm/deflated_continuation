@@ -63,12 +63,14 @@ double difference(
     return ops.norm( scratch ) / std::sqrt( double( ops.size() ) );
 }
 
-template <class Space, class Problem>
+template <
+    class Space, class Problem,
+    class Preconditioner = nmfd::preconditioners::dummy<Space, typename Problem::jacobi_operator_type>>
 struct linear_solver
 {
-    using monitor = nmfd::solvers::monitor_krylov<Space, scfd::utils::log_std>;
-    using core_type =
-        nmfd::solvers::gmres<Space, monitor, scfd::utils::log_std, typename Problem::jacobi_operator_type>;
+    using monitor   = nmfd::solvers::monitor_krylov<Space, scfd::utils::log_std>;
+    using core_type = nmfd::solvers::gmres<
+        Space, monitor, scfd::utils::log_std, typename Problem::jacobi_operator_type, Preconditioner>;
     using vector_type = typename Space::vector_type;
     core_type                         core;
     std::size_t                       calls = 0, fail_on = 0;
@@ -82,7 +84,8 @@ struct linear_solver
         p.monitor.rel_tol       = 2e-13;
         return p;
     }
-    explicit linear_solver( std::shared_ptr<Space> ops ) : core( ops, nullptr, parameters() )
+    explicit linear_solver( std::shared_ptr<Space> ops, std::shared_ptr<Preconditioner> prec = nullptr )
+        : core( ops, nullptr, parameters(), std::move( prec ) )
     {
     }
     void set_operator( std::shared_ptr<const typename Problem::jacobi_operator_type> op )
@@ -94,10 +97,10 @@ struct linear_solver
         return ++calls != fail_on && core.solve( rhs, out );
     }
 };
-template <class Space, class P>
+template <class Space, class P, class Linear = linear_solver<Space, P>>
 struct newton
 {
-    using linear    = linear_solver<Space, P>;
+    using linear    = Linear;
     using iteration = nmfd::solvers::newton_iteration<Space, P, linear>;
     using strategy  = nmfd::solvers::default_convergence_strategy<Space, scfd::utils::log_std, P>;
     using solver    = nmfd::solvers::nonlinear_solver<Space, scfd::utils::log_std, P, iteration>;

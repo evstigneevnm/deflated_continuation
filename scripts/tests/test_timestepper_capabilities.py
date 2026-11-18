@@ -60,6 +60,19 @@ class CapabilityContractTest(unittest.TestCase):
                     self.assertIn('"executed":false', commands)
                     self.assertIn('"executed":true', commands)
 
+    def test_convex_split_ch_is_in_all_pde_gates(self):
+        jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
+        for name in ("timestepper-pde-cpu", "timestepper-pde-cuda", "timestepper-pde-hip"):
+            commands = "\n".join(step.get("run", "") for step in jobs[name]["steps"])
+            for case in ("cahn_hilliard_imex", "cahn_hilliard_energy", "cahn_hilliard_imex_lifecycle", "cahn_hilliard_unsplit"):
+                with self.subTest(job=name, case=case):
+                    self.assertIn(case, commands)
+        commands = "\n".join(step.get("run", "") for step in jobs["timestepper-capability-contract"]["steps"])
+        self.assertIn("source/nonlinear_operators/cahn_hilliard/*.h", commands)
+        self.assertIn("source/nonlinear_operators/cahn_hilliard/detail/*.h", commands)
+        self.assertIn("| General singular-mass IMEX | U:", self.text)
+        self.assertIn("| Reduced convex-split CH IMEX | V", self.text)
+
 
 if __name__ == "__main__":
     unittest.main()

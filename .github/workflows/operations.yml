@@ -1367,7 +1367,7 @@ jobs:
         run: |
           make test_pde_capabilities_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/capabilities"
           python3 scripts/check_timestepper_capabilities.py --metadata-binary "$BUILD_DIR/capabilities/test_pde_capabilities_cpu.bin" --report "$BUILD_DIR/capabilities/report.json"
-          for header in source/nonlinear_operators/pde_validation/*.h source/discretization/finite_difference/*.h; do
+          for header in source/nonlinear_operators/pde_validation/*.h source/nonlinear_operators/cahn_hilliard/*.h source/nonlinear_operators/cahn_hilliard/detail/*.h source/discretization/finite_difference/*.h; do
             printf '#include <%s>\n' "${header#source/}" | g++ -std=c++17 -I source -I "$NMFD_TIMESTEPPERS_ROOT/include" -I "$NMFD_OPERATIONS_ROOT/include" -I "$SCFD_ROOT/include" -x c++ -fsyntax-only -
           done
 
@@ -1395,7 +1395,7 @@ jobs:
           mkdir -p "$BUILD_DIR/pde"
           '${{ matrix.compiler }}' --version > "$BUILD_DIR/pde/compiler.txt"
           printf '{"backend":"cpu/openmp","executed":true,"result":"started"}\n' > "$BUILD_DIR/pde/backend.json"
-          for test in diffusion reaction_diffusion cahn_hilliard; do
+          for test in diffusion reaction_diffusion cahn_hilliard cahn_hilliard_imex cahn_hilliard_energy cahn_hilliard_imex_lifecycle cahn_hilliard_unsplit; do
             make -j2 "test_pde_${test}_cpu.bin" "test_pde_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/pde"
             for backend in cpu cpu_omp; do
               OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/pde/"test_pde_${test}_${backend}.bin" > "$BUILD_DIR/pde/${test}_${backend}.log" 2>&1
@@ -1432,7 +1432,7 @@ jobs:
           fi
           "$NVCC_BIN" --version > "$BUILD_DIR/pde_cuda/compiler.txt"
           printf '{"backend":"cuda","executed":true,"result":"started"}\n' > "$BUILD_DIR/pde_cuda/backend.json"
-          for test in diffusion reaction_diffusion cahn_hilliard; do
+          for test in diffusion reaction_diffusion cahn_hilliard cahn_hilliard_imex cahn_hilliard_energy cahn_hilliard_imex_lifecycle cahn_hilliard_unsplit; do
             make "test_pde_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/pde_cuda" NVCC="$NVCC_BIN"
             timeout 300s ./"$BUILD_DIR"/pde_cuda/"test_pde_${test}_cuda.bin" > "$BUILD_DIR/pde_cuda/${test}.log" 2>&1
           done
@@ -1472,7 +1472,7 @@ jobs:
             PLATFORM=hip-on-amd
           fi
           printf '{"backend":"%s","executed":true,"result":"started"}\n' "$PLATFORM" > "$BUILD_DIR/pde_hip/backend.json"
-          for test in diffusion reaction_diffusion cahn_hilliard; do
+          for test in diffusion reaction_diffusion cahn_hilliard cahn_hilliard_imex cahn_hilliard_energy cahn_hilliard_imex_lifecycle cahn_hilliard_unsplit; do
             make "test_pde_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/pde_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
             timeout 300s ./"$BUILD_DIR"/pde_hip/"test_pde_${test}_hip.bin" > "$BUILD_DIR/pde_hip/${test}.log" 2>&1
           done
@@ -2589,7 +2589,7 @@ jobs:
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
             sudo apt-get update
-            sudo apt-get install -y --no-install-recommends python3-numpy python3-matplotlib
+            sudo apt-get install -y --no-install-recommends python3-numpy python3-matplotlib libfftw3-dev
           fi
       - name: Validate and plot manufactured PDE solutions and temporal orders
         if: matrix.compiler == 'g++'
@@ -2611,6 +2611,41 @@ jobs:
           path: |
             ${{ env.BUILD_DIR }}/stokes_figures/*/runs/
             ${{ env.BUILD_DIR }}/stokes_figures/*/build_*.log
+          if-no-files-found: warn
+
+      - name: Validate and plot convex-split Cahn-Hilliard energy, order and fields
+        if: matrix.compiler == 'g++'
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+            export PYTHON=/usr/bin/python3
+          fi
+          "${PYTHON:-python3}" -m unittest discover -s scripts/tests -p test_ch_benchmarks.py
+          for backend in cpu cpu_omp; do
+            bash source/nonlinear_operators/cahn_hilliard/tests/run_all.sh \
+              --build-dir "$BUILD_DIR/ch_figures/$backend" --backend "$backend" \
+              --methods IMEX_EULER IE CN 'SDIRK2(1)2' BDF2 ROS3 ARK324L2SA ROS34PW2 BDF IMEX_ARK324L2SA \
+              --grid 16 --end .4 --step .1 --levels 4 --base-steps 5 --frames 3 --threads 2
+            bash source/nonlinear_operators/cahn_hilliard/tests/run_all.sh \
+              --build-dir "$BUILD_DIR/ch_figures/$backend" --backend "$backend" \
+              --methods ARK324L2SA ROS34PW2 BDF IMEX_ARK324L2SA \
+              --adaptive-methods ARK324L2SA ROS34PW2 IMEX_ARK324L2SA \
+              --grid 16 --end .4 --step .1 --levels 4 --base-steps 5 --frames 3 --threads 2
+          done
+          bash source/nonlinear_operators/cahn_hilliard/fourier/tests/run_all.sh \
+            --build-dir "$BUILD_DIR/ch_figures/fourier" --methods IMEX_EULER CN BDF ROS34PW2 \
+            --grid 12 --end .4 --step .1 --levels 3 --base-steps 5 --frames 3
+          # The unpreconditioned Euler stages exhausted GMRES at t=1.1 and t=52.7.
+          bash source/nonlinear_operators/cahn_hilliard/fourier/tests/run_all.sh \
+            --build-dir "$BUILD_DIR/ch_figures/fourier_omp" --backend cpu_omp --threads 1 \
+            --methods IE IMEX_EULER --grid 32 --end 60 --step .1 --frames 3
+      - name: Save Cahn-Hilliard figures and numerical reports
+        if: always() && matrix.compiler == 'g++'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ch-energy-timestepper-validation
+          path: |
+            ${{ env.BUILD_DIR }}/ch_figures/*/runs/
+            ${{ env.BUILD_DIR }}/ch_figures/*/build_*.log
           if-no-files-found: warn
 
   timestepper-projection-cuda:
