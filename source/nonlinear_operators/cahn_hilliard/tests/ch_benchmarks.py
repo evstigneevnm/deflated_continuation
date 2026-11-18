@@ -14,6 +14,8 @@ import time
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[3]
+sys.path.insert(0, str(ROOT / "scripts/ci"))
+import platforms
 BUILD_ENVIRONMENT = ("PATH", "G++", "G++FLAGS", "GCC_ROOT_PATH", "CPPSTD", "NVCC", "NVCCFLAGS", "CUDA_ROOT_PATH", "CUDA_ARCH_LIST",
                      "HIPCC", "HIPFLAGS", "HIP_ROOT_PATH", "HIP_PATH", "HIP_ARCH_LIST",
                      "NMFD_TIMESTEPPERS_ROOT", "CONTRIB_NMFD_OPERATIONS", "CONTRIB_SCFD")
@@ -66,6 +68,9 @@ Examples (append to run_all.sh):
   --methods ARK324L2SA ROS34PW2 BDF IMEX_ARK324L2SA
   --methods ARK324L2SA BDF --adaptive-methods ARK324L2SA --relative-tolerance 1e-5
 
+For the directory CI suite, run the CH launcher with --profile ci --help.
+PLATFORM=SERIAL|OMP|CUDA|HIP selects a backend; a conflicting --backend is an error.
+
 Results are kept in timestamped runs under --build-dir. Bulk field exports occur
 only after integration. Finer grids/longer runs may require more solver work;
 this runner does not relax Newton/GMRES tolerances automatically.""")
@@ -102,7 +107,7 @@ this runner does not relax Newton/GMRES tolerances automatically.""")
     physics.add_argument("--amplitude", type=float, default=.12,
                         help="Positive initial amplitude A in c=mean+A*(cos(x)+0.4*sin(y)+0.25*cos(2*x)*cos(y))")
     execution = parser.add_argument_group("Execution and output")
-    execution.add_argument("--backend", choices=("cpu", "cpu_omp", "cuda", "hip"), default="cpu",
+    execution.add_argument("--backend", choices=tuple(platforms.BACKENDS.values()),
                            help="Numerical backend; CUDA/HIP require a matching compiler and usable GPU")
     execution.add_argument("--threads", type=int, default=1, help="OpenMP thread count (cpu_omp backend)")
     execution.add_argument("--timeout", type=float, default=600,
@@ -114,6 +119,11 @@ this runner does not relax Newton/GMRES tolerances automatically.""")
     execution.add_argument("--make-option", action="append", default=[], metavar="KEY=VALUE",
                            help="Additional Make variable; repeat for multiple settings, e.g. --make-option G++=clang++")
     args = parser.parse_args(argv)
+    try:
+        args.platform, args.backend = platforms.selection(args.backend)
+        platforms.overrides(args.make_option)
+    except ValueError as error:
+        parser.error(str(error))
     args.methods = list(dict.fromkeys(args.methods))
     args.adaptive_methods = list(dict.fromkeys(args.adaptive_methods))
     if any(m not in args.methods for m in args.adaptive_methods):
@@ -133,11 +143,6 @@ this runner does not relax Newton/GMRES tolerances automatically.""")
         parser.error("Choose between frames-1 and 20000 uniform trajectory steps")
     if args.order_end / (args.base_steps * 2**(args.levels-1) * 16) < 1e-14:
         parser.error("Reference timestep is too small")
-    for option in args.make_option:
-        key, equal, _ = option.partition("=")
-        if (not equal or key in ("BUILD_DIR", "CONFIG_FILE", "CH_BENCHMARK_OPTIONS") or
-                not key.replace("_", "").replace("+", "").isalnum()):
-            parser.error("Use --make-option KEY=VALUE; build paths have separate options")
     args.build_dir = (args.build_dir or ROOT / "build" / (
         "ch_fourier_benchmarks" if args.spatial == "fourier" else "ch_energy_benchmarks")).resolve()
     args.config_file = args.config_file.resolve()
@@ -175,7 +180,7 @@ def build(args, config):
         command.append("-B")
     command.extend([target, f"BUILD_DIR={binary_dir}", f"CONFIG_FILE={args.config_file}",
                     f"CH_BENCHMARK_OPTIONS={options}",
-                    *(" = ".join(option.split("=", 1)) for option in args.make_option)])
+                    *platforms.overrides(args.make_option)])
     log_path = args.build_dir / f"build_{args.backend}.log"
     with log_path.open("w") as log:
         try:
@@ -720,6 +725,9 @@ def main(argv=None):
         ensure_plotting()
     if args.plot_only:
         return summarize(args.plot_only.resolve())
+    if not args.build_only:
+        platforms.probe(args.platform, args.build_dir / "probe" / args.backend,
+                        args.config_file, args.make_option)
     configs = [configuration(args, method) for method in args.methods]
     executable = build(args, configs[0])
     for config in configs:

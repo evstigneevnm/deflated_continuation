@@ -64,6 +64,7 @@ jobs:
           python3 -S -m unittest discover -s scripts/tests -p test_orbit_benchmarks.py
           python3 -S -m unittest discover -s scripts/tests -p test_stokes_benchmarks.py
           python3 -S -m unittest discover -s scripts/tests -p test_timestepper_capabilities.py
+          python3 -S -m unittest discover -s scripts/tests -p test_ch_ci.py
           python3 -m unittest discover -s scripts/tests -p test_nmfd_standalone.py
           python3 -m unittest discover -s scripts/tests -p test_timestepper_extraction.py
           python3 source/contrib/nmfd-timesteppers/tests/test_ode_benchmarks.py
@@ -1395,7 +1396,7 @@ jobs:
           mkdir -p "$BUILD_DIR/pde"
           '${{ matrix.compiler }}' --version > "$BUILD_DIR/pde/compiler.txt"
           printf '{"backend":"cpu/openmp","executed":true,"result":"started"}\n' > "$BUILD_DIR/pde/backend.json"
-          for test in diffusion reaction_diffusion cahn_hilliard cahn_hilliard_imex cahn_hilliard_energy cahn_hilliard_imex_lifecycle cahn_hilliard_unsplit; do
+          for test in diffusion reaction_diffusion cahn_hilliard; do
             make -j2 "test_pde_${test}_cpu.bin" "test_pde_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/pde"
             for backend in cpu cpu_omp; do
               OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/pde/"test_pde_${test}_${backend}.bin" > "$BUILD_DIR/pde/${test}_${backend}.log" 2>&1
@@ -1404,6 +1405,16 @@ jobs:
             ASAN_OPTIONS=detect_leaks=1 OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/pde_sanitizers/"test_pde_${test}_cpu.bin" > "$BUILD_DIR/pde/${test}_sanitizers.log" 2>&1
           done
           printf '{"backend":"cpu/openmp","executed":true,"result":"passed"}\n' > "$BUILD_DIR/pde/backend.json"
+      - name: Cahn-Hilliard contracts and sanitizer regressions
+        run: |
+          suite=source/nonlinear_operators/cahn_hilliard/tests/run_all.sh
+          args=(--build-dir "$BUILD_DIR/ch_contracts/${{ matrix.compiler }}" --make-option 'G++=${{ matrix.compiler }}')
+          failed=0
+          for platform in SERIAL OMP; do
+            PLATFORM=$platform bash "$suite" --profile ci --group contracts "${args[@]}" || failed=1
+          done
+          PLATFORM=SERIAL bash "$suite" --profile ci --group sanitizers "${args[@]}" || failed=1
+          exit "$failed"
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -1412,6 +1423,8 @@ jobs:
             ${{ env.BUILD_DIR }}/pde/*.log
             ${{ env.BUILD_DIR }}/pde/*.json
             ${{ env.BUILD_DIR }}/pde/*.txt
+            ${{ env.BUILD_DIR }}/ch_contracts/**/*.log
+            ${{ env.BUILD_DIR }}/ch_contracts/**/summary.json
 
   timestepper-pde-cuda:
     needs: [timestepper-pde-cpu, scfd-vector-operations-cuda]
@@ -1422,17 +1435,22 @@ jobs:
         with:
           submodules: true
       - name: Validate PDEs on CUDA when available
+        env:
+          GPU_POLICY: optional-on-hosted
         run: |
+          source scripts/ci/hosted_gpu_policy.sh
           mkdir -p "$BUILD_DIR/pde_cuda"
           NVCC_BIN="$(command -v "${NVCC:-nvcc}" || true)"
-          if [ -z "$NVCC_BIN" ] && [ -x /usr/local/cuda/bin/nvcc ]; then NVCC_BIN=/usr/local/cuda/bin/nvcc; fi
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L > "$BUILD_DIR/pde_cuda/device.txt" 2>&1 || [ -z "$NVCC_BIN" ]; then
-            printf '{"backend":"cuda","executed":false,"reason":"GPU or toolkit unavailable"}\n' > "$BUILD_DIR/pde_cuda/backend.json"
-            exit 0
+          if [ -z "${NVCC:-}" ] && [ -z "$NVCC_BIN" ] && [ -x /usr/local/cuda/bin/nvcc ]; then NVCC_BIN=/usr/local/cuda/bin/nvcc; fi
+          if [ -z "$NVCC_BIN" ]; then gpu_unavailable cuda "$BUILD_DIR/pde_cuda/backend.json" "compiler unavailable"; fi
+          if gpu_skip_allowed && ! nvidia-smi -L > "$BUILD_DIR/pde_cuda/device.txt" 2>&1; then
+            gpu_unavailable cuda "$BUILD_DIR/pde_cuda/backend.json" "device unavailable"
           fi
           "$NVCC_BIN" --version > "$BUILD_DIR/pde_cuda/compiler.txt"
           printf '{"backend":"cuda","executed":true,"result":"started"}\n' > "$BUILD_DIR/pde_cuda/backend.json"
-          for test in diffusion reaction_diffusion cahn_hilliard cahn_hilliard_imex cahn_hilliard_energy cahn_hilliard_imex_lifecycle cahn_hilliard_unsplit; do
+          PLATFORM=CUDA bash source/nonlinear_operators/cahn_hilliard/tests/run_all.sh --profile ci --group contracts \
+            --config-file "$CONFIG_FILE" --make-option "NVCC=$NVCC_BIN" --build-dir "$BUILD_DIR/pde_cuda/ch"
+          for test in diffusion reaction_diffusion cahn_hilliard; do
             make "test_pde_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/pde_cuda" NVCC="$NVCC_BIN"
             timeout 300s ./"$BUILD_DIR"/pde_cuda/"test_pde_${test}_cuda.bin" > "$BUILD_DIR/pde_cuda/${test}.log" 2>&1
           done
@@ -1445,6 +1463,9 @@ jobs:
             ${{ env.BUILD_DIR }}/pde_cuda/*.log
             ${{ env.BUILD_DIR }}/pde_cuda/*.json
             ${{ env.BUILD_DIR }}/pde_cuda/*.txt
+            ${{ env.BUILD_DIR }}/pde_cuda/ch/**/*.log
+            ${{ env.BUILD_DIR }}/pde_cuda/ch/**/results.make
+            ${{ env.BUILD_DIR }}/pde_cuda/ch/**/summary.json
 
   timestepper-pde-hip:
     needs: [timestepper-pde-cpu, scfd-vector-operations-hip]
@@ -1455,28 +1476,37 @@ jobs:
         with:
           submodules: true
       - name: Validate PDEs on HIP when available
+        env:
+          GPU_POLICY: optional-on-hosted
         run: |
+          source scripts/ci/hosted_gpu_policy.sh
           mkdir -p "$BUILD_DIR/pde_hip"
-          printf '{"backend":"hip","executed":false,"reason":"GPU or toolkit unavailable"}\n' > "$BUILD_DIR/pde_hip/backend.json"
           HIPCC_BIN="$(command -v "${HIPCC:-hipcc}" || true)"
-          if [ -z "$HIPCC_BIN" ]; then exit 0; fi
+          if [ -z "$HIPCC_BIN" ]; then gpu_unavailable hip "$BUILD_DIR/pde_hip/backend.json" "compiler unavailable"; fi
           HIP_ROOT="${ROCM_PATH:-$(dirname "$(dirname "$HIPCC_BIN")")}"
           "$HIPCC_BIN" --version > "$BUILD_DIR/pde_hip/compiler.txt"
           if grep -qi nvcc "$BUILD_DIR/pde_hip/compiler.txt"; then
-            if ! nvidia-smi -L > "$BUILD_DIR/pde_hip/device.txt" 2>&1; then exit 0; fi
+            if gpu_skip_allowed && ! nvidia-smi -L > "$BUILD_DIR/pde_hip/device.txt" 2>&1; then
+              gpu_unavailable hip "$BUILD_DIR/pde_hip/backend.json" "device unavailable"
+            fi
             HIP_TARGET="${HIP_ARCH_LIST:-75}"
-            PLATFORM=hip-on-nvidia
+            runtime=hip-on-nvidia
           else
-            if ! "$HIP_ROOT/bin/rocm-smi" > "$BUILD_DIR/pde_hip/device.txt" 2>&1; then exit 0; fi
+            if gpu_skip_allowed && ! "$HIP_ROOT/bin/rocm-smi" > "$BUILD_DIR/pde_hip/device.txt" 2>&1; then
+              gpu_unavailable hip "$BUILD_DIR/pde_hip/backend.json" "device unavailable"
+            fi
             HIP_TARGET="${HIP_ARCH_LIST:-native}"
-            PLATFORM=hip-on-amd
+            runtime=hip-on-amd
           fi
-          printf '{"backend":"%s","executed":true,"result":"started"}\n' "$PLATFORM" > "$BUILD_DIR/pde_hip/backend.json"
-          for test in diffusion reaction_diffusion cahn_hilliard cahn_hilliard_imex cahn_hilliard_energy cahn_hilliard_imex_lifecycle cahn_hilliard_unsplit; do
+          printf '{"backend":"%s","executed":true,"result":"started"}\n' "$runtime" > "$BUILD_DIR/pde_hip/backend.json"
+          PLATFORM=HIP bash source/nonlinear_operators/cahn_hilliard/tests/run_all.sh --profile ci --group contracts \
+            --config-file "$CONFIG_FILE" --make-option "HIPCC=$HIPCC_BIN" --make-option "HIP_ROOT_PATH=$HIP_ROOT" \
+            --make-option "HIP_PATH=$HIP_ROOT" --make-option "HIP_ARCH_LIST=$HIP_TARGET" --build-dir "$BUILD_DIR/pde_hip/ch"
+          for test in diffusion reaction_diffusion cahn_hilliard; do
             make "test_pde_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/pde_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
             timeout 300s ./"$BUILD_DIR"/pde_hip/"test_pde_${test}_hip.bin" > "$BUILD_DIR/pde_hip/${test}.log" 2>&1
           done
-          printf '{"backend":"%s","executed":true,"result":"passed"}\n' "$PLATFORM" > "$BUILD_DIR/pde_hip/backend.json"
+          printf '{"backend":"%s","executed":true,"result":"passed"}\n' "$runtime" > "$BUILD_DIR/pde_hip/backend.json"
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -1485,6 +1515,9 @@ jobs:
             ${{ env.BUILD_DIR }}/pde_hip/*.log
             ${{ env.BUILD_DIR }}/pde_hip/*.json
             ${{ env.BUILD_DIR }}/pde_hip/*.txt
+            ${{ env.BUILD_DIR }}/pde_hip/ch/**/*.log
+            ${{ env.BUILD_DIR }}/pde_hip/ch/**/results.make
+            ${{ env.BUILD_DIR }}/pde_hip/ch/**/summary.json
 
   timestepper-implicit-dirk-cpu:
     needs: [timestepper-tables-implicit-cpu, nmfd-newton-backend-cpu-omp]
@@ -2620,32 +2653,21 @@ jobs:
             export PYTHON=/usr/bin/python3
           fi
           "${PYTHON:-python3}" -m unittest discover -s scripts/tests -p test_ch_benchmarks.py
-          for backend in cpu cpu_omp; do
-            bash source/nonlinear_operators/cahn_hilliard/tests/run_all.sh \
-              --build-dir "$BUILD_DIR/ch_figures/$backend" --backend "$backend" \
-              --methods IMEX_EULER IE CN 'SDIRK2(1)2' BDF2 ROS3 ARK324L2SA ROS34PW2 BDF IMEX_ARK324L2SA \
-              --grid 16 --end .4 --step .1 --levels 4 --base-steps 5 --frames 3 --threads 2
-            bash source/nonlinear_operators/cahn_hilliard/tests/run_all.sh \
-              --build-dir "$BUILD_DIR/ch_figures/$backend" --backend "$backend" \
-              --methods ARK324L2SA ROS34PW2 BDF IMEX_ARK324L2SA \
-              --adaptive-methods ARK324L2SA ROS34PW2 IMEX_ARK324L2SA \
-              --grid 16 --end .4 --step .1 --levels 4 --base-steps 5 --frames 3 --threads 2
+          failed=0
+          for platform in SERIAL OMP; do
+            PLATFORM=$platform bash source/nonlinear_operators/cahn_hilliard/tests/run_all.sh \
+              --profile ci --group benchmarks --build-dir "$BUILD_DIR/ch_figures" || failed=1
           done
-          bash source/nonlinear_operators/cahn_hilliard/fourier/tests/run_all.sh \
-            --build-dir "$BUILD_DIR/ch_figures/fourier" --methods IMEX_EULER CN BDF ROS34PW2 \
-            --grid 12 --end .4 --step .1 --levels 3 --base-steps 5 --frames 3
-          # The unpreconditioned Euler stages exhausted GMRES at t=1.1 and t=52.7.
-          bash source/nonlinear_operators/cahn_hilliard/fourier/tests/run_all.sh \
-            --build-dir "$BUILD_DIR/ch_figures/fourier_omp" --backend cpu_omp --threads 1 \
-            --methods IE IMEX_EULER --grid 32 --end 60 --step .1 --frames 3
+          exit "$failed"
       - name: Save Cahn-Hilliard figures and numerical reports
         if: always() && matrix.compiler == 'g++'
         uses: actions/upload-artifact@v4
         with:
           name: ch-energy-timestepper-validation
           path: |
-            ${{ env.BUILD_DIR }}/ch_figures/*/runs/
-            ${{ env.BUILD_DIR }}/ch_figures/*/build_*.log
+            ${{ env.BUILD_DIR }}/ch_figures/**/runs/**
+            ${{ env.BUILD_DIR }}/ch_figures/**/*.log
+            ${{ env.BUILD_DIR }}/ch_figures/**/summary.json
           if-no-files-found: warn
 
   timestepper-projection-cuda:

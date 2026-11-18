@@ -6,4 +6,9 @@ if [[ -z ${PYTHON:-} ]] && ! "$python" -c 'import importlib.util; assert all(imp
     fallback="$HOME/anaconda3/bin/python"
     if [[ -x $fallback ]]; then python="$fallback"; fi
 fi
+if [[ ${1:-} == --profile ]]; then
+    [[ ${2:-} == ci ]] || { echo "Expected --profile ci" >&2; exit 2; }
+    shift 2
+    exec "$python" "$here/ch_ci.py" "$@"
+fi
 exec "$python" "$here/ch_benchmarks.py" "$@"

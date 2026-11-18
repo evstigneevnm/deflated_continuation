@@ -1341,6 +1341,26 @@ $(BUILD_DIR)/stokes_benchmark_hip.bin: source/nonlinear_operators/stokes/tests/s
 -include $(wildcard $(BUILD_DIR)/stokes_benchmark_*.bin.d)
 
 CH_BENCHMARK_OPTIONS ?=
+# SCFD-style platform selection for migrated suites only. Existing backend-specific
+# targets retain their names and do not inherit a new compiler or preprocessor flag.
+PLATFORM ?= SERIAL
+.PHONY: test-ch ci-device-probe
+test-ch:
+	PLATFORM="$(PLATFORM)" bash source/nonlinear_operators/cahn_hilliard/tests/run_all.sh --profile ci \
+	    --config-file "$(CONFIG_FILE)" --build-dir "$(BUILD_DIR)/ch_ci" $(CH_TEST_OPTIONS)
+
+# Always compile the probe using the same config/overrides as the actual tests:
+# a stale executable must not hide a broken compiler. Never called in build-only mode.
+ci-device-probe: | $(BUILD_STAMP)
+ifeq ($(PLATFORM),CUDA)
+	$(NVCC) $(NVCCFLAGS) -x cu scripts/ci/device_probe.cpp -o "$(BUILD_DIR)/device_probe.bin"
+else ifeq ($(PLATFORM),HIP)
+	$(HIPCC) $(HIPFLAGS) scripts/ci/device_probe.cpp -o "$(BUILD_DIR)/device_probe.bin"
+else
+	$(error ci-device-probe requires PLATFORM=CUDA or HIP)
+endif
+	"$(BUILD_DIR)/device_probe.bin"
+
 CH_BENCHMARK_TARGETS = $(foreach backend,cpu cpu_omp cuda hip,ch_energy_benchmark_$(backend).bin)
 CH_FOURIER_TARGETS = $(foreach backend,cpu cpu_omp cuda hip,ch_fourier_benchmark_$(backend).bin)
 CH_BENCHMARK_DEPS = $(PDE_VALIDATION_DEPS) Makefile $(CONFIG_FILE) $(CH_BENCHMARK_OPTIONS)

@@ -1,0 +1,47 @@
+name: Cahn-Hilliard (manual self-hosted)
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Required backend (and self-hosted runner label)
+        type: choice
+        options: [SERIAL, OMP, CUDA, HIP]
+        required: true
+      group:
+        description: Validation to execute
+        type: choice
+        options: [contracts, benchmarks, all]
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  ch:
+    runs-on: [self-hosted, linux, '${{ inputs.platform }}']
+    timeout-minutes: 90
+    env:
+      PLATFORM: ${{ inputs.platform }}
+      CH_GROUP: ${{ inputs.group }}
+      BUILD_DIR: build/ch_self_hosted/${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+          persist-credentials: false
+      - name: Run required backend
+        shell: bash
+        run: |
+          bash source/nonlinear_operators/cahn_hilliard/tests/run_all.sh --profile ci \
+            --group "$CH_GROUP" --build-dir "$BUILD_DIR" \
+            --config-file "${CH_CI_CONFIG:-build_configs/config_github_ubuntu_cpu.inc}"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ch-${{ inputs.platform }}-${{ inputs.group }}
+          path: |
+            ${{ env.BUILD_DIR }}/**/*.log
+            ${{ env.BUILD_DIR }}/**/results.make
+            ${{ env.BUILD_DIR }}/**/summary.json
+            ${{ env.BUILD_DIR }}/**/runs/**
