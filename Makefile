@@ -1365,10 +1365,17 @@ test-explicit-rk test-rk test-timesteppers:
 	    --make-option "G++ = $(G++)" \
 	    --device-probe-target ci-device-probe --build-dir "$(BUILD_DIR)" $(TIMESTEPPER_TEST_OPTIONS)
 
-.PHONY: test-ch ci-device-probe
+.PHONY: test-pde test-ch ci-device-probe
+test-pde:
+	PLATFORM="$(PLATFORM)" CONFIG_FILE="$(abspath $(CONFIG_FILE))" NVCC="$(NVCC)" \
+	    NMFD_TIMESTEPPERS_ROOT="$(abspath $(NMFD_TIMESTEPPERS_ROOT))" \
+	    bash source/nonlinear_operators/pde_validation/tests/run_all.sh \
+	    --make-option "G++ = $(G++)" --build-dir "$(BUILD_DIR)" \
+	    $(if $(filter SERIAL OMP,$(PLATFORM)),--build-jobs 2) $(PDE_TEST_OPTIONS)
+
 test-ch:
 	PLATFORM="$(PLATFORM)" bash source/nonlinear_operators/cahn_hilliard/tests/run_all.sh --profile ci \
-	    --config-file "$(CONFIG_FILE)" --build-dir "$(BUILD_DIR)/ch_ci" $(CH_TEST_OPTIONS)
+	    --config-file "$(CONFIG_FILE)" --make-option "G++=$(G++)" --build-dir "$(BUILD_DIR)/ch_ci" $(CH_TEST_OPTIONS)
 
 # Always compile the probe using the same config/overrides as the actual tests:
 # a stale executable must not hide a broken compiler. Never called in build-only mode.

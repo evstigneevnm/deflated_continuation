@@ -22,7 +22,7 @@ class DirectoryCITest(unittest.TestCase):
     def setUpClass(cls):
         cls.jobs = run_local_ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
         cls.steps = [(job, step) for job, spec in cls.jobs.items() for step in spec.get("steps", [])
-                     if SUITE in step.get("run", "") and "--profile ci" in step["run"]]
+                     if SUITE in step.get("run", "") or "run_pde_validation.sh" in step.get("run", "")]
 
     def test_all_suite_calls_are_required_by_the_reference_gate(self):
         required = set()
@@ -39,13 +39,8 @@ class DirectoryCITest(unittest.TestCase):
             self.assertIn(job, required)
             self.assertFalse(step.get("continue-on-error"))
             self.assertFalse(self.jobs[job].get("continue-on-error"))
-        contracts = [s["run"] for _, s in self.steps if "--group contracts" in s["run"]]
-        for platform in ("PLATFORM=CUDA", "PLATFORM=HIP"):
-            self.assertTrue(any(platform in cmd for cmd in contracts))
-        job, cpu = next((j, s["run"]) for j, s in self.steps if "--group sanitizers" in s["run"])
-        self.assertEqual(set(self.jobs[job]["strategy"]["matrix"]["compiler"]), {"g++", "clang++"})
-        self.assertIn("SERIAL OMP", cpu)
-        self.assertIn("PLATFORM=SERIAL", cpu)
+        self.assertEqual({j for j, s in self.steps if "run_pde_validation.sh" in s["run"]},
+                         {"timestepper-pde-"+p for p in ("cpu", "cuda", "hip")})
         job, figures = next((j, s) for j, s in self.steps if "--group benchmarks" in s["run"])
         self.assertIn("SERIAL OMP", figures["run"])
         self.assertNotIn("if", figures)
@@ -75,7 +70,7 @@ class DirectoryCITest(unittest.TestCase):
 
     def test_missing_toolchain_only_skips_on_optional_hosted_job(self):
         for platform, compiler in [("cuda", "NVCC"), ("hip", "HIPCC")]:
-            step = next(s for _, s in self.steps if f"PLATFORM={platform.upper()} " in s["run"])
+            step = next(s for job, s in self.steps if job == f"timestepper-pde-{platform}")
             for runner, outcome in [("github-hosted", "skipped"), ("self-hosted", "failed"), ("", "failed")]:
                 with self.subTest(platform=platform, runner=runner), tempfile.TemporaryDirectory() as tmp:
                     env = {**os.environ, **step["env"], compiler: tmp+"/absent", "BUILD_DIR": tmp,
@@ -121,6 +116,24 @@ class DirectoryCITest(unittest.TestCase):
         with patch.dict(os.environ, {"PLATFORM": "CUAD"}):
             with self.assertRaisesRegex(ValueError, "Unsupported"):
                 suite.platforms.selection()
+
+    def test_parent_make_passes_selected_compiler_to_ch_builds(self):
+        # GNU Make can reinterpret a recursively forwarded G++=... as an append to G+.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = root/"site.inc"
+            config.write_text(f"GCC_ROOT_PATH={root}/no-fallback-compiler\n")
+            compiler = root/"selected-cxx"
+            compiler.write_text("#!/bin/sh\nwhile [ \"$1\" != -o ]; do shift || exit 2; done\ncp /bin/true \"$2\"\n")
+            compiler.chmod(0o755)
+            for group in ("contracts", "sanitizers"):
+                subprocess.run(["make", "test-ch", "PLATFORM=SERIAL", f"G++ = {compiler}", f"CONFIG_FILE={config}",
+                                f"BUILD_DIR={root}", f"CH_TEST_OPTIONS=--group {group}"], cwd=ROOT, check=True,
+                               capture_output=True, env=dict(os.environ, PYTHON=sys.executable), timeout=30)
+                for name in suite.CONTRACTS:
+                    lines = (root/f"ch_ci/SERIAL/{group}/{name}.log").read_text().splitlines()
+                    cmd, = [line for line in lines if line.startswith(str(compiler)+" ")]
+                    self.assertEqual("-fsanitize=address,undefined" in cmd, group == "sanitizers")
 
     def test_case_failure_is_reported_after_running_the_other_cases(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"PLATFORM": "OMP"}):

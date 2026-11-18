@@ -22,6 +22,20 @@ The four contracts are split residual/Jacobian, energy, split lifecycle and unsp
 
 `--group all` runs contracts and benchmarks for the selected platform. Use `--group sanitizers` separately on SERIAL. `-B` builds only; it neither probes hardware nor counts as an execution pass. Set `--config-file` and repeat `--make-option KEY=VALUE` for the site toolchain. Use a separate build root per compiler. The suite writes a status per case in `PLATFORM/group/summary.json`, keeps logs for failed cases, and exits nonzero if any case fails. The plotting runner still saves timestamped numerical results and figures.
 
+## Generic PDE validation
+
+The [PDE runner](../source/nonlinear_operators/pde_validation/tests/run_all.sh) owns three cases: forced diffusion, manufactured Brusselator reaction-diffusion, and linear mixed index-1 Cahn-Hilliard. The last case checks the mass constraint and chemical potential; it does not replace any of the four dedicated CH contracts above. Neither the capability/header check nor the plots are part of this profile.
+
+```bash
+PLATFORM=CUDA bash source/nonlinear_operators/pde_validation/tests/run_all.sh --profile ci --list
+make test-pde PLATFORM=OMP 'G++ = clang++' CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
+    BUILD_DIR=build/pde_clang
+```
+
+`PDE_TEST_OPTIONS=-B` forces a build without executing tests or probing a GPU. GCC and Clang each run SERIAL, OMP and SERIAL with ASan/UBSan and leak detection (18 generic executions); CUDA and HIP add three each on equipped runners. CPU execution uses two OpenMP threads and 180 seconds per binary; GPU execution uses 300 seconds. CPU compilations can overlap (two workers); numerical runs are sequential. The same jobs also run 32 dedicated CH executions separately.
+
+Each ordinary generic run writes `PLATFORM/pde/summary.json` and one log per case beneath its build root; sanitizer results use a separate root. Workflow artifacts remain `timestepper-pde-g++`, `timestepper-pde-clang++`, `timestepper-pde-cuda`, and `timestepper-pde-hip`. Inspect `backend.json` for a hosted skip, `compiler.txt` for the selected compiler, and GPU `probe.log` for a failed device check. A failed numerical case does not suppress subsequent generic cases or the dedicated CH suite.
+
 ## Explicit Runge-Kutta
 
 The timestepper module owns the [timestepper case inventory](../source/contrib/nmfd-timesteppers/tests/timestepper_ci.py); the parent Make target supplies the same build configuration as its other tests. For example:
