@@ -2656,19 +2656,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Prepare hosted CPU and Python dependencies
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends python3-numpy python3-scipy
-          fi
+      - uses: ./.github/actions/prepare-reference-python
+        timeout-minutes: 3
       - name: Compare fixed-step native interpolants with SciPy
         run: |
           DENSE_BUILD="$BUILD_DIR/dop853_dense_python"
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            PYTHON=/usr/bin/python3
-          else
+          if [ -z "${PYTHON:-}" ]; then
             PYTHON=python3
             if ! "$PYTHON" -c 'import numpy, scipy' >/dev/null 2>&1; then
               PYTHON="$HOME/anaconda3/bin/python"
@@ -2697,19 +2690,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Prepare hosted CPU and Python dependencies
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends python3-numpy python3-scipy python3-matplotlib
-          fi
+      - uses: ./.github/actions/prepare-reference-python
+        timeout-minutes: 3
       - name: Compare Lorenz trajectories with SciPy RK45, RK23 and DOP853
         run: |
           SIMULATION_BUILD="$BUILD_DIR/lorenz_simulation"
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            PYTHON=/usr/bin/python3
-          else
+          if [ -z "${PYTHON:-}" ]; then
             PYTHON=python3
             if ! "$PYTHON" -c 'import numpy, scipy, matplotlib' >/dev/null 2>&1; then
               PYTHON="$HOME/anaconda3/bin/python"
@@ -2769,19 +2755,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Prepare hosted CPU and Python dependencies
-        run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends python3-numpy python3-scipy python3-matplotlib
-          fi
+      - uses: ./.github/actions/prepare-reference-python
+        timeout-minutes: 3
       - name: Compare classical RK4 Lorenz trajectories with NumPy
         run: |
           SIMULATION_BUILD="$BUILD_DIR/rk4_simulation"
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            PYTHON=/usr/bin/python3
-          else
+          if [ -z "${PYTHON:-}" ]; then
             PYTHON=python3
             if ! "$PYTHON" -c 'import numpy, scipy, matplotlib' >/dev/null 2>&1; then
               PYTHON="$HOME/anaconda3/bin/python"
