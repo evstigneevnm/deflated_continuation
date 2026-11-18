@@ -28,6 +28,8 @@ To dispatch [self-hosted CH validation](../.github/workflows/ch-self-hosted.yml)
 
 ## Migration inventory
 
-At the pilot baseline the parent [Operations workflow](../.github/workflows/operations.yml) has 189 job definitions before matrix expansion, including 70 timestepper jobs. Run `python3 run_local_ci.py --list` for the full job inventory. The CH cases were steps inside shared jobs, not separate graph nodes: the pilot retains those scheduling and artifact boundaries. The hosted CPU/compiler, optional GPU and figures jobs all still feed `all-tests-passed` before the symmetric KS1D N=64 reference job.
+At the pilot baseline the parent [Operations workflow](../.github/workflows/operations.yml) had 189 job definitions before matrix expansion, including 70 timestepper jobs. Run `python3 run_local_ci.py --list` for the current inventory. The GCC Stokes/Oseen and CH figures now share a job independent of projection compilation; their artifact names are unchanged. The hosted CPU/compiler, optional GPU and figures jobs all feed `all-tests-passed` before the symmetric KS1D N=64 reference job.
+
+Implicit sanitizer tests run in six method-family groups. Each runner builds at most two binaries concurrently, then runs its cases one at a time with ASan/UBSan and the existing 90-second per-binary timeout. To reproduce a group locally, use its `bash scripts/ci/run_timestepper_sanitizers.sh ...` command and sanitizer environment from the workflow.
 
 Subsequent batches should inventory actual cases inside each job (including compiler variants, sanitizers, Python checks, and backend-specific exceptions) before removing its graph nodes. The CH policy is not yet a claim of strict GPU coverage for unmigrated legacy jobs.

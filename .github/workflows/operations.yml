@@ -270,6 +270,7 @@ jobs:
       - timestepper-explicit-vdp-cpu
       - timestepper-fsal-cuda
       - timestepper-projection-cpu
+      - timestepper-pde-figures-cpu
       - timestepper-projection-cuda
       - timestepper-projection-hip
       - timestepper-pde-cpu
@@ -2407,7 +2408,11 @@ jobs:
   timestepper-implicit-sanitizers-cpu:
     needs: [timestepper-implicit-dirk-cpu, timestepper-bdf-cpu, timestepper-rosenbrock-cpu, timestepper-implicit-adaptive-cpu, timestepper-implicit-esdirk-cpu, timestepper-imex-cpu, timestepper-implicit-dense-cpu, timestepper-implicit-globalization-cpu, timestepper-implicit-mass-dae-cpu, timestepper-implicit-lifecycle-cpu, timestepper-implicit-nonautonomous-cpu, timestepper-explicit-nonautonomous-cpu, timestepper-implicit-lorenz-cpu, timestepper-implicit-rossler-cpu, timestepper-implicit-vdp-cpu]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [dirk, steady-esdirk, imex-dense, bdf, rosenbrock, rosenbrock-mass]
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
@@ -2415,37 +2420,56 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Check implicit stage storage and rollback with sanitizers
-        run: |
-          make -j2 test_implicit_dirk_cpu.bin test_implicit_adaptive_cpu.bin test_implicit_globalization_cpu.bin test_implicit_nonnormal_steady_state_cpu.bin test_implicit_lorenz_steady_state_cpu.bin test_implicit_rossler_steady_state_cpu.bin test_implicit_vdp_steady_state_cpu.bin test_implicit_mass_dae_cpu.bin test_implicit_lifecycle_cpu.bin test_implicit_nonautonomous_cpu.bin test_explicit_nonautonomous_cpu.bin test_explicit_filter_adaptation_cpu.bin test_implicit_lorenz_cpu.bin test_implicit_rossler_cpu.bin test_implicit_vdp_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-          for test in dirk adaptive mass_dae lifecycle nonautonomous lorenz rossler vdp; do
-            OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
-          done
-          for test in globalization nonnormal_steady_state lorenz_steady_state rossler_steady_state vdp_steady_state; do
-            OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
-          done
-          make -j2 test_implicit_esdirk_cpu.bin test_implicit_esdirk_adaptive_cpu.bin test_implicit_esdirk_mass_dae_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-          for test in esdirk esdirk_adaptive esdirk_mass_dae; do
-            OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
-          done
-          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks imex_dense_output imex_dense_lifecycle; do
-            make "test_implicit_${test}_cpu.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-            OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
-          done
-          make -j2 test_implicit_dense_output_cpu.bin test_implicit_dense_lifecycle_cpu.bin test_implicit_dense_mass_dae_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-          for test in dense_output dense_lifecycle dense_mass_dae; do
-            OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
-          done
-          for test in bdf bdf_lifecycle bdf_mass_dae bdf_backend bdf_adaptive bdf_adaptive_lifecycle bdf_adaptive_mass_dae bdf_orders bdf_variable_order bdf_stability bdf_dense bdf_dense_lifecycle bdf_dense_mass_dae; do
-            make "test_implicit_${test}_cpu.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-            OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
-          done
-          for test in rosenbrock rosenbrock_lifecycle rosenbrock_backend rosenbrock_adaptive rosenbrock_nonautonomous rosenbrock_ros3 rosenbrock_ros3_adaptive rosenbrock_ros3_lifecycle rosenbrock_dense rosenbrock_dense_lifecycle rosenbrock_w rosenbrock_w_adaptive rosenbrock_w_lifecycle rosenbrock_w_dense rosenbrock_w_dense_lifecycle rosenbrock_mass rosenbrock_mass_adaptive rosenbrock_mass_lifecycle rosenbrock_mass_nonautonomous rosenbrock_mass_time_lifecycle rosenbrock_dae rosenbrock_dae_lifecycle rosenbrock_variable_mass rosenbrock_variable_mass_adaptive rosenbrock_variable_mass_lifecycle rosenbrock_variable_mass_benchmarks rosenbrock_index2 rosenbrock_index2_moving rosenbrock_index2_dense rosenbrock_index2_lifecycle; do
-            make "test_implicit_${test}_cpu.bin" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/implicit_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-            OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/"test_implicit_${test}_cpu.bin"
-          done
-          OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/test_explicit_nonautonomous_cpu.bin
-          OMP_NUM_THREADS=2 timeout 90s ./"$BUILD_DIR"/implicit_sanitizers/test_explicit_filter_adaptation_cpu.bin
+      - name: Check dirk with sanitizers
+        if: matrix.family == 'dirk'
+        run: >
+          bash scripts/ci/run_timestepper_sanitizers.sh
+          implicit_dirk implicit_adaptive implicit_mass_dae implicit_lifecycle implicit_nonautonomous
+          implicit_lorenz implicit_rossler implicit_vdp explicit_nonautonomous explicit_filter_adaptation
+      - name: Check steady-esdirk with sanitizers
+        if: matrix.family == 'steady-esdirk'
+        run: >
+          bash scripts/ci/run_timestepper_sanitizers.sh
+          implicit_globalization implicit_nonnormal_steady_state implicit_lorenz_steady_state
+          implicit_rossler_steady_state implicit_vdp_steady_state implicit_esdirk implicit_esdirk_adaptive
+          implicit_esdirk_mass_dae
+      - name: Check imex-dense with sanitizers
+        if: matrix.family == 'imex-dense'
+        run: >
+          bash scripts/ci/run_timestepper_sanitizers.sh
+          implicit_imex implicit_imex_adaptive implicit_imex_mass implicit_imex_lifecycle
+          implicit_imex_backend implicit_imex_benchmarks implicit_imex_dense_output
+          implicit_imex_dense_lifecycle implicit_dense_output implicit_dense_lifecycle
+          implicit_dense_mass_dae
+      - name: Check bdf with sanitizers
+        if: matrix.family == 'bdf'
+        run: >
+          bash scripts/ci/run_timestepper_sanitizers.sh
+          implicit_bdf implicit_bdf_lifecycle implicit_bdf_mass_dae implicit_bdf_backend
+          implicit_bdf_adaptive implicit_bdf_adaptive_lifecycle implicit_bdf_adaptive_mass_dae
+          implicit_bdf_orders implicit_bdf_variable_order implicit_bdf_stability implicit_bdf_dense
+          implicit_bdf_dense_lifecycle implicit_bdf_dense_mass_dae
+      - name: Check rosenbrock with sanitizers
+        if: matrix.family == 'rosenbrock'
+        run: >
+          bash scripts/ci/run_timestepper_sanitizers.sh
+          implicit_rosenbrock implicit_rosenbrock_lifecycle implicit_rosenbrock_backend
+          implicit_rosenbrock_adaptive implicit_rosenbrock_nonautonomous implicit_rosenbrock_ros3
+          implicit_rosenbrock_ros3_adaptive implicit_rosenbrock_ros3_lifecycle implicit_rosenbrock_dense
+          implicit_rosenbrock_dense_lifecycle implicit_rosenbrock_w implicit_rosenbrock_w_adaptive
+          implicit_rosenbrock_w_lifecycle implicit_rosenbrock_w_dense
+          implicit_rosenbrock_w_dense_lifecycle
+      - name: Check rosenbrock-mass with sanitizers
+        if: matrix.family == 'rosenbrock-mass'
+        run: >
+          bash scripts/ci/run_timestepper_sanitizers.sh
+          implicit_rosenbrock_mass implicit_rosenbrock_mass_adaptive implicit_rosenbrock_mass_lifecycle
+          implicit_rosenbrock_mass_nonautonomous implicit_rosenbrock_mass_time_lifecycle
+          implicit_rosenbrock_dae implicit_rosenbrock_dae_lifecycle implicit_rosenbrock_variable_mass
+          implicit_rosenbrock_variable_mass_adaptive implicit_rosenbrock_variable_mass_lifecycle
+          implicit_rosenbrock_variable_mass_benchmarks implicit_rosenbrock_index2
+          implicit_rosenbrock_index2_moving implicit_rosenbrock_index2_dense
+          implicit_rosenbrock_index2_lifecycle
 
   timestepper-tables-explicit-cpu:
     runs-on: ubuntu-latest
@@ -2592,13 +2616,26 @@ jobs:
           fi
       - name: Verify stage projection, dense output, retries and backend guards
         run: |
-          for test in explicit_apply_operator implicit_operator_projection explicit_projection explicit_projection_lifecycle explicit_projection_backend implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection implicit_imex_projection implicit_imex_projection_lifecycle implicit_imex_projection_backend periodic_stokes_imex_projection implicit_bdf_projection implicit_bdf_projection_lifecycle implicit_bdf_projection_backend periodic_stokes_bdf_projection implicit_rosenbrock_projection implicit_rosenbrock_projection_lifecycle implicit_rosenbrock_projection_backend periodic_stokes_rosenbrock_projection; do
-            make -j2 "test_${test}_cpu.bin" "test_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/projection"
-            for backend in cpu cpu_omp; do
-              OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/projection/"test_${test}_${backend}.bin"
-            done
-            make -j2 "test_${test}_cpu.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/projection_sanitizers" G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
-            ASAN_OPTIONS=detect_leaks=1 OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/projection_sanitizers/"test_${test}_cpu.bin"
+          cases=(explicit_apply_operator implicit_operator_projection
+                 explicit_projection explicit_projection_lifecycle explicit_projection_backend
+                 implicit_projection implicit_projection_lifecycle implicit_projection_backend periodic_stokes_projection
+                 implicit_imex_projection implicit_imex_projection_lifecycle implicit_imex_projection_backend periodic_stokes_imex_projection
+                 implicit_bdf_projection implicit_bdf_projection_lifecycle implicit_bdf_projection_backend periodic_stokes_bdf_projection
+                 implicit_rosenbrock_projection implicit_rosenbrock_projection_lifecycle implicit_rosenbrock_projection_backend periodic_stokes_rosenbrock_projection)
+          cpu=() omp=()
+          for case_name in "${cases[@]}"; do
+            cpu+=("test_${case_name}_cpu.bin")
+            omp+=("test_${case_name}_cpu_omp.bin")
+          done
+          opts=("G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc)
+          make -j2 "${cpu[@]}" "${omp[@]}" "${opts[@]}" BUILD_DIR="$BUILD_DIR/projection"
+          for binary in "${cpu[@]}" "${omp[@]}"; do
+            OMP_NUM_THREADS=2 timeout 180s "$BUILD_DIR/projection/$binary"
+          done
+          make -j2 "${cpu[@]}" "${opts[@]}" BUILD_DIR="$BUILD_DIR/projection_sanitizers" \
+            G++FLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+          for binary in "${cpu[@]}"; do
+            ASAN_OPTIONS=detect_leaks=1 OMP_NUM_THREADS=2 timeout 180s "$BUILD_DIR/projection_sanitizers/$binary"
           done
       - name: Reject unsupported operator results and missing apply methods
         run: |
@@ -2617,15 +2654,21 @@ jobs:
             done
           done
 
-      - name: Prepare Stokes/Oseen figure dependencies
-        if: matrix.compiler == 'g++'
+  timestepper-pde-figures-cpu:
+    needs: [timestepper-capability-contract, scfd-vector-operations-cpu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Prepare Stokes/Oseen and CH figure dependencies
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends python3-numpy python3-matplotlib libfftw3-dev
           fi
       - name: Validate and plot manufactured PDE solutions and temporal orders
-        if: matrix.compiler == 'g++'
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
             export PYTHON=/usr/bin/python3
@@ -2637,7 +2680,7 @@ jobs:
               --methods IE CN IMEX_ARK324L2SA BDF1 BDF2 BDF ROS2 ROS3 ROS34PW2 --levels 4 --threads 2
           done
       - name: Save Stokes/Oseen figures and numerical reports
-        if: always() && matrix.compiler == 'g++'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: stokes-oseen-timestepper-validation
@@ -2647,7 +2690,6 @@ jobs:
           if-no-files-found: warn
 
       - name: Validate and plot convex-split Cahn-Hilliard energy, order and fields
-        if: matrix.compiler == 'g++'
         run: |
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
             export PYTHON=/usr/bin/python3
@@ -2660,7 +2702,7 @@ jobs:
           done
           exit "$failed"
       - name: Save Cahn-Hilliard figures and numerical reports
-        if: always() && matrix.compiler == 'g++'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ch-energy-timestepper-validation

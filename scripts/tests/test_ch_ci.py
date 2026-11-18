@@ -46,9 +46,11 @@ class DirectoryCITest(unittest.TestCase):
         self.assertEqual(set(self.jobs[job]["strategy"]["matrix"]["compiler"]), {"g++", "clang++"})
         self.assertIn("SERIAL OMP", cpu)
         self.assertIn("PLATFORM=SERIAL", cpu)
-        figures = next(s for _, s in self.steps if "--group benchmarks" in s["run"])
+        job, figures = next((j, s) for j, s in self.steps if "--group benchmarks" in s["run"])
         self.assertIn("SERIAL OMP", figures["run"])
-        self.assertEqual(figures["if"], "matrix.compiler == 'g++'")
+        self.assertNotIn("if", figures)
+        self.assertNotIn("strategy", self.jobs[job])  # Run figures once with the configured GCC.
+        self.assertFalse(any("projection_sanitizers" in s.get("run", "") for s in self.jobs[job]["steps"]))
 
     def test_case_inventory(self):
         self.assertEqual(set(suite.CONTRACTS), {"cahn_hilliard_imex", "cahn_hilliard_energy",

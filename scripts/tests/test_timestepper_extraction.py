@@ -4,6 +4,7 @@ import configparser
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import sys
 import unittest
@@ -16,6 +17,37 @@ import run_local_ci as ci
 
 
 class TimestepperExtractionTest(unittest.TestCase):
+    def sanitizer_cases(self, job):
+        cases = []
+        for family in job["strategy"]["matrix"]["family"]:
+            steps = [s for s in job["steps"] if s.get("if") == f"matrix.family == '{family}'"]
+            self.assertEqual(len(steps), 1, family)
+            command = shlex.split(steps[0]["run"])
+            self.assertEqual(command[:2], ["bash", "scripts/ci/run_timestepper_sanitizers.sh"])
+            self.assertTrue(command[2:], family)
+            cases.extend(command[2:])
+        self.assertEqual(len(cases), len(set(cases)), "Duplicate sanitizer case")
+        return set(cases)
+
+    def test_sanitizer_batch_builds_then_runs_and_propagates_failures(self):
+        harness = """
+            make() { printf 'make %s\n' "$*"; return "$BUILD_RC"; }
+            timeout() { printf 'run %s %s %s\n' "$OMP_NUM_THREADS" "$1" "$2"; return "$TEST_RC"; }
+            export -f make timeout
+            bash scripts/ci/run_timestepper_sanitizers.sh implicit_dirk explicit_nonautonomous
+        """
+        for build_rc, test_rc, runs in [(0, 0, 2), (7, 0, 0), (0, 9, 1)]:
+            with self.subTest(build=build_rc, test=test_rc):
+                result = subprocess.run(["bash", "-c", harness], cwd=ROOT, capture_output=True, text=True,
+                                        env=dict(os.environ, BUILD_DIR="build/mock", BUILD_RC=str(build_rc),
+                                                 TEST_RC=str(test_rc)))
+                self.assertEqual(result.returncode, build_rc or test_rc)
+                build, *actual = result.stdout.splitlines()
+                self.assertIn("make -j2 test_implicit_dirk_cpu.bin test_explicit_nonautonomous_cpu.bin", build)
+                self.assertIn("-fsanitize=address,undefined", build)
+                self.assertEqual(actual, [f"run 2 90s build/mock/implicit_sanitizers/test_{case}_cpu.bin"
+                                          for case in ("implicit_dirk", "explicit_nonautonomous")[:runs]])
+
     def make(self, directory, *arguments):
         env = os.environ.copy()
         for name in ("MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "CPPFLAGS", "CPATH",
@@ -139,7 +171,7 @@ class TimestepperExtractionTest(unittest.TestCase):
             self.assertIn("test_implicit_${test}_" + backend + ".bin", commands)
         sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
         self.assertIn("timestepper-rosenbrock-cpu", sanitizer["needs"])
-        self.assertIn(loop, "\n".join(step.get("run", "") for step in sanitizer["steps"]))
+        self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))
         headers = self.make(ROOT, "test_implicit_rosenbrock_cpu.bin", "BUILD_DIR=build/rosenbrock_probe", "-p")
         dependencies = next(line for line in headers.splitlines() if line.startswith("test_implicit_rosenbrock_cpu.bin:"))
         self.assertIn("include/nmfd/time_steppers/rosenbrock/time_step.h", dependencies)
@@ -165,7 +197,7 @@ class TimestepperExtractionTest(unittest.TestCase):
             self.assertIn("test_implicit_${test}_" + backend + ".bin", commands)
         sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
         self.assertIn("timestepper-bdf-cpu", sanitizer["needs"])
-        self.assertIn(loop, "\n".join(step.get("run", "") for step in sanitizer["steps"]))
+        self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))
         visual = "\n".join(step.get("run", "") for step in jobs["timestepper-lorenz-simulation-python-cpu"]["steps"])
         self.assertIn("--methods BDF1 BDF2 --controllers constant", visual)
         self.assertIn("--methods BDF1 BDF2 --controllers matlab scipy PID", visual)
@@ -187,27 +219,26 @@ class TimestepperExtractionTest(unittest.TestCase):
         self.assertIn("timestepper-implicit-adaptive-cpu", jobs["timestepper-implicit-adaptive-cuda"]["needs"])
         sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
         self.assertIn("timestepper-implicit-adaptive-cpu", sanitizer["needs"])
-        commands = "\n".join(step.get("run", "") for step in sanitizer["steps"])
-        self.assertIn("test_implicit_adaptive_cpu.bin", commands)
-        self.assertIn("for test in dirk adaptive mass_dae lifecycle nonautonomous", commands)
+        self.assertTrue({"implicit_" + name for name in ("dirk", "adaptive", "mass_dae", "lifecycle", "nonautonomous")}
+                        <= self.sanitizer_cases(sanitizer))
 
     def test_adaptive_system_matrix_runs_on_all_supported_test_backends(self):
         jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
         sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
-        sanitizer_commands = "\n".join(step.get("run", "") for step in sanitizer["steps"])
+        sanitizer_cases = self.sanitizer_cases(sanitizer)
         for system in ("lorenz", "rossler", "vdp", "mass-dae"):
             cpu_job = f"timestepper-implicit-{system}-cpu"
             self.assertIn("timestepper-implicit-adaptive-cpu", jobs[cpu_job]["needs"])
             self.assertIn(cpu_job, sanitizer["needs"])
             target = "test_implicit_" + system.replace("-", "_")
-            self.assertIn(target + "_cpu.bin", sanitizer_commands)
+            self.assertIn(target.removeprefix("test_"), sanitizer_cases)
             for backend in ("cpu", "cuda"):
                 steps = jobs[f"timestepper-implicit-{system}-{backend}"]["steps"]
                 commands = "\n".join(step.get("run", "") for step in steps)
                 self.assertIn(target + f"_{backend}.bin", commands)
             cpu_commands = "\n".join(step.get("run", "") for step in jobs[cpu_job]["steps"])
             self.assertIn(target + "_cpu_omp.bin", cpu_commands)
-        self.assertIn("nonautonomous lorenz rossler vdp; do", sanitizer_commands)
+        self.assertIn("explicit_nonautonomous", sanitizer_cases)
 
     def test_globalization_is_standalone_and_required_by_ci(self):
         tests = ("globalization", "nonnormal_steady_state", "lorenz_steady_state",
@@ -231,11 +262,7 @@ class TimestepperExtractionTest(unittest.TestCase):
                 self.assertIn("test_implicit_${test}_${backend}.bin", commands)
         sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
         self.assertIn("timestepper-implicit-globalization-cpu", sanitizer["needs"])
-        commands = "\n".join(step.get("run", "") for step in sanitizer["steps"])
-        self.assertIn(test_loop, commands)
-        self.assertIn("test_implicit_${test}_cpu.bin", commands)
-        for test in tests:
-            self.assertIn(f"test_implicit_{test}_cpu.bin", commands)
+        self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))
 
     def test_esdirk_rate_matrix_is_standalone_and_required_by_ci(self):
         tests = ("esdirk", "esdirk_adaptive", "esdirk_mass_dae")
@@ -257,10 +284,7 @@ class TimestepperExtractionTest(unittest.TestCase):
                 self.assertIn("test_implicit_${test}_${backend}.bin", commands)
         sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
         self.assertIn("timestepper-implicit-esdirk-cpu", sanitizer["needs"])
-        commands = "\n".join(step.get("run", "") for step in sanitizer["steps"])
-        self.assertIn(test_loop, commands)
-        for test in tests:
-            self.assertIn(f"test_implicit_{test}_cpu.bin", commands)
+        self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))
 
     def test_implicit_dense_matrix_is_standalone_and_required_by_ci(self):
         tests = ("dense_output", "dense_lifecycle", "dense_mass_dae")
@@ -283,10 +307,7 @@ class TimestepperExtractionTest(unittest.TestCase):
                 self.assertIn("test_implicit_${test}_${backend}.bin", commands)
         sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
         self.assertIn("timestepper-implicit-dense-cpu", sanitizer["needs"])
-        commands = "\n".join(step.get("run", "") for step in sanitizer["steps"])
-        self.assertIn(test_loop, commands)
-        for test in tests:
-            self.assertIn(f"test_implicit_{test}_cpu.bin", commands)
+        self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))
 
     def test_imex_execution_is_built_standalone_and_required_by_ci(self):
         tests = ("imex", "imex_adaptive", "imex_mass", "imex_lifecycle", "imex_backend", "imex_benchmarks",
@@ -309,7 +330,7 @@ class TimestepperExtractionTest(unittest.TestCase):
                 self.assertIn("test_implicit_${test}_cpu_omp.bin", commands)
         sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
         self.assertIn("timestepper-imex-cpu", sanitizer["needs"])
-        self.assertIn(test_loop, "\n".join(step.get("run", "") for step in sanitizer["steps"]))
+        self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))
 
     def test_filter_adaptation_is_standalone_and_gates_implicit_tests(self):
         for directory in (ROOT, MODULE):
@@ -326,8 +347,7 @@ class TimestepperExtractionTest(unittest.TestCase):
             self.assertIn(f"test_explicit_filter_adaptation_{backend}.bin", commands)
             if backend == "cpu":
                 self.assertIn("test_explicit_filter_adaptation_cpu_omp.bin", commands)
-        sanitizer = "\n".join(step.get("run", "") for step in jobs["timestepper-implicit-sanitizers-cpu"]["steps"])
-        self.assertIn("test_explicit_filter_adaptation_cpu.bin", sanitizer)
+        self.assertIn("explicit_filter_adaptation", self.sanitizer_cases(jobs["timestepper-implicit-sanitizers-cpu"]))
 
     def test_nonautonomous_matrix_preserves_explicit_independence(self):
         workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
