@@ -118,7 +118,9 @@ class TimestepperExtractionTest(unittest.TestCase):
         for job, directory in (("timestepper-explicit-cuda", "explicit_cuda"),
                                ("timestepper-implicit-dirk-cuda", "dirk_ci"),
                                ("timestepper-imex-cuda", "imex_cuda"), ("timestepper-imex-hip", "imex_hip"),
-                               ("timestepper-bdf-cuda", "bdf_cuda"), ("timestepper-bdf-hip", "bdf_hip")):
+                               ("timestepper-bdf-cuda", "bdf_cuda"), ("timestepper-bdf-hip", "bdf_hip"),
+                               ("timestepper-rosenbrock-cuda", "rosenbrock_cuda"),
+                               ("timestepper-rosenbrock-hip", "rosenbrock_hip")):
             step = next(s for s in jobs[job]["steps"] if "run" in s)
             with self.subTest(job=job):
                 self.check_missing_compiler(step, directory)
@@ -210,14 +212,8 @@ class TimestepperExtractionTest(unittest.TestCase):
         for path in (MODULE / "include/nmfd/time_steppers/rosenbrock").glob("*.h"):
             self.assertNotIn("#include <nmfd/solvers/", path.read_text())
         jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
-        self.assertEqual(jobs["timestepper-rosenbrock-cpu"]["strategy"]["matrix"]["compiler"], ["g++", "clang++"])
-        loop = "for test in " + " ".join(tests) + "; do"
-        for backend in ("cpu", "cuda", "hip"):
-            name = f"timestepper-rosenbrock-{backend}"
-            self.assertIn(name, jobs["all-tests-passed"]["needs"])
-            commands = "\n".join(step.get("run", "") for step in jobs[name]["steps"])
-            self.assertIn(loop, commands)
-            self.assertIn("test_implicit_${test}_" + backend + ".bin", commands)
+        self.check_family_workflow(jobs, "rosenbrock", tests)
+        self.assertIn("timestepper-rosenbrock-cpu", jobs["all-tests-passed"]["needs"])
         sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
         self.assertIn("timestepper-rosenbrock-cpu", sanitizer["needs"])
         self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))

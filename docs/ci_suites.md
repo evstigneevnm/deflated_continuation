@@ -74,6 +74,17 @@ make test-timesteppers PLATFORM=CUDA TIMESTEPPER_TEST_OPTIONS='--group bdf --lis
 
 Logs and `summary.json` are under `BUILD_DIR/PLATFORM/bdf/`. Workflow artifacts are `bdf-g++`, `bdf-clang++`, `bdf-CUDA` and `bdf-HIP`. An optional hosted GPU skip produces `backend.json`, not a numerical pass. `test-rk` and `test-explicit-rk` retain their original defaults and option variables.
 
+## Rosenbrock/W
+
+The `rosenbrock` group runs 30 cases covering ROS2/ROS3/W stepping, adaptivity, dense output, mass operators, DAEs and moving index-2 constraints. As with BDF, both compilers check the public headers and run SERIAL and OMP; CUDA and HIP use the required device probe when selected. This gives 180 numerical executions on equipped runners. The separate projection tests and both Rosenbrock sanitizer groups are unchanged.
+
+```bash
+make test-timesteppers PLATFORM=OMP 'G++ = clang++' CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
+    BUILD_DIR=build/rosenbrock_clang TIMESTEPPER_TEST_OPTIONS='--group rosenbrock'
+```
+
+Per-case logs and `summary.json` are under `BUILD_DIR/PLATFORM/rosenbrock/`. Look for the `rosenbrock-g++`, `rosenbrock-clang++`, `rosenbrock-CUDA` or `rosenbrock-HIP` workflow artifact. An optional hosted GPU skip produces `backend.json` instead.
+
 ## Required vs optional hardware
 
 Select the expected platform explicitly; never infer the test list from installed compilers. A requested local/self-hosted GPU must compile, link, launch and synchronize a kernel and read the expected value before running numerical cases. A compile or runtime failure is fatal; no CPU fallback is allowed. The direct suite is always strict. Only the optional accelerator steps in the hosted workflow may skip for absent hardware/toolchains, and only with an explicit `optional-on-hosted` policy **and** GitHub's [hosted runner identity](https://docs.github.com/en/actions/reference/workflows-and-actions/variables). Once selected for execution, even a hosted probe or test failure is fatal.
