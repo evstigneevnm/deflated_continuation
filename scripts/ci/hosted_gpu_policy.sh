@@ -26,3 +26,21 @@ select_cuda_compiler() {
     if gpu_skip_allowed && ! nvidia-smi -L; then gpu_unavailable cuda "$report" "device unavailable"; fi
     export NVCC="$compiler"
 }
+
+# HIP on NVIDIA and HIP on AMD use different architecture flags. A broken
+# compiler is a failure even on an optional runner; only absence may skip.
+select_hip_compiler() {
+    local dir=$1 compiler root arch
+    compiler=$(command -v "${HIPCC:-hipcc}" || true)
+    if [[ -z $compiler ]]; then gpu_unavailable hip "$dir/backend.json" "compiler unavailable"; fi
+    root="${ROCM_PATH:-$(dirname "$(dirname "$compiler")")}"
+    "$compiler" --version > "$dir/compiler.txt" || return 1
+    if grep -qi nvcc "$dir/compiler.txt"; then
+        arch="${HIP_ARCH_LIST:-75}"
+        if gpu_skip_allowed && ! nvidia-smi -L; then gpu_unavailable hip "$dir/backend.json" "device unavailable"; fi
+    else
+        arch="${HIP_ARCH_LIST:-native}"
+        if gpu_skip_allowed && ! "$root/bin/rocm-smi"; then gpu_unavailable hip "$dir/backend.json" "device unavailable"; fi
+    fi
+    export HIPCC="$compiler" HIP_ROOT_PATH="$root" HIP_PATH="$root" HIP_ARCH_LIST="$arch"
+}

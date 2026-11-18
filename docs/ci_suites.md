@@ -50,6 +50,18 @@ make test-rk PLATFORM=CUDA RK_TEST_OPTIONS='--group dirk-core --list'
 
 Both groups use the same per-case logs and summaries as explicit RK. Artifacts are named `<group>-<platform>`. CPU cases use two OpenMP threads and the original 120/180-second budgets; CUDA cases keep their 300-second budgets and require the device probe before execution. HIP was not registered for these cases. The six sanitizer groups remain independent.
 
+## IMEX Runge-Kutta
+
+The `imex` group runs eight cases: fixed and adaptive stepping, mass solves, lifecycle, backend operations, benchmarks, dense output and dense-output lifecycle. GCC and Clang each check the public headers and run the group on SERIAL and OMP. CUDA and HIP each run it once, after a kernel probe. This preserves 48 numerical executions on equipped runners without adding graph nodes. CPU cases use two OpenMP threads and a 180-second timeout; GPU cases retain 300 seconds.
+
+```bash
+make test-rk PLATFORM=OMP 'G++ = clang++' CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc \
+    BUILD_DIR=build/imex_clang RK_TEST_OPTIONS='--group imex'
+make test-rk PLATFORM=HIP RK_TEST_OPTIONS='--group imex'  # use the site's HIP config
+```
+
+Keep the space before `=` in `G++ = clang++`: without it Make parses an append assignment. Use a separate build directory for each compiler. The standalone module Makefile provides SERIAL, OMP and CUDA targets; use the parent target for HIP. Reports are under `BUILD_DIR/PLATFORM/imex/`; workflow artifacts are `imex-g++`, `imex-clang++`, `imex-CUDA` and `imex-HIP`. For an optional hosted skip, inspect `backend.json` instead of a numerical summary.
+
 ## Required vs optional hardware
 
 Select the expected platform explicitly; never infer the test list from installed compilers. A requested local/self-hosted GPU must compile, link, launch and synchronize a kernel and read the expected value before running numerical cases. A compile or runtime failure is fatal; no CPU fallback is allowed. The direct suite is always strict. Only the optional accelerator steps in the hosted workflow may skip for absent hardware/toolchains, and only with an explicit `optional-on-hosted` policy **and** GitHub's [hosted runner identity](https://docs.github.com/en/actions/reference/workflows-and-actions/variables). Once selected for execution, even a hosted probe or test failure is fatal.

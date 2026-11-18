@@ -1731,20 +1731,36 @@ jobs:
           submodules: true
       - name: Prepare Clang OpenMP runtime
         if: matrix.compiler == 'clang++'
+        timeout-minutes: 3
         run: |
-          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-            sudo apt-get update
-            sudo apt-get install -y libomp-dev
+          if [[ ${RUNNER_ENVIRONMENT:-} == github-hosted && ${GITHUB_ACTIONS:-} == true ]]; then
+            probe="$RUNNER_TEMP/imex_openmp"
+            if printf '#include <omp.h>\nint main() { return omp_get_max_threads() < 1; }\n' | \
+               clang++ -fopenmp -x c++ - -o "$probe" && "$probe"; then
+              exit 0
+            fi
+            sudo apt-get -o Acquire::Retries=1 update
+            sudo apt-get -o Acquire::Retries=1 install -y --no-install-recommends libomp-dev
           fi
-      - name: Verify fixed/adaptive IMEX orders, mass solves and transactional failures
+      - name: Verify IMEX headers and contracts on serial CPU and OpenMP
         run: |
-          make check_timestepper_headers_cpu "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
-          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks imex_dense_output imex_dense_lifecycle; do
-            make -j2 "test_implicit_${test}_cpu.bin" "test_implicit_${test}_cpu_omp.bin" "G++ = ${{ matrix.compiler }}" CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc BUILD_DIR="$BUILD_DIR/imex"
-            for backend in cpu cpu_omp; do
-              OMP_NUM_THREADS=2 timeout 180s ./"$BUILD_DIR"/imex/"test_implicit_${test}_${backend}.bin"
-            done
+          compiler='${{ matrix.compiler }}'
+          dir="$BUILD_DIR/imex/$compiler"
+          config=build_configs/config_github_ubuntu_cpu.inc
+          make check_timestepper_headers_cpu "G++ = $compiler" CONFIG_FILE="$config" BUILD_DIR="$dir"
+          failed=0
+          for platform in SERIAL OMP; do
+            make test-rk PLATFORM="$platform" "G++ = $compiler" CONFIG_FILE="$config" \
+              BUILD_DIR="$dir" RK_TEST_OPTIONS="--group imex" || failed=1
           done
+          exit "$failed"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: imex-${{ matrix.compiler }}
+          path: |
+            ${{ env.BUILD_DIR }}/imex/**/*.log
+            ${{ env.BUILD_DIR }}/imex/**/summary.json
 
   timestepper-imex-cuda:
     needs: [timestepper-imex-cpu, scfd-vector-operations-cuda]
@@ -1754,20 +1770,24 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify fixed/adaptive IMEX when CUDA is available
+      - name: Run IMEX contracts on CUDA
+        env:
+          GPU_POLICY: optional-on-hosted
         run: |
-          if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
-            echo "Skipping IMEX CUDA tests: no usable GPU"
-            exit 0
-          fi
-          if ! command -v nvcc >/dev/null 2>&1 && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-            echo "Skipping IMEX CUDA tests: nvcc unavailable"
-            exit 0
-          fi
-          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks imex_dense_output imex_dense_lifecycle; do
-            make "test_implicit_${test}_cuda.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/imex_cuda"
-            timeout 300s ./"$BUILD_DIR"/imex_cuda/"test_implicit_${test}_cuda.bin"
-          done
+          source scripts/ci/hosted_gpu_policy.sh
+          dir="$BUILD_DIR/imex_cuda"
+          mkdir -p "$dir"
+          select_cuda_compiler "$dir/backend.json"
+          make test-rk PLATFORM=CUDA RK_TEST_OPTIONS="--group imex" CONFIG_FILE="$CONFIG_FILE" \
+            BUILD_DIR="$dir" NVCC="$NVCC"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: imex-CUDA
+          path: |
+            ${{ env.BUILD_DIR }}/imex_cuda/**/*.log
+            ${{ env.BUILD_DIR }}/imex_cuda/**/summary.json
+            ${{ env.BUILD_DIR }}/imex_cuda/backend.json
 
   timestepper-imex-hip:
     needs: [timestepper-imex-cpu, scfd-vector-operations-hip]
@@ -1777,31 +1797,25 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Verify fixed/adaptive IMEX when HIP is available
+      - name: Run IMEX contracts on HIP
+        env:
+          GPU_POLICY: optional-on-hosted
         run: |
-          HIPCC_BIN="$(command -v "${HIPCC:-hipcc}" || true)"
-          if [ -z "$HIPCC_BIN" ]; then
-            echo "Skipping IMEX HIP tests: hipcc unavailable"
-            exit 0
-          fi
-          HIP_ROOT="${ROCM_PATH:-$(dirname "$(dirname "$HIPCC_BIN")")}"
-          if "$HIPCC_BIN" --version | grep -qi nvcc; then
-            if ! nvidia-smi -L >/dev/null 2>&1; then
-              echo "Skipping IMEX HIP tests: no usable NVIDIA GPU"
-              exit 0
-            fi
-            HIP_TARGET="${HIP_ARCH_LIST:-75}"
-          else
-            if ! "$HIP_ROOT/bin/rocm-smi" >/dev/null 2>&1; then
-              echo "Skipping IMEX HIP tests: no usable AMD GPU"
-              exit 0
-            fi
-            HIP_TARGET="${HIP_ARCH_LIST:-native}"
-          fi
-          for test in imex imex_adaptive imex_mass imex_lifecycle imex_backend imex_benchmarks imex_dense_output imex_dense_lifecycle; do
-            make "test_implicit_${test}_hip.bin" CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$BUILD_DIR/imex_hip" HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
-            timeout 300s ./"$BUILD_DIR"/imex_hip/"test_implicit_${test}_hip.bin"
-          done
+          source scripts/ci/hosted_gpu_policy.sh
+          dir="$BUILD_DIR/imex_hip"
+          mkdir -p "$dir"
+          select_hip_compiler "$dir"
+          make test-rk PLATFORM=HIP RK_TEST_OPTIONS="--group imex" CONFIG_FILE="$CONFIG_FILE" \
+            BUILD_DIR="$dir" HIPCC="$HIPCC" HIP_ROOT_PATH="$HIP_ROOT_PATH" HIP_PATH="$HIP_PATH" HIP_ARCH_LIST="$HIP_ARCH_LIST"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: imex-HIP
+          path: |
+            ${{ env.BUILD_DIR }}/imex_hip/**/*.log
+            ${{ env.BUILD_DIR }}/imex_hip/**/summary.json
+            ${{ env.BUILD_DIR }}/imex_hip/backend.json
+            ${{ env.BUILD_DIR }}/imex_hip/compiler.txt
 
   periodic-orbit-sections-cpu:
     name: Section geometry, flights and layouts / ${{ matrix.compiler }}

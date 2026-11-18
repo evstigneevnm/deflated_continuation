@@ -113,10 +113,11 @@ class TimestepperExtractionTest(unittest.TestCase):
         self.assertNotIn(".cpp", link)
         self.assertIn("cuda_reductions.o", link)
 
-    def test_rk_cuda_missing_compiler_fails_except_on_optional_hosted_runner(self):
+    def test_rk_missing_gpu_compiler_fails_except_on_optional_hosted_runner(self):
         jobs = ci.load_workflow(ROOT / ".github/workflows/operations.yml")["jobs"]
         for job, directory in (("timestepper-explicit-cuda", "explicit_cuda"),
-                               ("timestepper-implicit-dirk-cuda", "dirk_ci")):
+                               ("timestepper-implicit-dirk-cuda", "dirk_ci"),
+                               ("timestepper-imex-cuda", "imex_cuda"), ("timestepper-imex-hip", "imex_hip")):
             step = next(s for s in jobs[job]["steps"] if "run" in s)
             with self.subTest(job=job):
                 self.check_missing_compiler(step, directory)
@@ -126,13 +127,32 @@ class TimestepperExtractionTest(unittest.TestCase):
                                           ("self-hosted", "true", "failed"), ("", "", "failed")):
             with self.subTest(runner=runner), tempfile.TemporaryDirectory() as tmp:
                 env = dict(os.environ, **step["env"], RUNNER_ENVIRONMENT=runner, GITHUB_ACTIONS=actions,
-                           NVCC=str(Path(tmp)/"missing-nvcc"), BUILD_DIR=tmp)
+                           NVCC=str(Path(tmp)/"missing-nvcc"), HIPCC=str(Path(tmp)/"missing-hipcc"), BUILD_DIR=tmp)
                 result = subprocess.run(["bash", "-eu", "-c", step["run"]], cwd=ROOT, env=env,
                                         capture_output=True, text=True, timeout=10)
                 self.assertEqual(result.returncode, 0 if expected == "skipped" else 1, result.stderr)
                 report = json.loads((Path(tmp)/directory/"backend.json").read_text())
                 self.assertEqual(report["result"], expected)
                 self.assertFalse(report["executed"])
+
+    def test_hip_ci_toolchain_selection(self):
+        script = """
+            compiler() { echo "$VERSION"; return "$COMPILER_RC"; }
+            source scripts/ci/hosted_gpu_policy.sh
+            select_hip_compiler "$BUILD_DIR"
+            printf '%s %s %s %s' "$HIPCC" "$HIP_ROOT_PATH" "$HIP_PATH" "$HIP_ARCH_LIST"
+        """
+        for version, arch, expected in (("nvcc", "", "75"), ("AMD clang", "", "native"),
+                                        ("AMD clang", "gfx90a", "gfx90a")):
+            with self.subTest(version=version, arch=arch), tempfile.TemporaryDirectory() as tmp:
+                env = dict(os.environ, GPU_POLICY="required", HIPCC="compiler", ROCM_PATH="/rocm",
+                           HIP_ARCH_LIST=arch, VERSION=version, COMPILER_RC="0", BUILD_DIR=tmp)
+                result = subprocess.run(["bash", "-eu", "-c", script], cwd=ROOT, env=env, check=True,
+                                        text=True, capture_output=True)
+                self.assertEqual(result.stdout, f"compiler /rocm /rocm {expected}")
+                env.update(COMPILER_RC="1", GPU_POLICY="optional-on-hosted",
+                           RUNNER_ENVIRONMENT="github-hosted", GITHUB_ACTIONS="true")
+                self.assertNotEqual(subprocess.run(["bash", "-eu", "-c", script], cwd=ROOT, env=env).returncode, 0)
 
     def test_parent_ci_initializes_module_and_uses_migrated_scripts(self):
         workflow = ci.load_workflow(ROOT / ".github/workflows/operations.yml")
@@ -294,12 +314,29 @@ class TimestepperExtractionTest(unittest.TestCase):
         self.assertIn("timestepper-imex-hip", jobs["all-tests-passed"]["needs"])
         self.assertEqual(jobs["timestepper-imex-cpu"]["strategy"]["matrix"]["compiler"], ["g++", "clang++"])
         self.assertIn("timestepper-imex-cpu", jobs["timestepper-imex-cuda"]["needs"])
-        test_loop = "for test in " + " ".join(tests) + "; do"
         for backend in ("cpu", "cuda", "hip"):
-            commands = "\n".join(step.get("run", "") for step in jobs[f"timestepper-imex-{backend}"]["steps"])
-            self.assertIn(test_loop, commands)
+            job = jobs[f"timestepper-imex-{backend}"]
+            commands = "\n".join(step.get("run", "") for step in job["steps"])
+            self.assertIn('RK_TEST_OPTIONS="--group imex"', commands)
+            self.assertTrue(any(s.get("if") == "always()" and "summary.json" in s["with"]["path"]
+                                for s in job["steps"] if s.get("uses", "").startswith("actions/upload-artifact")))
             if backend == "cpu":
-                self.assertIn("test_implicit_${test}_cpu_omp.bin", commands)
+                self.assertIn('make check_timestepper_headers_cpu "G++ = $compiler"', commands)
+                self.assertIn("for platform in SERIAL OMP", commands)
+                self.assertIn('make test-rk PLATFORM="$platform" "G++ = $compiler"', commands)
+                for compiler in ("g++", "clang++"):
+                    invocation = self.make(ROOT, "test-rk", f"G++ = {compiler}", "PLATFORM=OMP",
+                                           "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc")
+                    self.assertIn(f'--make-option "G++ = {compiler}"', invocation)
+            else:
+                self.assertIn(f"make test-rk PLATFORM={backend.upper()}", commands)
+                self.assertIn("timestepper-imex-cpu", job["needs"])
+        for platform, backend in (("SERIAL", "cpu"), ("OMP", "cpu_omp"), ("CUDA", "cuda"), ("HIP", "hip")):
+            listing = subprocess.check_output(
+                ["bash", str(MODULE/"tests/run_all.sh"), "--profile", "ci", "--group", "imex", "--list"],
+                env=dict(os.environ, PLATFORM=platform, PYTHON=sys.executable), text=True)
+            self.assertCountEqual([line.split()[1] for line in listing.splitlines()],
+                                  [f"test_implicit_{test}_{backend}.bin" for test in tests])
         sanitizer = jobs["timestepper-implicit-sanitizers-cpu"]
         self.assertIn("timestepper-imex-cpu", sanitizer["needs"])
         self.assertTrue({"implicit_" + test for test in tests} <= self.sanitizer_cases(sanitizer))

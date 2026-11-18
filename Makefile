@@ -1349,6 +1349,7 @@ RK_TEST_OPTIONS ?= $(EXPLICIT_RK_OPTIONS)
 test-explicit-rk test-rk:
 	PLATFORM="$(PLATFORM)" CONFIG_FILE="$(abspath $(CONFIG_FILE))" NVCC="$(NVCC)" \
 	    bash "$(NMFD_TIMESTEPPERS_ROOT)/tests/run_all.sh" --profile ci --make-dir "$(CURDIR)" \
+	    --make-option "G++ = $(G++)" \
 	    --device-probe-target ci-device-probe --build-dir "$(BUILD_DIR)" $(RK_TEST_OPTIONS)
 
 .PHONY: test-ch ci-device-probe
