@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <common/tests/vector_operations_template_tests.h>
+#include <contrib/nmfd-operations/test/scfd_norm_selector_tests.h>
 
 namespace vector_operations_tests
 {
@@ -51,6 +52,8 @@ void run_nmfd_vector_space_interface_tests(
     using multivector_type = typename VecOps::multivector_type;
 
     const base_type &base = vec_ops;
+    if ( n == 2 )
+        check_norm_selectors( vec_ops, access, label, report );
 
     vector_type x;
     vector_type y;
