@@ -6,6 +6,12 @@
 
 namespace periodic_orbit
 {
+struct grazing_section_error : std::runtime_error
+{
+    grazing_section_error() : std::runtime_error( "Grazing dense-output derivative" )
+    {
+    }
+};
 // One checkpoint and a bounded scalar schedule; the supplied replay owns serial
 // scratch. Only stationary sections and identity-state reconstruction are implied.
 template <
@@ -51,7 +57,7 @@ public:
             throw std::runtime_error( "Frozen replay disagrees with the prepared section flight" );
         denominator_ = target_->bind( work_ ).state_derivative( steps_.back().end, *endpoint_, *time_rate_ );
         if ( !traits::is_finite( denominator_ ) || traits::abs( denominator_ ) <= minimum_speed )
-            throw std::runtime_error( "Grazing dense-output derivative" );
+            throw grazing_section_error();
     }
     void apply( const X &in, X &out ) const
     {
@@ -61,13 +67,12 @@ public:
         if ( !space_->is_valid_number( in ) )
             throw std::runtime_error( "Nonfinite flight direction" );
         replay_->run( table_, steps_, *initial_, &in, *endpoint_, &*pending_, nullptr );
-        const T dt =
-            -target_->bind( work_ ).state_derivative( steps_.back().end, *endpoint_, *pending_ ) / denominator_;
-        space_->add_lin_comb( dt, *time_rate_, *pending_ );
-        if ( !traits::is_finite( dt ) || !space_->is_valid_number( *pending_ ) )
-            throw std::runtime_error( "Nonfinite section derivative" );
-        space_->assign( *pending_, out );
-        last_time_increment_ = dt;
+        last_time_increment_ = correct_crossing( out );
+    }
+    T parameter_derivative( X &out ) const
+    {
+        replay_->run_parameter( table_, steps_, *initial_, *endpoint_, *pending_ );
+        return correct_crossing( out );
     }
     T last_time_increment() const
     {
@@ -79,6 +84,16 @@ public:
     }
 
 private:
+    T correct_crossing( X &out ) const
+    {
+        const T dt =
+            -target_->bind( work_ ).state_derivative( steps_.back().end, *endpoint_, *pending_ ) / denominator_;
+        space_->add_lin_comb( dt, *time_rate_, *pending_ );
+        if ( !traits::is_finite( dt ) || !space_->is_valid_number( *pending_ ) )
+            throw std::runtime_error( "Nonfinite section derivative" );
+        space_->assign( *pending_, out );
+        return dt;
+    }
     std::shared_ptr<Space>                         space_;
     std::shared_ptr<Replay>                        replay_;
     table_type                                     table_;

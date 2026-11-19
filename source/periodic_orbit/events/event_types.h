@@ -91,6 +91,7 @@ struct event_report
     section_status status = section_status::idle;
     T              time{}, value{}, crossing_speed{};
     std::size_t    iterations = 0;
+    T              rate_norm{}; // Optional diagnostic in the state-space norm.
     bool           succeeded() const
     {
         return status == section_status::located || status == section_status::initial_event;
@@ -110,6 +111,7 @@ struct flight_request
     T                            start_time{}, end_time{};
     std::shared_ptr<const Event> target;
     crossing_rule<T>             rule;
+    bool                         measure_rate_norm = false;
 };
 
 template <class Space>

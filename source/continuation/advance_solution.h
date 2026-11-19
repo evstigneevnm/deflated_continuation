@@ -2,6 +2,8 @@
 #define __CONTINUATION__ADVANCE_SOLUTION_H__
 
 #include <string>
+#include <sstream>
+#include <iomanip>
 #include <stdexcept>
 #include <cmath>
 #include <limits>
@@ -404,12 +406,12 @@ public:
             attempt.attempted_step = predictor->get_ds();
             attempt.retry_count    = predictor_retry_count( predictor, 0 );
             last_attempt_state_    = attempt;
-            throw std::runtime_error(
-                std::string(
-                    "continuation::advance_solution (corrector) " __FILE__ " " __STR( __LINE__ ) " failed: "
-                ) +
-                ( attempt.failure_reason.empty() ? "unknown retry failure" : attempt.failure_reason )
-            );
+            std::ostringstream message;
+            message << "continuation::advance_solution (corrector) " __FILE__ " " __STR( __LINE__ ) " failed: "
+                    << ( attempt.failure_reason.empty() ? "unknown retry failure" : attempt.failure_reason )
+                    << std::setprecision( std::numeric_limits<T>::max_digits10 )
+                    << " (last accepted lambda=" << lambda0 << ", predicted lambda=" << lambda_p << ')';
+            throw std::runtime_error( message.str() );
         }
         if ( terminal_isotropy_transition )
         {

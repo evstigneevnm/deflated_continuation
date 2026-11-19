@@ -50,12 +50,32 @@ public:
     run( const table_type &table, const std::vector<flight_step_record<T>> &steps, const X &initial, const X *direction,
          X &endpoint, X *derivative, X *time_rate )
     {
+        replay<false>( table, steps, initial, direction, endpoint, derivative, time_rate );
+    }
+    void run_parameter(
+        const table_type &table, const std::vector<flight_step_record<T>> &steps, const X &initial, X &endpoint,
+        X &derivative
+    )
+    {
+        replay<true>( table, steps, initial, nullptr, endpoint, &derivative, nullptr );
+    }
+
+private:
+    template <bool Parameter>
+    void replay(
+        const table_type &table, const std::vector<flight_step_record<T>> &steps, const X &initial, const X *direction,
+        X &endpoint, X *derivative, X *time_rate
+    )
+    {
         if ( table.type() != table_type::scheme_type::explicit_rk || !table.has_dense_output() || steps.empty() ||
-             table.dense_outout_stage_count() > rates_.size() || bool( direction ) != bool( derivative ) ||
-             &endpoint == derivative || &endpoint == time_rate || ( derivative && derivative == time_rate ) )
+             table.dense_outout_stage_count() > rates_.size() ||
+             ( !Parameter && bool( direction ) != bool( derivative ) ) || &endpoint == derivative ||
+             &endpoint == time_rate || ( derivative && derivative == time_rate ) )
             throw std::invalid_argument( "Invalid flight replay workspace" );
         space_->assign( initial, *state_ );
-        if ( direction )
+        if constexpr ( Parameter )
+            space_->assign_scalar( T( 0 ), *tangent_ );
+        else if ( direction )
             space_->assign( *direction, *tangent_ );
         for ( std::size_t step = 0; step < steps.size(); ++step )
         {
@@ -65,7 +85,7 @@ public:
             for ( std::size_t i = 0; i < count; ++i )
             {
                 space_->assign( *state_, *stage_state_ );
-                if ( direction )
+                if ( derivative )
                     space_->assign( *tangent_, *stage_tangent_ );
                 for ( std::size_t j = 0; j < i; ++j )
                 {
@@ -73,15 +93,22 @@ public:
                     if ( a == T( 0 ) )
                         continue;
                     space_->add_lin_comb( r.dt * a, *rates_[j], *stage_state_ );
-                    if ( direction )
+                    if ( derivative )
                         space_->add_lin_comb( r.dt * a, *tangents_[j], *stage_tangent_ );
                 }
                 const T time = r.time + r.dt * static_cast<T>( table.dense_outout_c( i ) );
                 if ( !rate_->evaluate( time, *stage_state_, *rates_[i] ) || !space_->is_valid_number( *rates_[i] ) )
                     throw std::runtime_error( "Prepared flight rate evaluation failed" );
-                if ( direction && ( !rate_->apply_jacobian( time, *stage_state_, *stage_tangent_, *tangents_[i] ) ||
-                                    !space_->is_valid_number( *tangents_[i] ) ) )
+                if ( derivative && ( !rate_->apply_jacobian( time, *stage_state_, *stage_tangent_, *tangents_[i] ) ||
+                                     !space_->is_valid_number( *tangents_[i] ) ) )
                     throw std::runtime_error( "Prepared flight tangent evaluation failed" );
+                // The stage direction is dead after Jv, so reuse it for the source term.
+                if constexpr ( Parameter )
+                {
+                    if ( !rate_->parameter_derivative( time, *stage_state_, *stage_tangent_ ) )
+                        throw std::runtime_error( "Prepared flight parameter evaluation failed" );
+                    space_->add_lin_comb( T( 1 ), *stage_tangent_, *tangents_[i] );
+                }
             }
             if ( last && time_rate )
             {
@@ -104,10 +131,10 @@ public:
                 if ( b == T( 0 ) )
                     continue;
                 space_->add_lin_comb( r.dt * b, *rates_[i], *state_ );
-                if ( direction )
+                if ( derivative )
                     space_->add_lin_comb( r.dt * b, *tangents_[i], *tangent_ );
             }
-            if ( !space_->is_valid_number( *state_ ) || ( direction && !space_->is_valid_number( *tangent_ ) ) )
+            if ( !space_->is_valid_number( *state_ ) || ( derivative && !space_->is_valid_number( *tangent_ ) ) )
                 throw std::runtime_error( "Nonfinite prepared flight replay" );
         }
         space_->assign( *state_, endpoint );

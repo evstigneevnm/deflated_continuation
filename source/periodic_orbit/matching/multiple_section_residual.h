@@ -114,7 +114,7 @@ public:
 
     // Reports are borrowed until the next evaluation. No component is published
     // before every flight and geometry check succeeds; in/out may alias.
-    const report_type &evaluate( const vector_type &in, vector_type &out )
+    const report_type &evaluate( const vector_type &in, vector_type &out, bool measure_crossings = false )
     {
         report_.status         = section_status::invalid_input;
         report_.period         = T( 0 );
@@ -139,6 +139,7 @@ public:
             request.end_time   = node.pilot_time + params_.flight_limit_factor * node.expected_flight;
             request.target     = layout_->at( next ).section;
             request.rule       = params_.rule;
+            request.measure_rate_norm = measure_crossings;
             report_.status     = section_status::step_failure;
             diagnostic.flight  = segments_[i].flight->evaluate( *initial_, request, *arrival_ );
             const auto &flight = diagnostic.flight;

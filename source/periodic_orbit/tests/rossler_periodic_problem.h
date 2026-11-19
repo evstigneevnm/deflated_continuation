@@ -15,9 +15,10 @@ namespace ode_orbit_tests
 struct rossler_periodic
 {
     static constexpr const char                        *name = "rossler_periodic";
-    static constexpr double                             a = .1, b = .1, c = 6;
+    static constexpr double                             a = .1, b = .1, anchor_parameter = 6;
+    double                                              c = anchor_parameter;
     inline static constexpr std::array<const char *, 3> parameter_names{ "a", "b", "c" };
-    inline static constexpr std::array<double, 3>       parameters{ a, b, c };
+    inline static constexpr std::array<double, 3>       parameters{ a, b, anchor_parameter };
     static constexpr double                             period = 6.0309863678295104;
     inline static constexpr std::array<double, 3> seed{ 5.4075195831062954, -7.955995200747136, .036837201516959343 };
     static double                                 default_step( const std::string &method )

@@ -108,6 +108,8 @@ public:
                              !space_->is_valid_number( *rate_buffer_ ) )
                             return fail( section_status::rate_failure );
                         report_.crossing_speed = event.state_derivative( report_.time, *located_, *rate_buffer_ );
+                        if ( request_.measure_rate_norm )
+                            report_.rate_norm = space_->norm( *rate_buffer_ );
                         if ( !traits::is_finite( report_.crossing_speed ) )
                             return fail( section_status::nonfinite_event );
                         if ( traits::abs( report_.crossing_speed ) <= request_.rule.minimum_crossing_speed ||

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, independently validate and plot seeded periodic-orbit correction."""
+"""Build, independently validate and plot seeded periodic-orbit correction or continuation."""
 
 import argparse
 from datetime import datetime, timezone
@@ -36,6 +36,9 @@ METHODS = ("RK45", "DOP853", "IE", *DIRK_STEPS["analytic_cycle"])
 BDF_STEPS = {"analytic_cycle": .00025, "rossler_periodic": .00002,
              "lorenz_periodic": .000005, "vaidyanathan_periodic": .000003}
 METHODS += ("BDF1", "BDF2", "BDF")
+BRANCHES = {"rossler_periodic": ("c", 6., ODE_CASES["rossler_periodic"]["period"]),
+            "vdp_periodic": ("mu", 1., 6.6632868593231365),
+            "lorenz_periodic": ("rho", 28., ODE_CASES["lorenz_periodic"]["period"])}
 BUILD_ENVIRONMENT = (
     "PATH", "G++", "GCC_ROOT_PATH", "TARGET_GCC", "CPPSTD", "NVCC", "CUDA_ROOT_PATH",
     "CUDA_ARCH_LIST", "TARGET_NVCC", "HIPCC", "HIPFLAGS", "HIP_ROOT_PATH", "HIP_PATH",
@@ -56,38 +59,57 @@ def arguments(argv=None):
     mode.add_argument("-B", dest="build_only", action="store_true", help="Force build and assembly only")
     mode.add_argument("--plot-only", type=Path, help="Revalidate and plot an existing run, without building")
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build/periodic_orbit_benchmarks")
-    parser.add_argument("--systems", "--system", nargs="+", choices=("analytic_cycle", "analytic_cycle_newton", *ODE_CASES), default=["analytic_cycle"])
-    parser.add_argument("--sections", nargs="+", type=int, default=[1, 2, 4, 8])
-    parser.add_argument("--methods", nargs="+", choices=METHODS, default=["DOP853"])
+    parser.add_argument("--mode", choices=("correction", "continuation"), default="correction")
+    parser.add_argument("--systems", "--system", nargs="+", choices=("analytic_cycle", "analytic_cycle_newton", *ODE_CASES, "vdp_periodic"))
+    parser.add_argument("--sections", nargs="+", type=int)
+    parser.add_argument("--methods", nargs="+", choices=METHODS)
+    parser.add_argument("--arclength-step", type=positive, help="Initial pseudo-arclength step, distinct from the RK timestep")
+    parser.add_argument("--branch-steps", type=int, help="Accepted steps on each side of the anchor (at least two)")
+    parser.add_argument("--observe-layout", action="store_true", help="Diagnose continuation chart deterioration without refreshing; repeated circuits still fail")
+    parser.add_argument("--require-rossler-reference", action="store_true", help="Require reverse Rossler continuation to reach c=0.4 with the independently verified period")
+    parser.add_argument("--probe-offset", type=positive, help="Parameter offset for comparing section counts (default: 0.05 times the arclength step)")
     parser.add_argument("--backend", choices=("cpu", "cpu_omp", "cuda", "hip"), default="cpu")
     parser.add_argument("--step", type=positive, help="Override the system/method-specific default step")
     parser.add_argument("--relative-tolerance", type=positive, default=1e-12, help="Adaptive BDF local relative tolerance")
     parser.add_argument("--absolute-tolerance", type=positive, default=1e-13, help="Adaptive BDF local absolute tolerance")
     parser.add_argument("--maximum-step", type=positive, default=.1, help="Adaptive BDF maximum step")
     parser.add_argument("--maximum-order", type=int, choices=range(1, 6), default=5, help="Adaptive BDF order cap")
-    parser.add_argument("--start", type=float, default=.37)
-    parser.add_argument("--perturbation", type=positive, default=.02)
-    parser.add_argument("--matching-tolerance", type=positive, default=1e-6)
-    parser.add_argument("--newton-tolerance", type=positive, default=1e-10)
-    parser.add_argument("--newton-max-iterations", type=int, default=12)
+    parser.add_argument("--start", type=float)
+    parser.add_argument("--perturbation", type=positive)
+    parser.add_argument("--matching-tolerance", type=positive)
+    parser.add_argument("--newton-tolerance", type=positive)
+    parser.add_argument("--newton-max-iterations", type=int)
     parser.add_argument("--max-steps", type=int, help="Override the method-specific integration budget")
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--timeout", type=positive, help="Per-case seconds; defaults to 900 for BDF, otherwise 300")
     parser.add_argument("--config-file", type=Path, default=ROOT / "build_configs/config_github_ubuntu_cpu.inc")
     parser.add_argument("--make-option", action="append", default=[], metavar="KEY=VALUE")
     args = parser.parse_args(argv)
-    if (not math.isfinite(args.start) or (args.step is not None and args.start + args.step == args.start) or
-            args.perturbation > .1 or (args.max_steps is not None and args.max_steps < 1) or args.threads < 1 or args.newton_max_iterations < 1 or
-            any(n < 1 or n > 64 for n in args.sections)):
-        parser.error("Invalid start, section count, perturbation or execution budget")
+    branch = args.mode == "continuation"
+    args.systems = args.systems or (["rossler_periodic"] if branch else ["analytic_cycle"])
+    if not branch:
+        if args.observe_layout or args.require_rossler_reference:
+            parser.error("layout observation and branch references require --mode continuation")
+        args.methods = args.methods or ["DOP853"]
+        args.sections = args.sections or [1, 2, 4, 8]
+        for key, default in dict(start=.37, perturbation=.02, matching_tolerance=1e-6,
+                                 newton_tolerance=1e-10, newton_max_iterations=12).items():
+            if getattr(args, key) is None:
+                setattr(args, key, default)
+    elif any(s not in BRANCHES for s in args.systems) or (args.methods and set(args.methods) != {"RK45"}):
+        parser.error("Continuation requires RK45 and a supported system")
+    if not branch and "vdp_periodic" in args.systems:
+        parser.error("vdp_periodic is a continuation benchmark; use --mode continuation")
+    if args.threads < 1 or (args.newton_max_iterations is not None and args.newton_max_iterations < 1):
+        parser.error("Invalid thread count or Newton iteration budget")
     for option in args.make_option:
         key, equal, _ = option.partition("=")
         if not equal or key in ("BUILD_DIR", "CONFIG_FILE", "PERIODIC_BENCHMARK_OPTIONS") or not key.replace("_", "").replace("+", "").isalnum():
             parser.error("Use --make-option KEY=VALUE; build directory/configuration are separate options")
     args.build_dir = args.build_dir.resolve()
     args.config_file = args.config_file.resolve()
-    args.sections = list(dict.fromkeys(args.sections))
-    args.methods = list(dict.fromkeys(args.methods))
+    args.sections = list(dict.fromkeys(args.sections or []))
+    args.methods = list(dict.fromkeys(args.methods or []))
     args.systems = list(dict.fromkeys(args.systems))
     if args.timeout is None:
         args.timeout = 900 if any(method.startswith("BDF") for method in args.methods) else 300
@@ -97,12 +119,26 @@ def arguments(argv=None):
         configs = configurations(args)
     except OverflowError:
         parser.error("The chosen step requires an unrepresentable integration budget")
-    if any(args.start + c["step"] == args.start for c in configs):
-        parser.error("The chosen step cannot advance the starting time")
+    for c in configs:
+        t, h = c["start_time"], c["step"]
+        if not math.isfinite(t) or not math.isfinite(t + h) or h <= 0 or t + h == t:
+            parser.error("The chosen step cannot advance the starting time")
+        if (not 1 <= c["sections"] <= 64 or not 0 < c["perturbation"] <= .1 or c["maximum_steps"] < 1
+                or c.get("newton_max_iterations", 1) < 1):
+            parser.error("Invalid section count, perturbation or execution budget")
+        if branch and (c["branch_steps"] < 2 or c["method"] != "RK45"):
+            parser.error("Continuation requires RK45 and at least two branch steps")
+        if branch and not all(math.isfinite(c[key]) and c[key] > 0 for key in
+                              ("arclength_step", "probe_offset", "newton_tolerance", "matching_tolerance")):
+            parser.error("Invalid continuation step, probe offset or tolerance")
+    if branch and any(BRANCHES[c["system"]][1] + c["probe_offset"] == BRANCHES[c["system"]][1] for c in configs):
+        parser.error("The probe offset must produce a distinct physical parameter")
     return args
 
 
 def configurations(args):
+    if args.mode == "continuation":
+        return branch_configurations(args)
     configs = []
     for system in args.systems:
         key = "analytic_cycle" if system == "analytic_cycle_newton" else system
@@ -135,6 +171,27 @@ def configurations(args):
     return configs
 
 
+def branch_configurations(args):
+    configs = []
+    overrides = dict(step=args.step, start_time=args.start, maximum_steps=args.max_steps,
+                     perturbation=args.perturbation, newton_tolerance=args.newton_tolerance,
+                     newton_max_iterations=args.newton_max_iterations, matching_tolerance=args.matching_tolerance,
+                     arclength_step=args.arclength_step, branch_steps=args.branch_steps)
+    for system in args.systems:
+        preset = json.loads((HERE / "benchmarks" / f"{system}_continuation.json").read_text())
+        counts = args.sections or preset["sections"]
+        preset.update({key: value for key, value in overrides.items() if value is not None})
+        fraction = preset.pop("probe_fraction")
+        if args.observe_layout:
+            preset["observe_layout"] = True
+        if args.require_rossler_reference and system == "rossler_periodic":
+            preset["require_reference"] = True
+        for count in counts:
+            configs.append(dict(preset, system=system, mode="continuation", sections=count, backend=args.backend,
+                                probe_offset=args.probe_offset or fraction * preset["arclength_step"]))
+    return configs
+
+
 def write_if_changed(path, value):
     text = json.dumps(value, indent=2) + "\n"
     if not path.exists() or path.read_text() != text:
@@ -148,7 +205,8 @@ def build(args, configs):
     write_if_changed(options, dict(root=str(ROOT), configuration=str(args.config_file),
         configuration_text=args.config_file.read_text(), options=args.make_option,
         environment={name: os.environ.get(name) for name in BUILD_ENVIRONMENT}))
-    targets = {system: f"periodic_orbit_benchmark_{system}_{args.backend}.bin" for system in args.systems}
+    suffix = "_continuation" if args.mode == "continuation" else ""
+    targets = {system: f"periodic_orbit_benchmark_{system}{suffix}_{args.backend}.bin" for system in args.systems}
     command = ["make", "--no-print-directory", "-C", str(ROOT)]
     if args.build_only:
         command.append("-B")
@@ -168,11 +226,12 @@ def build(args, configs):
 
 
 def case_name(config):
-    return f"{config['system']}_{config['method']}_M{config['sections']}"
+    prefix = "branch_" if config.get("mode") == "continuation" else ""
+    return f"{prefix}{config['system']}_{config['method']}_M{config['sections']}"
 
 
 def stage(configs):
-    stages = {"matching_only" if c["system"] == "analytic_cycle" else "periodic_newton" for c in configs}
+    stages = {c.get("mode") or ("matching_only" if c["system"] == "analytic_cycle" else "periodic_newton") for c in configs}
     return next(iter(stages)) if len(stages) == 1 else "mixed"
 
 
@@ -206,6 +265,8 @@ def section_samples(directory, filename, config, part):
 
 
 def validate_case(directory, config):
+    if config.get("mode") == "continuation":
+        return validate_branch(directory, config)[0]
     if config["system"] != "analytic_cycle":
         return validate_newton_case(directory, config)
     report = json.loads((directory / "report.json").read_text())
@@ -413,7 +474,82 @@ def plot_newton_case(directory, config):
     return result
 
 
+def validate_branch(directory, config):
+    import numpy as np
+    report = json.loads((directory / "report.json").read_text())
+    rows = np.genfromtxt(directory / "branch.csv", delimiter=",", names=True, ndmin=1)
+    _, anchor, period = BRANCHES[config["system"]]
+    n = config["branch_steps"]
+    tol = config["matching_tolerance"]
+    if (report.get("format") != "periodic_orbit.continuation.v1" or report["configuration"] != config
+            or report["passed"] is not True or report["core_host_bytes"] != 0
+            or not 0 <= report["parameter_column_error"] < 2e-5
+            or not 0 <= report["restart_error"] < config["newton_tolerance"]):
+        raise ValueError("Invalid continuation, restart or transfer report")
+    if (len(rows) != 1 + 2*n or not all(np.isfinite(rows[key]).all() for key in rows.dtype.names)
+            or not np.array_equal(rows["direction"], [0] + [-1]*n + [1]*n)
+            or not np.array_equal(rows["index"], [0] + list(range(1, n+1))*2)
+            or rows["parameter"][0] != anchor or abs(rows["period"][0]-period) >= tol
+            or not rows["parameter"][1] < anchor < rows["parameter"][n+1]
+            or np.any(rows["period"] <= 0) or np.any(rows["ds"][1:] <= 0)
+            or np.any(rows["ds"][1:] > config["arclength_step"])
+            or np.any(rows["retries"] < 0) or np.any(rows["retries"] != np.floor(rows["retries"]))
+            or np.any(rows["residual"] < 0) or np.any(rows["residual"] > config["newton_tolerance"])
+            or any(np.any((rows[k] < 0) | (rows[k] >= tol)) for k in ("closure", "max_gap"))):
+        raise ValueError("Branch table violates anchor, itinerary, matching or independent closure checks")
+    if config.get("require_reference"):
+        reference = report.get("reference_point") or {}
+        if (reference.get("parameter") != .4 or not abs(reference.get("period", math.inf) - 5.53393796) < tol
+                or not 0 <= reference.get("closure", math.inf) < tol
+                or min(rows["parameter"][rows["direction"] == -1]) > .4):
+            raise ValueError("Reverse Rossler branch did not verify the one-circuit reference at c=0.4")
+    probes = report["probes"]
+    if len(probes) != 2:
+        raise ValueError("Missing common-parameter samples")
+    for sign, sample in zip((-1, 1), probes):
+        target = anchor + sign * config["probe_offset"]
+        ps = rows["parameter"][rows["direction"] == sign]
+        if (sample["parameter"] != target or not min(anchor, min(ps)) <= target <= max(anchor, max(ps))
+                or not math.isfinite(sample["period"]) or sample["period"] <= 0
+                or len(sample["state"]) != (2 if config["system"] == "vdp_periodic" else 3)
+                or not all(map(math.isfinite, sample["state"]))):
+            raise ValueError("Missing or invalid bracketed common-parameter sample")
+    return report, rows
+
+
+def compare_probes(first, second, tolerance):
+    if not first or len(first) != len(second):
+        raise ValueError("Different numbers of common-parameter samples")
+    for a, b in zip(first, second):
+        period_error, state_error = abs(a["period"] - b["period"]), math.dist(a["state"], b["state"])
+        if a["parameter"] != b["parameter"] or not (period_error < tolerance and state_error < tolerance):
+            raise ValueError(f"Section counts disagree: parameters {a['parameter']}, {b['parameter']}; "
+                             f"period difference {period_error:.3g}, state distance {state_error:.3g}")
+
+
+def plot_branch(directory, config):
+    report, rows = validate_branch(directory, config)
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    fig, axes = plt.subplots(2, 1, figsize=(7, 6), sharex=True, constrained_layout=True)
+    for sign, label in ((-1, "Decreasing from anchor"), (1, "Increasing from anchor")):
+        part = rows[(rows["direction"] == 0) | (rows["direction"] == sign)]
+        axes[0].plot(part["parameter"], part["period"], "o-", label=label)
+        axes[1].semilogy(part["parameter"], np.maximum(part["closure"], 1e-16), "o-")
+    axes[0].set(ylabel="Period", title=f"{config['system']}: RK45, M={config['sections']}")
+    axes[0].legend()
+    axes[1].set(xlabel=BRANCHES[config["system"]][0], ylabel="Full-period closure error")
+    fig.savefig(directory / "branch.png", dpi=150)
+    plt.close(fig)
+    return dict(passed=True, probes=report["probes"], restart_error=report["restart_error"],
+                max_residual=float(max(rows["residual"])), max_closure=float(max(rows["closure"])))
+
+
 def plot_case(directory, config):
+    if config.get("mode") == "continuation":
+        return plot_branch(directory, config)
     if config["system"] != "analytic_cycle":
         return plot_newton_case(directory, config)
     import numpy as np
@@ -461,12 +597,20 @@ def plot_case(directory, config):
 def summarize(directory):
     manifest = json.loads((directory / "manifest.json").read_text())
     results = {}
+    probes = {}
     for case in manifest["cases"]:
         name = case_name(case["configuration"])
         try:
             if case["returncode"]:
                 raise ValueError(f"Executable failed with status {case['returncode']}; see {name}/run.log")
             results[name] = plot_case(directory / name, case["configuration"])
+            config = case["configuration"]
+            if config.get("mode") == "continuation":
+                key = config["system"], config["backend"], config["method"]
+                samples = results[name]["probes"]
+                for previous in probes.get(key, []):
+                    compare_probes(previous, samples, config["matching_tolerance"])
+                probes.setdefault(key, []).append(samples)
         except (OSError, ValueError, KeyError, TypeError) as error:
             results[name] = dict(passed=False, error=str(error))
         print(f"{name}: {'PASS' if results[name]['passed'] else 'FAIL'}")

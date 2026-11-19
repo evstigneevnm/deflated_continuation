@@ -1403,6 +1403,32 @@ are rejected, rather than silently projecting inaccurate arrivals onto a plane.
 Matching algebra/storage is `O(MN)` beyond the flight integrator's own cost; no
 vector-sized host transfer or dense orbit Jacobian is introduced.
 
+For one-parameter continuation in fixed sections, use
+`parameterized_multiple_section_problem` with the ordinary predictor, bordered
+corrector and augmented tangent. The binding updates trial models in place but
+must return an independently parameter-bound replay factory. The explicit RK
+provider additionally implements `bool parameter_derivative(t, state, out) const`
+for the physical rate at fixed state. Prepare the parameter column once using the
+frozen mesh and dense crossing-time correction; do not differentiate the controller.
+`period_parameter_partial()` holds section coordinates fixed, not the orbit branch.
+
+Automatic ordinary-orbit charts may be refreshed **between** accepted continuation
+points; prescribed physical sections must not move. Monitor the normalized crossing
+speed and each flight's share of the period relative to the current pilot. Validate
+a suspected multiple return before publishing it. Rebuild from the last accepted
+orbit, check closure at the same parameter and orient the tangent using the previous
+orbit in the new charts. Keep backend vectors resident and discard a failed proposal
+without changing the accepted state. This is not Hopf endpoint detection.
+
+Newton applies the cyclic matching blocks `B_i v_i - v_next`. Only explicitly
+request `make_return_operator()` at a corrected orbit to compose those same
+flight derivatives around a single section for transverse stability. It retains
+the preparation and shares its serial workspace; concurrent applications require
+independent preparations. Neither operation assembles a matrix or transfers orbit
+vectors to the host. The RK45 analytical branch regression checks both operators,
+step retry and restart; no parameter derivatives are implied for DIRK/BDF or
+relative closure.
+
 `multiple_section_problem` adds the standard nonlinear `apply`,
 `set_linearization_point` and `get_jacobi_operator` interface to this residual.
 The default prepared derivative supports identity-state explicit RK flights with

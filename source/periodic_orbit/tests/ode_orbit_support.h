@@ -40,6 +40,71 @@ std::string coordinate_name( std::size_t i )
     return "x" + std::to_string( i + 1 );
 }
 
+template <class Model, class Step>
+auto backend_layout(
+    const std::shared_ptr<operations> &physical, const std::shared_ptr<Step> &rk, const Model &model,
+    const X &initial, double period, std::size_t count, double start, std::size_t maximum_steps
+)
+{
+    auto rate   = std::make_shared<rate_provider<Model>>();
+    rate->model = model;
+    periodic_orbit::automatic_layout<operations, Step, rate_provider<Model>> builder(
+        physical, rk, rate, std::make_shared<policy>( physical ),
+        std::make_shared<periodic_orbit::euclidean_section_metric<operations>>( physical )
+    );
+    periodic_orbit::placement_params<double> p;
+    p.sections                  = count;
+    p.maximum_pilot_steps       = maximum_steps;
+    p.maximum_endpoint_distance = 1e-4;
+    auto result                 = builder.build( initial, { start, start + period, nullptr }, p );
+    if ( !result.succeeded() )
+        throw std::runtime_error(
+            "ODE pilot layout failed at section " + std::to_string( result.failed_section ) +
+            ", M=" + std::to_string( count ) + ", status=" + std::to_string( int( result.status ) ) +
+            ", flight=" + std::to_string( result.flight.flight_time )
+        );
+    return result.layout;
+}
+
+template <class Model, class Step, std::size_t N>
+auto anchor_layout( const std::shared_ptr<operations> &physical, const std::shared_ptr<Step> &rk, const Model &model,
+                    const std::array<double,N> &seed, double period, std::size_t count, double start, std::size_t budget )
+{
+    auto initial = buffer(physical);
+    fill_profile(*initial,seed);
+    return backend_layout(physical,rk,model,*initial,period,count,start,budget);
+}
+
+template <std::size_t dimension, class Blocks>
+void perturb_sections( double amplitude, Blocks &out )
+{
+    for ( std::size_t i = 0; i < out.size(); ++i )
+    {
+        std::array<double, dimension - 1> values{};
+        values[0] = amplitude * ( i + 1 ) / out.size();
+        for ( std::size_t j = 1; j < values.size(); ++j )
+            values[j] = amplitude * ( j % 2 ? -1 : 1 ) / ( j + 1 );
+        fill_profile( out.comp( i ), values );
+    }
+}
+
+template <class Step>
+double closure_error(
+    const std::shared_ptr<operations> &physical, const std::shared_ptr<Step> &rk, const X &initial, double start,
+    double period, std::size_t maximum_steps
+)
+{
+    auto endpoint    = buffer( physical );
+    using integrator = nmfd::time_steppers::integration::time_integrator<operations, Step>;
+    integrator verify( physical, rk, typename integrator::params{ maximum_steps } );
+    verify.set_time_interval( start, start + period );
+    verify.apply( initial, *endpoint );
+    if ( verify.get_status() != nmfd::time_steppers::integration_status::completed )
+        throw std::runtime_error( "Independent ODE orbit integration failed" );
+    physical->add_lin_comb( -1, initial, *endpoint );
+    return physical->norm( *endpoint );
+}
+
 template <class Model, class Assembly = orbit_benchmarks::explicit_assembly<Model>>
 struct fixture
 {
@@ -70,25 +135,9 @@ struct fixture
         : space( std::make_shared<blocks>( coordinates, count ) ), dt( h ), start( t ), maximum_steps( budget ),
           method( std::move( scheme ) ), assembly( std::move( selected ) )
     {
-        auto initial = buffer( physical );
-        fill_profile( *initial, Model::seed );
-        periodic_orbit::automatic_layout<operations, step_type, rate_provider<Model>> builder(
-            physical, make_stepper( dt ), std::make_shared<rate_provider<Model>>(),
-            std::make_shared<policy>( physical ),
-            std::make_shared<periodic_orbit::euclidean_section_metric<operations>>( physical )
+        layout = anchor_layout(
+            physical, make_stepper( dt ), Model{}, Model::seed, Model::period, count, start, maximum_steps
         );
-        periodic_orbit::placement_params<double> p;
-        p.sections                  = count;
-        p.maximum_pilot_steps       = maximum_steps;
-        p.maximum_endpoint_distance = 1e-4;
-        auto result                 = builder.build( *initial, { start, start + Model::period, nullptr }, p );
-        if ( !result.succeeded() )
-            throw std::runtime_error(
-                "ODE pilot layout failed at section " + std::to_string( result.failed_section ) +
-                ", M=" + std::to_string( count ) + ", status=" + std::to_string( int( result.status ) ) +
-                ", flight=" + std::to_string( result.flight.flight_time )
-            );
-        layout   = std::move( result.layout );
         segments = make_segments( dt );
         problem  = std::make_shared<orbit_problem>(
             physical, space, layout, segments, assembly.make_factory( physical, budget, rate )
@@ -119,28 +168,14 @@ struct fixture
     }
     void perturb( double amplitude, typename blocks::vector_type &out ) const
     {
-        for ( std::size_t i = 0; i < layout->size(); ++i )
-        {
-            std::array<double, dimension - 1> values{};
-            values[0] = amplitude * ( i + 1 ) / layout->size();
-            for ( std::size_t j = 1; j < values.size(); ++j )
-                values[j] = amplitude * ( j % 2 ? -1 : 1 ) / ( j + 1 );
-            fill_profile( out.comp( i ), values );
-        }
+        perturb_sections<dimension>( amplitude, out );
     }
     double closure( const typename blocks::vector_type &state, double period, double h ) const
     {
-        auto  initial = buffer( physical ), endpoint = buffer( physical );
+        auto  initial = buffer( physical );
         chart section( physical, coordinates, layout->at( 0 ).section );
         section.lift( state.comp( 0 ), *initial );
-        using integrator = nmfd::time_steppers::integration::time_integrator<operations, step_type>;
-        integrator verify( physical, make_stepper( h ), typename integrator::params{ maximum_steps } );
-        verify.set_time_interval( start, start + period );
-        verify.apply( *initial, *endpoint );
-        if ( verify.get_status() != nmfd::time_steppers::integration_status::completed )
-            throw std::runtime_error( "Independent ODE orbit integration failed" );
-        physical->add_lin_comb( -1, *initial, *endpoint );
-        return physical->norm( *endpoint );
+        return closure_error( physical, make_stepper( h ), *initial, start, period, maximum_steps );
     }
 };
 }

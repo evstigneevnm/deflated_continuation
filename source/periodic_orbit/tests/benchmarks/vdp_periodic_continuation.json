@@ -1,0 +1,14 @@
+{
+  "method": "RK45",
+  "sections": [1, 4],
+  "step": 0.01,
+  "start_time": 0.37,
+  "maximum_steps": 20000,
+  "perturbation": 0.02,
+  "newton_tolerance": 1e-10,
+  "newton_max_iterations": 12,
+  "matching_tolerance": 1e-6,
+  "arclength_step": 0.05,
+  "branch_steps": 3,
+  "probe_fraction": 0.05
+}

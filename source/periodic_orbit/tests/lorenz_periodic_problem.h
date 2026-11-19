@@ -17,10 +17,11 @@ namespace ode_orbit_tests
 // one increasing return per period; the original z0=27 plane had two.
 struct lorenz_periodic
 {
-    static constexpr const char                        *name  = "lorenz_periodic";
-    static constexpr double                             sigma = 10, rho = 28, beta = 8. / 3, epsilon = .0055, delta = 0;
+    static constexpr const char *name  = "lorenz_periodic";
+    static constexpr double      sigma = 10, anchor_parameter = 28, beta = 8. / 3, epsilon = .0055, delta = 0;
+    double                       rho = anchor_parameter;
     inline static constexpr std::array<const char *, 5> parameter_names{ "sigma", "rho", "beta", "epsilon", "delta" };
-    inline static constexpr std::array<double, 5>       parameters{ sigma, rho, beta, epsilon, delta };
+    inline static constexpr std::array<double, 5>       parameters{ sigma, anchor_parameter, beta, epsilon, delta };
     static constexpr double                             period = 1.6443075739726336;
     inline static constexpr std::array<double, 3> seed{ 3.1769997853693805, 5.6626243224125057, 11.597900660565699 };
     static double                                 default_step( const std::string &method )

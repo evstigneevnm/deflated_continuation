@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -362,7 +363,7 @@ void require_close( const double value, const double expected, const double tole
 template <class Operator>
 void run_solve(
     Operator &op, mock_newton_extended &newton_extended, mock_predictor &predictor, std::vector<double> &x1,
-    double &lambda1
+    double &lambda1, double lambda0 = 0.0, double lambda_tangent = 0.0
 )
 {
     vector_ops           ops( 2 );
@@ -387,7 +388,38 @@ void run_solve(
     std::vector<double> tangent{ 1.0, 0.0 };
     std::vector<double> next_tangent( 2, 0.0 );
     double              next_lambda_tangent = 0.0;
-    advance.solve( &op, x0, 0.0, tangent, 0.0, x1, lambda1, next_tangent, next_lambda_tangent );
+    advance.solve( &op, x0, lambda0, tangent, lambda_tangent, x1, lambda1, next_tangent, next_lambda_tangent );
+}
+
+void test_failed_corrector_reports_parameter()
+{
+    for ( auto reason : { continuation::step_retry_result::minimum_step, continuation::step_retry_result::retry_limit } )
+    {
+        plain_operator op;
+        mock_newton_extended newton;
+        mock_predictor predictor;
+        std::vector<double> x1;
+        double lambda1 = 0;
+        newton.fail_on_call = 1;
+        predictor.failure_retry_result = reason;
+        predictor.ds = std::numeric_limits<double>::epsilon();
+        try
+        {
+            run_solve( op, newton, predictor, x1, lambda1, 1., 1. );
+            require_true( false, "terminal corrector failure must throw" );
+        }
+        catch ( const std::runtime_error &e )
+        {
+            const std::string message = e.what();
+            const char *expected_reason = reason == continuation::step_retry_result::minimum_step
+                                              ? "minimum continuation step reached after corrector failure"
+                                              : "continuation corrector retry limit reached";
+            require_true( message.find( expected_reason ) != std::string::npos, "failure retains retry reason" );
+            require_true( message.find( "last accepted lambda=1, predicted lambda=1.0000000000000002)" ) !=
+                              std::string::npos,
+                          "failure distinguishes accepted and predicted parameters one ULP apart" );
+        }
+    }
 }
 
 void test_rejected_chart_retries_before_newton()
@@ -553,6 +585,7 @@ int main()
 {
     test_rejected_chart_retries_before_newton();
     test_plain_operator_keeps_single_pass_path();
+    test_failed_corrector_reports_parameter();
     test_isotropy_event_stays_latched_after_non_event_trial();
     test_persistent_isotropy_event_terminates_without_commit();
     test_bracket_failure_preserves_detected_endpoint();

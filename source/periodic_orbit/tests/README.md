@@ -19,6 +19,7 @@ bash source/periodic_orbit/tests/run_all.sh -B
 bash source/periodic_orbit/tests/run_all.sh --backend cpu_omp --threads 2 --methods RK45 DOP853
 bash source/periodic_orbit/tests/run_all.sh --system analytic_cycle_newton --methods RK45 DOP853
 bash source/periodic_orbit/tests/run_all.sh --systems rossler_periodic lorenz_periodic --methods RK45 DOP853
+bash source/periodic_orbit/tests/run_all.sh --mode continuation --systems rossler_periodic vdp_periodic lorenz_periodic
 bash source/periodic_orbit/tests/run_all.sh --system vaidyanathan_periodic --methods RK45 DOP853
 bash source/periodic_orbit/tests/run_all.sh --systems analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic --methods 'SDIRK3(1)3' ARK324L2SA
 bash source/periodic_orbit/tests/run_all.sh --system analytic_cycle_newton --methods IM CN 'SDIRK2(1)2' 'ESDIRK2(1)3'
@@ -28,7 +29,44 @@ bash source/periodic_orbit/tests/run_all.sh --systems analytic_cycle_newton ross
 bash source/periodic_orbit/tests/run_all.sh --plot-only build/periodic_orbit_benchmarks/runs/RUN_DIRECTORY
 ```
 
-The default system remains `analytic_cycle`. Default section counts are 1, 2, 4,
+**Continuation.** This opt-in benchmark uses fixed-step RK45 and the project's
+pseudo-arclength predictor, bordered Newton corrector and tangent updates. It
+follows each seeded cycle in both directions: [Rossler](benchmarks/rossler_periodic_continuation.cpp)
+in `c` around 6, [Van der Pol](benchmarks/vdp_periodic_continuation.cpp) in `mu`
+around 1, and [cubic-damped Lorenz](benchmarks/lorenz_periodic_continuation.cpp)
+in `rho` around 28. Each source binds its physical parameter, defines its RHS
+parameter derivative, constructs the pilot flights and bordered Newton solver,
+and traces both directions from a corrected anchor. Numerical defaults are in
+the adjacent `*_continuation.json` preset: edit that file to tune one problem,
+or pass CLI overrides for one run. The resolved configuration is saved with
+each report. Rossler and Lorenz reuse their fixed-correction model equations
+and reference seeds. All three use the same [branch checks](benchmarks/ode_continuation_benchmark.h). The
+[analytical-cycle regression](test_analytic_cycle_continuation.cpp) separately
+checks the exact branch and transverse multiplier. Each solver keeps its pilot
+sections fixed throughout a correction. Between steps, the continuation benchmarks
+refresh automatic planes when the crossing cosine or the relative spacing of two
+sections deteriorates. Suspicious period growth is checked for a shorter closure
+before publication. Use `--observe-layout` to log warnings without moving the
+planes. The Rossler reference gate (`--require-rossler-reference`) requires reaching
+`c=0.4` on the decreasing branch with period 5.53393796. It does not test the
+zero-amplitude endpoint. Set `--arclength-step` and `--branch-steps` for continuation;
+`--step` controls the ODE timestep, not the arclength.
+
+Each case writes `branch.csv`, `branch.png`, and a full state/tangent
+`checkpoint.json`. The run checks the anchor period, physical matching gaps,
+full-period closure at one quarter of the RK step, the parameter derivative
+against independently relocated crossings, and a restart from a fresh
+solver/layout. Different section counts are compared at bracketed parameters
+on either side of the anchor (`--probe-offset`), using period and the physical
+state on their common first section. Only checkpoint and diagnostic exports
+read state entries on the host. This is a local branch validation, not a search
+for new orbits or a Floquet stability analysis.
+
+`report.json` lists committed layout changes. The first step following a refresh
+also gets a restart check using `refresh_checkpoint.json`. Checkpoints include
+the pilot seed, period and parameter needed to reconstruct the active charts.
+
+In default correction mode the system remains `analytic_cycle`. Default section counts are 1, 2, 4,
 8; the default dense-output method is DOP853.
 Use `--sections`, `--step`, `--start`, `--perturbation`, `--matching-tolerance`,
 `--max-steps` and `--timeout` to configure a run. The problem description and

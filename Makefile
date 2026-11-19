@@ -1428,6 +1428,8 @@ test_periodic_orbit_prepared_dirk_derivatives_%.bin test_periodic_orbit_prepared
 $(foreach test,prepared_dirk_derivatives prepared_dirk_matching orbit_method_assembly,$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_$(test)_$(backend).bin)): $(NEWTON_TEST_HEADERS)
 test_periodic_orbit_coordinate_solvers_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_multiple_section_newton_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+test_periodic_orbit_analytic_cycle_continuation_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_analytic_cycle_continuation_$(backend).bin): $(NEWTON_TEST_HEADERS) $(CONTINUATION_WRAPPER_TEST_HEADERS) $(wildcard source/continuation/*.h) source/numerical_algos/parameterized_correction.h source/periodic_orbit/tests/benchmarks/branch_solver.h
 test_periodic_orbit_rossler_periodic_%.bin test_periodic_orbit_lorenz_periodic_%.bin test_periodic_orbit_vaidyanathan_periodic_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 $(foreach system,rossler_periodic lorenz_periodic vaidyanathan_periodic,$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_$(system)_$(backend).bin)): $(NEWTON_TEST_HEADERS)
 test_periodic_orbit_multiple_section_newton_cpu.bin test_periodic_orbit_multiple_section_newton_cpu_omp.bin test_periodic_orbit_multiple_section_newton_cuda.bin test_periodic_orbit_multiple_section_newton_hip.bin: $(NEWTON_TEST_HEADERS)
@@ -1456,7 +1458,8 @@ check_periodic_orbit_headers_cpu:
 	done
 
 PERIODIC_BENCHMARK_OPTIONS ?=
-PERIODIC_BENCHMARK_TARGETS = $(foreach system,analytic_cycle analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic,$(foreach backend,cpu cpu_omp cuda hip,periodic_orbit_benchmark_$(system)_$(backend).bin))
+PERIODIC_CONTINUATION_BENCHMARKS = rossler_periodic_continuation vdp_periodic_continuation lorenz_periodic_continuation
+PERIODIC_BENCHMARK_TARGETS = $(foreach system,analytic_cycle analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic $(PERIODIC_CONTINUATION_BENCHMARKS),$(foreach backend,cpu cpu_omp cuda hip,periodic_orbit_benchmark_$(system)_$(backend).bin))
 PERIODIC_BENCHMARK_DEPS = $(PERIODIC_SECTION_DEPS) $(wildcard source/periodic_orbit/tests/benchmarks/*.h) Makefile $(CONFIG_FILE) $(PERIODIC_BENCHMARK_OPTIONS)
 $(addprefix $(BUILD_DIR)/,$(PERIODIC_BENCHMARK_TARGETS)): PERIODIC_BENCHMARK_FLAGS = $(INMFD_NEWTON)
 $(addprefix $(BUILD_DIR)/,$(PERIODIC_BENCHMARK_TARGETS)): $(NEWTON_TEST_HEADERS)

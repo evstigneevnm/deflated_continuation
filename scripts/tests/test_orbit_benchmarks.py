@@ -18,6 +18,93 @@ SPEC.loader.exec_module(runner)
 
 
 class OrbitBenchmarkRunnerTest(unittest.TestCase):
+    def test_continuation_mode_is_opt_in_and_has_separate_case_names(self):
+        args = runner.arguments(["--mode", "continuation", "--systems", *runner.BRANCHES])
+        configs = runner.configurations(args)
+        self.assertEqual(len(configs), 6)
+        self.assertEqual(runner.stage(configs), "continuation")
+        self.assertEqual({c["sections"] for c in configs}, {1, 4})
+        for c in configs:
+            self.assertEqual(c["method"], "RK45")
+            self.assertTrue(runner.case_name(c).startswith("branch_"))
+            self.assertGreater(c["probe_offset"], 0)
+            self.assertGreaterEqual(c["branch_steps"], 2)
+        for switches in (["--mode", "continuation", "--methods", "BDF"],
+                         ["--mode", "continuation", "--systems", "analytic_cycle"],
+                         ["--mode", "continuation", "--branch-steps", "1"],
+                         ["--systems", "vdp_periodic"]):
+            with self.subTest(switches=switches), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                runner.arguments(switches)
+
+    def test_agreement_requires_common_parameter_period_and_physical_state(self):
+        a = dict(parameter=1., period=6., state=[1., 2.])
+        runner.compare_probes([a], [dict(a, period=6.+1e-9)], 1e-6)
+        for other in (dict(a, parameter=1.1), dict(a, period=6.01), dict(a, state=[1., 2.01])):
+            with self.assertRaises(ValueError):
+                runner.compare_probes([a], [other], 1e-6)
+        with self.assertRaises(ValueError):
+            runner.compare_probes([a], [], 1e-6)
+
+    def test_each_continuation_preset_and_command_line_overrides(self):
+        for system, step in (("rossler_periodic", .005), ("lorenz_periodic", .002), ("vdp_periodic", .01)):
+            options = ["--mode", "continuation", "--system", system]
+            with self.subTest(system=system):
+                a, b = runner.configurations(runner.arguments(options))
+                self.assertEqual((a["sections"], b["sections"], a["step"], b["step"]), (1, 4, step, step))
+                case, = runner.configurations(runner.arguments(options + [
+                    "--sections", "2", "--step", ".003", "--start", "0", "--max-steps", "9000",
+                    "--arclength-step", ".02", "--branch-steps", "4", "--newton-tolerance", "2e-11"]))
+                self.assertEqual((case["sections"], case["step"], case["start_time"], case["maximum_steps"]),
+                                 (2, .003, 0, 9000))
+                self.assertEqual((case["branch_steps"], case["probe_offset"], case["newton_tolerance"]),
+                                 (4, .02 * .05, 2e-11))
+
+    def test_reference_gate_is_rossler_only(self):
+        args = runner.arguments(["--mode", "continuation", "--systems", "rossler_periodic", "vdp_periodic",
+                                 "--sections", "1", "--require-rossler-reference", "--observe-layout"])
+        rossler, vdp = runner.configurations(args)
+        self.assertTrue(rossler["require_reference"])
+        self.assertNotIn("require_reference", vdp)
+        self.assertTrue(rossler["observe_layout"] and vdp["observe_layout"])
+
+    def test_tuning_one_preset_does_not_change_another_system(self):
+        args = runner.arguments(["--mode", "continuation", "--systems", "lorenz_periodic", "vdp_periodic"])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for system in args.systems:
+                path = Path("benchmarks") / f"{system}_continuation.json"
+                preset = json.loads((runner.HERE / path).read_text())
+                if system == "lorenz_periodic":
+                    preset.update(sections=[2], step=.004, arclength_step=.02, probe_fraction=.1)
+                runner.write_if_changed(root / path, preset)
+            with patch.object(runner, "HERE", root):
+                configs = runner.configurations(args)
+            self.assertEqual([(c["sections"], c["step"]) for c in configs], [(2, .004), (1, .01), (4, .01)])
+            self.assertEqual(configs[0]["probe_offset"], .02 * .1)
+
+    def test_continuation_builds_one_executable_per_requested_model(self):
+        for systems in (["vdp_periodic"], list(runner.BRANCHES)):
+            with self.subTest(systems=systems), tempfile.TemporaryDirectory() as directory, \
+                    patch.object(runner.subprocess, "run") as make:
+                args = runner.arguments(["--mode", "continuation", "--systems", *systems, "--build-dir", directory])
+                executables = runner.build(args, runner.configurations(args))
+                targets = [t for t in make.call_args.args[0] if t.endswith(".bin")]
+                self.assertEqual(targets, [f"periodic_orbit_benchmark_{s}_continuation_cpu.bin" for s in systems])
+                self.assertEqual(executables, {s: Path(directory) / "bin" / t for s, t in zip(systems, targets)})
+
+    def test_continuation_case_failure_propagates_to_summary(self):
+        configs = runner.configurations(runner.arguments(["--mode", "continuation"]))
+        samples = [dict(parameter=6., period=6., state=[1., 0.])]
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            runner.write_if_changed(d / "manifest.json", dict(cases=[dict(configuration=c, returncode=0) for c in configs]))
+            with patch.object(runner, "plot_case", side_effect=[dict(passed=True, probes=samples), dict(passed=True,
+                              probes=[dict(samples[0], state=[0., 1.])])]), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(runner.summarize(d), 1)
+            summary = json.loads((d / "summary.json").read_text())
+            self.assertFalse(summary["passed"])
+            self.assertIn("state distance", summary["cases"][runner.case_name(configs[1])]["error"])
+
     def test_configuration_is_explicit_and_unique(self):
         args = runner.arguments(["--sections", "1", "4", "4", "--methods", "RK45", "DOP853", "RK45"])
         configs = runner.configurations(args)

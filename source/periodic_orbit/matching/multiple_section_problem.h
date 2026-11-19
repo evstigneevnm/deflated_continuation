@@ -13,16 +13,18 @@ template <
 class multiple_section_problem
 {
 public:
-    using residual_type = multiple_section_residual<Space, CoordinateSpace, RecordedMap, Chart>;
-    using space_type    = typename residual_type::space_type;
-    using vector_type   = typename residual_type::vector_type;
-    using T             = typename Space::scalar_type;
-    using layout_type   = typename residual_type::layout_type;
-    using segment       = typename residual_type::segment;
-    using params        = typename residual_type::params;
-    using flow_type     = typename PreparedFlightFactory::flow_type;
-    using physical_wrap = nmfd::detail::vector_wrap<Space, false, false>;
-    using block_wrap    = nmfd::detail::vector_wrap<space_type, false, false>;
+    using residual_type     = multiple_section_residual<Space, CoordinateSpace, RecordedMap, Chart>;
+    using space_type        = typename residual_type::space_type;
+    using vector_type       = typename residual_type::vector_type;
+    using T                 = typename Space::scalar_type;
+    using layout_type       = typename residual_type::layout_type;
+    using segment           = typename residual_type::segment;
+    using params            = typename residual_type::params;
+    using flow_type         = typename PreparedFlightFactory::flow_type;
+    using factory_type      = PreparedFlightFactory;
+    using coordinate_vector = typename CoordinateSpace::vector_type;
+    using physical_wrap     = nmfd::detail::vector_wrap<Space, false, false>;
+    using block_wrap        = nmfd::detail::vector_wrap<space_type, false, false>;
 
     class jacobi_operator_type
     {
@@ -91,10 +93,8 @@ public:
             for ( std::size_t i = 0; i < flows_.size(); ++i )
             {
                 const auto next = ( i + 1 ) % flows_.size();
-                charts_[i]->lift_increment( in.comp( i ), *direction_ );
-                flows_[i].apply( *direction_, *image_ );
+                apply_segment( i, in.comp( i ), ( *pending_ ).comp( i ) );
                 pending_times_[i] = flows_[i].last_time_increment();
-                charts_[next]->restrict_increment( *image_, ( *pending_ ).comp( i ) );
                 coordinates_->space_comp( i ).add_lin_comb( -1, in.comp( next ), ( *pending_ ).comp( i ) );
             }
             if ( !coordinates_->is_valid_number( *pending_ ) )
@@ -106,8 +106,38 @@ public:
         {
             return time_increments_.at( i );
         }
+        T parameter_column( vector_type &out ) const
+        {
+            T period_derivative{};
+            for ( std::size_t i = 0; i < flows_.size(); ++i )
+            {
+                period_derivative += flows_[i].parameter_derivative( *image_ );
+                charts_[( i + 1 ) % flows_.size()]->restrict_increment( *image_, ( *pending_ ).comp( i ) );
+            }
+            coordinates_->assign( *pending_, out );
+            return period_derivative;
+        }
+
+        // Compose transverse derivatives, not the cyclic matching Jacobian.
+        void apply_return_derivative( const coordinate_vector &in, coordinate_vector &out ) const
+        {
+            const coordinate_vector *direction = &in;
+            for ( std::size_t i = 0; i < flows_.size(); ++i )
+            {
+                auto &next = ( *pending_ ).comp( ( i + 1 ) % flows_.size() );
+                apply_segment( i, *direction, next );
+                direction = &next;
+            }
+            coordinates_->space_comp( 0 ).assign( *direction, out );
+        }
 
     private:
+        void apply_segment( std::size_t i, const coordinate_vector &in, coordinate_vector &out ) const
+        {
+            charts_[i]->lift_increment( in, *direction_ );
+            flows_[i].apply( *direction_, *image_ );
+            charts_[( i + 1 ) % flows_.size()]->restrict_increment( *image_, out );
+        }
         std::shared_ptr<Space>              physical_;
         std::shared_ptr<space_type>         coordinates_;
         std::vector<std::shared_ptr<Chart>> charts_;
@@ -159,14 +189,20 @@ public:
     {
         return residual_.report();
     }
+    const auto &inspect_crossings( const vector_type &in, vector_type &out )
+    {
+        return residual_.evaluate( in, out, true );
+    }
     void set_linearization_point( const vector_type &base )
     {
-        // Nothing is published until all flights and replay checks succeed.
+        jacobi_ = prepare( base, *factory_ );
+    }
+    std::shared_ptr<const jacobi_operator_type> prepare( const vector_type &base, const factory_type &factory )
+    {
         residual_.apply( base, *scratch_ );
-        auto pending = std::make_shared<jacobi_operator_type>(
-            physical_, coordinates_, *layout_, segments_, *factory_, base, *scratch_, params_
+        return std::make_shared<jacobi_operator_type>(
+            physical_, coordinates_, *layout_, segments_, factory, base, *scratch_, params_
         );
-        jacobi_ = std::move( pending );
     }
     std::shared_ptr<const jacobi_operator_type> get_jacobi_operator() const
     {
