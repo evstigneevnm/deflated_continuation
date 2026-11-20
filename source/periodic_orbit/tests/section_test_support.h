@@ -164,6 +164,11 @@ struct problem
         backend::for_each_type{}( rhs_kernel<Model>{ in.raw_ptr(), out.raw_ptr(), time, model }, out.size() );
         return true;
     }
+    void norm_bifurcation_diagram( const X &u, std::vector<double> &out ) const
+    {
+        out.assign( 1, ops->norm( u ) );
+    }
+    std::vector<std::string> norm_bifurcation_diagram_labels() const { return { "state_euclidean" }; }
 };
 // An independent provider avoids changing the timestepper's prepared problem context.
 template <class Model>

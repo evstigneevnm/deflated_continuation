@@ -21,8 +21,8 @@ class PeriodicSectionContractTest(unittest.TestCase):
     def test_backend_local_public_headers(self):
         headers = [path for path in MODERN.rglob("*.h")
                    if "legacy" not in path.parts and "tests" not in path.parts]
-        self.assertEqual(len(headers), 22)
-        self.assertTrue({"layout_health.h", "rechart_orbit.h", "refresh_section_branch.h"} <=
+        self.assertEqual(len(headers), 23)
+        self.assertTrue({"layout_health.h", "rechart_orbit.h", "refresh_section_branch.h", "orbit_observable.h"} <=
                         {path.name for path in headers})
         for path in headers:
             with self.subTest(header=path.name):

@@ -1419,7 +1419,7 @@ $(BUILD_DIR)/ch_energy_benchmark_hip.bin $(BUILD_DIR)/ch_fourier_benchmark_hip.b
 -include $(wildcard $(BUILD_DIR)/ch_energy_benchmark_*.bin.d $(BUILD_DIR)/ch_fourier_benchmark_*.bin.d)
 
 PERIODIC_SECTION_HEADERS = $(wildcard source/periodic_orbit/*.h source/periodic_orbit/events/*.h source/periodic_orbit/sections/*.h source/periodic_orbit/sections/detail/*.h source/periodic_orbit/matching/*.h source/periodic_orbit/flows/*.h source/periodic_orbit/tests/*.h)
-PERIODIC_SECTION_DEPS = $(PERIODIC_SECTION_HEADERS) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS)
+PERIODIC_SECTION_DEPS = $(PERIODIC_SECTION_HEADERS) $(TIME_STEPPER_HEADERS) $(TIME_STEPPER_VECTOR_WRAP_HEADER) $(SCFD_VECTOR_OPS_HEADERS) source/containers/bifurcation_diagram/observable_column.h
 test_periodic_orbit_poincare_implicit_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_poincare_bdf_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_prepared_bdf_derivatives_%.bin test_periodic_orbit_prepared_bdf_matching_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
@@ -1460,7 +1460,7 @@ check_periodic_orbit_headers_cpu:
 	done
 
 PERIODIC_BENCHMARK_OPTIONS ?=
-PERIODIC_CONTINUATION_BENCHMARKS = rossler_periodic_continuation vdp_periodic_continuation lorenz_periodic_continuation
+PERIODIC_CONTINUATION_BENCHMARKS = analytic_cycle_continuation rossler_periodic_continuation vdp_periodic_continuation lorenz_periodic_continuation vaidyanathan_periodic_continuation
 PERIODIC_BENCHMARK_TARGETS = $(foreach system,analytic_cycle analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic $(PERIODIC_CONTINUATION_BENCHMARKS),$(foreach backend,cpu cpu_omp cuda hip,periodic_orbit_benchmark_$(system)_$(backend).bin))
 PERIODIC_BENCHMARK_DEPS = $(PERIODIC_SECTION_DEPS) $(wildcard source/periodic_orbit/tests/benchmarks/*.h) Makefile $(CONFIG_FILE) $(PERIODIC_BENCHMARK_OPTIONS)
 $(addprefix $(BUILD_DIR)/,$(PERIODIC_BENCHMARK_TARGETS)): PERIODIC_BENCHMARK_FLAGS = $(INMFD_NEWTON)

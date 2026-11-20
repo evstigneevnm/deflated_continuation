@@ -4,6 +4,9 @@
 #include "ode_continuation_fixture.h"
 #include <periodic_orbit/sections/layout_health.h>
 #include <periodic_orbit/matching/refresh_section_branch.h>
+#include <periodic_orbit/orbit_observable.h>
+#include <containers/bifurcation_diagram/observable_column.h>
+#include <functional>
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iomanip>
@@ -17,6 +20,9 @@ struct branch_reference
 {
     double parameter, period;
 };
+
+template <std::size_t N>
+std::array<double, N> origin_reference( double ) { return {}; }
 
 // Effective settings come from the system's preset, with the runner's CLI overrides applied.
 struct branch_settings
@@ -83,12 +89,22 @@ struct branch_case
     json                                         reference_point = nullptr;
     double                                       restart_error = 0, parameter_column_error = 0;
     std::size_t                                  export_bytes = 0;
-    std::ofstream                                csv;
-    branch_case( MakeFlights flights, MakeSolver newton, const branch_settings &settings )
-        : make_flights( flights ), make_solver( newton ), options( settings ), csv( options.dir + "/branch.csv" )
+    using model_type = std::decay_t<decltype( initial.flights.model )>;
+    using steady_reference = std::function<std::optional<std::array<double, fixture_type::dimension>>( double )>;
+    problem<model_type>                          diagnostic{ initial.flights.physical, initial.flights.model };
+    container::observable_column<double>         column{ diagnostic, "state_euclidean" };
+    wrap                                         steady_state = buffer( diagnostic.ops );
+    steady_reference                             equilibrium;
+    std::ofstream                                csv, steady;
+    branch_case( MakeFlights flights, MakeSolver newton, const branch_settings &settings, steady_reference ref )
+        : make_flights( flights ), make_solver( newton ), options( settings ), equilibrium( std::move( ref ) ),
+          csv( options.dir + "/branch.csv" ), steady( options.dir + "/steady_reference.csv" )
     {
         csv.exceptions( std::ios::failbit | std::ios::badbit );
-        csv << std::setprecision( 17 ) << "direction,index,parameter,period,residual,max_gap,closure,ds,retries\n";
+        steady.exceptions( std::ios::failbit | std::ios::badbit );
+        steady << std::setprecision( 17 ) << "direction,index,parameter,value\n";
+        csv << std::setprecision( 17 ) << "direction,index,parameter,period,residual,max_gap,closure,ds,retries,"
+                                         "observable_rms,observable_min,observable_max\n";
         policy.success_growth_factor = 1;
         policy.minimum_step_size     = options.arclength_step * 1e-6;
     }
@@ -193,6 +209,7 @@ struct branch_case
     {
         double    period, norm, gap, closure;
         condition health;
+        periodic_orbit::orbit_observable_summary<double> observable;
     };
     measurement measure( fixture_type &s, const state &z, double p, double previous_period )
     {
@@ -211,7 +228,12 @@ struct branch_case
                 options.start, period, options.budget
             );
         };
-        const double closure = closure_at( report.period );
+        auto evaluate = [&]( const X &x ) { return column.evaluate( diagnostic, x ); };
+        auto observer = std::make_shared<periodic_orbit::orbit_observable<double, decltype( evaluate )>>( evaluate );
+        const double closure = closure_error(
+            s.physical, make_step( s.physical, options.step / 4, s.model.with_parameter( p ) ), *initial,
+            options.start, report.period, options.budget, observer
+        );
         require(
             report.succeeded() && report.period > 0 && norm <= options.newton_tolerance &&
                 gap < options.matching_tolerance && closure < options.matching_tolerance,
@@ -222,13 +244,19 @@ struct branch_case
             periodic_orbit::layout_health<double>{}.inspect(
                 *s.layout, s.period, previous_period, report,
                 [&]( double t ) { return closure_at( t ) < options.matching_tolerance; }
-            )
+            ), observer->summary()
         };
     }
     void record( const measurement &m, int sign, unsigned index, double p, double used, unsigned retries )
     {
         csv << sign << ',' << index << ',' << p << ',' << m.period << ',' << m.norm << ',' << m.gap << ',' << m.closure
-            << ',' << used << ',' << retries << std::endl;
+            << ',' << used << ',' << retries << ',' << m.observable.rms << ',' << m.observable.minimum << ','
+            << m.observable.maximum << std::endl;
+        if ( const auto ref = equilibrium( p ) )
+        {
+            fill_profile( *steady_state, *ref );
+            steady << sign << ',' << index << ',' << p << ',' << column.evaluate( diagnostic, *steady_state ) << '\n';
+        }
     }
     auto corrected_sample( const state &z, double p, const state &next, double q, double target )
     {
@@ -249,9 +277,10 @@ struct branch_case
         auto  at      = corrected_sample( z, p, next, q, target );
         auto  initial = buffer( s.physical );
         s.first->lift( ( *at ).comp( 0 ), *initial );
+        const auto m = measure( s, *at, target, s.op->report().period );
         probes.push_back(
             { { "parameter", target },
-              { "period", s.op->report().period },
+              { "period", m.period }, { "observable_rms", m.observable.rms },
               { "state", snapshot<fixture_type::dimension>( *s.physical, *initial ) } }
         );
     }
@@ -408,7 +437,8 @@ struct branch_case
             guarded_memory::host_bytes == export_bytes, "Continuation transferred vectors outside diagnostic export"
         );
         json result = {
-            { "format", "periodic_orbit.continuation.v1" },
+            { "format", "periodic_orbit.continuation.v2" },
+            { "observable", "state_euclidean" },
             { "configuration", options.config },
             { "probes", probes },
             { "layout_refreshes", refreshes },

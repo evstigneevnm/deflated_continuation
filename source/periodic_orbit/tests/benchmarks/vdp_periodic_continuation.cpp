@@ -48,7 +48,7 @@ int main( int argc, char **argv )
                 flights, settings.arclength_step, settings.newton_tolerance, settings.iterations
             );
         };
-        branch_case checks( make_flights, make_solver, settings );
+        branch_case checks( make_flights, make_solver, settings, origin_reference<2> );
         auto        anchor = checks.correct_anchor( model.mu );
         checks.trace( *anchor, model.mu, -1 );
         checks.trace( *anchor, model.mu, +1 );

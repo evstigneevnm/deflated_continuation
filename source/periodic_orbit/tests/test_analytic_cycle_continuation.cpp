@@ -1,4 +1,7 @@
 #include "prepared_cycle_support.h"
+#include "parameterized_cycle.h"
+#include <containers/bifurcation_diagram/observable_column.h>
+#include <periodic_orbit/orbit_observable.h>
 #include "benchmarks/branch_solver.h"
 #include <periodic_orbit/matching/refresh_section_branch.h>
 #include <periodic_orbit/matching/rechart_orbit.h>
@@ -9,25 +12,7 @@
 namespace
 {
 using namespace cycle_tests;
-// r'=(lambda-r^2)r, angle'=omega. At r=sqrt(lambda) the transverse
-// multiplier is exp(-2*lambda*T), with T=2*pi/omega.
-struct cycle
-{
-    double                lambda = 1;
-    __DEVICE_TAG__ double omega() const
-    {
-        return 1 + .25 * ( lambda - 1 );
-    }
-    __DEVICE_TAG__ double rhs( std::ptrdiff_t i, const double *u, double ) const
-    {
-        return ( lambda - u[0] * u[0] - u[1] * u[1] ) * u[i] + omega() * ( i ? u[0] : -u[1] );
-    }
-    __DEVICE_TAG__ double jacobian( std::ptrdiff_t i, const double *u, const double *v, double ) const
-    {
-        return ( lambda - u[0] * u[0] - u[1] * u[1] ) * v[i] - 2 * u[i] * ( u[0] * v[0] + u[1] * v[1] ) +
-               omega() * ( i ? v[0] : -v[1] );
-    }
-};
+using cycle = parameterized_cycle;
 struct source_term
 {
     __DEVICE_TAG__ double rhs( std::ptrdiff_t i, const double *u, double ) const
@@ -377,6 +362,30 @@ void check( unsigned m )
 }
 void test()
 {
+    struct columns
+    {
+        std::vector<std::string> norm_bifurcation_diagram_labels() const { return { "signed", "magnitude" }; }
+        void norm_bifurcation_diagram( double x, std::vector<double> &out ) const
+        {
+            out.push_back( x );
+            out.push_back( std::abs( x ) );
+        }
+    } problem;
+    container::observable_column<double> selected( problem, "magnitude" ), indexed( 1 );
+    require_throws<std::invalid_argument>( [&] { decltype(selected) bad( problem, "missing" ); }, "Unknown column" );
+    require_throws<std::out_of_range>( [&] { decltype(indexed)( 2 ).evaluate( problem, 1. ); }, "Invalid column" );
+    require( indexed.evaluate( problem, -3. ) == 3, "Index fallback for unlabelled columns" );
+    int calls = 0;
+    auto sample = [&]( double x ) { ++calls; return selected.evaluate( problem, x ); };
+    periodic_orbit::orbit_observable<double, decltype(sample)> observer( sample );
+    require_throws<std::domain_error>( [&] { observer.summary(); }, "Empty orbit measurement" );
+    observer.set_time_interval( .25, 1. );
+    observer.apply( 0., -2. );
+    observer.set_time_interval( 1., 1.25 ); // Short final interval.
+    observer.apply( -2., 2. );
+    auto summary = observer.summary();
+    require( calls == 3 && summary.minimum == 0 && summary.maximum == 2 &&
+             std::abs( summary.rms - std::sqrt( 2.5 ) ) < 1e-14, "Time-weighted norm on unequal intervals" );
     for ( auto m : { 1u, 4u } )
         check( m );
     require( guarded_memory::host_bytes == 0, "Continuation transferred vectors" );

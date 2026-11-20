@@ -408,13 +408,14 @@ public:
 
     void norm_bifurcation_diagram( const T_vec &u_in, std::vector<T> &res ) const
     {
-        std::vector<T> host_u( mode_count_, T( 0 ) );
-        vec_ops->get( u_in, host_u.data(), mode_count_ );
+        T modes[2]{};
+        if ( mode_count_ )
+            vec_ops->get( u_in, modes, std::min<std::size_t>( 2, mode_count_ ) );
         res.clear();
         res.reserve( 3 );
         res.push_back( vec_ops->norm_l2( u_in ) );
-        res.push_back( mode_count_ > 0 ? host_u[0] : T( 0 ) );
-        res.push_back( mode_count_ > 1 ? host_u[1] : T( 0 ) );
+        res.push_back( modes[0] );
+        res.push_back( modes[1] );
     }
 
     std::vector<std::string> norm_bifurcation_diagram_labels() const

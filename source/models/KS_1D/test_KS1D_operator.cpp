@@ -125,6 +125,15 @@ void test_zero_branch( vec_ops_real &vec_ops, ks1d_t &ks )
     ks.F( x, real( 3.7 ), f );
     check_close( vec_ops.norm( f ), real( 0 ), tolerance<real>(), "zero branch residual" );
 
+    vec_ops.assign_scalar( real( 3 ), x );
+    vec_ops.set_value_at_point( real( -2 ), 1, x );
+    std::vector<real> columns;
+    ks.norm_bifurcation_diagram( x, columns );
+    check_condition( columns.size() == 3, "diagram column count" );
+    check_close( columns.at( 0 ), vec_ops.norm_l2( x ), tolerance<real>(), "diagram full-state norm" );
+    check_close( columns.at( 1 ), real( 3 ), real( 0 ), "diagram mode 1" );
+    check_close( columns.at( 2 ), real( -2 ), real( 0 ), "diagram mode 2" );
+
     vec_ops.stop_use_vector( f );
     vec_ops.free_vector( f );
     vec_ops.stop_use_vector( x );

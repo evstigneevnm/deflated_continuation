@@ -35,7 +35,14 @@ int main( int argc, char **argv )
                 flights, settings.arclength_step, settings.newton_tolerance, settings.iterations
             );
         };
-        branch_case checks( make_flights, make_solver, settings );
+        // Inner equilibrium: a*z^2-c*z+b=0, x=a*z, y=-z.
+        auto equilibrium = [&]( double c ) -> std::optional<std::array<double, 3>> {
+            const double disc = c * c - 4 * model.a * model.b;
+            if ( disc < 0 ) return {};
+            const double z = 2 * model.b / ( c + std::copysign( std::sqrt( disc ), c ) );
+            return std::array<double, 3>{ model.a * z, -z, z };
+        };
+        branch_case checks( make_flights, make_solver, settings, equilibrium );
         auto        anchor = checks.correct_anchor( model.c );
         // Independent periodic collocation, continued from the same anchor beyond both original layout failures.
         checks.trace( *anchor, model.c, -1, branch_reference{ .4, 5.53393796 } );

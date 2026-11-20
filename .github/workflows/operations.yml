@@ -1736,7 +1736,7 @@ jobs:
             if [ "$backend" = cpu ]; then
               bash source/periodic_orbit/tests/run_all.sh \
                 --build-dir "$BUILD_DIR/orbit_matching/$backend" --backend cpu --mode continuation \
-                --systems rossler_periodic vdp_periodic lorenz_periodic --sections 1 4 --threads 1 --require-rossler-reference
+                --systems rossler_periodic vdp_periodic lorenz_periodic analytic_cycle vaidyanathan_periodic --sections 1 4 --threads 1 --require-rossler-reference
               bash source/periodic_orbit/tests/run_all.sh \
                 --build-dir "$BUILD_DIR/orbit_matching/$backend" --backend "$backend" \
                 --systems analytic_cycle analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic \

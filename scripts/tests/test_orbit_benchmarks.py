@@ -21,7 +21,7 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
     def test_continuation_mode_is_opt_in_and_has_separate_case_names(self):
         args = runner.arguments(["--mode", "continuation", "--systems", *runner.BRANCHES])
         configs = runner.configurations(args)
-        self.assertEqual(len(configs), 6)
+        self.assertEqual(len(configs), 2 * len(runner.BRANCHES))
         self.assertEqual(runner.stage(configs), "continuation")
         self.assertEqual({c["sections"] for c in configs}, {1, 4})
         for c in configs:
@@ -30,7 +30,7 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
             self.assertGreater(c["probe_offset"], 0)
             self.assertGreaterEqual(c["branch_steps"], 2)
         for switches in (["--mode", "continuation", "--methods", "BDF"],
-                         ["--mode", "continuation", "--systems", "analytic_cycle"],
+                         ["--mode", "continuation", "--systems", "analytic_cycle_newton"],
                          ["--mode", "continuation", "--branch-steps", "1"],
                          ["--systems", "vdp_periodic"]):
             with self.subTest(switches=switches), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
@@ -44,9 +44,12 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
                 runner.compare_probes([a], [other], 1e-6)
         with self.assertRaises(ValueError):
             runner.compare_probes([a], [], 1e-6)
+        with self.assertRaisesRegex(ValueError, "time-RMS"):
+            runner.compare_probes([dict(a, observable_rms=1.)], [dict(a, observable_rms=1.1)], 1e-6)
 
     def test_each_continuation_preset_and_command_line_overrides(self):
-        for system, step in (("rossler_periodic", .005), ("lorenz_periodic", .002), ("vdp_periodic", .01)):
+        for system, step in (("rossler_periodic", .005), ("lorenz_periodic", .002), ("vdp_periodic", .01),
+                             ("vaidyanathan_periodic", .002)):
             options = ["--mode", "continuation", "--system", system]
             with self.subTest(system=system):
                 a, b = runner.configurations(runner.arguments(options))

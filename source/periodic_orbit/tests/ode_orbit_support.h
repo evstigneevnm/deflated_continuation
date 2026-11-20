@@ -88,15 +88,15 @@ void perturb_sections( double amplitude, Blocks &out )
     }
 }
 
-template <class Step>
+template <class Step, class Observer = nmfd::time_steppers::detail::no_external_operations>
 double closure_error(
     const std::shared_ptr<operations> &physical, const std::shared_ptr<Step> &rk, const X &initial, double start,
-    double period, std::size_t maximum_steps
+    double period, std::size_t maximum_steps, std::shared_ptr<Observer> observer = {}
 )
 {
     auto endpoint    = buffer( physical );
-    using integrator = nmfd::time_steppers::integration::time_integrator<operations, Step>;
-    integrator verify( physical, rk, typename integrator::params{ maximum_steps } );
+    using integrator = nmfd::time_steppers::integration::time_integrator<operations, Step, Observer>;
+    integrator verify( physical, rk, typename integrator::params{ maximum_steps }, std::move( observer ) );
     verify.set_time_interval( start, start + period );
     verify.apply( initial, *endpoint );
     if ( verify.get_status() != nmfd::time_steppers::integration_status::completed )

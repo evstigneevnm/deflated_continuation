@@ -19,9 +19,10 @@ namespace ode_orbit_tests
 struct vaidyanathan_periodic
 {
     static constexpr const char                        *name = "vaidyanathan_periodic";
-    static constexpr double                             a = 10, b = 8. / 3, c = 28, p = 1.3, q = 2.5;
+    static constexpr double                             a = 10, b = 8. / 3, anchor_parameter = 28, p = 1.3, q = 2.5;
+    double                                              c = anchor_parameter;
     inline static constexpr std::array<const char *, 5> parameter_names{ "a", "b", "c", "p", "q" };
-    inline static constexpr std::array<double, 5>       parameters{ a, b, c, p, q };
+    inline static constexpr std::array<double, 5>       parameters{ a, b, anchor_parameter, p, q };
     static constexpr double                             period = 2.4064400379694417;
     inline static constexpr std::array<double, 5>       seed{
         1.6056697979945038, -5.404348869605473, 24.3673777180209, 112.34762925394274, -3.4191430134752285

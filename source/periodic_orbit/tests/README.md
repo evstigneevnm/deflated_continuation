@@ -21,6 +21,7 @@ bash source/periodic_orbit/tests/run_all.sh --system analytic_cycle_newton --met
 bash source/periodic_orbit/tests/run_all.sh --systems rossler_periodic lorenz_periodic --methods RK45 DOP853
 bash source/periodic_orbit/tests/run_all.sh --mode continuation --systems rossler_periodic vdp_periodic lorenz_periodic
 bash source/periodic_orbit/tests/run_all.sh --system vaidyanathan_periodic --methods RK45 DOP853
+bash source/periodic_orbit/tests/run_all.sh --mode continuation --system vaidyanathan_periodic --sections 1 4
 bash source/periodic_orbit/tests/run_all.sh --systems analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic --methods 'SDIRK3(1)3' ARK324L2SA
 bash source/periodic_orbit/tests/run_all.sh --system analytic_cycle_newton --methods IM CN 'SDIRK2(1)2' 'ESDIRK2(1)3'
 bash source/periodic_orbit/tests/run_all.sh --system analytic_cycle_newton --methods BDF2
@@ -33,14 +34,18 @@ bash source/periodic_orbit/tests/run_all.sh --plot-only build/periodic_orbit_ben
 pseudo-arclength predictor, bordered Newton corrector and tangent updates. It
 follows each seeded cycle in both directions: [Rossler](benchmarks/rossler_periodic_continuation.cpp)
 in `c` around 6, [Van der Pol](benchmarks/vdp_periodic_continuation.cpp) in `mu`
-around 1, and [cubic-damped Lorenz](benchmarks/lorenz_periodic_continuation.cpp)
-in `rho` around 28. Each source binds its physical parameter, defines its RHS
+around 1, [cubic-damped Lorenz](benchmarks/lorenz_periodic_continuation.cpp)
+in `rho` around 28, and [five-state Vaidyanathan](benchmarks/vaidyanathan_periodic_continuation.cpp)
+in `c` around 28. For Vaidyanathan the seeded unstable orbit has period
+2.4064400379694417 at the anchor; the steady reference is the origin. Each
+source binds its physical parameter, defines its RHS
 parameter derivative, constructs the pilot flights and bordered Newton solver,
 and traces both directions from a corrected anchor. Numerical defaults are in
 the adjacent `*_continuation.json` preset: edit that file to tune one problem,
 or pass CLI overrides for one run. The resolved configuration is saved with
 each report. Rossler and Lorenz reuse their fixed-correction model equations
-and reference seeds. All three use the same [branch checks](benchmarks/ode_continuation_benchmark.h). The
+and reference seeds. The [analytical cycle](benchmarks/analytic_cycle_continuation.cpp) uses the
+same [branch checks](benchmarks/ode_continuation_benchmark.h) and verifies the radius and period at every point. The
 [analytical-cycle regression](test_analytic_cycle_continuation.cpp) separately
 checks the exact branch and transverse multiplier. Each solver keeps its pilot
 sections fixed throughout a correction. Between steps, the continuation benchmarks
@@ -61,6 +66,16 @@ on either side of the anchor (`--probe-offset`), using period and the physical
 state on their common first section. Only checkpoint and diagnostic exports
 read state entries on the host. This is a local branch validation, not a search
 for new orbits or a Floquet stability analysis.
+
+`bifurcation.png` overlays the steady reference height and the periodic time-RMS
+of the **same** `norm_bifurcation_diagram` column (`state_euclidean` for these ODEs).
+The band is the sampled min/max, not the oscillation amplitude. Only periodic
+points appear on the period panel. Scalars are accumulated on the independent
+physical trajectory up to the measured period using trapezoidal time weights;
+neither the section coordinates nor an unweighted average of timesteps is used.
+`steady_reference.csv` is separate from the corrected periodic `branch.csv`:
+it samples the analytic origin, or the inner Rossler equilibrium, not a numerically
+continued stationary branch. Old v1 exports can still regenerate `branch.png`.
 
 `report.json` lists committed layout changes. The first step following a refresh
 also gets a restart check using `refresh_checkpoint.json`. Checkpoints include

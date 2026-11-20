@@ -36,9 +36,12 @@ METHODS = ("RK45", "DOP853", "IE", *DIRK_STEPS["analytic_cycle"])
 BDF_STEPS = {"analytic_cycle": .00025, "rossler_periodic": .00002,
              "lorenz_periodic": .000005, "vaidyanathan_periodic": .000003}
 METHODS += ("BDF1", "BDF2", "BDF")
-BRANCHES = {"rossler_periodic": ("c", 6., ODE_CASES["rossler_periodic"]["period"]),
+BRANCHES = {"analytic_cycle": ("lambda", 1., 2 * math.pi),
+            "rossler_periodic": ("c", 6., ODE_CASES["rossler_periodic"]["period"]),
             "vdp_periodic": ("mu", 1., 6.6632868593231365),
-            "lorenz_periodic": ("rho", 28., ODE_CASES["lorenz_periodic"]["period"])}
+            "lorenz_periodic": ("rho", 28., ODE_CASES["lorenz_periodic"]["period"]),
+            "vaidyanathan_periodic": ("c", ODE_CASES["vaidyanathan_periodic"]["parameters"]["c"],
+                                      ODE_CASES["vaidyanathan_periodic"]["period"])}
 BUILD_ENVIRONMENT = (
     "PATH", "G++", "GCC_ROOT_PATH", "TARGET_GCC", "CPPSTD", "NVCC", "CUDA_ROOT_PATH",
     "CUDA_ARCH_LIST", "TARGET_NVCC", "HIPCC", "HIPFLAGS", "HIP_ROOT_PATH", "HIP_PATH",
@@ -481,7 +484,7 @@ def validate_branch(directory, config):
     _, anchor, period = BRANCHES[config["system"]]
     n = config["branch_steps"]
     tol = config["matching_tolerance"]
-    if (report.get("format") != "periodic_orbit.continuation.v1" or report["configuration"] != config
+    if (report.get("format") not in ("periodic_orbit.continuation.v1", "periodic_orbit.continuation.v2") or report["configuration"] != config
             or report["passed"] is not True or report["core_host_bytes"] != 0
             or not 0 <= report["parameter_column_error"] < 2e-5
             or not 0 <= report["restart_error"] < config["newton_tolerance"]):
@@ -511,9 +514,22 @@ def validate_branch(directory, config):
         ps = rows["parameter"][rows["direction"] == sign]
         if (sample["parameter"] != target or not min(anchor, min(ps)) <= target <= max(anchor, max(ps))
                 or not math.isfinite(sample["period"]) or sample["period"] <= 0
-                or len(sample["state"]) != (2 if config["system"] == "vdp_periodic" else 3)
+                or len(sample["state"]) != len(state_axes(config))
                 or not all(map(math.isfinite, sample["state"]))):
             raise ValueError("Missing or invalid bracketed common-parameter sample")
+    if report["format"].endswith(".v2"):
+        if report["observable"] != "state_euclidean" or any(not math.isfinite(s["observable_rms"]) for s in probes):
+            raise ValueError("Invalid branch observable")
+        lo, rms, hi = (rows[k] for k in ("observable_min", "observable_rms", "observable_max"))
+        slack = 1e-12 * np.maximum(1, hi)
+        if np.any((lo < 0) | (lo > hi) | (lo - slack > rms) | (rms > hi + slack)):
+            raise ValueError("Orbit RMS is outside its sampled magnitude envelope")
+        if config["system"] == "analytic_cycle":
+            radius = np.sqrt(rows["parameter"])
+            exact_period = 2 * np.pi / (1 + .25 * (rows["parameter"] - 1))
+            if not all(np.allclose(v, radius, atol=tol, rtol=0) for v in (lo, rms, hi)) or not np.allclose(
+                    rows["period"], exact_period, atol=tol, rtol=0):
+                raise ValueError("Analytical cycle radius or period mismatch")
     return report, rows
 
 
@@ -525,6 +541,44 @@ def compare_probes(first, second, tolerance):
         if a["parameter"] != b["parameter"] or not (period_error < tolerance and state_error < tolerance):
             raise ValueError(f"Section counts disagree: parameters {a['parameter']}, {b['parameter']}; "
                              f"period difference {period_error:.3g}, state distance {state_error:.3g}")
+        if "observable_rms" in a or "observable_rms" in b:
+            if not abs(a.get("observable_rms", math.nan) - b.get("observable_rms", math.nan)) < tolerance:
+                raise ValueError("Section counts disagree on physical time-RMS")
+
+
+def plot_bifurcation(directory, config, rows, plt):
+    import numpy as np
+    steady = np.genfromtxt(directory / "steady_reference.csv", delimiter=",", names=True, ndmin=1)
+    # Values correspond to the same parameter samples, not a joined or inferred branch.
+    p = rows["parameter"]
+    valid = p*p >= .04 if config["system"] == "rossler_periodic" else np.ones(len(p), dtype=bool)
+    if any(not np.array_equal(steady[k], rows[k][valid]) for k in ("direction", "index", "parameter")):
+        raise ValueError("Steady reference does not match the branch sampling")
+    if config["system"] == "rossler_periodic":
+        c = steady["parameter"]
+        z = .2 / (c + np.copysign(np.sqrt(c*c - 4*.1*.1), c))
+        expected = np.abs(z) * math.sqrt(2 + .1**2)
+    else:
+        expected = np.zeros(len(steady))
+    if not np.allclose(steady["value"], expected, rtol=1e-12, atol=1e-14):
+        raise ValueError("Incorrect steady reference height")
+    stationary = np.full(len(rows), np.nan)
+    stationary[valid] = steady["value"]
+    fig, (height, period) = plt.subplots(2, 1, figsize=(7, 6), sharex=True, constrained_layout=True)
+    for sign in (-1, 1):
+        mask = (rows["direction"] == 0) | (rows["direction"] == sign)
+        part = rows[mask]
+        x = part["parameter"]
+        height.fill_between(x, part["observable_min"], part["observable_max"], color="C0", alpha=.18,
+                            label="Sampled min–max" if sign < 0 else None)
+        height.plot(x, part["observable_rms"], ".-", color="C0", label="Periodic: time-RMS" if sign < 0 else None)
+        height.plot(x, stationary[mask], "--", color="C1", label="Steady: analytical reference" if sign < 0 else None)
+        period.plot(x, part["period"], ".-", color="C0")
+    height.set(ylabel="Euclidean state norm", title=f"{config['system']}, M={config['sections']}")
+    height.legend()
+    period.set(ylabel="Period", xlabel=BRANCHES[config["system"]][0])
+    fig.savefig(directory / "bifurcation.png", dpi=150)
+    plt.close(fig)
 
 
 def plot_branch(directory, config):
@@ -533,6 +587,8 @@ def plot_branch(directory, config):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import numpy as np
+    if report["format"].endswith(".v2"):
+        plot_bifurcation(directory, config, rows, plt)
     fig, axes = plt.subplots(2, 1, figsize=(7, 6), sharex=True, constrained_layout=True)
     for sign, label in ((-1, "Decreasing from anchor"), (1, "Increasing from anchor")):
         part = rows[(rows["direction"] == 0) | (rows["direction"] == sign)]
