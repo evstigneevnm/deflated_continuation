@@ -3233,6 +3233,8 @@ jobs:
           KS1D_BUILD="$BUILD_DIR/ks1d_sym_cpu_omp"
           make KS1D_operator_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_operator_cpu_omp.bin
+          make test_periodic_orbit_ks1d_symmetric_periodic_cpu_omp.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD"
+          OMP_NUM_THREADS=1 timeout 120s ./"$KS1D_BUILD"/test_periodic_orbit_ks1d_symmetric_periodic_cpu_omp.bin
           make KS1D_bd_cpu_omp CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           python3 scripts/write_ks1d_ci_config.py "$KS1D_BUILD/ks1d_ci.json" "$KS1D_BUILD/project" --base-config json_project_files/KS1D_test_sym.json --clean-project --steps 32 --step-size 0.02 --max-step-size 0.03 --analytical-max-parameter-step 0.1
           timeout 120s ./"$KS1D_BUILD"/KS1D_bd_cpu_omp.bin "$KS1D_BUILD/ks1d_ci.json" --quiet
@@ -3762,6 +3764,8 @@ jobs:
           KS1D_BUILD="$BUILD_DIR/ks1d_sym_cuda"
           make KS1D_operator_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_operator_cuda.bin auto
+          make test_periodic_orbit_ks1d_symmetric_periodic_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD"
+          timeout 120s ./"$KS1D_BUILD"/test_periodic_orbit_ks1d_symmetric_periodic_cuda.bin --rates-only
           make test_KS1D_linear_solvers_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
           ./"$KS1D_BUILD"/test_KS1D_linear_solvers_cuda.bin
           make KS1D_full_operator_cuda.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double
@@ -3823,12 +3827,13 @@ jobs:
             HIP_TARGET="${HIP_ARCH_LIST:-native}"
           fi
           KS1D_BUILD="$BUILD_DIR/ks1d_sym_hip"
-          make test_fft_facade_hipfft.bin KS1D_operator_hip.bin test_KS1D_newton_hip.bin \
+          make test_fft_facade_hipfft.bin KS1D_operator_hip.bin test_KS1D_newton_hip.bin test_periodic_orbit_ks1d_symmetric_periodic_hip.bin \
             CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD" REAL_TYPE=double \
             HIPCC="$HIPCC_BIN" HIP_ROOT_PATH="$HIP_ROOT" HIP_PATH="$HIP_ROOT" HIP_ARCH_LIST="$HIP_TARGET"
           timeout 120s ./"$KS1D_BUILD"/test_fft_facade_hipfft.bin auto
           timeout 120s ./"$KS1D_BUILD"/test_KS1D_operator_hip.bin auto
           timeout 120s ./"$KS1D_BUILD"/test_KS1D_newton_hip.bin
+          timeout 120s ./"$KS1D_BUILD"/test_periodic_orbit_ks1d_symmetric_periodic_hip.bin --rates-only
 
   circle-bd-hip:
     needs: [scfd-vector-operations-hip]

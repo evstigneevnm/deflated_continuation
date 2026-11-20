@@ -1431,6 +1431,11 @@ $(foreach test,prepared_dirk_derivatives prepared_dirk_matching orbit_method_ass
 test_periodic_orbit_coordinate_solvers_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_multiple_section_newton_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_analytic_cycle_continuation_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+test_periodic_orbit_ks1d_symmetric_periodic_%.bin: private PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+test_periodic_orbit_ks1d_symmetric_periodic_cpu.bin test_periodic_orbit_ks1d_symmetric_periodic_cpu_omp.bin: private PERIODIC_SECTION_LIBS = $(LFFTW)
+test_periodic_orbit_ks1d_symmetric_periodic_cuda.bin: private PERIODIC_SECTION_LIBS = -lcufft
+test_periodic_orbit_ks1d_symmetric_periodic_hip.bin: private PERIODIC_SECTION_LIBS = -lhipfft
+$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_ks1d_symmetric_periodic_$(backend).bin): $(KS1D_MODEL_HEADERS) $(FFT_FACADE_HEADERS) $(NEWTON_TEST_HEADERS) source/periodic_orbit/tests/benchmarks/ks1d_evolution.h
 $(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_analytic_cycle_continuation_$(backend).bin): $(NEWTON_TEST_HEADERS) $(CONTINUATION_WRAPPER_TEST_HEADERS) $(wildcard source/continuation/*.h) source/numerical_algos/parameterized_correction.h source/periodic_orbit/tests/benchmarks/branch_solver.h
 test_periodic_orbit_rossler_periodic_%.bin test_periodic_orbit_lorenz_periodic_%.bin test_periodic_orbit_vaidyanathan_periodic_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 $(foreach system,rossler_periodic lorenz_periodic vaidyanathan_periodic,$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_$(system)_$(backend).bin)): $(NEWTON_TEST_HEADERS)
@@ -1440,18 +1445,18 @@ test_periodic_orbit_poincare_implicit_cpu.bin test_periodic_orbit_poincare_impli
 test_periodic_orbit_poincare_bdf_cpu.bin test_periodic_orbit_poincare_bdf_cpu_omp.bin test_periodic_orbit_poincare_bdf_cuda.bin test_periodic_orbit_poincare_bdf_hip.bin: $(NEWTON_TEST_HEADERS)
 
 test_periodic_orbit_%_cpu.bin: source/periodic_orbit/tests/test_%.cpp $(PERIODIC_SECTION_DEPS)
-	$(G++) $(G++FLAGS) -I source $(ITIME_STEPPER) $(PERIODIC_SECTION_TEST_FLAGS) $< $(OPENMP) -o $(BUILD_DIR)/$@
+	$(G++) $(G++FLAGS) -I source $(ITIME_STEPPER) $(PERIODIC_SECTION_TEST_FLAGS) $< $(OPENMP) $(PERIODIC_SECTION_LIBS) -o $(BUILD_DIR)/$@
 
 test_periodic_orbit_%_cpu_omp.bin: source/periodic_orbit/tests/test_%.cpp $(PERIODIC_SECTION_DEPS)
-	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP -I source $(ITIME_STEPPER) $(PERIODIC_SECTION_TEST_FLAGS) $< $(OPENMP) -o $(BUILD_DIR)/$@
+	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP -I source $(ITIME_STEPPER) $(PERIODIC_SECTION_TEST_FLAGS) $< $(OPENMP) $(PERIODIC_SECTION_LIBS) -o $(BUILD_DIR)/$@
 
 test_periodic_orbit_%_cuda.bin: source/periodic_orbit/tests/test_%.cpp $(PERIODIC_SECTION_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA -I source $(ITIME_STEPPER) $(PERIODIC_SECTION_TEST_FLAGS) $(ICUDA) -x cu $< -c -o $(BUILD_DIR)/test_periodic_orbit_$*_cuda.o
-	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_periodic_orbit_$*_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $(BUILD_DIR)/$@
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/test_periodic_orbit_$*_cuda.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) $(PERIODIC_SECTION_LIBS) -o $(BUILD_DIR)/$@
 
 test_periodic_orbit_%_hip.bin: source/periodic_orbit/tests/test_%.cpp $(PERIODIC_SECTION_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o
 	$(HIPCC) $(HIPFLAGS) -DTEST_VECTOR_BACKEND_HIP -I source $(ITIME_STEPPER) $(PERIODIC_SECTION_TEST_FLAGS) -c $< -o $(BUILD_DIR)/test_periodic_orbit_$*_hip.o
-	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_periodic_orbit_$*_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $(BUILD_DIR)/$@
+	$(HIPCC) $(HIPFLAGS) $(BUILD_DIR)/test_periodic_orbit_$*_hip.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) $(PERIODIC_SECTION_LIBS) -o $(BUILD_DIR)/$@
 
 .PHONY: check_periodic_orbit_headers_cpu
 check_periodic_orbit_headers_cpu:

@@ -30,6 +30,29 @@ bash source/periodic_orbit/tests/run_all.sh --systems analytic_cycle_newton ross
 bash source/periodic_orbit/tests/run_all.sh --plot-only build/periodic_orbit_benchmarks/runs/RUN_DIRECTORY
 ```
 
+**Symmetric KS1D (fixed parameter).** This standalone FFT regression exercises
+the production stationary operator as a physical rate, `u'=-F(u,lambda)`.
+It checks linear mode evolution, nonlinear state and parameter derivatives,
+then corrects a seeded ordinary orbit with RK45 and one and four sections.
+It compares the phase-fixed anchors and verifies identity closure by integrating
+a full period with a four-times finer timestep. No symmetry shift is applied.
+
+```bash
+make test_periodic_orbit_ks1d_symmetric_periodic_cpu_omp.bin
+OMP_NUM_THREADS=1 build/test_periodic_orbit_ks1d_symmetric_periodic_cpu_omp.bin
+```
+
+The seed is for **this discrete system only**: 24 physical grid points,
+11 unnormalized imaginary Fourier coefficients, `a=2, b=4, lambda=68`.
+It was generated independently with LSODA on the same pseudospectral product:
+in rescaled time `s=4*t` and state `v=2*u`, start from `v_k=1/k^2`
+at `s=0` with `a=b=1, lambda=17`. At the last two maxima of mode 1
+before `s=12`, take half the earlier state and one quarter of the peak spacing.
+The resulting period is approximately 0.01515369. The test perturbs the
+section coordinates before correction; it is not a continuation or a test
+of spatial convergence. Use `--rates-only` for the short evolution and
+derivative checks without Newton.
+
 **Continuation.** This opt-in benchmark uses fixed-step RK45 and the project's
 pseudo-arclength predictor, bordered Newton corrector and tangent updates. It
 follows each seeded cycle in both directions: [Rossler](benchmarks/rossler_periodic_continuation.cpp)
