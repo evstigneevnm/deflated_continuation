@@ -3214,7 +3214,7 @@ jobs:
           if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
             echo "CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc" >> "$GITHUB_ENV"
             sudo apt-get update
-            sudo apt-get install -y --no-install-recommends build-essential make python3 libboost-dev libboost-serialization-dev libfftw3-dev libopenblas-dev
+            sudo apt-get install -y --no-install-recommends build-essential make python3 python3-numpy python3-matplotlib libboost-dev libboost-serialization-dev libfftw3-dev libopenblas-dev
           fi
       - name: Build and validate symmetrized KS1D and its Jacobian/preconditioner adjoints
         run: |
@@ -3255,6 +3255,19 @@ jobs:
           export OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE OPENBLAS_NUM_THREADS=1
           KS1D_BUILD="$BUILD_DIR/ks1d_sym_cpu_omp"
           python3 scripts/test_ks1d_symmetric_nmfd.py --bd-executable "$KS1D_BUILD/KS1D_bd_cpu_omp.bin" --stability-executable "$KS1D_BUILD/KS1D_stability_cpu_omp.bin" --work-dir "$KS1D_BUILD/nonzero_replay"
+
+      - name: Compare symmetric KS1D periodic branches at common parameters
+        run: |
+          if [ "${GITHUB_ACTIONS:-}" = "true" ]; then export PYTHON=/usr/bin/python3; fi
+          bash source/periodic_orbit/tests/run_all.sh --mode continuation --system ks1d_symmetric_periodic \
+            --backend cpu --threads 1 --sections 1 4 --branch-steps 2 \
+            --build-dir "$BUILD_DIR/ks1d_periodic_branch" --config-file "$CONFIG_FILE"
+
+      - name: Trace symmetric KS1D periodic orbits with the production continuation driver
+        run: |
+          KS1D_BUILD="$BUILD_DIR/ks1d_sym_cpu_omp"
+          make test_periodic_orbit_ks1d_periodic_continuation_driver_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD"
+          OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 timeout 1200s "$KS1D_BUILD/test_periodic_orbit_ks1d_periodic_continuation_driver_cpu.bin"
 
   ks1d-full-nmfd-linear-solvers-cpu-omp:
     needs: [fftw-operations-cpu, lapack-wrap-cpu]

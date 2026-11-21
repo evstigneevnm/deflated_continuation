@@ -2,6 +2,7 @@
 #define PERIODIC_ORBIT_BENCHMARK_ODE_CONTINUATION_FIXTURE_H
 
 #include "../ode_orbit_support.h"
+#include <containers/bifurcation_diagram/observable_column.h>
 #include "branch_solver.h"
 #include <periodic_orbit/matching/rechart_orbit.h>
 
@@ -61,14 +62,19 @@ struct continuation_fixture
     std::vector<std::shared_ptr<chart>>                   charts;
     std::vector<std::size_t>                              pilot_indices;
     const Model                                           model;
+    static constexpr const char *observable_label = "state_euclidean";
+    problem<Model> diagnostic{ physical, model };
+    container::observable_column<double> column{ diagnostic, observable_label };
+    double observable( const X &x ) { return column.evaluate( diagnostic, x ); }
+    auto verification_step( double p ) const { return make_step( physical, verification_dt, model.with_parameter( p ) ); }
     const double                                          period;
-    const double                                          pilot_parameter;
+    const double                                          pilot_parameter, verification_dt;
     continuation_fixture(
         const Model &anchor, const std::array<double, dimension> &pilot_state, double pilot_period, std::size_t m,
         double h, double t, std::size_t budget
     )
         : coords( std::make_shared<space>( coordinates, m ) ), model( anchor ), period( pilot_period ),
-          pilot_parameter( Model::anchor_parameter )
+          pilot_parameter( Model::anchor_parameter ), verification_dt( h/4 )
     {
         layout = anchor_layout( physical, make_step( physical, h, model ), model, pilot_state, period, m, t, budget );
         assemble( h, budget );
@@ -78,7 +84,7 @@ struct continuation_fixture
         std::size_t budget
     )
         : physical( old.physical ), coordinates( old.coordinates ), coords( old.coords ),
-          model( old.model.with_parameter( p ) ), period( new_period ), pilot_parameter( p )
+          model( old.model.with_parameter( p ) ), period( new_period ), pilot_parameter( p ), verification_dt( h/4 )
     {
         layout = backend_layout(
             physical, make_step( physical, h, model ), model, seed, period, coords->component_count(), start, budget

@@ -53,6 +53,38 @@ section coordinates before correction; it is not a continuation or a test
 of spatial convergence. Use `--rates-only` for the short evolution and
 derivative checks without Newton.
 
+**Symmetric KS1D continuation.** Follow this same discrete orbit in physical
+`lambda` with the project's pseudo-arclength stepper in the benchmark's own branch loop:
+
+```bash
+bash source/periodic_orbit/tests/run_all.sh --mode continuation --system ks1d_symmetric_periodic
+```
+
+The [preset](benchmarks/ks1d_symmetric_periodic_continuation.json) starts at
+68 and controls the number of RK45-based branch steps on each arm; CI
+requests two with `--branch-steps 2`. The runner compares
+period, phase-fixed packed Fourier state and time-RMS of the KS `l2_norm`
+at 67.999 and 68.001 for one and four sections. Every accepted point is
+integrated independently at one quarter of the RK step. Matching uses
+backend vectors and matrix-free flight derivatives; plotting samples only
+the scalar reduced norm. The two cross-run comparison states and restart
+checkpoint are explicit host I/O, counted separately from solver transfers.
+No stationary archive is overlaid on this plot.
+
+The separate [driver regression](test_ks1d_periodic_continuation_driver.cpp)
+calls `continuate_curve_result()` once per branch, leaving seed tangents,
+both semicurves, knot sampling and endpoint refinement to the production driver.
+For one and four fixed sections it compares both corrected endpoints against
+the step-level benchmark's saved Fourier probes and independently checks closure.
+It repeats the branch with an interior knot and checks last-accepted recovery
+with a one-step cap. The recorder keeps only scalars per point; selected states
+stay on the backend. No archive or generated benchmark data is required.
+
+```bash
+make test_periodic_orbit_ks1d_periodic_continuation_driver_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+OMP_NUM_THREADS=1 build/test_periodic_orbit_ks1d_periodic_continuation_driver_cpu.bin
+```
+
 **Continuation.** This opt-in benchmark uses fixed-step RK45 and the project's
 pseudo-arclength predictor, bordered Newton corrector and tangent updates. It
 follows each seeded cycle in both directions: [Rossler](benchmarks/rossler_periodic_continuation.cpp)

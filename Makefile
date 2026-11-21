@@ -1431,11 +1431,13 @@ $(foreach test,prepared_dirk_derivatives prepared_dirk_matching orbit_method_ass
 test_periodic_orbit_coordinate_solvers_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_multiple_section_newton_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 test_periodic_orbit_analytic_cycle_continuation_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
-test_periodic_orbit_ks1d_symmetric_periodic_%.bin: private PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
-test_periodic_orbit_ks1d_symmetric_periodic_cpu.bin test_periodic_orbit_ks1d_symmetric_periodic_cpu_omp.bin: private PERIODIC_SECTION_LIBS = $(LFFTW)
-test_periodic_orbit_ks1d_symmetric_periodic_cuda.bin: private PERIODIC_SECTION_LIBS = -lcufft
-test_periodic_orbit_ks1d_symmetric_periodic_hip.bin: private PERIODIC_SECTION_LIBS = -lhipfft
-$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_ks1d_symmetric_periodic_$(backend).bin): $(KS1D_MODEL_HEADERS) $(FFT_FACADE_HEADERS) $(NEWTON_TEST_HEADERS) source/periodic_orbit/tests/benchmarks/ks1d_evolution.h
+ks_orbit_tests = $(foreach case,ks1d_symmetric_periodic ks1d_periodic_continuation_driver,$(foreach backend,$(1),test_periodic_orbit_$(case)_$(backend).bin))
+$(call ks_orbit_tests,cpu cpu_omp cuda hip): private PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
+$(call ks_orbit_tests,cpu cpu_omp): private PERIODIC_SECTION_LIBS = $(LFFTW)
+$(call ks_orbit_tests,cuda): private PERIODIC_SECTION_LIBS = -lcufft
+$(call ks_orbit_tests,hip): private PERIODIC_SECTION_LIBS = -lhipfft
+$(call ks_orbit_tests,cpu cpu_omp cuda hip): $(KS1D_MODEL_HEADERS) $(FFT_FACADE_HEADERS) $(NEWTON_TEST_HEADERS) source/periodic_orbit/tests/benchmarks/ks1d_evolution.h source/periodic_orbit/tests/benchmarks/ks1d_orbit_support.h | $(BUILD_STAMP)
+$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_ks1d_periodic_continuation_driver_$(backend).bin): $(CONTINUATION_WRAPPER_TEST_HEADERS) $(wildcard source/continuation/*.h) source/continuation/continuation.hpp source/containers/knots.hpp source/periodic_orbit/tests/benchmarks/branch_solver.h source/periodic_orbit/tests/benchmarks/ks1d_branch_flights.h
 $(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_analytic_cycle_continuation_$(backend).bin): $(NEWTON_TEST_HEADERS) $(CONTINUATION_WRAPPER_TEST_HEADERS) $(wildcard source/continuation/*.h) source/numerical_algos/parameterized_correction.h source/periodic_orbit/tests/benchmarks/branch_solver.h
 test_periodic_orbit_rossler_periodic_%.bin test_periodic_orbit_lorenz_periodic_%.bin test_periodic_orbit_vaidyanathan_periodic_%.bin: PERIODIC_SECTION_TEST_FLAGS = $(INMFD_NEWTON)
 $(foreach system,rossler_periodic lorenz_periodic vaidyanathan_periodic,$(foreach backend,cpu cpu_omp cuda hip,test_periodic_orbit_$(system)_$(backend).bin)): $(NEWTON_TEST_HEADERS)
@@ -1465,7 +1467,11 @@ check_periodic_orbit_headers_cpu:
 	done
 
 PERIODIC_BENCHMARK_OPTIONS ?=
-PERIODIC_CONTINUATION_BENCHMARKS = analytic_cycle_continuation rossler_periodic_continuation vdp_periodic_continuation lorenz_periodic_continuation vaidyanathan_periodic_continuation
+PERIODIC_CONTINUATION_BENCHMARKS = analytic_cycle_continuation rossler_periodic_continuation vdp_periodic_continuation lorenz_periodic_continuation vaidyanathan_periodic_continuation ks1d_symmetric_periodic_continuation
+KS1D_BRANCH_BIN = $(BUILD_DIR)/periodic_orbit_benchmark_ks1d_symmetric_periodic_continuation
+$(KS1D_BRANCH_BIN)_cpu.bin $(KS1D_BRANCH_BIN)_cpu_omp.bin: private PERIODIC_BENCHMARK_LIBS = $(LFFTW)
+$(KS1D_BRANCH_BIN)_cuda.bin: private PERIODIC_BENCHMARK_LIBS = -lcufft
+$(KS1D_BRANCH_BIN)_hip.bin: private PERIODIC_BENCHMARK_LIBS = -lhipfft
 PERIODIC_BENCHMARK_TARGETS = $(foreach system,analytic_cycle analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic $(PERIODIC_CONTINUATION_BENCHMARKS),$(foreach backend,cpu cpu_omp cuda hip,periodic_orbit_benchmark_$(system)_$(backend).bin))
 PERIODIC_BENCHMARK_DEPS = $(PERIODIC_SECTION_DEPS) $(wildcard source/periodic_orbit/tests/benchmarks/*.h) Makefile $(CONFIG_FILE) $(PERIODIC_BENCHMARK_OPTIONS)
 $(addprefix $(BUILD_DIR)/,$(PERIODIC_BENCHMARK_TARGETS)): PERIODIC_BENCHMARK_FLAGS = $(INMFD_NEWTON)
@@ -1474,18 +1480,18 @@ $(addprefix $(BUILD_DIR)/,$(PERIODIC_BENCHMARK_TARGETS)): $(NEWTON_TEST_HEADERS)
 $(PERIODIC_BENCHMARK_TARGETS): %: $(BUILD_DIR)/%
 
 $(BUILD_DIR)/periodic_orbit_benchmark_%_cpu.bin: source/periodic_orbit/tests/benchmarks/%.cpp $(PERIODIC_BENCHMARK_DEPS) | $(BUILD_STAMP)
-	$(G++) $(G++FLAGS) -I source $(ITIME_STEPPER) $(PERIODIC_BENCHMARK_FLAGS) -MMD -MP -MF $@.d -MT $@ $< $(OPENMP) -o $@
+	$(G++) $(G++FLAGS) -I source $(ITIME_STEPPER) $(PERIODIC_BENCHMARK_FLAGS) -MMD -MP -MF $@.d -MT $@ $< $(OPENMP) $(PERIODIC_BENCHMARK_LIBS) -o $@
 
 $(BUILD_DIR)/periodic_orbit_benchmark_%_cpu_omp.bin: source/periodic_orbit/tests/benchmarks/%.cpp $(PERIODIC_BENCHMARK_DEPS) | $(BUILD_STAMP)
-	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP -I source $(ITIME_STEPPER) $(PERIODIC_BENCHMARK_FLAGS) -MMD -MP -MF $@.d -MT $@ $< $(OPENMP) -o $@
+	$(G++) $(G++FLAGS) -DTEST_VECTOR_BACKEND_OMP -I source $(ITIME_STEPPER) $(PERIODIC_BENCHMARK_FLAGS) -MMD -MP -MF $@.d -MT $@ $< $(OPENMP) $(PERIODIC_BENCHMARK_LIBS) -o $@
 
 $(BUILD_DIR)/periodic_orbit_benchmark_%_cuda.bin: source/periodic_orbit/tests/benchmarks/%.cpp $(PERIODIC_BENCHMARK_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels.o | $(BUILD_STAMP)
 	$(NVCC) $(NVCCFLAGS) --extended-lambda -DTEST_VECTOR_BACKEND_CUDA -I source $(ITIME_STEPPER) $(PERIODIC_BENCHMARK_FLAGS) $(ICUDA) -MMD -MP -MF $@.d -MT $@ -x cu $< -c -o $@.o
-	$(NVCC) $(NVCCFLAGS) $@.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) -o $@
+	$(NVCC) $(NVCCFLAGS) $@.o $(BUILD_DIR)/gpu_reduction_ogita_kernels.o $(LIBS1) $(PERIODIC_BENCHMARK_LIBS) -o $@
 
 $(BUILD_DIR)/periodic_orbit_benchmark_%_hip.bin: source/periodic_orbit/tests/benchmarks/%.cpp $(PERIODIC_BENCHMARK_DEPS) $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o | $(BUILD_STAMP)
 	$(HIPCC) $(HIPFLAGS) -DTEST_VECTOR_BACKEND_HIP -I source $(ITIME_STEPPER) $(PERIODIC_BENCHMARK_FLAGS) -MMD -MP -MF $@.d -MT $@ -c $< -o $@.o
-	$(HIPCC) $(HIPFLAGS) $@.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) -o $@
+	$(HIPCC) $(HIPFLAGS) $@.o $(BUILD_DIR)/gpu_reduction_ogita_kernels_hip.o $(HIPLIBS) $(PERIODIC_BENCHMARK_LIBS) -o $@
 
 -include $(wildcard $(BUILD_DIR)/periodic_orbit_benchmark_*.bin.d)
 

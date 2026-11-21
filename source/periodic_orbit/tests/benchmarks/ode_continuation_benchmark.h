@@ -87,13 +87,11 @@ struct branch_case
     json                                         probes          = json::array();
     json                                         refreshes       = json::array();
     json                                         reference_point = nullptr;
+    json                                         replay_check = nullptr;
     double                                       restart_error = 0, parameter_column_error = 0;
     std::size_t                                  export_bytes = 0;
-    using model_type = std::decay_t<decltype( initial.flights.model )>;
     using steady_reference = std::function<std::optional<std::array<double, fixture_type::dimension>>( double )>;
-    problem<model_type>                          diagnostic{ initial.flights.physical, initial.flights.model };
-    container::observable_column<double>         column{ diagnostic, "state_euclidean" };
-    wrap                                         steady_state = buffer( diagnostic.ops );
+    wrap                                         steady_state = buffer( initial.flights.physical );
     steady_reference                             equilibrium;
     std::ofstream                                csv, steady;
     branch_case( MakeFlights flights, MakeSolver newton, const branch_settings &settings, steady_reference ref )
@@ -111,28 +109,35 @@ struct branch_case
     branch_case( const branch_case & ) = delete; // The solver refers to this instance's flights.
 
     template <std::size_t N>
-    std::array<double, N> snapshot( const operations &ops, const X &x )
+    std::array<double, N> checkpoint_state( const X &x )
     {
-        auto                  before = guarded_memory::host_bytes;
+        require( x.size() == N, "Checkpoint vector dimension mismatch" );
         std::array<double, N> values;
-        for ( std::size_t i = 0; i < N; ++i )
-            values[i] = ops.get_value_at_point( i, x );
-        export_bytes += guarded_memory::host_bytes - before;
+        // Explicit persistence boundary. Keep the solve's transfer guard enabled.
+        native_backend::memory_type::copy_to_host( N * sizeof(double), x.raw_ptr(), values.data() );
+        export_bytes += N * sizeof(double);
         return values;
+    }
+    template <std::size_t N>
+    void restore_state( const json &saved, X &x )
+    {
+        require( x.size() == N && saved.size() == N, "Checkpoint vector dimension mismatch" );
+        const auto values = saved.get<std::array<double, N>>();
+        native_backend::memory_type::copy_from_host( N * sizeof(double), values.data(), x.raw_ptr() );
+        export_bytes += N * sizeof(double);
     }
     json encode( const state &z )
     {
-        auto &s     = active().flights;
         json  saved = json::array();
         for ( std::size_t i = 0; i < options.sections; ++i )
-            saved.push_back( snapshot<fixture_type::dimension - 1>( *s.coordinates, z.comp( i ) ) );
+            saved.push_back( checkpoint_state<fixture_type::dimension - 1>( z.comp( i ) ) );
         return saved;
     }
-    static void decode( const json &saved, state &z )
+    void decode( const json &saved, state &z )
     {
         require( saved.size() == z.size(), "Checkpoint section count mismatch" );
         for ( std::size_t i = 0; i < z.size(); ++i )
-            fill_profile( z.comp( i ), saved.at( i ).get<std::array<double, fixture_type::dimension - 1>>() );
+            restore_state<fixture_type::dimension - 1>( saved.at( i ), z.comp( i ) );
     }
     void check_restart(
         const state &z, double p, const state &v, double vp, double next_ds, const state &next, double q,
@@ -147,7 +152,7 @@ struct branch_case
             { "direction", direction },
             { "pilot_parameter", s.pilot_parameter },
             { "pilot_period", s.period },
-            { "pilot_seed", snapshot<fixture_type::dimension>( *s.physical, s.layout->at( 0 ).section->center() ) },
+            { "pilot_seed", checkpoint_state<fixture_type::dimension>( s.layout->at( 0 ).section->center() ) },
             { "state", encode( z ) },
             { "tangent", encode( v ) },
             { "parameter", p },
@@ -161,7 +166,7 @@ struct branch_case
         }
         std::ifstream( path ) >> checkpoint;
         auto seed = buffer( s.physical );
-        fill_profile( *seed, checkpoint.at( "pilot_seed" ).get<std::array<double, fixture_type::dimension>>() );
+        restore_state<fixture_type::dimension>( checkpoint.at( "pilot_seed" ), *seed );
         fixture_type fresh(
             s, *seed, checkpoint.at( "pilot_parameter" ), checkpoint.at( "pilot_period" ), options.step, options.start,
             options.budget
@@ -188,22 +193,57 @@ struct branch_case
         );
         require( restart_error < options.newton_tolerance, "Restart differs from uninterrupted branch" );
     }
-    void check_parameter_column( const state &anchor, double p )
+    void check_parameter_column( const state &anchor, double p, bool verify_replay )
     {
         auto &s = active().flights;
         // Hold section coordinates fixed. Each perturbed flight must locate its
         // own crossing; differentiating at a fixed arrival time is insufficient.
         constexpr double eps = 2e-5;
+        // Pilot sections may be centered exactly on RK grid nodes at the
+        // anchor. Probe off the node to test one smooth dense-output interval.
+        if ( verify_replay )
+            p += 8 * eps;
         auto             col = s.workspace(), plus = s.workspace(), minus = s.workspace();
         s.op->set_linearization_point( anchor, p );
         s.op->jacobian_alpha( *col );
+        const auto base = s.op->report();
+        const auto partial = s.op->period_parameter_partial();
+        auto prepared = s.op->get_jacobi_operator();
+        auto direction = s.workspace(), before = s.workspace(), after = s.workspace();
+        if ( verify_replay )
+        {
+            s.coords->assign_scalar( .1, *direction );
+            prepared->apply( *direction, *before );
+        }
         s.op->F( anchor, p + eps, *plus );
+        const auto positive = s.op->report();
         s.op->F( anchor, p - eps, *minus );
+        const auto &negative = s.op->report();
+        if ( verify_replay )
+        {
+            // Fixed h and identical pilot start times: only the location within
+            // the last RK step may differ between the two perturbed crossings.
+            for ( std::size_t i = 0; i < base.segments.size(); ++i )
+                require( base.segments[i].flight.steps == positive.segments.at(i).flight.steps &&
+                         base.segments[i].flight.steps == negative.segments.at(i).flight.steps,
+                         "Parameter perturbation changed the frozen RK mesh" );
+            const double fd_time = ( positive.period - negative.period ) / ( 2 * eps );
+            const double time_error = std::abs( partial - fd_time );
+            require( time_error < 5e-8 + 2e-5 * std::abs( partial ), "Incorrect return-time parameter partial" );
+            const auto allocations = guarded_memory::allocation_calls;
+            prepared->apply( *direction, *after );
+            require( guarded_memory::allocation_calls == allocations, "Repeated matching Jv allocated a vector" );
+            s.coords->add_lin_comb( -1, *before, *after );
+            const double difference = s.coords->norm( *after );
+            require( difference < 1e-12, "Trial parameter invalidated prepared matching action" );
+            replay_check = { { "parameter", p }, { "period_partial", partial }, { "finite_difference", fd_time },
+                             { "prepared_action_difference", difference } };
+        }
         s.coords->assign_lin_comb( .5 / eps, *plus, -.5 / eps, *minus, *plus );
         const double size = s.coords->norm( *plus );
         s.coords->add_lin_comb( -1, *col, *plus );
         parameter_column_error = s.coords->norm( *plus ) / std::max( 1., size );
-        require( size > 1e-5 && parameter_column_error < 2e-5, "Incorrect orbit parameter derivative at anchor" );
+        require( size > 1e-5 && parameter_column_error < 2e-5, "Incorrect orbit parameter derivative" );
     }
     struct measurement
     {
@@ -224,14 +264,14 @@ struct branch_case
         s.first->lift( z.comp( 0 ), *initial );
         auto closure_at = [&]( double period ) {
             return closure_error(
-                s.physical, make_step( s.physical, options.step / 4, s.model.with_parameter( p ) ), *initial,
+                s.physical, s.verification_step( p ), *initial,
                 options.start, period, options.budget
             );
         };
-        auto evaluate = [&]( const X &x ) { return column.evaluate( diagnostic, x ); };
+        auto evaluate = [&]( const X &x ) { return s.observable( x ); };
         auto observer = std::make_shared<periodic_orbit::orbit_observable<double, decltype( evaluate )>>( evaluate );
         const double closure = closure_error(
-            s.physical, make_step( s.physical, options.step / 4, s.model.with_parameter( p ) ), *initial,
+            s.physical, s.verification_step( p ), *initial,
             options.start, report.period, options.budget, observer
         );
         require(
@@ -252,10 +292,10 @@ struct branch_case
         csv << sign << ',' << index << ',' << p << ',' << m.period << ',' << m.norm << ',' << m.gap << ',' << m.closure
             << ',' << used << ',' << retries << ',' << m.observable.rms << ',' << m.observable.minimum << ','
             << m.observable.maximum << std::endl;
-        if ( const auto ref = equilibrium( p ) )
+        if ( const auto ref = equilibrium ? equilibrium( p ) : std::nullopt )
         {
             fill_profile( *steady_state, *ref );
-            steady << sign << ',' << index << ',' << p << ',' << column.evaluate( diagnostic, *steady_state ) << '\n';
+            steady << sign << ',' << index << ',' << p << ',' << active().flights.observable( *steady_state ) << '\n';
         }
     }
     auto corrected_sample( const state &z, double p, const state &next, double q, double target )
@@ -281,10 +321,10 @@ struct branch_case
         probes.push_back(
             { { "parameter", target },
               { "period", m.period }, { "observable_rms", m.observable.rms },
-              { "state", snapshot<fixture_type::dimension>( *s.physical, *initial ) } }
+              { "state", checkpoint_state<fixture_type::dimension>( *initial ) } }
         );
     }
-    auto correct_anchor( double p0 )
+    auto correct_anchor( double p0, bool verify_replay = false )
     {
         auto &s      = initial.flights;
         auto &solver = initial.solver;
@@ -297,7 +337,7 @@ struct branch_case
             "Incorrect anchor layout"
         );
         record( m, 0, 0, p0, 0, 0 );
-        check_parameter_column( *anchor, p0 );
+        check_parameter_column( *anchor, p0, verify_replay );
         return anchor;
     }
     void refresh(
@@ -356,7 +396,7 @@ struct branch_case
             auto        &solver         = active().solver;
             auto        &f              = active().flights;
             const double next_ds        = solver.pred.get_ds();
-            solver.coupled.last_failure = {};
+            solver.coupled->last_failure = {};
             try
             {
                 require(
@@ -365,7 +405,7 @@ struct branch_case
             }
             catch ( const std::runtime_error & )
             {
-                const auto failure = solver.coupled.last_failure;
+                const auto failure = solver.coupled->last_failure;
                 if ( !failure.layout_related() || rebuilt || i == 1 || observe_only )
                     throw;
                 reason = "failed flight on section " + std::to_string( failure.section ) + " (status " +
@@ -434,19 +474,20 @@ struct branch_case
     void write_report() const
     {
         require(
-            guarded_memory::host_bytes == export_bytes, "Continuation transferred vectors outside diagnostic export"
+            guarded_memory::host_bytes == 0, "Continuation transferred vectors outside checkpoint I/O"
         );
         json result = {
             { "format", "periodic_orbit.continuation.v2" },
-            { "observable", "state_euclidean" },
+            { "observable", fixture_type::observable_label },
             { "configuration", options.config },
             { "probes", probes },
             { "layout_refreshes", refreshes },
             { "reference_point", reference_point },
             { "restart_error", restart_error },
             { "parameter_column_error", parameter_column_error },
+            { "replay_check", replay_check },
             { "diagnostic_host_bytes", export_bytes },
-            { "core_host_bytes", guarded_memory::host_bytes - export_bytes },
+            { "core_host_bytes", guarded_memory::host_bytes },
             { "passed", true }
         };
         std::ofstream stream( options.dir + "/report.json" );

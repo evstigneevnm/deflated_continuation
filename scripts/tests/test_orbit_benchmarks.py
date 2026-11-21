@@ -32,7 +32,7 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
         for switches in (["--mode", "continuation", "--methods", "BDF"],
                          ["--mode", "continuation", "--systems", "analytic_cycle_newton"],
                          ["--mode", "continuation", "--branch-steps", "1"],
-                         ["--systems", "vdp_periodic"]):
+                         ["--systems", "vdp_periodic"], ["--systems", runner.KS_BRANCH]):
             with self.subTest(switches=switches), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 runner.arguments(switches)
 
@@ -49,7 +49,7 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
 
     def test_each_continuation_preset_and_command_line_overrides(self):
         for system, step in (("rossler_periodic", .005), ("lorenz_periodic", .002), ("vdp_periodic", .01),
-                             ("vaidyanathan_periodic", .002)):
+                             ("vaidyanathan_periodic", .001), (runner.KS_BRANCH, .00002)):
             options = ["--mode", "continuation", "--system", system]
             with self.subTest(system=system):
                 a, b = runner.configurations(runner.arguments(options))
@@ -61,6 +61,18 @@ class OrbitBenchmarkRunnerTest(unittest.TestCase):
                                  (2, .003, 0, 9000))
                 self.assertEqual((case["branch_steps"], case["probe_offset"], case["newton_tolerance"]),
                                  (4, .02 * .05, 2e-11))
+
+    def test_ks_replay_and_checkpoint_budget(self):
+        config = dict(system=runner.KS_BRANCH, sections=4)
+        check = dict(prepared_action_difference=0., period_partial=.001, finite_difference=.001)
+        report = dict(format="periodic_orbit.continuation.v2", replay_check=check,
+                      layout_refreshes=[], diagnostic_host_bytes=1632)
+        runner.validate_ks_replay(report, config)
+        for invalid in (dict(report, diagnostic_host_bytes=1632 + 88),
+                        dict(report, replay_check=dict(check, finite_difference=0.)),
+                        dict(report, replay_check=dict(check, prepared_action_difference=1e-4))):
+            with self.assertRaises(ValueError):
+                runner.validate_ks_replay(invalid, config)
 
     def test_reference_gate_is_rossler_only(self):
         args = runner.arguments(["--mode", "continuation", "--systems", "rossler_periodic", "vdp_periodic",

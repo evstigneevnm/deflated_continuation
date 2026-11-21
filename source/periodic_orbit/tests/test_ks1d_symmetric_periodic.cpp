@@ -1,30 +1,9 @@
-#include "ode_orbit_support.h"
-#include "benchmarks/ks1d_evolution.h"
+#include "benchmarks/ks1d_orbit_support.h"
 #include <iomanip>
-#if defined( TEST_VECTOR_BACKEND_CUDA )
-#    include <external_libraries/fft_facade_cufft.h>
-using fft = external_libraries::fft::cufft_backend;
-#elif defined( TEST_VECTOR_BACKEND_HIP )
-#    include <external_libraries/fft_facade_hipfft.h>
-using fft = external_libraries::fft::hipfft_backend;
-#else
-#    include <external_libraries/fft_facade_fftw.h>
-using fft = external_libraries::fft::fftw_backend;
-#endif
 
 namespace
 {
-using namespace ode_orbit_tests;
-using rate     = ks1d_orbit::evolution<operations, fft>;
-using rk       = nmfd::time_steppers::runge_kutta::explicit_time_step<operations, rate, fixed, true>;
-using map      = periodic_orbit::recorded_section_map<operations, rk, plane, rate>;
-using matching = periodic_orbit::multiple_section_problem<operations, operations, map, rate>;
-
-auto stepper( const std::shared_ptr<operations> &space, const std::shared_ptr<rate> &rhs, double dt )
-{
-    return std::make_shared<rk>( space, rhs, std::make_shared<fixed>( fixed::params{ dt } ), rk::params{ "RK45" } );
-}
-
+using namespace ks1d_orbit;
 // Suppress advection: the two occupied modes have exact growth rates
 // lambda*k^2-b*k^4, respectively +2 and -4. This also fixes the time unit.
 void check_linear_modes()
@@ -76,43 +55,16 @@ void check_derivatives()
     require( guarded_memory::allocation_calls == allocations, "Repeated KS actions allocated backend vectors" );
 }
 
-// Seed of the N=24 odd, 2*pi-periodic semidiscretization, in unnormalized
-// imaginary R2C coefficients. Independent LSODA integration, sampled at a
-// maximum of mode 1. This is a seed, not a spatially converged PDE reference.
-constexpr std::array<double, 11> seed{ 3.4713118913,  -3.0269991860, 52.9326530721, 4.7307271608,
-                                       -3.2242998383, 15.8220336620, 1.7723260826,  -.7814574934,
-                                       1.8946420033,  .3659630652,   -.1943024199 };
-constexpr double                 period = .015153690425, dt = .00002;
-constexpr std::size_t            budget = 4096;
-
 double correct( const std::shared_ptr<operations> &space, std::size_t count, X &anchor )
 {
-    auto provider = [&] { return std::make_shared<rate>( space, 24, 2., 4., 68. ); };
-    auto trial    = provider();
-    auto initial  = buffer( space );
+    auto trial   = provider( space );
+    auto initial = buffer( space );
     fill_profile( *initial, seed );
-    periodic_orbit::automatic_layout<operations, rk, rate> builder(
-        space, stepper( space, trial, dt ), trial, std::make_shared<policy>( space ),
-        std::make_shared<periodic_orbit::euclidean_section_metric<operations>>( space )
-    );
-    periodic_orbit::placement_params<double> p;
-    p.sections                  = count;
-    p.maximum_pilot_steps       = budget;
-    p.maximum_endpoint_distance = 1e-5;
-    const auto pilot            = builder.build( *initial, { 0., period, nullptr }, p );
-    require( pilot.succeeded(), "KS pilot layout/itinerary failed" );
-
-    auto                           coords = std::make_shared<operations>( seed.size() - 1 );
-    auto                           blocks = std::make_shared<matching::space_type>( coords, count );
-    std::vector<matching::segment> segments;
-    map::map_type::params          flight;
-    flight.maximum_steps = budget;
-    for ( std::size_t i = 0; i < count; ++i )
-        segments.push_back(
-            { std::make_shared<map>( space, stepper( space, trial, dt ), trial, flight ),
-              std::make_shared<chart>( space, coords, pilot.layout->at( i ).section ) }
-        );
-    auto problem = std::make_shared<matching>( space, blocks, pilot.layout, segments, provider() );
+    auto layout   = make_layout( space, trial, *initial, period, count, dt, 0., budget );
+    auto coords   = std::make_shared<operations>( seed.size() - 1 );
+    auto blocks   = std::make_shared<matching::space_type>( coords, count );
+    auto segments = make_segments( space, coords, layout, trial, dt, budget );
+    auto problem  = std::make_shared<matching>( space, blocks, layout, segments, provider( space ) );
     nmfd::detail::vector_wrap<matching::space_type, true, true> guess( *blocks ), solution( *blocks ),
         residual( *blocks );
     perturb_sections<seed.size()>( .001, *guess );
@@ -124,7 +76,7 @@ double correct( const std::shared_ptr<operations> &space, std::size_t count, X &
     const auto gap = blocks->norm( *residual ), T = problem->report().period;
     require( gap < 1e-10 && std::abs( T - period ) < 1e-8, "KS matching residual or period" );
     segments.front().chart->lift( ( *solution ).comp( 0 ), anchor );
-    auto       fine      = stepper( space, provider(), dt / 4 );
+    auto       fine      = stepper( space, provider( space ), dt / 4 );
     const auto excursion = closure_error( space, fine, anchor, 0., T / 2, budget );
     const auto closure   = closure_error( space, fine, anchor, 0., T, budget );
     std::cout << std::setprecision( 12 ) << "M=" << count << " period=" << T << " gap=" << gap

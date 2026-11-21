@@ -36,7 +36,8 @@ METHODS = ("RK45", "DOP853", "IE", *DIRK_STEPS["analytic_cycle"])
 BDF_STEPS = {"analytic_cycle": .00025, "rossler_periodic": .00002,
              "lorenz_periodic": .000005, "vaidyanathan_periodic": .000003}
 METHODS += ("BDF1", "BDF2", "BDF")
-BRANCHES = {"analytic_cycle": ("lambda", 1., 2 * math.pi),
+KS_BRANCH = "ks1d_symmetric_periodic"
+BRANCHES = {KS_BRANCH: ("lambda", 68., .015153690425), "analytic_cycle": ("lambda", 1., 2 * math.pi),
             "rossler_periodic": ("c", 6., ODE_CASES["rossler_periodic"]["period"]),
             "vdp_periodic": ("mu", 1., 6.6632868593231365),
             "lorenz_periodic": ("rho", 28., ODE_CASES["lorenz_periodic"]["period"]),
@@ -63,7 +64,7 @@ def arguments(argv=None):
     mode.add_argument("--plot-only", type=Path, help="Revalidate and plot an existing run, without building")
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build/periodic_orbit_benchmarks")
     parser.add_argument("--mode", choices=("correction", "continuation"), default="correction")
-    parser.add_argument("--systems", "--system", nargs="+", choices=("analytic_cycle", "analytic_cycle_newton", *ODE_CASES, "vdp_periodic"))
+    parser.add_argument("--systems", "--system", nargs="+", choices=("analytic_cycle", "analytic_cycle_newton", *ODE_CASES, "vdp_periodic", KS_BRANCH))
     parser.add_argument("--sections", nargs="+", type=int)
     parser.add_argument("--methods", nargs="+", choices=METHODS)
     parser.add_argument("--arclength-step", type=positive, help="Initial pseudo-arclength step, distinct from the RK timestep")
@@ -84,7 +85,7 @@ def arguments(argv=None):
     parser.add_argument("--newton-max-iterations", type=int)
     parser.add_argument("--max-steps", type=int, help="Override the method-specific integration budget")
     parser.add_argument("--threads", type=int, default=1)
-    parser.add_argument("--timeout", type=positive, help="Per-case seconds; defaults to 900 for BDF, otherwise 300")
+    parser.add_argument("--timeout", type=positive, help="Per-case seconds; defaults to 900 for BDF or the KS branch, otherwise 300")
     parser.add_argument("--config-file", type=Path, default=ROOT / "build_configs/config_github_ubuntu_cpu.inc")
     parser.add_argument("--make-option", action="append", default=[], metavar="KEY=VALUE")
     args = parser.parse_args(argv)
@@ -101,8 +102,8 @@ def arguments(argv=None):
                 setattr(args, key, default)
     elif any(s not in BRANCHES for s in args.systems) or (args.methods and set(args.methods) != {"RK45"}):
         parser.error("Continuation requires RK45 and a supported system")
-    if not branch and "vdp_periodic" in args.systems:
-        parser.error("vdp_periodic is a continuation benchmark; use --mode continuation")
+    if not branch and any(s in ("vdp_periodic", KS_BRANCH) for s in args.systems):
+        parser.error("This benchmark requires --mode continuation")
     if args.threads < 1 or (args.newton_max_iterations is not None and args.newton_max_iterations < 1):
         parser.error("Invalid thread count or Newton iteration budget")
     for option in args.make_option:
@@ -115,7 +116,7 @@ def arguments(argv=None):
     args.methods = list(dict.fromkeys(args.methods or []))
     args.systems = list(dict.fromkeys(args.systems))
     if args.timeout is None:
-        args.timeout = 900 if any(method.startswith("BDF") for method in args.methods) else 300
+        args.timeout = 900 if KS_BRANCH in args.systems or any(method.startswith("BDF") for method in args.methods) else 300
     if any(method in args.methods for method in ("IE", "BDF1")) and args.step is None:
         parser.error("IE/BDF1 require --step: first-order reference accuracy can require millions of steps")
     try:
@@ -239,6 +240,8 @@ def stage(configs):
 
 
 def state_axes(config):
+    if config["system"] == KS_BRANCH:
+        return tuple(f"im{k}" for k in range(1, 12))
     return ODE_CASES[config["system"]].get("axes", tuple("xyz")) if config["system"] in ODE_CASES else tuple("xy")
 
 
@@ -477,6 +480,22 @@ def plot_newton_case(directory, config):
     return result
 
 
+def validate_ks_replay(report, config):
+    if report["format"] != "periodic_orbit.continuation.v2":
+        raise ValueError("Missing KS replay and transfer diagnostics")
+    check = report["replay_check"]
+    partial = check["period_partial"]
+    if (not 0 <= check["prepared_action_difference"] < 1e-12
+            or not abs(partial - check["finite_difference"]) < 5e-8 + 2e-5 * abs(partial)):
+        raise ValueError("Invalid KS prepared-action or return-time derivative check")
+    if not report["layout_refreshes"]:
+        # Two comparison states; one restart writes and reads its pilot, state and tangent.
+        d, m = len(state_axes(config)), config["sections"]
+        checkpoint_bytes = 8 * (2*d + 2*(d + 2*m*(d-1)))
+        if report["diagnostic_host_bytes"] != checkpoint_bytes:
+            raise ValueError("Unexpected KS state transfers outside the prescribed checkpoints")
+
+
 def validate_branch(directory, config):
     import numpy as np
     report = json.loads((directory / "report.json").read_text())
@@ -517,8 +536,11 @@ def validate_branch(directory, config):
                 or len(sample["state"]) != len(state_axes(config))
                 or not all(map(math.isfinite, sample["state"]))):
             raise ValueError("Missing or invalid bracketed common-parameter sample")
+    if config["system"] == KS_BRANCH:
+        validate_ks_replay(report, config)
     if report["format"].endswith(".v2"):
-        if report["observable"] != "state_euclidean" or any(not math.isfinite(s["observable_rms"]) for s in probes):
+        expected = "l2_norm" if config["system"] == KS_BRANCH else "state_euclidean"
+        if report["observable"] != expected or any(not math.isfinite(s["observable_rms"]) for s in probes):
             raise ValueError("Invalid branch observable")
         lo, rms, hi = (rows[k] for k in ("observable_min", "observable_rms", "observable_max"))
         slack = 1e-12 * np.maximum(1, hi)
@@ -552,6 +574,8 @@ def plot_bifurcation(directory, config, rows, plt):
     # Values correspond to the same parameter samples, not a joined or inferred branch.
     p = rows["parameter"]
     valid = p*p >= .04 if config["system"] == "rossler_periodic" else np.ones(len(p), dtype=bool)
+    if config["system"] == KS_BRANCH:
+        valid[:] = False  # No stationary archive is part of this discrete-orbit gate.
     if any(not np.array_equal(steady[k], rows[k][valid]) for k in ("direction", "index", "parameter")):
         raise ValueError("Steady reference does not match the branch sampling")
     if config["system"] == "rossler_periodic":
@@ -572,9 +596,11 @@ def plot_bifurcation(directory, config, rows, plt):
         height.fill_between(x, part["observable_min"], part["observable_max"], color="C0", alpha=.18,
                             label="Sampled min–max" if sign < 0 else None)
         height.plot(x, part["observable_rms"], ".-", color="C0", label="Periodic: time-RMS" if sign < 0 else None)
-        height.plot(x, stationary[mask], "--", color="C1", label="Steady: analytical reference" if sign < 0 else None)
+        if valid.any():
+            height.plot(x, stationary[mask], "--", color="C1", label="Steady: analytical reference" if sign < 0 else None)
         period.plot(x, part["period"], ".-", color="C0")
-    height.set(ylabel="Euclidean state norm", title=f"{config['system']}, M={config['sections']}")
+    label = "Reduced Fourier l2_norm" if config["system"] == KS_BRANCH else "Euclidean state norm"
+    height.set(ylabel=label, title=f"{config['system']}, M={config['sections']}")
     height.legend()
     period.set(ylabel="Period", xlabel=BRANCHES[config["system"]][0])
     fig.savefig(directory / "bifurcation.png", dpi=150)
