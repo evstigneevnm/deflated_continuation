@@ -186,7 +186,8 @@ def add_stability_arguments(parser: argparse.ArgumentParser) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Plot debug_curve*.dat bifurcation-diagram norms."
+        description="Plot debug_curve*.dat bifurcation-diagram norms.",
+        epilog="For stationary and periodic archives use: plot_bd.py mixed --help",
     )
     parser.add_argument("config", help="JSON project config file")
     parser.add_argument(
@@ -329,7 +330,7 @@ def branch_sort_key(path: Path):
         return (1, path.name)
 
 
-def read_curve_file(path: Path) -> list[list[float]]:
+def read_curve_file(path: Path, *, strict: bool = False) -> list[list[float]]:
     rows: list[list[float]] = []
     with path.open("r", encoding="utf-8") as stream:
         for line in stream:
@@ -340,11 +341,13 @@ def read_curve_file(path: Path) -> list[list[float]]:
             try:
                 rows.append([float(field) for field in fields])
             except ValueError:
+                if strict:
+                    raise ValueError(f"Invalid stationary curve row in {path}: {stripped}")
                 continue
     return rows
 
 
-def read_curve_segment_ids(path: Path, row_count: int) -> list[int]:
+def read_curve_segment_ids(path: Path, row_count: int, *, strict: bool = False) -> list[int]:
     if not path.exists():
         return [0] * row_count
 
@@ -355,21 +358,25 @@ def read_curve_segment_ids(path: Path, row_count: int) -> list[int]:
             if not stripped or stripped.startswith("#"):
                 continue
             fields = stripped.split()
-            if len(fields) < 6:
-                return [0] * row_count
             try:
+                if len(fields) < 6:
+                    raise ValueError("short metadata row")
                 source_index = int(fields[0])
                 segment_id = int(fields[4])
-            except ValueError:
-                return [0] * row_count
-            if source_index != len(segment_ids):
+                if source_index != len(segment_ids):
+                    raise ValueError("out-of-order source index")
+            except ValueError as error:
+                if strict:
+                    raise ValueError(f"Invalid segment metadata in {path}: {error}") from error
                 return [0] * row_count
             segment_ids.append(segment_id)
 
+    if strict and len(segment_ids) != row_count:
+        raise ValueError(f"Stationary segment count differs from curve row count: {path}")
     return segment_ids if len(segment_ids) == row_count else [0] * row_count
 
 
-def load_curves(project_dir: Path) -> dict[str, list[list[float]]]:
+def load_curves(project_dir: Path, *, strict: bool = False) -> dict[str, list[list[float]]]:
     curves: dict[str, list[list[float]]] = {}
     for branch_dir in sorted((path for path in project_dir.iterdir() if path.is_dir()), key=branch_sort_key):
         curve_file = branch_dir / "debug_curve_all.dat"
@@ -377,12 +384,13 @@ def load_curves(project_dir: Path) -> dict[str, list[list[float]]]:
             curve_file = branch_dir / "debug_curve.dat"
         if not curve_file.exists():
             continue
-        raw_rows = read_curve_file(curve_file)
+        raw_rows = read_curve_file(curve_file, strict=strict)
         rows = CurveRows(
             raw_rows,
             read_curve_segment_ids(
                 branch_dir / "metadata_curve.dat",
                 len(raw_rows),
+                strict=strict,
             ),
         )
         if rows:
@@ -1196,6 +1204,9 @@ def plot_curves(
 
 
 def main() -> int:
+    if sys.argv[1:2] == ["mixed"]:
+        from mixed_bd import main as mixed_main
+        return mixed_main(sys.argv[2:])
     args = parse_args()
     config_path = Path(args.config).expanduser().resolve()
     config = load_config(config_path)

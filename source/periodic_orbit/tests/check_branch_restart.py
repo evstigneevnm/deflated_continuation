@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 
 
@@ -66,5 +67,10 @@ if __name__ == "__main__":
     parser.add_argument("executable", type=Path)
     parser.add_argument("new_directory", type=Path)
     parser.add_argument("--check-invalid", action="store_true", help="exercise the analytical-cycle corruption cases")
+    parser.add_argument("--diagram", choices=("analytic-cycle", "ks1d"),
+                        help="also reopen, verify and plot saved scalar branches in NEW_DIRECTORY/diagram")
     args = parser.parse_args()
     check(args.executable, args.new_directory, args.check_invalid)
+    if args.diagram:
+        subprocess.run([sys.executable, str(Path(__file__).with_name("check_mixed_diagram.py")),
+                        args.diagram, str(args.new_directory), str(args.new_directory / "diagram")], check=True)

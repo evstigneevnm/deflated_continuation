@@ -81,8 +81,8 @@ have a separate fresh-process restart regression. Run from the repository root:
 ```bash
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 make test_periodic_orbit_periodic_branch_archive_cpu.bin test_periodic_orbit_ks1d_periodic_continuation_driver_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
-python3 source/periodic_orbit/tests/check_branch_restart.py build/test_periodic_orbit_periodic_branch_archive_cpu.bin build/cycle_restart --check-invalid
-python3 source/periodic_orbit/tests/check_branch_restart.py build/test_periodic_orbit_ks1d_periodic_continuation_driver_cpu.bin build/ks1d_restart
+python3 source/periodic_orbit/tests/check_branch_restart.py build/test_periodic_orbit_periodic_branch_archive_cpu.bin build/cycle_restart --check-invalid --diagram analytic-cycle
+python3 source/periodic_orbit/tests/check_branch_restart.py build/test_periodic_orbit_ks1d_periodic_continuation_driver_cpu.bin build/ks1d_restart --diagram ks1d
 ```
 
 Supply a new directory. The runner invokes the same executable twice
@@ -102,6 +102,51 @@ No trajectory is downloaded. The selected state stays on the backend
 until the trace returns. Snapshot I/O transfers three blocks per section
 (center, normal, coordinates) once per write/read; these bytes and the two
 endpoint-reference transfers are counted separately from the guarded solve.
+
+**Mixed stationary and periodic diagrams.** With `--diagram`, the final check
+reopens scalar exports after both solver processes have exited. The portable
+`diagram/` directory contains a manifest, stationary curve and legend files,
+periodic scalar archives, and `mixed_bd.png`; no solution snapshots are needed.
+Replot it offline (Python with Matplotlib):
+
+```bash
+python3 plot_scripts/plot_bd.py mixed build/ks1d_restart/diagram/manifest.json --envelope
+```
+
+For another dataset, use the [KS1D manifest](fixtures/mixed_bd/ks1d/manifest.json)
+as a template. Paths are relative to the manifest. Because legacy stationary
+exports have no physical identity header, the manifest must declare their
+model, discretization, parameter, observable, normalization, and named legend
+column. Each periodic archive must match all five identity fields. A shared
+filename or a similar norm label alone is not sufficient.
+
+The top panel compares the stationary observable with its orbital time-RMS;
+`--envelope` adds the sampled orbit minima and maxima. Only periodic branches
+appear in the period panel. Arms retain traversal order through folds;
+unverified points leave gaps, and restarts are separate traces. Without
+stationary segment metadata, only points are drawn. The analytical fixture
+is the exact stationary origin. The KS fixture is the stationary driver's
+zero-branch scalar export at N=24, a=2, b=4 on [67.999, 68.001], not the N=32
+stationary CI case. These overlays do not imply a detected branch connection.
+
+**Trajectory-derived seed.** The [recurrence regression](test_analytic_cycle_recurrence.cpp)
+starts at `(0.001, 0)` near the unstable stationary origin, without using the
+known radius or period. It measures consecutive increasing crossings of
+`y=0` within a single search deadline. A candidate needs an admissible
+flight time, crossing speed, and absolute return distance in the backend
+space norm. Short returns are not skipped to obtain a period multiple.
+The search reuses two backend vectors and publishes to the caller's buffer
+only on success. This is a seed for an ordinary autonomous cycle, not a
+primitive-period certificate or a general unstable-orbit finder.
+
+The test builds layouts with one and four sections, corrects and independently
+verifies the orbit, then traces both arms with the production driver. To keep
+the scalar branches, supply a new directory (omit it for a test-only run):
+
+```bash
+make test_periodic_orbit_analytic_cycle_recurrence_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+build/test_periodic_orbit_analytic_cycle_recurrence_cpu.bin build/cycle_recurrence_branches
+```
 
 **Symmetric KS1D continuation.** Follow this same discrete orbit in physical
 `lambda` with the project's pseudo-arclength stepper in the benchmark's own branch loop:

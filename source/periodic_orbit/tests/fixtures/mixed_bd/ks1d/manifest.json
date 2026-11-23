@@ -1,0 +1,18 @@
+{
+  "format": "mixed_branch_plot",
+  "version": 1,
+  "stationary": {
+    "project": "stationary",
+    "model": "symmetric_KS1D",
+    "discretization": "N24:odd-R2C:a2:b4",
+    "parameter": "lambda",
+    "observable": "l2_norm",
+    "normalization": "rms",
+    "column": "l2_norm"
+  },
+  "periodic": [
+    "ks-M1/branch.json",
+    "ks-M4/branch.json",
+    "ks-M4/restarted/branch.json"
+  ]
+}

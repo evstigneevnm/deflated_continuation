@@ -1,0 +1,18 @@
+{
+  "format": "mixed_branch_plot",
+  "version": 1,
+  "stationary": {
+    "project": "stationary",
+    "model": "analytic_cycle",
+    "discretization": "ode:2",
+    "parameter": "lambda",
+    "observable": "state_euclidean",
+    "normalization": "euclidean",
+    "column": "state_euclidean"
+  },
+  "periodic": [
+    "cycle-M1/branch.json",
+    "cycle-M4/branch.json",
+    "cycle-M4/restarted/branch.json"
+  ]
+}

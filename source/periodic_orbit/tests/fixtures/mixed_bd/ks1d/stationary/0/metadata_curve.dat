@@ -1,0 +1,13 @@
+# index lambda saved id_file_name segment_id semicurve_id forced_store endpoint_reason
+0 68 1 1 1 1 1 none
+1 67.99975000000001 1 2 1 1 0 none
+2 67.99950000000001 1 3 1 1 0 none
+3 67.99925000000002 1 4 1 1 0 none
+4 67.99900000000002 1 5 1 1 0 none
+5 67.999 1 6 1 1 1 boundary_min
+6 68 1 7 2 2 1 none
+7 68.00024999999999 1 8 2 2 0 none
+8 68.00049999999999 1 9 2 2 0 none
+9 68.00074999999998 1 10 2 2 0 none
+10 68.00099999999998 1 11 2 2 0 none
+11 68.001 1 12 2 2 1 boundary_max

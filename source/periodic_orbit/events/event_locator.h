@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <memory>
 #include <nmfd/detail/vector_wrap.h>
-#include <periodic_orbit/events/event_types.h>
+#include <periodic_orbit/events/validate_sample.h>
 
 namespace periodic_orbit
 {
@@ -59,19 +59,9 @@ public:
             }
             report.time       = dense.evaluate( theta, *sample_ );
             report.iterations = iteration + 1;
-            if ( !traits::is_finite( report.time ) || !space_->is_valid_number( *sample_ ) )
+            if ( const auto error = detail::validate_sample( *space_, policy, report.time, *sample_ ) )
             {
-                report.status = section_status::invalid_state;
-                return report;
-            }
-            if ( !policy.reconstruct( report.time, *sample_ ) )
-            {
-                report.status = section_status::reconstruction_failure;
-                return report;
-            }
-            if ( !space_->is_valid_number( *sample_ ) )
-            {
-                report.status = section_status::invalid_state;
+                report.status = *error;
                 return report;
             }
             report.value = event.value( report.time, *sample_ );

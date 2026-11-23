@@ -4,6 +4,7 @@
 #include <type_traits>
 #include <nmfd/time_steppers/detail/status.h>
 #include <periodic_orbit/events/event_locator.h>
+#include <periodic_orbit/events/validate_sample.h>
 
 namespace periodic_orbit
 {
@@ -165,12 +166,8 @@ private:
     bool sample( const Dense &dense, Evaluator &event, T theta, T &value )
     {
         const T time = dense.evaluate( theta, *sample_ );
-        if ( !traits::is_finite( time ) || !space_->is_valid_number( *sample_ ) )
-            return fail( section_status::invalid_state );
-        if ( !policy_->reconstruct( time, *sample_ ) )
-            return fail( section_status::reconstruction_failure );
-        if ( !space_->is_valid_number( *sample_ ) )
-            return fail( section_status::invalid_state );
+        if ( const auto error = detail::validate_sample( *space_, *policy_, time, *sample_ ) )
+            return fail( *error );
         value = event.value( time, *sample_ );
         return traits::is_finite( value ) || fail( section_status::nonfinite_event );
     }
