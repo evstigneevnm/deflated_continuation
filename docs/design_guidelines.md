@@ -1403,6 +1403,17 @@ are rejected, rather than silently projecting inaccurate arrivals onto a plane.
 Matching algebra/storage is `O(MN)` beyond the flight integrator's own cost; no
 vector-sized host transfer or dense orbit Jacobian is introduced.
 
+For ordinary-orbit deflation at a fixed parameter, distinguish physical orbit
+identity from distance in Newton coordinates. Admit an independently verified
+orbit only after a unique resolved oriented return and a distinct comparison
+against every cached crossing; an inconclusive comparison is not a new root.
+Before Newton, rechart all stored orbits into the frozen itinerary and verify
+matching and period. Never implicitly exclude zero chart coordinates. With
+`K` stored roots the multiplier and its gradient cost `O(KMN)`; after
+preparation the rank-one update to a matching Jacobian action costs `O(MN)`
+and requires no comparison flights. Rebuild the operator when roots, parameter,
+or layout change. See the [two-cycle regression](../source/periodic_orbit/tests/test_two_cycle_deflation.cpp).
+
 For one-parameter continuation in fixed sections, use
 `parameterized_multiple_section_problem` with the ordinary predictor, bordered
 corrector and augmented tangent. The binding updates trial models in place but

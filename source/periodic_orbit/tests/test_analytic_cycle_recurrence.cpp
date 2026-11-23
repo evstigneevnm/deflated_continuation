@@ -1,6 +1,7 @@
 #include "benchmarks/branch_archive_trace.h"
 #include "benchmarks/ode_continuation_fixture.h"
 #include "parameterized_cycle.h"
+#include <periodic_orbit/orbit_comparison.h>
 #include <periodic_orbit/recurrence_seed.h>
 #include <filesystem>
 #include <fstream>
@@ -13,11 +14,12 @@ using model = cycle_tests::parameterized_cycle;
 using setup = continuation_fixture<model>;
 using search = periodic_orbit::recurrence_seed_search<operations>;
 using flight = periodic_orbit::section_map<operations, step<model>, plane, policy, rate_provider<model>>;
+using comparison = periodic_orbit::orbit_comparison<operations, flight>;
 constexpr double h = .05;
 constexpr std::size_t budget = 2000;
 
-void trace( const std::shared_ptr<operations> &space, const periodic_orbit::orbit_seed<operations> &seed,
-            std::size_t m, const std::filesystem::path &directory )
+comparison::crossing trace( const std::shared_ptr<operations> &space, const periodic_orbit::orbit_seed<operations> &seed,
+                            std::size_t m, const std::filesystem::path &directory, comparison &cmp )
 {
     const model rhs{ seed.parameter };
     auto layout = backend_layout( space, make_step( space, h, rhs ), rhs, seed.state, seed.period, m, 0., budget );
@@ -35,6 +37,9 @@ void trace( const std::shared_ptr<operations> &space, const periodic_orbit::orbi
     require( solvers.ordinary.solve( f.op.get(), *z, p ), "Recurrence seed failed fixed-parameter correction" );
     auto anchor = verify( p, *z );
     require( anchor && anchor->valid(), "Corrected seed failed independent closure" );
+    auto hit = cmp.make_crossing();
+    require( cmp.prepare( *initial, p, anchor->period, hit ).status == periodic_orbit::crossing_preparation::ready,
+             "Verified anchor has no unique comparison crossing" );
 
     const container::branch_identity id{ "recurrence-M" + std::to_string( m ), "analytic_cycle", "ode:2",
                                          "lambda", setup::observable_label, "euclidean" };
@@ -70,6 +75,7 @@ void trace( const std::shared_ptr<operations> &space, const periodic_orbit::orbi
     }
     std::cout << "Verified recurrence branch M=" << m << ", corrected T=" << anchor->period
               << ", independent closure=" << anchor->closure_error << '\n';
+    return hit;
 }
 }
 
@@ -128,7 +134,11 @@ int main( int argc, char **argv )
                  "No converged recurrence after transient returns" );
         std::cout << "Seed: crossings=" << found.crossings << ", return distance=" << *found.last_distance
                   << ", estimated T=" << found.candidate->period << '\n';
-        for ( auto m : { 1u, 4u } ) trace( space, *found.candidate, m, directory );
+        comparison cmp( space, map, rhs.lambda, request, { 1e-6, 1e-6, 1e-6, 1e-5 } );
+        auto one = trace( space, *found.candidate, 1, directory, cmp );
+        auto four = trace( space, *found.candidate, 4, directory, cmp );
+        require( cmp.compare( one, four ).relation == periodic_orbit::orbit_relation::same,
+                 "Independent verified M=1 and M=4 corrections did not match" );
         require( guarded_memory::host_bytes == start_bytes, "Seed search or branch performed host transfers" );
     } );
 }

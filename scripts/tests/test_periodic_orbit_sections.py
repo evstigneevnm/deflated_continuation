@@ -13,7 +13,8 @@ SYSTEMS = (
     "prepared_section_derivatives", "prepared_dirk_derivatives", "prepared_dirk_matching",
     "prepared_bdf_derivatives", "prepared_bdf_matching", "orbit_method_assembly", "multiple_section_newton",
     "prepared_bdf_adaptive_derivatives", "prepared_bdf_adaptive_matching",
-    "analytic_cycle_continuation", "periodic_branch_archive", "analytic_cycle_recurrence",
+    "analytic_cycle_continuation", "periodic_branch_archive", "analytic_cycle_recurrence", "orbit_comparison",
+    "two_cycle_deflation",
     "rossler_periodic", "lorenz_periodic", "vaidyanathan_periodic",
 )
 
@@ -23,7 +24,7 @@ class PeriodicSectionContractTest(unittest.TestCase):
         headers = [path for path in MODERN.rglob("*.h")
                    if "legacy" not in path.parts and "tests" not in path.parts]
         self.assertTrue({"layout_health.h", "rechart_orbit.h", "refresh_section_branch.h", "orbit_observable.h",
-                         "periodic_curve_recorder.h", "recurrence_seed.h"} <=
+                         "periodic_curve_recorder.h", "recurrence_seed.h", "orbit_comparison.h"} <=
                         {path.name for path in headers})
         for path in headers:
             with self.subTest(header=path.name):

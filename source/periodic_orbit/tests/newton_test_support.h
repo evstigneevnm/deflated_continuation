@@ -10,24 +10,26 @@
 
 namespace section_tests
 {
-template <class Space, class Problem>
+template <class Space, class Problem, class Residual = nmfd::solvers::nonlinear_residual_norm>
 struct newton_types
 {
     using log         = scfd::utils::log_std;
     using monitor     = nmfd::solvers::monitor_krylov<Space, log>;
     using linear      = nmfd::solvers::gmres<Space, monitor, log, typename Problem::jacobi_operator_type>;
     using iteration   = nmfd::solvers::newton_iteration<Space, Problem, linear>;
-    using convergence = nmfd::solvers::default_convergence_strategy<Space, log, Problem>;
-    using solver      = nmfd::solvers::nonlinear_solver<Space, log, Problem, iteration>;
+    using projector   = nmfd::operations::ident_operator<Space>;
+    using quality     = nmfd::operations::zero_functional<Space>;
+    using convergence = nmfd::solvers::default_convergence_strategy<Space, log, Problem, projector, quality, Residual>;
+    using solver      = nmfd::solvers::nonlinear_solver<Space, log, Problem, iteration, projector, quality, convergence>;
 };
 
-template <class Space, class Problem>
+template <class Space, class Problem, class Residual = nmfd::solvers::nonlinear_residual_norm>
 auto make_newton(
     const std::shared_ptr<Space> &space, const std::shared_ptr<Problem> &problem, double tolerance = 1e-10,
-    unsigned int iterations = 12
+    unsigned int iterations = 12, Residual = {}
 )
 {
-    using types = newton_types<Space, Problem>;
+    using types = newton_types<Space, Problem, Residual>;
     typename types::linear::params lp;
     lp.basis_size = static_cast<unsigned>( std::min<std::size_t>( 64, std::max<std::size_t>( 16, space->size() ) ) );
     lp.batch_size = 1;

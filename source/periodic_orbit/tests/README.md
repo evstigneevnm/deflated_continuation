@@ -148,6 +148,54 @@ make test_periodic_orbit_analytic_cycle_recurrence_cpu.bin CONFIG_FILE=build_con
 build/test_periodic_orbit_analytic_cycle_recurrence_cpu.bin build/cycle_recurrence_branches
 ```
 
+**Comparing verified orbits.** [orbit_comparison](../orbit_comparison.h) compares
+ordinary autonomous orbits at one fixed parameter, using physical anchor states,
+not shooting coordinates or diagram norms. Bind a dedicated section flight to
+that problem and parameter. On a common oriented section, prepare one cached hit
+per orbit: its next transverse return must take the supplied period (within the
+absolute time tolerance) and close in the physical space norm. This costs at
+most two bounded section flights. As with other sampled event tests, the mesh
+and event subdivisions must resolve the crossings; this is not a proof of a
+primitive period. Failed preparation invalidates the slot.
+
+Cached comparisons take one backend vector subtraction and norm, with no new
+vector allocation or integration. Distances below or at the smaller threshold
+match; distances above or at the larger threshold are distinct. The gap, invalid
+preparations and incompatible periods yield **inconclusive**, not exclusion.
+A custom symmetric distance may be supplied only for actions that preserve the
+oriented section. No spatial quotient or Newton deflation is enabled by default.
+The [regression](test_orbit_comparison.cpp) covers phase, layout, distinct
+equal-period circles, multiple hits, double traversal and failed flights.
+
+```bash
+make test_periodic_orbit_orbit_comparison_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+build/test_periodic_orbit_orbit_comparison_cpu.bin
+```
+
+**Fixed-parameter deflation.** The [two-cycle benchmark](test_two_cycle_deflation.cpp)
+compares ordinary Newton and deflated Newton from identical radial seeds at angular
+speed 1, with one and four shooting sections. The isolated analytical cycles
+have radii 1 and 2 and period `2*pi`. Each successful correction must satisfy
+matching, independent full-period closure and the expected radius and period.
+Each experiment freezes the same known inner cycle for its entire batch, so
+the printed outcomes are directly comparable across seeds. The final check
+rebuilds with both verified cycles and excludes both.
+
+The [collection](../orbit_collection.h) compares each verified candidate once
+against each cached orbit until a definite duplicate is found. An inconclusive
+comparison never inserts a new solution. Before a Newton batch,
+[chart deflation](../matching/chart_deflation.h) recharts the stored cycles and
+checks their matching residuals and periods. A failure identifies the index
+and publishes no operator. The multiplier uses the existing shifted inverse
+distance and rank-one Jacobian in fixed coordinates; zero is not an implicit
+root. Changing the layout, parameter or known-root set requires fresh setup.
+This is not automatic branch discovery or relative-periodic deflation.
+
+```bash
+make test_periodic_orbit_two_cycle_deflation_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+OMP_NUM_THREADS=1 build/test_periodic_orbit_two_cycle_deflation_cpu.bin
+```
+
 **Symmetric KS1D continuation.** Follow this same discrete orbit in physical
 `lambda` with the project's pseudo-arclength stepper in the benchmark's own branch loop:
 
