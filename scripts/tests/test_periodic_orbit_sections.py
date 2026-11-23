@@ -13,7 +13,7 @@ SYSTEMS = (
     "prepared_section_derivatives", "prepared_dirk_derivatives", "prepared_dirk_matching",
     "prepared_bdf_derivatives", "prepared_bdf_matching", "orbit_method_assembly", "multiple_section_newton",
     "prepared_bdf_adaptive_derivatives", "prepared_bdf_adaptive_matching",
-    "analytic_cycle_continuation", "rossler_periodic", "lorenz_periodic", "vaidyanathan_periodic",
+    "analytic_cycle_continuation", "periodic_branch_archive", "rossler_periodic", "lorenz_periodic", "vaidyanathan_periodic",
 )
 
 
@@ -21,8 +21,8 @@ class PeriodicSectionContractTest(unittest.TestCase):
     def test_backend_local_public_headers(self):
         headers = [path for path in MODERN.rglob("*.h")
                    if "legacy" not in path.parts and "tests" not in path.parts]
-        self.assertEqual(len(headers), 23)
-        self.assertTrue({"layout_health.h", "rechart_orbit.h", "refresh_section_branch.h", "orbit_observable.h"} <=
+        self.assertTrue({"layout_health.h", "rechart_orbit.h", "refresh_section_branch.h", "orbit_observable.h",
+                         "periodic_curve_recorder.h"} <=
                         {path.name for path in headers})
         for path in headers:
             with self.subTest(header=path.name):
@@ -57,8 +57,11 @@ class PeriodicSectionContractTest(unittest.TestCase):
             if suffix != "cpu":
                 gate = workflow.split("  all-tests-passed:", 1)[1].split("    steps:", 1)[0]
                 self.assertIn(name, gate)
+        ks_systems = {"ks1d_symmetric_periodic": "cpu_omp", "ks1d_periodic_continuation_driver": "cpu"}
+        for system, backend in ks_systems.items():
+            self.assertIn(f"test_periodic_orbit_{system}_{backend}.bin", workflow)
         self.assertEqual({p.stem.removeprefix("test_") for p in (MODERN / "tests").glob("test_*.cpp")},
-                         set(SYSTEMS))
+                         set(SYSTEMS) | set(ks_systems))
 
 
 if __name__ == "__main__":

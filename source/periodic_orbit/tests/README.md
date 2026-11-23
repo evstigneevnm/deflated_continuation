@@ -53,6 +53,28 @@ section coordinates before correction; it is not a continuation or a test
 of spatial convergence. Use `--rates-only` for the short evolution and
 derivative checks without Newton.
 
+**Analytical-cycle branch archive.** To trace the RK45 cycle using the production
+driver and retain its scalar archives, supply a **new** output directory:
+
+```bash
+make test_periodic_orbit_periodic_branch_archive_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+OMP_NUM_THREADS=1 build/test_periodic_orbit_periodic_branch_archive_cpu.bin build/analytic_cycle_archive
+```
+
+The test reopens `cycle-M1.json`, `cycle-M4.json` and `cycle-capped.json`.
+The first two reach both boundaries of [0.95, 1.05]; the capped run records
+the last emitted points and the step-limit reason. Without an argument the
+test uses a temporary directory.
+
+Version 1 stores ordinary periodic branches with identity closure. Segments
+and points are in traversal order (global zero-based `source_index`); do not
+sort on the parameter. `trace_complete` reports driver completion, whereas
+`all_points_verified` reports physical orbit verification. Only verified
+rows have a period, time-RMS, sampled extrema and closure error. The observable
+is taken on physical states during independent full-period integration, not
+on matching coordinates. These scalar files can be read without a solver;
+they are **not** restart snapshots and do not change the stationary archive.
+
 **Symmetric KS1D continuation.** Follow this same discrete orbit in physical
 `lambda` with the project's pseudo-arclength stepper in the benchmark's own branch loop:
 

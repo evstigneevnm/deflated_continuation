@@ -1,4 +1,5 @@
 #include "benchmarks/branch_solver.h"
+#include "benchmarks/initial_tangent_solver.h"
 #include "benchmarks/ks1d_branch_flights.h"
 #include <containers/knots.hpp>
 #include <continuation/continuation.hpp>
@@ -34,33 +35,7 @@ constexpr reference_point reference[] = {
         -.19430695839266474 } }
 };
 
-// Initial tangent: R_z w = -R_lambda, on the matching space, not the bordered space.
-struct state_solver
-{
-    using gmres_type = section_tests::newton_types<space, orbit>::linear;
-    gmres_type gmres;
-    unsigned   successful = 0;
-    explicit state_solver( const std::shared_ptr<space> &s )
-        : gmres( s, nullptr, [&] {
-              gmres_type::params p;
-              p.basis_size = std::min<std::size_t>( 64, s->get_vector_size() );
-              p.batch_size = 1;
-              return p;
-          }() )
-    {
-    }
-    auto *get_linsolver_handle_original()
-    {
-        return &gmres;
-    }
-    bool solve( orbit &op, const state &rhs, state &out )
-    {
-        gmres.set_operator( op.get_jacobi_operator() );
-        const bool solved = gmres.solve( rhs, out );
-        successful += solved;
-        return solved;
-    }
-};
+using state_solver = orbit_benchmarks::initial_tangent_solver<space, orbit>;
 
 struct curve
 {
