@@ -28,6 +28,57 @@ struct two_cycles
     }
 };
 
+// Keep the same isolated radii but change angular speed from 1 at r=1
+// to outer_speed at r=2. Section comparison needs only the physical RHS.
+struct unequal_period_cycles
+{
+    double outer_speed;
+    __DEVICE_TAG__ double rhs( std::ptrdiff_t i, const double *u, double t ) const
+    {
+        const double s = u[0]*u[0] + u[1]*u[1];
+        return two_cycles{ 1 + (outer_speed - 1)*(s - 1)/3 }.rhs( i, u, t );
+    }
+};
+
+void compare_unequal_periods( double outer_speed )
+{
+    using flight = periodic_orbit::section_map<
+        operations, step<unequal_period_cycles>, plane, policy, rate_provider<unequal_period_cycles>>;
+    auto space = std::make_shared<operations>( 2 );
+    auto u = buffer( space );
+    auto rate = std::make_shared<rate_provider<unequal_period_cycles>>();
+    rate->model = { outer_speed };
+    flight map( space, make_step( space, .03, rate->model ), std::make_shared<policy>( space ), {}, rate );
+    flight::request_type req;
+    req.target = make_plane( space, 0, 0, 0, 1 );
+    req.rule.minimum_crossing_speed = .01;
+    periodic_orbit::orbit_comparison<operations, flight> cmp( space, map, outer_speed, req,
+                                                               { 1e-6, 1e-6, 1e-6, 1e-5 } );
+    periodic_orbit::orbit_collection catalog( cmp );
+    const double slow = 2*pi, fast = slow/outer_speed;
+    fill( *space, *u, 0, 1 );
+    require( catalog.admit_verified( *u, outer_speed, slow ).decision == orbit_admission::inserted,
+             "Slow cycle not admitted" );
+    fill( *space, *u, 0, -2 );
+    require( catalog.admit_verified( *u, outer_speed, fast ).decision == orbit_admission::inserted,
+             "Separated cycle with a different verified period not admitted" );
+
+    const auto allocations = guarded_memory::allocation_calls;
+    const auto ab = cmp.compare( catalog.at(0), catalog.at(1) ), ba = cmp.compare( catalog.at(1), catalog.at(0) );
+    require( ab.relation == periodic_orbit::orbit_relation::distinct && ba.relation == ab.relation &&
+             ab.distance && std::abs( *ab.distance - 1 ) < 1e-6 && ba.distance == ab.distance,
+             "Unequal-period comparison ignored the physical crossing distance" );
+    fill( *space, *u, -2, 0 );
+    const auto duplicate = catalog.admit_verified( *u, outer_speed, fast );
+    require( duplicate.decision == orbit_admission::duplicate && duplicate.index == 1,
+             "Phase-shifted fast orbit not recognized" );
+    const auto twice = catalog.admit_verified( *u, outer_speed, 2*fast );
+    require( twice.preparation.status == periodic_orbit::crossing_preparation::wrong_return_time &&
+             twice.decision == orbit_admission::inconclusive && catalog.size() == 2,
+             "Double traversal of the fast orbit was classified" );
+    require( guarded_memory::allocation_calls == allocations, "Cached comparisons allocated backend vectors" );
+}
+
 void run_discovery( unsigned m )
 {
     using setup = continuation_fixture<two_cycles>;
@@ -155,6 +206,7 @@ void run_discovery( unsigned m )
 int main()
 {
     return section_tests::run( [] {
+        for ( double ratio : {1.5, 2.} ) compare_unequal_periods( ratio );
         for ( unsigned m : {1u, 4u} ) run_discovery( m );
         require( guarded_memory::host_bytes == 0, "Orbit discovery transferred state vectors" );
     } );

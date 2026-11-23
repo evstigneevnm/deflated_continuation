@@ -83,6 +83,23 @@ void test_circles()
              capped.compare( c, c ).relation == orbit_relation::inconclusive, "Budget exhaustion classified" );
     require( capped.compare( a, a ).relation == orbit_relation::inconclusive, "Mixed comparison domains" );
 
+    // Each supplied period can agree with its measured return within tolerance
+    // while the two estimates disagree with each other.
+    const double offset = .75 * p.period_tolerance;
+    fill( *space, *state, 0, 1 );
+    require( cmp.prepare( *state, 1., period - offset, a ).status == crossing_preparation::ready &&
+             cmp.prepare( *state, 1., period + offset, b ).status == crossing_preparation::ready,
+             "Could not prepare two individually admissible period estimates" );
+    const auto near = cmp.compare( a, b );
+    require( near.distance && *near.distance <= p.same_distance && near.relation == orbit_relation::inconclusive,
+             "Matching crossings with incompatible periods were classified" );
+    fill( *space, *state, 0, 1.000002 );
+    require( cmp.prepare( *state, 1., period + offset, b ).status == crossing_preparation::ready,
+             "Cannot prepare nearby circle" );
+    const auto gap = cmp.compare( a, b );
+    require( gap.distance && *gap.distance > p.same_distance && *gap.distance < p.distinct_distance &&
+             gap.relation == orbit_relation::inconclusive, "Period mismatch overrode the uncertainty band" );
+
     // An inconclusive earlier entry must not hide a later definite duplicate.
     comparison<harmonic> ccmp( space, map, 1., request, { 1e-6, 1e-7, .01, .1 } );
     periodic_orbit::orbit_collection catalog( ccmp );

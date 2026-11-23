@@ -126,13 +126,14 @@ public:
     template <class Distance>
     comparison_report compare( const crossing &a, const crossing &b, Distance &&distance ) const
     {
-        if ( a.domain_ != domain_ || b.domain_ != domain_ || !a.ready_ || !b.ready_ ||
-             traits::abs( a.period_ - b.period_ ) > p_.period_tolerance )
+        if ( a.domain_ != domain_ || b.domain_ != domain_ || !a.ready_ || !b.ready_ )
             return {};
         const T d = distance( *a.state_, *b.state_ );
         if ( !traits::is_finite( d ) || d < T(0) ) return {};
-        return { d <= p_.same_distance ? orbit_relation::same :
-                 d >= p_.distinct_distance ? orbit_relation::distinct : orbit_relation::inconclusive, d };
+        if ( d >= p_.distinct_distance ) return { orbit_relation::distinct, d };
+        if ( d <= p_.same_distance && traits::abs( a.period_ - b.period_ ) <= p_.period_tolerance )
+            return { orbit_relation::same, d };
+        return { orbit_relation::inconclusive, d };
     }
 
     comparison_report compare( const crossing &a, const crossing &b )

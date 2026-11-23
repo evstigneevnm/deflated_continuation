@@ -159,9 +159,10 @@ and event subdivisions must resolve the crossings; this is not a proof of a
 primitive period. Failed preparation invalidates the slot.
 
 Cached comparisons take one backend vector subtraction and norm, with no new
-vector allocation or integration. Distances below or at the smaller threshold
-match; distances above or at the larger threshold are distinct. The gap, invalid
-preparations and incompatible periods yield **inconclusive**, not exclusion.
+vector allocation or integration. Two verified crossings at or above the larger
+distance threshold are distinct regardless of period. Crossings at or below the
+smaller threshold match only when their periods also agree within tolerance.
+All other cases are **inconclusive**; a period difference alone never excludes an orbit.
 A custom symmetric distance may be supplied only for actions that preserve the
 oriented section. No spatial quotient or Newton deflation is enabled by default.
 The [regression](test_orbit_comparison.cpp) covers phase, layout, distinct
@@ -180,6 +181,11 @@ matching, independent full-period closure and the expected radius and period.
 Each experiment freezes the same known inner cycle for its entire batch, so
 the printed outcomes are directly comparable across seeds. The final check
 rebuilds with both verified cycles and excludes both.
+
+A separate admission check uses the same radial dynamics with radius-dependent
+angular speed. Both isolated cycles are admitted at period ratios 3:2 and 2:1.
+Reporting the faster cycle with twice its period fails its own return-time check,
+even when that number is exactly the slower cycle's true period.
 
 The [collection](../orbit_collection.h) compares each verified candidate once
 against each cached orbit until a definite duplicate is found. An inconclusive

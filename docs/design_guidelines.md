@@ -1407,6 +1407,8 @@ For ordinary-orbit deflation at a fixed parameter, distinguish physical orbit
 identity from distance in Newton coordinates. Admit an independently verified
 orbit only after a unique resolved oriented return and a distinct comparison
 against every cached crossing; an inconclusive comparison is not a new root.
+Well-separated verified crossings establish distinctness regardless of period.
+A duplicate requires both close crossings and compatible periods.
 Before Newton, rechart all stored orbits into the frozen itinerary and verify
 matching and period. Never implicitly exclude zero chart coordinates. With
 `K` stored roots the multiplier and its gradient cost `O(KMN)`; after
