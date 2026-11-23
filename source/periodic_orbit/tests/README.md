@@ -75,6 +75,34 @@ is taken on physical states during independent full-period integration, not
 on matching coordinates. These scalar files can be read without a solver;
 they are **not** restart snapshots and do not change the stationary archive.
 
+**Restart an interior orbit.** The analytical cycle and symmetric KS1D
+have a separate fresh-process restart regression. Run from the repository root:
+
+```bash
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+make test_periodic_orbit_periodic_branch_archive_cpu.bin test_periodic_orbit_ks1d_periodic_continuation_driver_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+python3 source/periodic_orbit/tests/check_branch_restart.py build/test_periodic_orbit_periodic_branch_archive_cpu.bin build/cycle_restart --check-invalid
+python3 source/periodic_orbit/tests/check_branch_restart.py build/test_periodic_orbit_ks1d_periodic_continuation_driver_cpu.bin build/ks1d_restart
+```
+
+Supply a new directory. The runner invokes the same executable twice
+(`--write DIR` then `--restart DIR`) for M=1 and 4. Each source branch
+identifies a verified interior point by segment and global source index.
+Its separate `interior.json` stores the binary64 matching coordinates,
+parameter, period, ordered Euclidean section centers and signed unit normals,
+flight itinerary, and RK/trace configuration. Only ordinary forward
+identity closure is supported. The reader restores the chart from these
+planes, not from a regenerated pilot, and independently verifies the orbit
+**before** starting continuation. `restarted/branch.json` links back to the
+source point. This is a new two-arm trace, not an exact predictor-history resume.
+
+The regression compares both lifted endpoints and their periods at the
+same parameters; `endpoint_reference.json` is test data, not solver input.
+No trajectory is downloaded. The selected state stays on the backend
+until the trace returns. Snapshot I/O transfers three blocks per section
+(center, normal, coordinates) once per write/read; these bytes and the two
+endpoint-reference transfers are counted separately from the guarded solve.
+
 **Symmetric KS1D continuation.** Follow this same discrete orbit in physical
 `lambda` with the project's pseudo-arclength stepper in the benchmark's own branch loop:
 

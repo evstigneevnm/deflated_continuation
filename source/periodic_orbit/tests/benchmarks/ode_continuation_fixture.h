@@ -91,6 +91,14 @@ struct continuation_fixture
         );
         assemble( h, budget );
     }
+    continuation_fixture( std::shared_ptr<operations> phys, std::shared_ptr<const typename matching::layout_type> saved,
+                          double p, double T, double h, std::size_t budget )
+        : physical( std::move( phys ) ), coords( std::make_shared<space>( coordinates, saved->size() ) ),
+          layout( std::move( saved ) ), model( Model{}.with_parameter( p ) ), period( T ), pilot_parameter( p ),
+          verification_dt( h/4 )
+    {
+        assemble( h, budget );
+    }
     void assemble( double h, std::size_t budget )
     {
         binding b{

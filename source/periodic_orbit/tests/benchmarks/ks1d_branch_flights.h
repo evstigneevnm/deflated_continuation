@@ -57,8 +57,20 @@ struct branch_flights
     }
     void assemble( const X &initial, double h, double t, std::size_t n )
     {
-        fine          = stepper( physical, verification, h / 4 );
         layout        = make_layout( physical, rates.trial, initial, period, coords->component_count(), h, t, n );
+        assemble_layout( h, n );
+    }
+    branch_flights( std::shared_ptr<operations> phys, std::shared_ptr<const matching::layout_type> saved,
+                    double p, double T, double h, std::size_t n )
+        : physical( std::move( phys ) ), coordinates( std::make_shared<operations>( dimension - 1 ) ),
+          coords( std::make_shared<space>( coordinates, saved->size() ) ), pilot_parameter( p ), period( T ),
+          layout( std::move( saved ) )
+    {
+        assemble_layout( h, n );
+    }
+    void assemble_layout( double h, std::size_t n )
+    {
+        fine = stepper( physical, verification, h / 4 );
         auto segments = make_segments( physical, coordinates, layout, rates.trial, h, n );
         for ( std::size_t i = 0; i < segments.size(); ++i )
         {

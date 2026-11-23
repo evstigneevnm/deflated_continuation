@@ -9,22 +9,35 @@
 
 namespace periodic_orbit
 {
+struct no_verified_point_action
+{
+    template <class... Args> void operator()( const Args &... ) const {}
+};
+
 // Verify(p,z) borrows the backend coordinates and returns an optional scalar
 // measurement. An empty result records a failed verification, not a plot value.
-template <class Verify>
+template <class Verify, class OnVerified = no_verified_point_action>
 class periodic_curve_recorder
 {
     using reason = container::curve_endpoint_reason;
     Verify verify_;
+    OnVerified on_verified_;
     nlohmann::json archive_;
     std::uint64_t count_ = 0;
     bool verified_ = true;
 
 public:
     periodic_curve_recorder( const container::branch_identity &id, const std::string &method,
-                             std::size_t sections, Verify verify )
-        : verify_( std::move( verify ) ), archive_( container::periodic_branch_manifest( id, method, sections ) )
+                             std::size_t sections, Verify verify, OnVerified action = {} )
+        : verify_( std::move( verify ) ), on_verified_( std::move( action ) ),
+          archive_( container::periodic_branch_manifest( id, method, sections ) )
     {}
+    void set_restart_source( const std::string &branch, std::uint64_t segment, std::uint64_t index )
+    {
+        if ( get_current_segment_id() || branch.empty() || !segment )
+            throw std::logic_error( "Invalid orbit restart source" );
+        archive_["restarted_from"] = { { "branch", branch }, { "segment", segment }, { "source_index", index } };
+    }
     void start_new_segment()
     {
         auto &segments = archive_.at( "segments" );
@@ -46,6 +59,7 @@ public:
             point.update( { { "period", measurement->period }, { "observable_rms", measurement->rms },
                             { "observable_min", measurement->minimum }, { "observable_max", measurement->maximum },
                             { "closure_error", measurement->closure_error } } );
+            on_verified_( get_current_segment_id(), count_, parameter, endpoint, z, *measurement );
         }
         archive_.at( "segments" ).back().at( "points" ).push_back( std::move( point ) );
         ++count_;

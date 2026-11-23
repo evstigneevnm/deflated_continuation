@@ -1708,6 +1708,12 @@ jobs:
             done
           done
 
+      - name: Reopen an interior analytical orbit in a fresh process
+        run: |
+          OMP_NUM_THREADS=1 python3 source/periodic_orbit/tests/check_branch_restart.py \
+            "$BUILD_DIR/sections_cpu/test_periodic_orbit_periodic_branch_archive_cpu.bin" \
+            "$BUILD_DIR/sections_cpu/analytic_restart" --check-invalid
+
   periodic-orbit-matching-benchmark-cpu:
     needs: periodic-orbit-sections-cpu
     runs-on: ubuntu-latest
@@ -1824,6 +1830,8 @@ jobs:
             esac
             timeout "${timeout_seconds}s" "$BUILD_DIR/sections_cuda/test_periodic_orbit_${test}_cuda.bin"
           done
+          timeout 600s python3 source/periodic_orbit/tests/check_branch_restart.py \
+            "$BUILD_DIR/sections_cuda/test_periodic_orbit_periodic_branch_archive_cuda.bin" "$BUILD_DIR/sections_cuda/analytic_restart"
 
   periodic-orbit-sections-hip:
     needs: [periodic-orbit-sections-cpu, scfd-vector-operations-hip]
@@ -1865,6 +1873,8 @@ jobs:
             esac
             timeout "${timeout_seconds}s" "$BUILD_DIR/sections_hip/test_periodic_orbit_${test}_hip.bin"
           done
+          timeout 600s python3 source/periodic_orbit/tests/check_branch_restart.py \
+            "$BUILD_DIR/sections_hip/test_periodic_orbit_periodic_branch_archive_hip.bin" "$BUILD_DIR/sections_hip/analytic_restart"
 
   timestepper-implicit-sanitizers-cpu:
     needs: [timestepper-implicit-dirk-cpu, timestepper-bdf-cpu, timestepper-rosenbrock-cpu, timestepper-imex-cpu, timestepper-explicit-rk-cpu]
@@ -3268,6 +3278,8 @@ jobs:
           KS1D_BUILD="$BUILD_DIR/ks1d_sym_cpu_omp"
           make test_periodic_orbit_ks1d_periodic_continuation_driver_cpu.bin CONFIG_FILE="$CONFIG_FILE" BUILD_DIR="$KS1D_BUILD"
           OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 timeout 1200s "$KS1D_BUILD/test_periodic_orbit_ks1d_periodic_continuation_driver_cpu.bin"
+          OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 timeout 1200s python3 source/periodic_orbit/tests/check_branch_restart.py \
+            "$KS1D_BUILD/test_periodic_orbit_ks1d_periodic_continuation_driver_cpu.bin" "$KS1D_BUILD/orbit_restart"
 
   ks1d-full-nmfd-linear-solvers-cpu-omp:
     needs: [fftw-operations-cpu, lapack-wrap-cpu]

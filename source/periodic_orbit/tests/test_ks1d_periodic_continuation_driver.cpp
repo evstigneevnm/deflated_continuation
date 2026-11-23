@@ -1,6 +1,7 @@
 #include "benchmarks/branch_solver.h"
 #include "benchmarks/initial_tangent_solver.h"
 #include "benchmarks/ks1d_branch_flights.h"
+#include "benchmarks/branch_restart_case.h"
 #include <containers/knots.hpp>
 #include <continuation/continuation.hpp>
 
@@ -190,9 +191,21 @@ void check( std::size_t m )
 }
 }
 
-int main()
+int main( int argc, char **argv )
 {
-    return section_tests::run( [] {
+    return section_tests::run( [&] {
+        if ( argc != 1 )
+        {
+            if ( argc != 3 || (std::string( argv[1] ) != "--write" && std::string( argv[1] ) != "--restart") )
+                throw std::invalid_argument( "Expected --write DIR or --restart DIR" );
+            for ( const auto m : { 1u, 4u } )
+                orbit_benchmarks::branch_restart_case<branch_flights>(
+                    std::filesystem::path( argv[2] ) / ("ks-M" + std::to_string( m )), std::string( argv[1] ) == "--restart",
+                    { "ks1d-M" + std::to_string( m ), "symmetric_KS1D", "N24:odd-R2C:a2:b4", "lambda", "l2_norm", "rms" },
+                    m, p0, dt, { lower, upper, m == 1 ? .003 : .009, budget, 1e-7 },
+                    [=] { return std::make_unique<branch_flights>( m, dt, 0., budget ); } );
+            return;
+        }
         check( 1 );
         check( 4 );
     } );
