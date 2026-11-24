@@ -1421,6 +1421,18 @@ with a verified but inactive root. Keep vectors on the backend and report
 scalar per-seed outcomes. See the [frozen-root](../source/periodic_orbit/tests/test_two_cycle_deflation.cpp)
 and [incremental discovery](../source/periodic_orbit/tests/test_knot_discovery.cpp) regressions.
 
+Use `knot_discovery::run_and_continue` to trace newly activated roots. Finish
+the seed batch first. An incomplete activation launches nothing; a completed
+batch with no activations launches nothing either. For each new catalog index,
+rechart its physical crossing in reusable backend scratch and verify the matching
+residual and period before invoking ordinary, undeflated continuation. The trace
+callback borrows its coordinates only during the call; it must not re-enter the
+knot. Keep the comparison/rechart flight bound to the knot even when the
+continuation solver changes parameter. Record the source parameter and catalog
+index on each branch. Preparation or numerical trace failure is local to that
+branch; neither removes an orbit from discovery. Root indices are local to a
+catalog, not global branch identities.
+
 For one-parameter continuation in fixed sections, use
 `parameterized_multiple_section_problem` with the ordinary predictor, bordered
 corrector and augmented tangent. The binding updates trial models in place but

@@ -217,6 +217,30 @@ make test_periodic_orbit_knot_discovery_cpu.bin CONFIG_FILE=build_configs/config
 OMP_NUM_THREADS=1 build/test_periodic_orbit_knot_discovery_cpu.bin
 ```
 
+**Continue discovered orbits.** `knot.run_and_continue(seeds, anchor, ordinary,
+deflated, verify, rechart, trace)` finishes discovery, then calls
+`trace(parameter, root_index, coordinates)` only for this batch's activated
+roots that pass rechart, matching and period checks. Use ordinary continuation
+in `trace`, returning false for an incomplete branch. Inspect
+`discovery_complete` (the batch finished, not a proof of completeness) and
+the per-root `preparation` and `trace_complete` results separately.
+
+The [two-cycle regression](test_discovered_two_cycle_branches.cpp) checks
+radii 1 and 2 along both arms, replay without launches, and a capped trace.
+The [KS1D regression](test_ks1d_discovered_branch.cpp) continues one verified
+odd-subspace orbit at N=24 from 68 to 67.999 and 68.001. Both section counts
+use the existing endpoint Fourier references and independently integrated
+closure. Neither test requires downloading an orbit to start a trace.
+
+```bash
+make -j2 test_periodic_orbit_discovered_two_cycle_branches_cpu.bin test_periodic_orbit_ks1d_discovered_branch_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+OMP_NUM_THREADS=1 build/test_periodic_orbit_discovered_two_cycle_branches_cpu.bin --write build/two_cycle_traces
+OMP_NUM_THREADS=1 build/test_periodic_orbit_ks1d_discovered_branch_cpu.bin --write build/ks1d_traces
+```
+
+Omit `--write` for a test-only run. The optional directory must be new; each
+JSON archive records its own `discovered_at.parameter` and `root_index`.
+
 **Symmetric KS1D continuation.** Follow this same discrete orbit in physical
 `lambda` with the project's pseudo-arclength stepper in the benchmark's own branch loop:
 

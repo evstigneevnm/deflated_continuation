@@ -14,7 +14,7 @@ SYSTEMS = (
     "prepared_bdf_derivatives", "prepared_bdf_matching", "orbit_method_assembly", "multiple_section_newton",
     "prepared_bdf_adaptive_derivatives", "prepared_bdf_adaptive_matching",
     "analytic_cycle_continuation", "periodic_branch_archive", "analytic_cycle_recurrence", "orbit_comparison",
-    "two_cycle_deflation", "knot_discovery",
+    "two_cycle_deflation", "knot_discovery", "discovered_two_cycle_branches",
     "rossler_periodic", "lorenz_periodic", "vaidyanathan_periodic",
 )
 
@@ -59,7 +59,7 @@ class PeriodicSectionContractTest(unittest.TestCase):
             if suffix != "cpu":
                 gate = workflow.split("  all-tests-passed:", 1)[1].split("    steps:", 1)[0]
                 self.assertIn(name, gate)
-        ks_systems = {"ks1d_symmetric_periodic": "cpu_omp", "ks1d_periodic_continuation_driver": "cpu"}
+        ks_systems = {"ks1d_symmetric_periodic": "cpu_omp", "ks1d_periodic_continuation_driver": "cpu", "ks1d_discovered_branch": "cpu"}
         for system, backend in ks_systems.items():
             self.assertIn(f"test_periodic_orbit_{system}_{backend}.bin", workflow)
         self.assertEqual({p.stem.removeprefix("test_") for p in (MODERN / "tests").glob("test_*.cpp")},

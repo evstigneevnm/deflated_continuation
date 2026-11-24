@@ -22,7 +22,8 @@ class chart_deflated_operator : public deflation::deflated_operator<Space, Orbit
 public:
     using base::base;
     // No prepared linearization may be reused after changing its multiplier.
-    void roots_changed() { base::set_parameter( this->parameter() ); }
+    void invalidate_linearization() { base::set_parameter( this->parameter() ); }
+    void roots_changed() { invalidate_linearization(); }
 };
 
 enum class chart_root_status { ready, rechart_failed, matching_failed, period_mismatch, capacity_reached };
@@ -57,14 +58,23 @@ public:
     chart_root_status append( const Crossing &root, Rechart &rechart )
     {
         if ( size() == stored_->get_number_of_reserved_solutions() ) return chart_root_status::capacity_reached;
+        return with_coordinates( root, rechart, [&]( const auto &z ) {
+            stored_->push_back( z );
+            op_->roots_changed();
+        } );
+    }
+
+    // Borrow the checked coordinates for the synchronous callback only.
+    template <class Crossing, class Rechart, class Use>
+    chart_root_status with_coordinates( const Crossing &root, Rechart &rechart, Use &&use )
+    {
         if ( !rechart( root.state(), root.period(), *z_ ) ) return chart_root_status::rechart_failed;
         const auto &r = orbit_->inspect_crossings( *z_, op_->parameter(), *residual_ );
         if ( !r.succeeded() || !(coords_->norm( *residual_ ) <= matching_tol_) )
             return chart_root_status::matching_failed;
         if ( !(common::scalar_math::abs( r.period - root.period() ) <= period_tol_) )
             return chart_root_status::period_mismatch;
-        stored_->push_back( *z_ );
-        op_->roots_changed();
+        use( std::as_const( *z_ ) );
         return chart_root_status::ready;
     }
 private:

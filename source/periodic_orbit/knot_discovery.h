@@ -23,6 +23,20 @@ struct discovery_attempt
     std::optional<chart_root_status> activation;
 };
 
+struct orbit_launch
+{
+    std::size_t root_index;
+    chart_root_status preparation;
+    bool trace_complete;
+};
+
+struct discovery_trace_report
+{
+    std::vector<discovery_attempt> attempts;
+    bool discovery_complete;
+    std::vector<orbit_launch> launches;
+};
+
 // Serial discovery at one physical parameter and one fixed layout. The supplied
 // solvers, independent verifier and rechart flight retain their backend workspace.
 template <class Comparison, class Space, class Orbit>
@@ -78,6 +92,31 @@ public:
             a.outcome = seed_outcome::activated;
         }
         return attempts;
+    }
+
+    // Dispatch only this batch's new roots, after discovery has finished.
+    // trace(parameter, root_index, coordinates) uses ordinary continuation;
+    // false reports an incomplete branch without suppressing other launches.
+    template <class Seeds, class Ordinary, class Deflated, class Verify, class Rechart, class Trace>
+    discovery_trace_report run_and_continue( const Seeds &seeds, typename Comparison::X &anchor, Ordinary &&ordinary,
+                                             Deflated &&deflated, Verify &&verify, Rechart &&rechart, Trace &&trace )
+    {
+        auto attempts = run( seeds, anchor, ordinary, deflated, verify, rechart );
+        discovery_trace_report report{ std::move( attempts ), roots_.size() == active_count(), {} };
+        if ( !report.discovery_complete ) return report;
+        for ( const auto &a : report.attempts )
+        {
+            if ( a.outcome != seed_outcome::activated ) continue;
+            const auto index = a.root_index.value();
+            // Ordinary continuation may replace the state Jacobian underneath the deflated operator.
+            chart_.op()->invalidate_linearization();
+            bool complete = false;
+            const auto status = chart_.with_coordinates( roots_.at( index ), rechart, [&]( const auto &z ) {
+                complete = trace( roots_.parameter(), index, z );
+            } );
+            report.launches.push_back( { index, status, complete } );
+        }
+        return report;
     }
 private:
     void require_synchronized() const

@@ -38,6 +38,12 @@ public:
             throw std::logic_error( "Invalid orbit restart source" );
         archive_["restarted_from"] = { { "branch", branch }, { "segment", segment }, { "source_index", index } };
     }
+    void set_discovery_source( double knot, std::size_t root_index )
+    {
+        if ( get_current_segment_id() || !std::isfinite( knot ) )
+            throw std::logic_error( "Invalid orbit discovery source" );
+        archive_["discovered_at"] = { { "parameter", knot }, { "root_index", root_index } };
+    }
     void start_new_segment()
     {
         auto &segments = archive_.at( "segments" );

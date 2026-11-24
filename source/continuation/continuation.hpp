@@ -100,7 +100,8 @@ auto record_symmetry_intersection_if_available(Curve* curve, const Event& event,
     );
 }
 
-inline void record_symmetry_intersection_if_available( ... )
+template <class Curve, class Event>
+void record_symmetry_intersection_if_available( Curve *, const Event &, ... )
 {
 }
 

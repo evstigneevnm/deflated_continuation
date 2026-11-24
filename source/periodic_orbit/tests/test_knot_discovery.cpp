@@ -112,10 +112,26 @@ void check_knot( unsigned m )
 
     periodic_orbit::knot_discovery limited( cmp, f.coords, f.op, 1, 1e-6, 1e-6, 1e-7 );
     const auto before = recharted;
-    const auto exhausted = limited.run( std::array<int,3>{ 2, 5, 6 }, *u, scripted, scripted, inspect, rechart );
+    unsigned launches = 0;
+    auto launch = [&]( double, std::size_t, const auto & ){ ++launches; return true; };
+    const auto incomplete = limited.run_and_continue( std::array<int,3>{ 2, 5, 6 }, *u, scripted, scripted, inspect, rechart, launch );
+    const auto &exhausted = incomplete.attempts;
+    require( !incomplete.discovery_complete && incomplete.launches.empty() && !launches, "Launched a partial batch" );
     require( exhausted.size() == 2 && exhausted[0].outcome == seed_outcome::activated &&
              exhausted[1].activation == periodic_orbit::chart_root_status::capacity_reached &&
              limited.active_count() == 1 && recharted == before + 1, "Capacity exceeded or old roots recharted" );
+
+    periodic_orbit::knot_discovery prepared( cmp, f.coords, f.op, 2, 1e-6, 1e-6, 1e-7 );
+    unsigned preparations = 0;
+    auto miss_first_launch = [&]( const X &state, double T, setup::state &z ) {
+        return ++preparations != 3 && rechart( state, T, z );
+    };
+    const auto traced = prepared.run_and_continue( std::array<int,2>{ 2, 5 }, *u, scripted, scripted, inspect,
+                                                    miss_first_launch, launch );
+    require( traced.discovery_complete && traced.launches.size() == 2 && launches == 1 &&
+             traced.launches[0].preparation == periodic_orbit::chart_root_status::rechart_failed &&
+             !traced.launches[0].trace_complete && traced.launches[1].trace_complete &&
+             prepared.active_count() == 2, "Failed handoff changed catalog or suppressed next launch" );
 }
 }
 int main()

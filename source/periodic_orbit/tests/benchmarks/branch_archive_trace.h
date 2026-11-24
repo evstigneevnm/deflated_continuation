@@ -17,6 +17,7 @@ struct archive_trace_settings
     std::size_t budget;
     double closure_tol;
     unsigned max_steps = 40;
+    double matching_tol = 1e-8;
 };
 
 template <class Fixture>
@@ -25,7 +26,7 @@ auto orbit_measurement( Fixture &check, const typename Fixture::state &point, do
                         const archive_trace_settings &settings ) -> std::optional<container::periodic_measurement>
 {
     const auto &report = check.op->inspect_crossings( point, lambda, residual );
-    if ( !report.succeeded() || !(check.coords->norm( residual ) < 1e-8) )
+    if ( !report.succeeded() || !(check.coords->norm( residual ) < settings.matching_tol) )
         return {};
     check.first->lift( point.comp( 0 ), initial );
     auto evaluate = [&]( const section_tests::X &x ) { return check.observable( x ); };

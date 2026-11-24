@@ -53,6 +53,13 @@ inline nlohmann::json read_periodic_branch( std::istream &in )
             throw std::invalid_argument( "Missing periodic branch identity" );
     if ( !data.at( "sections" ).is_number_unsigned() || data.at( "sections" ) == 0 )
         throw std::invalid_argument( "Invalid section count" );
+    if ( data.contains( "discovered_at" ) )
+    {
+        const auto &source = data.at( "discovered_at" );
+        if ( !source.at( "parameter" ).is_number() || !std::isfinite( source.at( "parameter" ).get<double>() ) ||
+             !source.at( "root_index" ).is_number_unsigned() )
+            throw std::invalid_argument( "Invalid periodic discovery source" );
+    }
     std::size_t index = 0, segment_id = 0;
     bool verified = true;
     for ( const auto &segment : data.at( "segments" ) )
