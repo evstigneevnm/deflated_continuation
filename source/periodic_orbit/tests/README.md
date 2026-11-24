@@ -194,12 +194,27 @@ comparison never inserts a new solution. Before a Newton batch,
 checks their matching residuals and periods. A failure identifies the index
 and publishes no operator. The multiplier uses the existing shifted inverse
 distance and rank-one Jacobian in fixed coordinates; zero is not an implicit
-root. Changing the layout, parameter or known-root set requires fresh setup.
-This is not automatic branch discovery or relative-periodic deflation.
+root. Changing the layout or parameter requires fresh setup.
 
 ```bash
 make test_periodic_orbit_two_cycle_deflation_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
 OMP_NUM_THREADS=1 build/test_periodic_orbit_two_cycle_deflation_cpu.bin
+```
+
+**Discovery from an empty catalog.** At one parameter and fixed layout,
+[knot discovery](../knot_discovery.h) uses ordinary Newton until the first
+verified orbit is admitted. Each subsequent seed sees all active roots.
+Only a newly admitted orbit is recharted; a duplicate or inconclusive return
+does not change the exclusions. If a new orbit cannot be activated (including
+the configured capacity limit), the batch stops and reports its index and
+reason. The catalog retains the verified orbit; do not reuse the stale exclusions.
+The [regression](test_knot_discovery.cpp) finds the two analytical cycles for
+both section counts, replays the same seeds, and checks failure handling and
+backend transfers. Exhausting a seed batch is not a completeness claim.
+
+```bash
+make test_periodic_orbit_knot_discovery_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
+OMP_NUM_THREADS=1 build/test_periodic_orbit_knot_discovery_cpu.bin
 ```
 
 **Symmetric KS1D continuation.** Follow this same discrete orbit in physical

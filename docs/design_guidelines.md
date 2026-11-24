@@ -1409,12 +1409,17 @@ orbit only after a unique resolved oriented return and a distinct comparison
 against every cached crossing; an inconclusive comparison is not a new root.
 Well-separated verified crossings establish distinctness regardless of period.
 A duplicate requires both close crossings and compatible periods.
-Before Newton, rechart all stored orbits into the frozen itinerary and verify
-matching and period. Never implicitly exclude zero chart coordinates. With
+Before using an orbit for deflation, rechart it into the frozen itinerary and
+verify matching and period. Never implicitly exclude zero chart coordinates. With
 `K` stored roots the multiplier and its gradient cost `O(KMN)`; after
 preparation the rank-one update to a matching Jacobian action costs `O(MN)`
-and requires no comparison flights. Rebuild the operator when roots, parameter,
-or layout change. See the [two-cycle regression](../source/periodic_orbit/tests/test_two_cycle_deflation.cpp).
+and requires no comparison flights. Rebuild the chart when the parameter or
+layout changes. At one fixed knot, [discovery](../source/periodic_orbit/knot_discovery.h)
+can append a newly verified root between solves without recharting existing
+roots. Invalidate the prepared Jacobian on append; never run the next solve
+with a verified but inactive root. Keep vectors on the backend and report
+scalar per-seed outcomes. See the [frozen-root](../source/periodic_orbit/tests/test_two_cycle_deflation.cpp)
+and [incremental discovery](../source/periodic_orbit/tests/test_knot_discovery.cpp) regressions.
 
 For one-parameter continuation in fixed sections, use
 `parameterized_multiple_section_problem` with the ordinary predictor, bordered

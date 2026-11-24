@@ -14,7 +14,7 @@ SYSTEMS = (
     "prepared_bdf_derivatives", "prepared_bdf_matching", "orbit_method_assembly", "multiple_section_newton",
     "prepared_bdf_adaptive_derivatives", "prepared_bdf_adaptive_matching",
     "analytic_cycle_continuation", "periodic_branch_archive", "analytic_cycle_recurrence", "orbit_comparison",
-    "two_cycle_deflation",
+    "two_cycle_deflation", "knot_discovery",
     "rossler_periodic", "lorenz_periodic", "vaidyanathan_periodic",
 )
 
