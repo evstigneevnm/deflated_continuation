@@ -1758,9 +1758,13 @@ jobs:
               --systems analytic_cycle analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic \
               --methods RK45 DOP853 --sections 1 2 4 8 --threads 2
             if [ "$backend" = cpu ]; then
+              # The four-section Rossler branch reaches c=0.4 after about 352 steps.
               bash source/periodic_orbit/tests/run_all.sh \
                 --build-dir "$BUILD_DIR/orbit_matching/$backend" --backend cpu --mode continuation \
-                --systems rossler_periodic vdp_periodic lorenz_periodic analytic_cycle vaidyanathan_periodic --sections 1 4 --threads 1 --require-rossler-reference
+                --systems rossler_periodic --sections 1 4 --threads 1 --branch-steps 400 --require-rossler-reference
+              bash source/periodic_orbit/tests/run_all.sh \
+                --build-dir "$BUILD_DIR/orbit_matching/$backend" --backend cpu --mode continuation \
+                --systems vdp_periodic lorenz_periodic analytic_cycle vaidyanathan_periodic --sections 1 4 --threads 1
               bash source/periodic_orbit/tests/run_all.sh \
                 --build-dir "$BUILD_DIR/orbit_matching/$backend" --backend "$backend" \
                 --systems analytic_cycle analytic_cycle_newton rossler_periodic lorenz_periodic vaidyanathan_periodic \
