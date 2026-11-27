@@ -232,6 +232,28 @@ odd-subspace orbit at N=24 from 68 to 67.999 and 68.001. Both section counts
 use the existing endpoint Fourier references and independently integrated
 closure. Neither test requires downloading an orbit to start a trace.
 
+**Discovery at a second knot.** Register the exact target parameter with the
+continuation driver. For each traced branch, a bounded
+[sample set](../verified_knot_samples.h) keeps one backend copy of the already
+verified physical anchor per hit. Finalize it against the scalar records in
+traversal order, separately for each arm. A trace that never crossed is a
+valid empty set; a bracket without an exact verified point, an incomplete
+trace, or an overflow is not. This checks resolved crossings, not tangencies
+hidden inside a step.
+
+Create a fresh discovery instance and comparison flight bound to the target
+parameter. Call `preload_verified(samples, rechart_at_target)` for each source
+branch before running any seeds. Its report maps branch/segment/point IDs to
+local exclusions. Comparison uses a canonical crossing, but the rechart callback
+receives the original verified physical anchor. When the source and target share
+the same oriented first section, restrict that crossing directly and replay
+only the remaining flights. Otherwise locate the first section normally.
+Both paths still check matching and period before activating the exclusion.
+Duplicate hits reuse an exclusion; neither new nor duplicate
+imports launch continuation. An incomplete import blocks discovery on that
+instance. The analytical test exercises one and two known cycles at 1.025;
+KS1D exercises one known orbit at 68.0005, both for M=1 and M=4.
+
 ```bash
 make -j2 test_periodic_orbit_discovered_two_cycle_branches_cpu.bin test_periodic_orbit_ks1d_discovered_branch_cpu.bin CONFIG_FILE=build_configs/config_github_ubuntu_cpu.inc
 OMP_NUM_THREADS=1 build/test_periodic_orbit_discovered_two_cycle_branches_cpu.bin --write build/two_cycle_traces

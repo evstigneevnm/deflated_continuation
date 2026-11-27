@@ -47,7 +47,20 @@ class discovered_branch
     nmfd::detail::vector_wrap<section_tests::operations, true, true> physical, scratch;
     decltype( std::declval<Fixture &>().workspace() ) trial, solved, residual;
 
+    auto rechart_at_knot( bool on_first_section = false )
+    {
+        return [this, on_first_section]( const auto &crossing, double period, state &z ) {
+            f.physical->assign( crossing, *scratch );
+            if ( on_first_section )
+                return periodic_orbit::rechart_from_first_crossing(
+                    flight, *f.layout, f.charts, *scratch, f.layout->at( 0 ).pilot_time, z
+                );
+            return periodic_orbit::rechart_orbit( flight, *f.layout, f.charts, *scratch, period, z );
+        };
+    }
+
 public:
+    using samples_type = periodic_orbit::verified_knot_samples<section_tests::operations>;
     discovered_branch( Fixture &fixture, Flight &map, typename Flight::request_type section,
                        double h, archive_trace_settings controls, typename comparison::params tolerances,
                        double matching_tol )
@@ -59,6 +72,12 @@ public:
           trial( f.workspace() ), solved( f.workspace() ), residual( check.workspace() )
     {}
     const auto &catalog() const { return knot.catalog(); }
+    auto        preload_verified( const samples_type &hits, const Fixture &source )
+    {
+        return knot.preload_verified(
+            hits, rechart_at_knot( f.layout->at( 0 ).section == source.layout->at( 0 ).section )
+        );
+    }
 
     template <class Seeds, class Prepare, class Trace>
     auto run( const Seeds &seeds, Prepare prepare, Trace trace )
@@ -77,29 +96,40 @@ public:
             if ( !v || !v->valid() ) return {};
             return v->period;
         };
-        auto rechart = [&]( const auto &crossing, double period, state &z ) {
-            f.physical->assign( crossing, *scratch );
-            return periodic_orbit::rechart_orbit( flight, *f.layout, f.charts, *scratch, period, z );
-        };
-        return knot.run_and_continue( seeds, *physical, plain, search, verify, rechart, trace );
+        return knot.run_and_continue( seeds, *physical, plain, search, verify, rechart_at_knot(), trace );
     }
 
     template <class OnVerified = periodic_orbit::no_verified_point_action>
-    auto record( container::branch_identity id, double p, std::size_t index, const state &z,
-                 unsigned max_steps = 40, OnVerified action = {} )
+    auto record(
+        container::branch_identity id, double p, std::size_t index, const state &z, unsigned max_steps = 40,
+        OnVerified action = {}, samples_type *hits = nullptr
+    )
     {
         auto verify = [&]( double lambda, const state &point ) {
             return orbit_measurement( check, point, lambda, *residual, *physical, settings );
         };
         id.id += "-M" + std::to_string( f.layout->size() ) + "-root" + std::to_string( index );
-        periodic_orbit::periodic_curve_recorder recorder( id, "RK45", f.layout->size(), verify, action );
+        if ( hits )
+            hits->begin( id.id );
+        auto observe = [&]( auto arm, auto point, double lambda, auto reason, const state &coordinates,
+                            const auto &v ) {
+            if ( hits )
+                hits->on_verified( arm, point, lambda, v.period, *physical );
+            action( arm, point, lambda, reason, coordinates, v );
+        };
+        periodic_orbit::periodic_curve_recorder recorder( id, "RK45", f.layout->size(), verify, observe );
         recorder.set_discovery_source( p, index );
         auto controls = settings;
         controls.max_steps = max_steps;
+        if ( hits )
+            controls.observation_knot = hits->parameter();
         const auto result = drive_archive( f, solvers, recorder, z, p, controls );
         std::stringstream stream;
         recorder.write( stream, result );
-        return container::read_periodic_branch( stream );
+        auto data = container::read_periodic_branch( stream );
+        if ( hits )
+            hits->finish( data );
+        return data;
     }
 };
 }

@@ -28,6 +28,9 @@ not require changes to unrelated algorithm interfaces.
   Select runtime implementations at workflow boundaries.
 - Generic algorithms consume contracts, never concrete PDE/backend types.
   Keep required methods minimal; do not provide throwing optional-method stubs.
+- No thick host<->device copies in repeated loops are allowed (only copy initial data/results or some
+  periodic data output for diagnostic/visualization). Major calculations are to be performed on the
+  selected backend without off-loading.
 - Implement each mathematical formula once. Residuals, partitions, Jacobians,
   adjoints, and stationary/transient formulations reuse kernels and prepared data.
 - Use RAII ownership and explicit non-owning lifetimes. Keep reusable workspaces

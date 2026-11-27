@@ -2,11 +2,63 @@
 #include "benchmarks/branch_archive_trace.h"
 #include "two_cycle_problem.h"
 #include <periodic_orbit/knot_discovery.h>
+#include <periodic_orbit/verified_knot_samples.h>
 
 namespace
 {
 using namespace ode_orbit_tests;
 using periodic_orbit::seed_outcome;
+
+void check_capture()
+{
+    using status = periodic_orbit::knot_capture_status;
+    auto space   = std::make_shared<operations>( 2 );
+    auto x       = buffer( space );
+    // Each inner list is a separate arm. Exercise folds and a failed exact
+    // correction whose forced replacement differs by only one ulp.
+    auto observe = [&]( std::vector<std::vector<double>> arms, bool verify, std::size_t capacity ) {
+        periodic_orbit::verified_knot_samples hits( space, 1., capacity );
+        hits.begin( "fold" );
+        nlohmann::json archive = {
+            { "id", "fold" }, { "trace_complete", true }, { "segments", nlohmann::json::array() }
+        };
+        unsigned segment = 0, point = 0;
+        for ( const auto &points : arms )
+        {
+            nlohmann::json arm = { { "id", ++segment }, { "points", nlohmann::json::array() } };
+            for ( double p : points )
+            {
+                if ( verify )
+                    hits.on_verified( segment, point, p, 4., *x );
+                arm["points"].push_back(
+                    { { "parameter", p }, { "source_index", point++ }, { "verified", verify }, { "period", 4. } }
+                );
+            }
+            archive["segments"].push_back( std::move( arm ) );
+        }
+        hits.finish( archive );
+        return hits;
+    };
+    space->assign_scalar( 2., *x );
+    const auto folded = observe( { { 0., 1., 2., 1., 0. } }, true, 2 );
+    space->assign_scalar( 0., *x );
+    require(
+        folded.complete() && folded.size() == 2 && folded.at( 0 ).source.point == 1 &&
+            folded.at( 1 ).source.point == 3 && space->norm( folded.at( 0 ).state() ) > 2.,
+        "Fold hits or owned physical anchor lost"
+    );
+    const auto allocations = guarded_memory::allocation_calls;
+    const auto absent      = observe( { { 0., .9 }, { 1.1, 2. } }, true, 1 );
+    require( absent.complete() && !absent.size(), "Crossed between unrelated arms" );
+    require( guarded_memory::allocation_calls == allocations, "Non-knot points allocated backend storage" );
+    require(
+        observe( { { 0., std::nextafter( 1., 2. ), 2. } }, true, 1 ).status() == status::missing_hit &&
+            observe( { { 2., 0. } }, true, 1 ).status() == status::missing_hit &&
+            observe( { { 0., 1. } }, false, 1 ).status() == status::missing_hit,
+        "Accepted an unresolved crossing"
+    );
+    require( observe( { { 1., 2., 1. } }, true, 1 ).status() == status::capacity_reached, "Ignored capture overflow" );
+}
 
 void check_knot( unsigned m )
 {
@@ -132,12 +184,76 @@ void check_knot( unsigned m )
              traced.launches[0].preparation == periodic_orbit::chart_root_status::rechart_failed &&
              !traced.launches[0].trace_complete && traced.launches[1].trace_complete &&
              prepared.active_count() == 2, "Failed handoff changed catalog or suppressed next launch" );
+
+    // Missing hit, wrong knot, ambiguous return period, and failed activation
+    // must block Newton even when the catalog and exclusion counts still agree.
+    using preload = periodic_orbit::preload_status;
+    for ( auto failure : { preload::unresolved_capture, preload::wrong_parameter, preload::admission_failed } )
+    {
+        const double target = failure == preload::wrong_parameter ? std::nextafter( p, 2. ) : p;
+        const auto  &root   = knot.catalog().at( 0 );
+        periodic_orbit::verified_knot_samples hits( f.physical, target, 2 );
+        hits.begin( "import" );
+        nlohmann::json points = nlohmann::json::array();
+        if ( failure == preload::unresolved_capture )
+        {
+            for ( double q : { .9, 1.1 } )
+                points.push_back( { { "parameter", q } } );
+        }
+        else
+        {
+            // An independently checked closure at 2T need not be a primitive return.
+            for ( double period : { root.period(), 2 * root.period() } )
+            {
+                hits.on_verified( 1, points.size(), target, period, root.state() );
+                points.push_back(
+                    { { "parameter", target },
+                      { "verified", true },
+                      { "period", period },
+                      { "source_index", points.size() } }
+                );
+            }
+        }
+        hits.finish(
+            { { "id", "import" },
+              { "trace_complete", true },
+              { "segments", nlohmann::json::array( { { { "id", 1 }, { "points", points } } } ) } }
+        );
+        auto blocked = [&]( bool refuse_rechart ) {
+            periodic_orbit::knot_discovery target_knot( cmp, f.coords, f.op, 2, 1e-6, 1e-6, 1e-7 );
+            auto                           activate = [&]( const X &x, double t, setup::state &z ) {
+                return !refuse_rechart && rechart( x, t, z );
+            };
+            auto report = target_knot.preload_verified( hits, activate );
+            require( report.status == failure && !report.complete(), "Failed import marked complete" );
+            if ( failure == preload::admission_failed )
+            {
+                const auto &last = report.entries.back().admission;
+                require(
+                    refuse_rechart ? last.activation == periodic_orbit::chart_root_status::rechart_failed
+                                   : last.decision == periodic_orbit::orbit_admission::inconclusive,
+                    "Wrong admission failure"
+                );
+            }
+            const auto before_calls = calls;
+            require_throws<std::logic_error>(
+                [&] { target_knot.run( scripts, *u, scripted, scripted, inspect, rechart ); },
+                "Allowed Newton after an incomplete preload"
+            );
+            require( before_calls == calls, "Called Newton after failed preload" );
+        };
+        blocked( false );
+        if ( failure == preload::admission_failed )
+            blocked( true );
+    }
 }
 }
 int main()
 {
     return section_tests::run( [] {
-        for ( unsigned m : {1u, 4u} ) check_knot( m );
+        check_capture();
+        for ( unsigned m : { 1u, 4u } )
+            check_knot( m );
         require( guarded_memory::host_bytes == 0, "Discovery transferred state vectors" );
     } );
 }

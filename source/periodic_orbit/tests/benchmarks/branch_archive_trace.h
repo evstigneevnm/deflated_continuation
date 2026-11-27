@@ -18,6 +18,7 @@ struct archive_trace_settings
     double closure_tol;
     unsigned max_steps = 40;
     double matching_tol = 1e-8;
+    std::optional<double> observation_knot = {};
 };
 
 template <class Fixture>
@@ -51,6 +52,8 @@ auto drive_archive( Fixture &f, branch_corrections<Fixture> &solvers, Recorder &
         continuation::system_operator_continuation, corrections>;
     linear_type linear( f.coords );
     container::knots<double> knots;
+    if ( settings.observation_knot )
+        knots.add_element( *settings.observation_knot );
     driver_type driver( f.coords.get(), nullptr, &solvers.log, f.op.get(), f.op.get(), &knots, &linear,
                         &solvers.ordinary, solvers.coupled, solvers.tan );
     driver.set_parameter_bounds( settings.lower, settings.upper );
